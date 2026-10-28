@@ -40,6 +40,39 @@ const MIGRATIONS = [
      at INTEGER NOT NULL
    );
    CREATE INDEX auth_failures_key ON auth_failures (key, at);`,
+  // GitHub App (one per server), its installations, manifest-flow states and
+  // webhook deliveries (each processed once).
+  `CREATE TABLE github_app (
+     id INTEGER PRIMARY KEY CHECK (id = 1),
+     app_id INTEGER NOT NULL,
+     slug TEXT NOT NULL,
+     name TEXT NOT NULL,
+     client_id TEXT NOT NULL,
+     owner_login TEXT NOT NULL,
+     html_url TEXT NOT NULL,
+     private_key_enc TEXT NOT NULL,
+     webhook_secret_enc TEXT NOT NULL,
+     client_secret_enc TEXT NOT NULL,
+     created_at INTEGER NOT NULL
+   );
+   CREATE TABLE github_installations (
+     id INTEGER PRIMARY KEY,
+     account_login TEXT NOT NULL,
+     account_type TEXT NOT NULL,
+     repository_selection TEXT NOT NULL,
+     suspended INTEGER NOT NULL DEFAULT 0,
+     created_at INTEGER NOT NULL
+   );
+   CREATE TABLE github_states (
+     state_hash TEXT PRIMARY KEY,
+     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+     expires_at INTEGER NOT NULL
+   );
+   CREATE TABLE webhook_deliveries (
+     id TEXT PRIMARY KEY,
+     event TEXT NOT NULL,
+     received_at INTEGER NOT NULL
+   );`,
 ];
 
 function open(): DatabaseSync {

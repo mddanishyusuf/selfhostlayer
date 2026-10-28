@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { PHASE_DEVELOPMENT_SERVER } from "next/constants";
 
 const securityHeaders = [
   { key: "X-Frame-Options", value: "DENY" },
@@ -8,7 +9,7 @@ const securityHeaders = [
   { key: "Strict-Transport-Security", value: "max-age=31536000" },
 ];
 
-const config: NextConfig = {
+const base: NextConfig = {
   output: "standalone",
   poweredByHeader: false,
   // The agent client and validators are TypeScript source in the monorepo.
@@ -20,4 +21,9 @@ const config: NextConfig = {
   },
 };
 
-export default config;
+// `next dev` gets its own folder: release builds (`next build`) rewrite .next,
+// and a dev server sharing it ends up with a stale cache and makes the browser
+// reload in a loop ("HMR hash mismatch").
+export default function config(phase: string): NextConfig {
+  return { ...base, distDir: phase === PHASE_DEVELOPMENT_SERVER ? ".next-dev" : ".next" };
+}

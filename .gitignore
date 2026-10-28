@@ -5,6 +5,7 @@ dist/
 .env*
 spike/out/
 .next/
+.next-dev/
 .dev/
 next-env.d.ts
 *.tsbuildinfo

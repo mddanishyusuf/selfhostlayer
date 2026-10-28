@@ -75,6 +75,15 @@ All six examples were built from clean copies the way the server will, with froz
 - **Bugs found:** app users couldn't reach their own static folder (the site folder is now 751). Re-publishing the *same* commit deleted the live folder before copying, so a failed redeploy would take the site down; every publish now goes to a new folder. Plus one `curl | grep -q` pipefail flake in the tests (fixed in two places).
 - **Risk noted:** `sslip.io` is not on the Public Suffix List, so in principle Let's Encrypt's 50-certificates-per-week limit is shared by every sslip.io user. Caddy falls back to ZeroSSL; free URLs are for trying things, custom domains (Week 3) are for production.
 
+## Day 4 result (2026-10-28)
+**Done when "connect GitHub from the panel; repos are listed": passed against a fake GitHub** (`panel/scripts/fake-github.ts`, which implements the endpoints the flow uses and verifies the app JWT with a real RSA key). The real click-through needs the user signed in to GitHub; it's ready on the VPS panel, where webhooks can also arrive.
+
+- **GitHub client** (`panel/lib/github.ts`): manifest (contents read, metadata read, statuses write; `push` events), RS256 app JWT signed with `node:crypto` (`iss` = client id, 9 minutes), installation tokens narrowed per use (repo list: metadata only), paged repo list, webhook HMAC check. `LAYER_GITHUB_WEB` / `LAYER_GITHUB_API` point it at the fake.
+- **Flow:** `/github/connect` posts the manifest from the browser (optionally to an organization) with a one-time `state` tied to the user → GitHub → `/api/github/manifest` trades the code for the credentials (private key, webhook and client secrets stored encrypted) → GitHub's install page → `/api/github/installed` confirms the installation with the app's own JWT → `/new` lists repos with search (Import arrives on Day 5).
+- **Webhook** `/api/github/webhook`: the only route without a session. Wrong signature → 401; each `X-GitHub-Delivery` processed once (7 days kept); `installation` events keep the installation list current; `push` is recorded for Day 6.
+- **Root cause of the reload loop you saw on localhost:** `next build` (every release build) and `next dev` shared `panel/.next`, so the dev server's cache went stale after each build. `next dev` now uses `.next-dev` (phase-based `next.config.ts`). The tour's new reload guard caught it straight away.
+- **Tests:** 191 unit tests; the browser tour runs the whole GitHub flow against the fake with `TOUR_GITHUB=1`, plus signed, replayed and forged webhooks.
+
 ## Known limits
 - The VM has no public IP, so GitHub can't deliver webhooks to it: push-to-deploy is tested on the VPS. Everything else works in the VM.
 - Builds have outbound network access (npm needs it). A malicious install script stays inside the app user's sandbox but can make outbound connections during the build. A per-app "no outbound network" option comes later.

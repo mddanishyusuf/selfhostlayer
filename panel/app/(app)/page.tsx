@@ -1,6 +1,7 @@
 import { ArrowUpRight, GitBranch, ServerCrash } from "lucide-react";
+import Link from "next/link";
 import { Suspense } from "react";
-import { Button, Card, Skeleton, StatusDot, cx } from "@/components/ui";
+import { Card, Skeleton, StatusDot, cx } from "@/components/ui";
 import { agent, type AppSummary, type SystemInfo } from "@/lib/agent";
 
 export const dynamic = "force-dynamic";
@@ -118,9 +119,9 @@ async function Apps() {
     return null;
   }
   const connect = (
-    <Button variant="secondary" disabled title="Arrives in Week 2" className="h-8 px-3 text-[13px]">
-      <GitBranch className="size-3.5" aria-hidden /> Connect GitHub
-    </Button>
+    <Link href="/new" className="inline-flex h-8 items-center gap-2 rounded-md border border-border bg-background px-3 text-[13px] font-medium transition-colors duration-150 hover:bg-hover">
+      <GitBranch className="size-3.5" aria-hidden /> New project
+    </Link>
   );
 
   if (apps.length === 0) {

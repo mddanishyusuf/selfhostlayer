@@ -8,6 +8,7 @@
 import { spawn } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { createHmac, randomUUID } from "node:crypto";
 import { currentCounter, totpAt } from "../lib/totp.ts";
 
 const [baseArg, tokenArg, outArg] = process.argv.slice(2);
@@ -163,6 +164,50 @@ await setViewport(1280, 820, true);
 await go("/login");
 await waitForPath("/");
 console.log("  ✓ signed in again; /login redirects to the dashboard");
+
+// With a fake GitHub (panel/scripts/fake-github.ts): TOUR_GITHUB=1 TOUR_WEBHOOK_SECRET=<its secret>.
+if (process.env.TOUR_GITHUB === "1") {
+  console.log("GitHub");
+  await setViewport(1280, 820);
+  await go("/new");
+  await waitForPath("/github/connect");
+  await screenshot("github-connect");
+  // The form that posts to GitHub (not the sign-out form in the top bar).
+  await click('form[action^="http"] button[type=submit]');
+  // Panel → GitHub (create app) → panel (manifest) → GitHub (install) → panel (installed) → /new
+  await waitForPath("/new");
+  await waitFor(`document.body.innerText.includes("selfhostlayer-examples")`, "repository list");
+  await screenshot("new-project-repos");
+  await go("/github/connect");
+  await waitFor(`document.body.innerText.includes("Connected")`, "connected state");
+  await screenshot("github-connected");
+
+  const secret = process.env.TOUR_WEBHOOK_SECRET ?? "";
+  const deliver = async (signatureSecret: string, delivery: string) => {
+    const payload = JSON.stringify({ action: "created", installation: { id: 4242, account: { login: "mddanishyusuf", type: "User" }, repository_selection: "selected", suspended_at: null } });
+    const res = await fetch(new URL("/api/github/webhook", base), {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-GitHub-Event": "installation",
+        "X-GitHub-Delivery": delivery,
+        "X-Hub-Signature-256": `sha256=${createHmac("sha256", signatureSecret).update(payload).digest("hex")}`,
+      },
+      body: payload,
+    });
+    return { status: res.status, body: (await res.json()) as { duplicate?: boolean } };
+  };
+  const id = randomUUID();
+  const first = await deliver(secret, id);
+  if (first.status !== 202) throw new Error(`signed webhook: expected 202, got ${first.status}`);
+  console.log("  ✓ signed webhook accepted (202)");
+  const again = await deliver(secret, id);
+  if (!again.body.duplicate) throw new Error("replayed webhook wasn't recognized as a duplicate");
+  console.log("  ✓ replayed delivery ignored");
+  const forged = await deliver("wrong-secret", randomUUID());
+  if (forged.status !== 401) throw new Error(`forged webhook: expected 401, got ${forged.status}`);
+  console.log("  ✓ webhook with a bad signature refused (401)");
+}
 
 console.log("Guards");
 await send("Network.enable");
