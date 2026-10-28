@@ -1,9 +1,12 @@
 // Where the panel finds its state. Production values come from the systemd
-// unit; anything unset falls back to a local ./.dev folder for `next dev`.
+// unit; anything unset falls back to ~/.selfhostlayer-dev for `next dev`.
+// That folder must stay outside the project: `next dev` watches the project,
+// and SQLite writing its WAL there makes every page reload itself forever.
+import { homedir } from "node:os";
 import { join } from "node:path";
 
 const isProd = process.env.NODE_ENV === "production";
-const devDir = join(process.cwd(), ".dev");
+const devDir = process.env.LAYER_DEV_DIR ?? join(homedir(), ".selfhostlayer-dev");
 
 export const config = {
   isProd,
