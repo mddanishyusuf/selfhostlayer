@@ -49,6 +49,11 @@ All six examples were built from clean copies the way the server will, with froz
 - **Bind address:** Astro's Node adapter and Nuxt/Nitro read `HOST`, not `HOSTNAME`, so the per-color env file gets `HOST=127.0.0.1` too (otherwise they may bind to `localhost`/IPv6 and fail the 127.0.0.1 health check).
 - **Tarball URL:** `api.github.com/repos/<owner>/<repo>/tarball/<sha>` answers with a 302 to `codeload.github.com`. The agent follows exactly that redirect and refuses any other host.
 
+## Findings from the real VPS (Day 1)
+1GB Hetzner box, Ubuntu 26.04.1, x86_64, 1 CPU. Real Let's Encrypt certificate for `37-27-25-45.sslip.io` on the first try. `verify.sh` and the blue/green test pass (≈170 requests per switch, 0 failed). Two bugs that the VM couldn't show:
+- **Installer order:** `caddy` was added to `layer-web` only in the panel-site step, after the caddy-user health check, so a fresh box failed at "Starting services". Now `setup_users` adds it, before Caddy restarts.
+- **`RestrictSUIDSGID=yes` breaks GNU tar on 26.04:** systemd blocks `openat2()` with ENOSYS under that setting, and tar there uses `openat2()` without falling back ("Cannot open: Function not implemented"). Removed from the agent unit. **Day 2 impact:** `source.fetch` unpacks as the app user; either its transient unit leaves out `RestrictSUIDSGID`, or the unpacking happens in Node (whose `fs` uses `openat`) rather than with the tar binary. App runtime units keep it.
+
 ## Known limits
 - The VM has no public IP, so GitHub can't deliver webhooks to it: push-to-deploy is tested on the VPS. Everything else works in the VM.
 - Builds have outbound network access (npm needs it). A malicious install script stays inside the app user's sandbox but can make outbound connections during the build. A per-app "no outbound network" option comes later.
