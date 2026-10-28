@@ -36,7 +36,7 @@ export interface Dispatcher {
 }
 
 export function createDispatcher(ctx: Context, audit: Audit, table: ActionTable = ACTION_TABLE): Dispatcher {
-  const lock = new Lock();
+  const locks = { global: new Lock(), build: new Lock() };
 
   async function handleLine(line: string, makeIO: (id: string) => CallIO = () => NO_IO): Promise<Response> {
     let req: unknown;
@@ -68,7 +68,7 @@ export function createDispatcher(ctx: Context, audit: Audit, table: ActionTable 
     try {
       const io = makeIO(id);
       const run = () => def.run(p, ctx, io);
-      const result = await (def.mutates ? lock.run(run) : run());
+      const result = await (def.mutates ? locks[def.lock ?? "global"].run(run) : run());
       response = { id, ok: true, result };
     } catch (err) {
       if (err instanceof ValidationError) {

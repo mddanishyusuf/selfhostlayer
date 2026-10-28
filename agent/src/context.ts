@@ -17,9 +17,17 @@ export interface CallIO {
 
 export const NO_IO: CallIO = { emit: () => {}, signal: new AbortController().signal };
 
+export type LockName = "global" | "build";
+
 export interface ActionDef {
-  /** Mutating actions run one at a time under the global lock. */
+  /** Mutating actions run one at a time under a lock: "global" unless `lock` says otherwise. */
   mutates: boolean;
+  /**
+   * "build" for long-running builds: one build at a time, without holding the
+   * global lock, so a 10-minute build never blocks proxy.set or unit.* for
+   * other apps.
+   */
+  lock?: LockName;
   run: (params: Params, ctx: Context, io: CallIO) => Promise<unknown>;
   /** What the audit log records instead of the raw params (e.g. env keys, never values). */
   redact?: (params: Params) => unknown;

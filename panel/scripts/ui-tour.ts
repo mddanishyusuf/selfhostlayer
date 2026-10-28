@@ -38,9 +38,13 @@ const ws = new WebSocket(target.webSocketDebuggerUrl);
 await new Promise((r) => ws.addEventListener("open", r, { once: true }));
 let nextId = 0;
 const pending = new Map<number, (v: any) => void>();
+// Full page loads of the top frame. A page that reloads by itself (an HMR loop,
+// a redirect loop) shows up here even when each load looks fine on its own.
+let topNavigations = 0;
 ws.addEventListener("message", (e) => {
   const msg = JSON.parse(String(e.data));
   if (msg.id && pending.has(msg.id)) pending.get(msg.id)!(msg);
+  if (msg.method === "Page.frameNavigated" && !msg.params.frame.parentId) topNavigations++;
 });
 async function send(method: string, params: Record<string, unknown> = {}): Promise<any> {
   const id = ++nextId;
@@ -64,9 +68,18 @@ async function waitFor(expression: string, what: string, timeoutMs = 15000) {
 }
 const waitForPath = (path: string) => waitFor(`location.pathname === ${JSON.stringify(path)} && document.readyState === "complete"`, path);
 
+/** Fails if the page keeps navigating on its own while we do nothing. */
+async function assertSettled(where: string) {
+  const before = topNavigations;
+  await sleep(1500);
+  if (topNavigations !== before) {
+    throw new Error(`${where}: the page reloaded ${topNavigations - before} time(s) by itself within 1.5s (reload loop?)`);
+  }
+}
+
 let shot = 0;
 async function screenshot(name: string) {
-  await sleep(400); // let transitions settle
+  await assertSettled(name);
   const { data } = await send("Page.captureScreenshot", { format: "png" });
   const file = join(outDir, `${String(++shot).padStart(2, "0")}-${name}.png`);
   writeFileSync(file, Buffer.from(data, "base64"));

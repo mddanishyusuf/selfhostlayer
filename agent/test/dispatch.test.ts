@@ -40,6 +40,16 @@ const table: ActionTable = {
     run: async () => ({ ok: true }),
     redact: (p) => ({ slug: p.slug, keys: Object.keys(p.vars as object) }),
   },
+  "release.point": {
+    mutates: true,
+    lock: "build",
+    run: async (p) => {
+      order.push(`start build ${p.slug}`);
+      await new Promise((r) => setTimeout(r, 40));
+      order.push(`end build ${p.slug}`);
+      return {};
+    },
+  },
 };
 
 const call = async (req: unknown) => dispatcher.handleLine(typeof req === "string" ? req : JSON.stringify(req));
@@ -129,6 +139,22 @@ describe("locking", () => {
       call({ id: "2", action: "app.create", params: { slug: "fast" } }),
     ]);
     expect(order).toEqual(["start slow", "end slow", "start fast", "end fast"]);
+  });
+
+  it("doesn't let a build hold up global actions", async () => {
+    await Promise.all([
+      call({ id: "1", action: "release.point", params: { slug: "big" } }),
+      call({ id: "2", action: "app.create", params: { slug: "fast" } }),
+    ]);
+    expect(order).toEqual(["start build big", "start fast", "end fast", "end build big"]);
+  });
+
+  it("runs builds one at a time", async () => {
+    await Promise.all([
+      call({ id: "1", action: "release.point", params: { slug: "one" } }),
+      call({ id: "2", action: "release.point", params: { slug: "two" } }),
+    ]);
+    expect(order).toEqual(["start build one", "end build one", "start build two", "end build two"]);
   });
 
   it("keeps going after a failed mutating action", async () => {

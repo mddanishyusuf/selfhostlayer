@@ -1,6 +1,55 @@
 # Self Host Layer
 
-Vercel on your own VPS, without Docker. Private while in development. Read [CLAUDE.md](CLAUDE.md) for the product and [PLAN-WEEK1.md](PLAN-WEEK1.md) for the current plan.
+Vercel on your own VPS, without Docker. Private while in development. Read [CLAUDE.md](CLAUDE.md) for the product and [PLAN-WEEK2.md](PLAN-WEEK2.md) for the current plan.
+
+## Install on a server
+
+Needs a fresh Ubuntu 24.04/26.04 or Debian 12 box (x86_64 or arm64, systemd, 10GB free disk; 1GB RAM works) with ports 80 and 443 free.
+
+While the repo is private there's no public download, so build the release locally and copy it over:
+
+```sh
+bash scripts/build-installer.sh && bash scripts/build-release.sh 0.1.0
+scp dist/install.sh dist/layer-0.1.0.tar.gz root@<server>:
+ssh root@<server> bash install.sh --from-tarball layer-0.1.0.tar.gz
+```
+
+It finishes with a box showing the panel URL (`https://<ip-with-dashes>.sslip.io`, a real Let's Encrypt certificate) and a one-time setup token. Open the URL, paste the token, create the admin account and turn on 2FA. Re-running the installer is safe: it repairs the setup, installs the given release, and prints a new token only until setup is done.
+
+| Flag | Effect |
+|---|---|
+| `--domain panel.example.com` | Use your own domain for the panel (its DNS must point at the server) |
+| `--yes` | Answer yes to prompts; with an SSH key present, this turns off SSH password login |
+| `--no-harden-ssh` | Leave SSH settings alone |
+| `--internal-tls` | Caddy's local CA instead of Let's Encrypt (test boxes without a public IP) |
+
+### What's on the box
+
+| Where | What |
+|---|---|
+| `/opt/layer/releases/<version>/`, `/opt/layer/current` | The panel, agent and CLI. Read-only, root-owned. The last 3 releases are kept |
+| `/opt/layer/node/<version>/` | Node runtimes (checksum-verified official builds), shared by all apps |
+| `/srv/apps/<app>/` | Each app's releases and `data/`, owned by its own Linux user `app-<app>` |
+| `/etc/layer/apps/<app>/` | Each app's env files (root-only `app.env`, plus `blue.env` / `green.env` with its ports) |
+| `/etc/systemd/system/app-<app>@.service` | Each app's sandboxed unit; instances `blue` and `green` |
+| `/etc/caddy/sites/<app>.caddy` | Each app's Caddy site; `_panel.caddy` is the panel |
+| `/var/lib/layer/panel.db` | Panel state (SQLite, owned by the `layer` user) |
+| `/var/log/layer/audit.jsonl` | Every privileged action, root-only |
+
+On the server, `layer ps`, `layer status <app>`, `layer logs <app> -f` and `layer info` show what the panel shows. Underneath they are `systemctl` and `journalctl` on `app-<app>@*`.
+
+### Remove the panel (your apps keep running)
+
+Apps are plain systemd units and Caddy files, so they don't need the panel. To remove only the panel and agent:
+
+```sh
+systemctl disable --now layer-panel layer-agent
+rm /etc/systemd/system/layer-panel.service /etc/systemd/system/layer-agent.service
+rm /etc/caddy/sites/_panel.caddy /usr/local/bin/layer
+systemctl daemon-reload && systemctl reload caddy
+```
+
+Keep `/opt/layer/node/` (the apps' units run Node from there), `/srv/apps/`, `/etc/layer/apps/`, `/etc/caddy/sites/` and the `app-*` units. Optionally delete the panel's own files afterwards: `/opt/layer/releases`, `/opt/layer/current`, `/var/lib/layer` and `/etc/layer/secret.key`.
 
 ## Develop
 
