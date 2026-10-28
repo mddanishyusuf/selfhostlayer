@@ -5,7 +5,7 @@ import type { ActionTable, Context, Params } from "../context.ts";
 import { ActionError } from "../errors.ts";
 import { BIN } from "../exec.ts";
 import { childOf, ensureDir, writeFileAtomic } from "../fsutil.ts";
-import { assertDomains, renderCaddySite, renderStaticSite } from "../templates/caddy-site.ts";
+import { assertDomains, assertRedirects, renderCaddySite, renderStaticSite } from "../templates/caddy-site.ts";
 import { parseColorEnvPort } from "../templates/env-file.ts";
 import { appLayout } from "./app.ts";
 
@@ -28,13 +28,13 @@ async function proxySet(params: Params, ctx: Context) {
     if (!existsSync(root)) throw new ActionError("not_found", `${slug} has no published static site yet (run static.publish first)`);
     if (params.spa !== undefined && typeof params.spa !== "boolean") throw new ValidationError("spa", "must be true or false");
     const spa = params.spa === true;
-    content = renderStaticSite({ slug, domains, spa, root });
+    content = renderStaticSite({ slug, domains, spa, root, redirects: assertRedirects(params.redirects, domains) });
     target = { static: true, spa };
   } else {
     const color = assertColor(params.color);
     const port = existsSync(app.colorEnv(color)) ? parseColorEnvPort(readFileSync(app.colorEnv(color), "utf8")) : null;
     if (port === null) throw new ActionError("not_found", `no port for ${color}`);
-    content = renderCaddySite({ slug, color, port, domains });
+    content = renderCaddySite({ slug, color, port, domains, redirects: assertRedirects(params.redirects, domains) });
     target = { color, port };
   }
 

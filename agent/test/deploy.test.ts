@@ -28,6 +28,19 @@ describe("renderCaddySite", () => {
     expect(parseLiveMarker(site)).toEqual({ slug: "hello", color: "green", port: 4001 });
   });
 
+  it("adds a permanent redirect block for each redirect host", () => {
+    const site = renderCaddySite({ slug: "hello", color: "blue", port: 4000, domains: ["hello.com"], redirects: [{ from: "www.hello.com", to: "hello.com" }] });
+    expect(site).toContain("\nwww.hello.com {\n\tredir https://hello.com{uri} permanent\n}\n");
+    expect(site.indexOf("hello.com {")).toBeLessThan(site.indexOf("www.hello.com {"));
+  });
+
+  it("rejects redirects to foreign hosts and hosts listed twice", () => {
+    const base = { slug: "hello", color: "blue" as const, port: 4000, domains: ["hello.com"] };
+    expect(() => renderCaddySite({ ...base, redirects: [{ from: "www.hello.com", to: "evil.com" }] })).toThrow(/site's domains/);
+    expect(() => renderCaddySite({ ...base, redirects: [{ from: "hello.com", to: "hello.com" }] })).toThrow(/twice/);
+    expect(() => renderCaddySite({ ...base, redirects: [{ from: "www.hello.com {", to: "hello.com" }] })).toThrow(/from/);
+  });
+
   it("validates domains", () => {
     const base = { slug: "hello", color: "blue" as const, port: 4000 };
     expect(() => renderCaddySite({ ...base, domains: [] })).toThrow(/domains/);

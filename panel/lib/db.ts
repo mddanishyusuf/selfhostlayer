@@ -115,6 +115,21 @@ const MIGRATIONS = [
      value_enc TEXT NOT NULL,
      PRIMARY KEY (project_id, key)
    );`,
+  // Domains per project: the free host, custom domains (live once their DNS
+  // points here) and redirect hosts such as www.
+  `CREATE TABLE project_domains (
+     id INTEGER PRIMARY KEY,
+     project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+     host TEXT NOT NULL UNIQUE,
+     role TEXT NOT NULL CHECK (role IN ('free', 'primary', 'redirect')),
+     redirect_to TEXT,
+     status TEXT NOT NULL CHECK (status IN ('pending', 'active')),
+     message TEXT,
+     created_at INTEGER NOT NULL,
+     verified_at INTEGER
+   );
+   INSERT INTO project_domains (project_id, host, role, status, created_at, verified_at)
+     SELECT p.id, j.value, 'free', 'active', p.created_at, p.created_at FROM projects p, json_each(p.domains) j;`,
 ];
 
 function open(): DatabaseSync {

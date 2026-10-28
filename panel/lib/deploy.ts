@@ -12,6 +12,7 @@ import { agent } from "./agent";
 import { config } from "./config";
 import { db, now } from "./db";
 import { installationToken } from "./github";
+import { servingConfig } from "./domains";
 import { getApp } from "./github-store";
 import { latestCommit } from "./github-repo";
 import { getProject, projectEnv, type Project } from "./projects";
@@ -216,6 +217,12 @@ function finish(id: number, status: DeployStatus, error: string | null, color?: 
   events.emit(`status:${id}`, status);
 }
 
+/** Active domains and redirects; the free host as a fallback for projects from before domains existed. */
+function serving(p: Project): { domains: string[]; redirects: { from: string; to: string }[] } {
+  const config = servingConfig(p.id);
+  return config.domains.length ? config : { domains: p.domains, redirects: [] };
+}
+
 /** A read-only token for exactly this repo, valid for an hour. undefined for public repos without the app. */
 async function repoToken(project: Project): Promise<string | undefined> {
   if (!project.installationId) return undefined;
@@ -294,7 +301,7 @@ async function run(id: number): Promise<void> {
     if (p.runtime.kind === "static") {
       setStatus("switching", "switch");
       await agent("static.publish", { slug: p.slug, sha: d.sha, rootDir: p.rootDir, outputDir: p.runtime.outputDir });
-      await agent("proxy.set", { slug: p.slug, domains: p.domains, static: true, spa: p.runtime.spa });
+      await agent("proxy.set", { slug: p.slug, ...serving(p), static: true, spa: p.runtime.spa });
       color = "static";
     } else {
       setStatus("starting", "start");
@@ -313,7 +320,7 @@ async function run(id: number): Promise<void> {
       const started = await agent<{ readyMs: number; port: number }>("unit.start", { slug: p.slug, color: idle, healthPath: p.runtime.healthPath, timeoutSec: 120 });
       log(id, `Healthy on port ${started.port} after ${(started.readyMs / 1000).toFixed(1)}s\n`);
       setStatus("switching", "switch");
-      await agent("proxy.set", { slug: p.slug, domains: p.domains, color: idle });
+      await agent("proxy.set", { slug: p.slug, ...serving(p), color: idle });
       if (status.live) {
         // Let requests already on the old version finish.
         await new Promise((r) => setTimeout(r, DRAIN_MS));
@@ -325,7 +332,7 @@ async function run(id: number): Promise<void> {
 
     if (steps.length) steps[steps.length - 1]!.ms = Date.now() - stepStart;
     update(id, { steps: JSON.stringify(steps) });
-    log(id, `\n\x1b[32m✓ Ready\x1b[0m at ${p.domains.map((h) => `https://${h}`).join(", ")}\n`);
+    log(id, `\n\x1b[32m✓ Ready\x1b[0m at ${serving(p).domains.map((h) => `https://${h}`).join(", ")}\n`);
     finish(id, "ready", null, color);
   } catch (err) {
     if (steps.length) steps[steps.length - 1]!.ms = Date.now() - stepStart;

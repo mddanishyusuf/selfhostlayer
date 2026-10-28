@@ -170,6 +170,23 @@ if grep -qE "^$slug +blue" <<<"$ps_out"; then pass "layer ps shows $slug live on
 if grep -q "aaaaaaa" <<<"$status_out"; then pass "layer status shows the release"; else fail "layer status shows the release"; fi
 if systemctl is-enabled --quiet "app-$slug@blue"; then pass "live color starts on boot (enabled)"; else fail "live color starts on boot (enabled)"; fi
 
+echo "Redirect domains"
+expect "proxy.set adds www.$domain as a redirect" \
+  "$(call proxy.set "{\"slug\":\"$slug\",\"color\":\"blue\",\"domains\":[\"$domain\"],\"redirects\":[{\"from\":\"www.$domain\",\"to\":\"$domain\"}]}")" '.ok'
+redirect_headers=""
+for _ in $(seq 1 20); do
+  redirect_headers="$(curl -sk --max-time 5 -o /dev/null -D - --resolve "www.$domain:443:127.0.0.1" "https://www.$domain/some/path?x=1")"
+  grep -qi "^location: https://$domain/some/path?x=1" <<<"$redirect_headers" && break
+  sleep 0.5
+done
+if grep -qiE "^HTTP/[0-9.]+ 30[18]" <<<"$redirect_headers" && grep -qi "^location: https://$domain/some/path?x=1" <<<"$redirect_headers"; then
+  pass "https://www.$domain/… redirects permanently to https://$domain/…, keeping path and query"
+else
+  fail "www redirect" "$redirect_headers"
+fi
+expect "a redirect to a host that isn't the site's is refused" \
+  "$(call proxy.set "{\"slug\":\"$slug\",\"color\":\"blue\",\"domains\":[\"$domain\"],\"redirects\":[{\"from\":\"www.$domain\",\"to\":\"evil.internal\"}]}")" '.error.code == "invalid_params"'
+
 echo "Delete"
 expect "app.delete $slug" "$(call app.delete "{\"slug\":\"$slug\",\"keepData\":false}")" '.ok'
 if [[ ! -e "/etc/caddy/sites/$slug.caddy" && ! -e "/etc/systemd/system/app-$slug@.service" ]]; then

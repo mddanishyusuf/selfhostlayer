@@ -6,6 +6,7 @@ import { installationToken } from "./github";
 import { getApp } from "./github-store";
 import { latestCommit, projectFiles, repoInfo } from "./github-repo";
 import { pickNodeVersion } from "./node-releases";
+import { addDomain } from "./domains";
 import { createProject, slugFor, slugTaken, type Project } from "./projects";
 
 const ROOT_DIR = /^(?:[A-Za-z0-9._-]+\/)*[A-Za-z0-9._-]+$/;
@@ -56,5 +57,6 @@ export async function importRepo(input: ImportInput): Promise<{ project: Project
     memoryMb: 512,
     autoDeploy: true,
   });
+  addDomain(project.id, project.domains[0]!, "free", null, "active");
   return { project, detected, warnings };
 }
