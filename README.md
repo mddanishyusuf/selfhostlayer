@@ -20,9 +20,22 @@ yarn build:installer   # → dist/install.sh (single file)
 | `packages/protocol/` | Action allowlist and validators shared by agent and panel |
 | `spike/` | Throwaway experiments to run on a test VPS |
 
+## Test in a local Ubuntu VM
+
+Install [Multipass](https://canonical.com/multipass) with `brew install --cask multipass`. Then:
+
+```sh
+scripts/dev-vm.sh up        # Ubuntu 24.04 VM, 2 CPU / 2GB RAM like a small VPS
+scripts/dev-vm.sh spike     # run the Day 1 sandbox spike inside it
+scripts/dev-vm.sh install   # build and run the installer inside it
+scripts/dev-vm.sh reset     # start again from a fresh box
+```
+
+Use `LAYER_VM_IMAGE=26.04` to test the other Ubuntu release. The VM has no public IP, so anything that needs real Let's Encrypt certificates still needs a real VPS.
+
 ## Day 1 spike: Next.js inside the sandbox
 
-On a throwaway Ubuntu 24.04/26.04 box:
+On a throwaway Ubuntu 24.04/26.04 box (or use `scripts/dev-vm.sh spike`):
 
 ```sh
 node agent/scripts/render-unit.ts --slug hello --node 24.13.1 --write .next/cache \
