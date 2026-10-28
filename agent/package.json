@@ -1,0 +1,9 @@
+{
+  "name": "@layer/agent",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@layer/protocol": "0.0.0"
+  }
+}

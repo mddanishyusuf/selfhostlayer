@@ -166,7 +166,7 @@ CapabilityBoundingSet=
 AmbientCapabilities=
 ProtectSystem=strict
 ProtectHome=yes
-ReadWritePaths=/srv/apps/piqo/data /srv/apps/piqo/%i/.next/cache
+ReadWritePaths=/srv/apps/piqo/data -/srv/apps/piqo/%i/.next/cache
 PrivateTmp=yes
 PrivateDevices=yes
 ProtectKernelTunables=yes
@@ -176,14 +176,14 @@ ProtectControlGroups=yes
 ProtectClock=yes
 ProtectHostname=yes
 ProtectProc=invisible
-ProcSubset=pid
 RestrictNamespaces=yes
 RestrictRealtime=yes
 RestrictSUIDSGID=yes
 LockPersonality=yes
-RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX AF_NETLINK
 SystemCallFilter=@system-service
 SystemCallFilter=~@privileged @resources
+SystemCallErrorNumber=EPERM
 SystemCallArchitectures=native
 
 [Install]
@@ -193,7 +193,7 @@ Notes:
 - **Order of the env files:** systemd lets the later file win, so `blue.env`/`green.env` always override `PORT`.
 - **Never `MemoryDenyWriteExecute=yes`.** V8's JIT needs writable, executable memory.
 - **Next.js writes at runtime** to `.next/cache` (ISR, image optimization). Other frameworks get their write paths from the framework detector.
-- **Test on Day 1:** confirm `os.networkInterfaces()` works without `AF_NETLINK`.
+- **`AF_NETLINK` is allowed** because `os.networkInterfaces()` needs it. **No `ProcSubset=pid`**, because it hides `/proc/cpuinfo` and `os.cpus()` would return `[]`. **`SystemCallErrorNumber=EPERM`** makes a blocked syscall fail with an error instead of killing the process with SIGSYS. The source of truth is `agent/src/templates/app-unit.ts` and its snapshot test.
 - **Known limit:** apps on `127.0.0.1` can still connect to each other's ports (documented in CLAUDE.md).
 
 ## Day by day

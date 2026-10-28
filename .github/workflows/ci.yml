@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: yarn
+      - run: yarn install --frozen-lockfile
+      - run: yarn typecheck
+      - run: yarn test
+
+  shell:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: shellcheck
+        run: shellcheck --external-sources installer/install.sh installer/lib/*.sh scripts/*.sh spike/*.sh
+      - name: build single-file installer
+        run: bash scripts/build-installer.sh "ci-${GITHUB_SHA::7}"
+      - name: shellcheck bundled installer
+        run: shellcheck dist/install.sh
+      - name: installer refuses to run without root
+        run: |
+          if bash dist/install.sh 2>err.txt; then echo "should have failed"; exit 1; fi
+          grep -q "run as root" err.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: install.sh
+          path: dist/install.sh
