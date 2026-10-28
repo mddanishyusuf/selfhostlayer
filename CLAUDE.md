@@ -1,6 +1,6 @@
 # Self Host Layer: "Vercel on your own VPS, without Docker"
 
-> Planning done, Week 1 starting. When you (Claude) open this folder, read this file, [PLAN-WEEK1.md](PLAN-WEEK1.md) and [RESEARCH.md](RESEARCH.md) before suggesting anything.
+> Week 1 built, Week 2 in progress. When you (Claude) open this folder, read this file, [PLAN-WEEK2.md](PLAN-WEEK2.md), [PLAN-WEEK1.md](PLAN-WEEK1.md) and [RESEARCH.md](RESEARCH.md) before suggesting anything.
 >
 > **Name:** Self Host Layer. Domain **selfhostlayer.com** (owned). Repo: https://github.com/mddanishyusuf/selfhostlayer. The internal identifier is **`layer`**: CLI `layer`, Linux user `layer`, paths `/opt/layer`, `/etc/layer`, `/var/lib/layer`, units `layer-agent` / `layer-panel`, manifest `layer.yaml`.
 
@@ -114,7 +114,7 @@ The panel should feel like Vercel's dashboard: calm, monochrome, fast. Take the 
 
 ## MVP plan (~6 weeks, solo)
 - **Week 1:** Installer, root agent, panel user, systemd unit template, panel shell (setup token + 2FA). Detailed day-by-day plan in [PLAN-WEEK1.md](PLAN-WEEK1.md).
-- **Week 2:** GitHub App connect, import repo, detect framework, `build.run` as a sandboxed transient unit into `releases/<sha>`, blue/green start, logs streamed.
+- **Week 2:** GitHub App (manifest flow), tarball fetch, framework detection, sandboxed builds, deploy pipeline, push-to-deploy, free `<app>.<panel-host>` URLs. Plan: [PLAN-WEEK2.md](PLAN-WEEK2.md).
 - **Week 3:** Domains + auto TLS + DNS verification, env vars, rollback, push-to-deploy webhook.
 - **Week 4:** SQLite/Redis services, backups to S3/R2, crons, alerts.
 - **Week 5:** Marketplace v0: manifest format plus 3 first-party apps (Piqo self-host, maillayer-lite, post scheduler).
@@ -131,6 +131,6 @@ The panel should feel like Vercel's dashboard: calm, monochrome, fast. Take the 
 8. **UI:** Vercel-like (see UI design above).
 
 ## Status
-**2026-10-28:** Brainstorm done, all open questions decided except the license (deferred). Repo is **private** (github.com/mddanishyusuf/selfhostlayer). **Day 1 done:** skeleton, validators, unit template, installer preflight, CI. The sandbox spike passed in a local VM (safety score 1.3, 42MB idle; see [PLAN-WEEK1.md](PLAN-WEEK1.md#day-1-spike-result-2026-10-28)). Local testing uses Multipass via `scripts/dev-vm.sh` (macOS needs the Local Network permission for VS Code). **Day 2 done:** installer server setup, verified on Ubuntu 24.04 and 26.04 ([results](PLAN-WEEK1.md#day-2-result-2026-10-28)). **Day 3 done:** root agent with the first 5 actions, 41-check socket e2e, agent score 3.1 ([results](PLAN-WEEK1.md#day-3-result-2026-10-28)). **Day 4 done:** blue/green deploy and rollback under traffic with 0 failed requests, all 14 agent actions, `layer` CLI ([results](PLAN-WEEK1.md#day-4-result-2026-10-28)). **Day 5 done:** panel (setup token → admin → TOTP → recovery codes → dashboard), full installer with release tarball, browser tour in CI; idle PSS 172MB ([results](PLAN-WEEK1.md#day-5-result-2026-10-28)). Next step: Day 6 (wrap Week 1: x86 run on a real VPS, docs, release layout notes) then Week 2 (GitHub App + builds).
+**2026-10-28:** Brainstorm done, all open questions decided except the license (deferred). Repo is **private** (github.com/mddanishyusuf/selfhostlayer). **Day 1 done:** skeleton, validators, unit template, installer preflight, CI. The sandbox spike passed in a local VM (safety score 1.3, 42MB idle; see [PLAN-WEEK1.md](PLAN-WEEK1.md#day-1-spike-result-2026-10-28)). Local testing uses Multipass via `scripts/dev-vm.sh` (macOS needs the Local Network permission for VS Code). **Day 2 done:** installer server setup, verified on Ubuntu 24.04 and 26.04 ([results](PLAN-WEEK1.md#day-2-result-2026-10-28)). **Day 3 done:** root agent with the first 5 actions, 41-check socket e2e, agent score 3.1 ([results](PLAN-WEEK1.md#day-3-result-2026-10-28)). **Day 4 done:** blue/green deploy and rollback under traffic with 0 failed requests, all 14 agent actions, `layer` CLI ([results](PLAN-WEEK1.md#day-4-result-2026-10-28)). **Day 5 done:** panel (setup token → admin → TOTP → recovery codes → dashboard), full installer with release tarball, browser tour in CI; idle PSS 172MB ([results](PLAN-WEEK1.md#day-5-result-2026-10-28)). **Week 2 planned** ([PLAN-WEEK2.md](PLAN-WEEK2.md)): one GitHub App per server, tarball fetch, `<app>.<panel-host>` URLs, push-to-deploy in Week 2, examples in github.com/mddanishyusuf/selfhostlayer-examples. Test VPS: 1GB.
 
 **Launch-time tasks (not now):** choose the license plus CLA, make the repo public (or publish releases somewhere public), and serve `get.selfhostlayer.com` from GitHub Pages (needs a public repo or GitHub Pro). Deploy it from tagged releases only, with a verified domain and HTTPS enforced.
