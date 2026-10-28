@@ -18,6 +18,8 @@ Environment=PATH=/opt/layer/node/24.11.0/bin:/usr/bin:/bin
 ExecStart=/opt/layer/node/24.11.0/bin/node node_modules/next/dist/bin/next start -H 127.0.0.1
 Restart=on-failure
 RestartSec=2
+# Next.js and others exit 143 (128 + SIGTERM) when stopped; that's a clean stop.
+SuccessExitStatus=143
 SyslogIdentifier=app-piqo-%i
 UMask=0077
 

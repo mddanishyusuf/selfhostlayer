@@ -94,6 +94,15 @@ All six examples were built from clean copies the way the server will, with froz
 - **Bugs found:** the live log never updated, because Next.js gave the server action and the `/events` route separate copies of the deploy module (two event buses). The bus and queue now live on `globalThis`, like the DB. Plus `--apps-domain` for boxes behind NAT (the VM uses `internal`).
 - **Tooling note:** `multipass exec` hangs (burning CPU) in background jobs even with stdin closed; VM steps run in the foreground.
 
+## Day 6 result (2026-10-28)
+**Week 2's goal is met in the VM, through the UI:** import (Configure: detected settings and env vars) → Deploy → live URL with streamed logs → redeploy → instant rollback → delete. Push-to-deploy is built and signature-checked; the real GitHub click-through is the one step left for the user on the VPS (the VM can't receive webhooks).
+
+- **Configure / Settings** (`/projects/[slug]/settings`): branch, Node version, install/build commands, Node server (start command, health path, writable folders, memory) or static (output folder, SPA), env vars (rows with show/hide, paste a .env). Validated by `lib/project-settings.ts` with the agent's own rules, so mistakes show in the form. "Deploy" on first import, then "Save" / "Save and redeploy".
+- **Delete project:** type the name to confirm; refused while a deployment runs; removes the app from the server with `app.delete` (data/ archived unless ticked).
+- **Polish:** breadcrumbs in the top bar (Overview / app / Settings), framework names ("Next.js"), Settings button on the project page.
+- **Bug found:** a stopped Next.js color showed as `failed` in `layer ps`, because `next start` exits 143 on SIGTERM. App units now have `SuccessExitStatus=143`.
+- **Tests:** 194 unit tests; the browser tour (VM and CI) covers setup → 2FA → import → configure with an env var → deploy Next.js and Vite → visit both → redeploy → rollback without rebuild → delete.
+
 ## Known limits
 - The VM has no public IP, so GitHub can't deliver webhooks to it: push-to-deploy is tested on the VPS. Everything else works in the VM.
 - Builds have outbound network access (npm needs it). A malicious install script stays inside the app user's sandbox but can make outbound connections during the build. A per-app "no outbound network" option comes later.

@@ -73,6 +73,9 @@ const LABELS: Record<Framework, string> = {
   unknown: "Node.js",
 };
 
+/** "nextjs" → "Next.js" (unknown values come back as they are). */
+export const frameworkLabel = (framework: string) => LABELS[framework as Framework] ?? framework;
+
 const content = (files: ProjectFiles, path: string) => (typeof files[path] === "string" ? (files[path] as string) : null);
 
 export function detectPackageManager(files: ProjectFiles, pkg: PackageJson | null): PackageManager {

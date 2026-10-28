@@ -257,11 +257,23 @@ if (process.env.TOUR_DEPLOY === "1") {
     await fill("#repo", "https://github.com/mddanishyusuf/selfhostlayer-examples");
     await fill("#rootDir", rootDir);
     await click("form:has(#repo) button[type=submit]");
-    await waitFor(`location.pathname === "/projects/${rootDir}"`, `project page for ${rootDir}`, 60_000);
+    // Import lands on Configure (detected settings, env vars) before the first deploy.
+    await waitFor(`location.pathname === "/projects/${rootDir}/settings"`, `configure page for ${rootDir}`, 60_000);
+  };
+  const deployFromSettings = async () => {
+    await click('button[value="deploy"]');
+    await waitFor(`location.pathname.startsWith("/deployments/")`, "deployment page", 60_000);
   };
 
   await importFolder("next");
-  await openNewestDeployment();
+  await evaluate(`(() => {
+    const [name, value] = document.querySelectorAll('input[aria-label="Name"], input[aria-label="Value"]');
+    const set = (el, v) => { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(el, v); el.dispatchEvent(new Event("input", { bubbles: true })); };
+    set(name, "GREETING"); set(value, "hello from the panel");
+    return true;
+  })()`);
+  await screenshot("configure-next");
+  await deployFromSettings();
   await waitForDeploy("Next.js deploy");
   await screenshot("deployment-next-ready");
   await visit(`next.${appsDomain}`, "/", "example-next");
@@ -270,7 +282,7 @@ if (process.env.TOUR_DEPLOY === "1") {
   await screenshot("project-next");
 
   await importFolder("vite");
-  await openNewestDeployment();
+  await deployFromSettings();
   await waitForDeploy("Vite (static) deploy");
   await visit(`vite.${appsDomain}`, "/some/route", "example-vite");
 
@@ -290,6 +302,18 @@ if (process.env.TOUR_DEPLOY === "1") {
   console.log("  ✓ rollback reused the build on disk (no rebuild)");
   await screenshot("deployment-rollback");
   await visit(`next.${appsDomain}`, "/api/health", "ok");
+
+  console.log("Settings and delete");
+  await go("/projects/vite/settings");
+  await waitForPath("/projects/vite/settings");
+  await screenshot("settings-vite");
+  // React-controlled input: set the value through the native setter so React sees it.
+  await evaluate(`(() => { const el = document.querySelector("#confirm"); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(el, "vite"); el.dispatchEvent(new Event("input", { bubbles: true })); return true; })()`);
+  await click('form:has(#confirm) button[type=submit]');
+  await waitForPath("/");
+  const overview = String(await evaluate("document.body.innerText"));
+  if (/\bvite\b/.test(overview.split("Projects")[1] ?? "")) throw new Error("vite is still listed after deleting it");
+  console.log("  ✓ deleted the vite project; it's gone from the overview");
 }
 
 console.log("Guards");

@@ -174,6 +174,14 @@ export function rollbackTo(target: Deployment): Deployment {
   return createDeployment(project, "rollback", { sha: target.sha, message: target.commitMessage, author: target.commitAuthor });
 }
 
+/** A queued or running deployment of this project, if any. */
+export function activeDeployment(projectId: number): Deployment | null {
+  const row = db()
+    .prepare("SELECT * FROM deployments WHERE project_id = ? AND status NOT IN ('ready','failed','cancelled') ORDER BY id DESC LIMIT 1")
+    .get(projectId) as Row | undefined;
+  return row ? fromRow(row) : null;
+}
+
 export async function cancelDeployment(id: number): Promise<void> {
   const d = getDeployment(id);
   if (!d || FINISHED.includes(d.status)) return;

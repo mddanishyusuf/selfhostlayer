@@ -130,3 +130,12 @@ export function setProjectEnv(projectId: number, vars: Record<string, string>): 
     throw err;
   }
 }
+
+export function updateProjectSettings(
+  id: number,
+  s: { branch: string; installCommand: string | null; buildCommand: string | null; runtime: Runtime; nodeVersion: string; memoryMb: number },
+): void {
+  db()
+    .prepare("UPDATE projects SET branch = ?, install_command = ?, build_command = ?, runtime = ?, node_version = ?, memory_mb = ? WHERE id = ?")
+    .run(s.branch, s.installCommand, s.buildCommand, JSON.stringify(s.runtime), s.nodeVersion, s.memoryMb, id);
+}

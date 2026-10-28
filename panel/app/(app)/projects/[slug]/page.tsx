@@ -5,6 +5,7 @@ import { redeploy, rollback } from "@/app/actions/projects";
 import { SubmitButton } from "@/components/form";
 import { DeployStatusBadge, timeAgo } from "@/components/status";
 import { Card } from "@/components/ui";
+import { frameworkLabel } from "@/lib/detect";
 import { listDeployments, liveDeployment } from "@/lib/deploy";
 import { getProjectBySlug } from "@/lib/projects";
 import { requireUser } from "@/lib/session";
@@ -42,6 +43,9 @@ export default async function ProjectPage({ params }: { params: Promise<{ slug: 
               Redeploy
             </SubmitButton>
           </form>
+          <Link href={`/projects/${project.slug}/settings`} className="inline-flex h-9 items-center rounded-md border border-border px-4 text-sm font-medium transition-colors duration-150 hover:bg-hover">
+            Settings
+          </Link>
           <a href={url} target="_blank" rel="noreferrer" className="inline-flex h-9 items-center gap-1.5 rounded-md border border-border px-4 text-sm font-medium transition-colors duration-150 hover:bg-hover">
             Visit <ArrowUpRight className="size-3.5" aria-hidden />
           </a>
@@ -64,7 +68,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ slug: 
         <div className="grid gap-1">
           <p className="text-[13px] text-muted">Runtime</p>
           <p className="font-medium">
-            {project.framework} · {project.runtime.kind === "static" ? "static" : `Node ${project.nodeVersion}`}
+            {frameworkLabel(project.framework)} · {project.runtime.kind === "static" ? "static" : `Node ${project.nodeVersion}`}
           </p>
         </div>
       </Card>

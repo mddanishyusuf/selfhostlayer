@@ -71,6 +71,8 @@ Environment=PATH=${nodeBin}:/usr/bin:/bin
 ExecStart=${execStart}
 Restart=on-failure
 RestartSec=2
+# Next.js and others exit 143 (128 + SIGTERM) when stopped; that's a clean stop.
+SuccessExitStatus=143
 SyslogIdentifier=${user}-%i
 UMask=0077
 

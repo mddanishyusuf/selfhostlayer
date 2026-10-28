@@ -44,7 +44,7 @@ jobs:
     runs-on: ubuntu-24.04
     needs: [test, shell]
     env:
-      INSTALL_FLAGS: --yes --no-harden-ssh --domain layer.internal --internal-tls
+      INSTALL_FLAGS: --yes --no-harden-ssh --domain layer.internal --internal-tls --apps-domain internal
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -77,10 +77,11 @@ jobs:
         run: sudo bash installer/test/bluegreen-e2e.sh
       - name: fetch and build every example from GitHub, sandboxed
         run: sudo bash installer/test/build-e2e.sh
-      - name: panel UI tour in Chrome (setup, 2FA, sign in)
+      - name: panel UI tour in Chrome (setup, 2FA, sign in, deploy, rollback, delete)
         run: |
-          echo "127.0.0.1 layer.internal" | sudo tee -a /etc/hosts
-          CHROME="$(command -v google-chrome)" node panel/scripts/ui-tour.ts https://layer.internal "$(cat setup-token)" screenshots
+          echo "127.0.0.1 layer.internal next.internal vite.internal" | sudo tee -a /etc/hosts
+          TOUR_DEPLOY=1 TOUR_APPS_DOMAIN=internal CHROME="$(command -v google-chrome)" \
+            node panel/scripts/ui-tour.ts https://layer.internal "$(cat setup-token)" screenshots
       - name: after setup, a re-run prints no setup token
         run: |
           sudo bash dist/install.sh --from-tarball dist/layer-ci.tar.gz $INSTALL_FLAGS | tee install.out
