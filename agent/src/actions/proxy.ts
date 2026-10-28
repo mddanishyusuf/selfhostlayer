@@ -28,14 +28,16 @@ async function proxySet(params: Params, ctx: Context) {
     if (!existsSync(root)) throw new ActionError("not_found", `${slug} has no published static site yet (run static.publish first)`);
     if (params.spa !== undefined && typeof params.spa !== "boolean") throw new ValidationError("spa", "must be true or false");
     const spa = params.spa === true;
-    content = renderStaticSite({ slug, domains, spa, root, redirects: assertRedirects(params.redirects, domains) });
-    target = { static: true, spa };
+    const redirects = assertRedirects(params.redirects, domains);
+    content = renderStaticSite({ slug, domains, spa, root, redirects });
+    target = { static: true, spa, redirects };
   } else {
     const color = assertColor(params.color);
     const port = existsSync(app.colorEnv(color)) ? parseColorEnvPort(readFileSync(app.colorEnv(color), "utf8")) : null;
     if (port === null) throw new ActionError("not_found", `no port for ${color}`);
-    content = renderCaddySite({ slug, color, port, domains, redirects: assertRedirects(params.redirects, domains) });
-    target = { color, port };
+    const redirects = assertRedirects(params.redirects, domains);
+    content = renderCaddySite({ slug, color, port, domains, redirects });
+    target = { color, port, redirects };
   }
 
   ensureDir(ctx.paths.caddySitesDir, 0o755);

@@ -12,6 +12,7 @@ import { agent } from "./agent";
 import { config } from "./config";
 import { db, now } from "./db";
 import { installationToken } from "./github";
+import { checkCertificate } from "./cert";
 import { servingConfig } from "./domains";
 import { getApp } from "./github-store";
 import { latestCommit } from "./github-repo";
@@ -223,6 +224,24 @@ function serving(p: Project): { domains: string[]; redirects: { from: string; to
   return config.domains.length ? config : { domains: p.domains, redirects: [] };
 }
 
+/**
+ * A brand-new domain's certificate is issued right after Caddy reloads; wait
+ * (up to 90s) so "Ready" means visitors really get HTTPS. Not fatal: Caddy
+ * keeps retrying, and the Domains page shows the status.
+ */
+async function waitForCertificates(id: number, hosts: string[]): Promise<void> {
+  for (const host of hosts) {
+    let status = await checkCertificate(host);
+    if (status.ok || status.reason !== "issuing") continue;
+    log(id, `Waiting for the certificate for ${host}…\n`);
+    for (let i = 0; i < 30 && !status.ok && status.reason === "issuing"; i++) {
+      await new Promise((r) => setTimeout(r, 3000));
+      status = await checkCertificate(host);
+    }
+    log(id, status.ok ? `Certificate for ${host} issued by ${status.issuer}\n` : `The certificate for ${host} isn't ready yet; Caddy keeps trying. Check DNS on the Domains page.\n`);
+  }
+}
+
 /** A read-only token for exactly this repo, valid for an hour. undefined for public repos without the app. */
 async function repoToken(project: Project): Promise<string | undefined> {
   if (!project.installationId) return undefined;
@@ -328,6 +347,7 @@ async function run(id: number): Promise<void> {
       }
       color = idle;
     }
+    await waitForCertificates(id, serving(p).domains);
     await agent("release.prune", { slug: p.slug, keep: 5 }).catch((err) => log(id, `Pruning old releases failed: ${(err as Error).message}\n`));
 
     if (steps.length) steps[steps.length - 1]!.ms = Date.now() - stepStart;

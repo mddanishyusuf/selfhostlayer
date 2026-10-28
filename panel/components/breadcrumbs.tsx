@@ -11,6 +11,7 @@ export function Breadcrumbs() {
   if (parts[0] === "projects" && parts[1]) {
     crumbs.push({ label: parts[1], href: parts[2] ? `/projects/${parts[1]}` : undefined });
     if (parts[2] === "settings") crumbs.push({ label: "Settings" });
+    if (parts[2] === "domains") crumbs.push({ label: "Domains" });
   } else if (parts[0] === "deployments" && parts[1]) {
     crumbs.push({ label: `Deployment #${parts[1]}` });
   } else if (parts[0] === "new") {

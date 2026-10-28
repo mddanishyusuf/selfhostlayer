@@ -7,6 +7,7 @@ import { DeployStatusBadge, timeAgo } from "@/components/status";
 import { Card } from "@/components/ui";
 import { frameworkLabel } from "@/lib/detect";
 import { listDeployments, liveDeployment } from "@/lib/deploy";
+import { servingConfig } from "@/lib/domains";
 import { getProjectBySlug } from "@/lib/projects";
 import { requireUser } from "@/lib/session";
 
@@ -22,7 +23,10 @@ export default async function ProjectPage({ params }: { params: Promise<{ slug: 
   if (!project) notFound();
   const deployments = listDeployments(project.id);
   const live = liveDeployment(project.id);
-  const url = `https://${project.domains[0]}`;
+  const serving = servingConfig(project.id);
+  const hosts = serving.domains.length ? serving.domains : project.domains;
+  // A custom domain (not the free URL) is the one to visit, once it's live.
+  const url = `https://${hosts.find((h) => h !== project.domains[0]) ?? hosts[0]}`;
 
   return (
     <div className="grid gap-8">
@@ -43,6 +47,9 @@ export default async function ProjectPage({ params }: { params: Promise<{ slug: 
               Redeploy
             </SubmitButton>
           </form>
+          <Link href={`/projects/${project.slug}/domains`} className="inline-flex h-9 items-center rounded-md border border-border px-4 text-sm font-medium transition-colors duration-150 hover:bg-hover">
+            Domains
+          </Link>
           <Link href={`/projects/${project.slug}/settings`} className="inline-flex h-9 items-center rounded-md border border-border px-4 text-sm font-medium transition-colors duration-150 hover:bg-hover">
             Settings
           </Link>
@@ -59,7 +66,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ slug: 
         </div>
         <div className="grid gap-1 sm:col-span-2">
           <p className="text-[13px] text-muted">Domains</p>
-          {project.domains.map((d) => (
+          {hosts.map((d) => (
             <a key={d} href={`https://${d}`} className="truncate font-medium underline-offset-4 hover:underline">
               {d}
             </a>

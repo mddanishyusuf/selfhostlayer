@@ -34,4 +34,12 @@
 
 **Testing without the user's domain:** any `<name>.<ip-with-dashes>.sslip.io` resolves through public DNS exactly like a custom domain would, so on the VPS `shop.37-27-25-45.sslip.io` (and `www.shop…`) gets a real Let's Encrypt certificate through the full verify flow.
 
-**Needs from the user (Day 2, optional):** a domain or subdomain that can point at the VPS (37.27.25.45).
+## Day 2 result (2026-10-28)
+**Done when "a real domain goes live on the VPS with a Let's Encrypt certificate; www redirects": passed** with `shop.37-27-25-45.sslip.io` (resolves through public DNS like any custom domain): both it and `www.shop…` got Let's Encrypt certificates, and `https://www.shop…/a/b?c=1` answers 301 → `https://shop…/a/b?c=1`.
+
+- **Domains page** (`/projects/[slug]/domains`): add a domain (+ www redirect, on by default) → DNS checked at once → live, or pending with the explanation and the exact record (with copy) and a Verify button; certificate status per live domain (issuer and days left, issuing, local CA, expired, unreachable), streamed in separately; remove (the free URL stays). Linked from the project page; breadcrumbs.
+- **Deploys wait for new certificates** (up to 90s, logged; not fatal, Caddy keeps retrying).
+- **Browser tour** (`TOUR_DOMAIN=…`): add a domain + www → both verified and live; add `github.com` → stays pending with "points at …, not this server" and the record; remove it. Passes in the VM.
+- **Bug found by the screenshots:** `SubmitButton` always added `w-full`, which beat a caller's `w-auto` and squashed the input next to inline buttons. It now applies `w-full` only when no width is given.
+
+**Needs from the user (optional):** a domain or subdomain that can point at the VPS (37.27.25.45).

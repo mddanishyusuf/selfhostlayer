@@ -303,6 +303,41 @@ if (process.env.TOUR_DEPLOY === "1") {
   await screenshot("deployment-rollback");
   await visit(`next.${appsDomain}`, "/api/health", "ok");
 
+  // TOUR_DOMAIN: a host whose public DNS points at the box (e.g. shop.<ip-with-dashes>.sslip.io).
+  const tourDomain = process.env.TOUR_DOMAIN;
+  if (tourDomain) {
+    console.log("Domains");
+    await go("/projects/next/domains");
+    await waitForPath("/projects/next/domains");
+    await fill('input[name="host"]', tourDomain);
+    await click('form:has(input[name="host"]) button[type=submit]');
+    await waitFor(`document.body.innerText.includes("www.${tourDomain}")`, "domain rows", 60_000);
+    // Both are live once DNS checks out: no Verify button left, a certificate status instead.
+    await waitFor(`!document.querySelector('form:has(input[name="domainId"]) button[type=submit]')?.innerText.includes("Verify")`, "domains to go live", 60_000);
+    const text = String(await evaluate("document.body.innerText"));
+    if (!/Issuing certificate|expires in|local CA/.test(text)) throw new Error(`no certificate status shown:\n${text.slice(0, 600)}`);
+    console.log(`  ✓ ${tourDomain} and www.${tourDomain} verified through public DNS and live`);
+    await screenshot("domains-live");
+
+    await fill('input[name="host"]', "github.com");
+    await click('form:has(input[name="host"]) button[type=submit]');
+    await waitFor(`document.body.innerText.includes("not this server")`, "wrong-IP explanation", 60_000);
+    console.log("  ✓ a domain pointing elsewhere stays pending, with the explanation and the record to create");
+    await screenshot("domains-pending");
+    for (const host of ["github.com", "www.github.com"]) {
+      await evaluate(`(() => {
+        const row = [...document.querySelectorAll("a")].find((a) => a.textContent === ${JSON.stringify(host)})?.closest("div.grid");
+        row?.querySelector('button[type=submit]:not([class*="bg-inverse"])')?.click();
+        return true;
+      })()`);
+      await sleep(1500);
+    }
+    await go("/projects/next/domains");
+    await waitForPath("/projects/next/domains");
+    if (String(await evaluate("document.body.innerText")).includes("github.com")) throw new Error("removing the pending domain didn't work");
+    console.log("  ✓ removed the pending domain");
+  }
+
   console.log("Settings and delete");
   await go("/projects/vite/settings");
   await waitForPath("/projects/vite/settings");

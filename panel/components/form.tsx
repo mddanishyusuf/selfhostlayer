@@ -7,7 +7,9 @@ import { Button, cx } from "./ui";
 export function SubmitButton({ children, pending: pendingLabel, className }: { children: React.ReactNode; pending: string; className?: string }) {
   const { pending } = useFormStatus();
   return (
-    <Button type="submit" disabled={pending} className={cx("w-full", className)}>
+    // Full width unless the caller sets a width (w-auto, w-32, …): both classes
+    // at once would leave the winner to CSS order.
+    <Button type="submit" disabled={pending} className={cx(/(^|\s)w-/.test(className ?? "") ? "" : "w-full", className)}>
       {pending ? pendingLabel : children}
     </Button>
   );
