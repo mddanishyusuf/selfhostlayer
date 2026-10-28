@@ -1,10 +1,14 @@
 import { isActionName, ValidationError, type Response } from "@layer/protocol";
 import { appActions } from "./actions/app.ts";
 import { envActions } from "./actions/env.ts";
+import { logsActions } from "./actions/logs.ts";
+import { proxyActions } from "./actions/proxy.ts";
+import { releaseActions } from "./actions/release.ts";
+import { unitActions } from "./actions/unit.ts";
 import { nodeActions } from "./actions/node.ts";
 import { systemActions } from "./actions/system.ts";
 import type { Audit } from "./audit.ts";
-import type { ActionTable, Context } from "./context.ts";
+import { NO_IO, type ActionTable, type CallIO, type Context } from "./context.ts";
 import { ActionError } from "./errors.ts";
 import { Lock } from "./lock.ts";
 
@@ -13,6 +17,10 @@ export const ACTION_TABLE: ActionTable = {
   ...nodeActions,
   ...appActions,
   ...envActions,
+  ...unitActions,
+  ...releaseActions,
+  ...proxyActions,
+  ...logsActions,
 };
 
 export const MAX_LINE_BYTES = 1024 * 1024;
@@ -23,13 +31,14 @@ function fail(id: string | null, code: string, message: string): Response {
 }
 
 export interface Dispatcher {
-  handleLine(line: string): Promise<Response>;
+  /** makeIO builds the streaming handle once the request id is known. */
+  handleLine(line: string, makeIO?: (id: string) => CallIO): Promise<Response>;
 }
 
 export function createDispatcher(ctx: Context, audit: Audit, table: ActionTable = ACTION_TABLE): Dispatcher {
   const lock = new Lock();
 
-  async function handleLine(line: string): Promise<Response> {
+  async function handleLine(line: string, makeIO: (id: string) => CallIO = () => NO_IO): Promise<Response> {
     let req: unknown;
     try {
       req = JSON.parse(line);
@@ -57,7 +66,8 @@ export function createDispatcher(ctx: Context, audit: Audit, table: ActionTable 
     audit.write({ id, action, phase: "start", params: def.redact ? def.redact(p) : p });
     let response: Response;
     try {
-      const run = () => def.run(p, ctx);
+      const io = makeIO(id);
+      const run = () => def.run(p, ctx, io);
       const result = await (def.mutates ? lock.run(run) : run());
       response = { id, ok: true, result };
     } catch (err) {

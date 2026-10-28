@@ -69,9 +69,10 @@ main() {
   install_packages
   install_node
   setup_users
+  setup_caddy
   setup_firewall
   harden_ssh
-  # Day 5: panel + agent, secrets, caddy, services, finish
+  # Day 5: panel + agent, secrets, panel site, services, finish
 
   printf '\n%sServer is ready for Self Host Layer.%s The panel install arrives later in Week 1.\n' "$C_GREEN" "$C_RESET"
   info "Full log: $LAYER_LOG"

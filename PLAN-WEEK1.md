@@ -103,13 +103,16 @@ Steps:
 |---|---|---|
 | `system.info` | none | OS, CPU, RAM, disk, Node versions, Caddy status |
 | `node.install` | `version` | Fetch, verify and unpack into `/opt/layer/node` |
+| `app.list` | none | Every app with ports, live color and domains, read back from its files (added Day 4 for `layer ps`) |
 | `app.create` | `slug` | Run `useradd --system --shell /usr/sbin/nologin --home /srv/apps/<slug> -G layer-apps app-<slug>`, create dirs with the right modes, allocate 2 ports |
 | `app.delete` | `slug, keepData` | Stop units, remove units, vhost and user. Archive `data/` unless told otherwise |
 | `env.write` | `slug, vars{}` | Validate keys (`^[A-Z_][A-Z0-9_]*$`) and reject newlines in values. Write `app.env` atomically (temp file + rename) |
 | `unit.write` | `slug, nodeVersion, startCmd, memoryMax, cpuQuota` | Render `app-<slug>@.service`, then `daemon-reload` |
-| `unit.start` / `unit.stop` / `unit.status` | `slug, color` | `systemctl` on `app-<slug>@<color>` |
-| `release.point` | `slug, color, sha` | Point the `blue` or `green` symlink at `releases/<sha>` |
-| `proxy.set` | `slug, domains[], color` | Render `sites/<slug>.caddy` with the upstream on that color's port, validate, reload |
+| `unit.start` | `slug, color, healthPath?, timeoutSec?` | Enable and (re)start `app-<slug>@<color>`, wait until it answers HTTP below 500. Otherwise stop it again and fail `unhealthy` |
+| `unit.stop` | `slug, color, force?` | Stop and disable a color. Refuses the live color unless forced |
+| `unit.status` | `slug` | Per color: state, enabled, release, port, memory, restarts, live |
+| `release.point` | `slug, color, sha` | Atomically point the `blue` or `green` symlink at `releases/<sha>`. Refuses the live color unless forced |
+| `proxy.set` | `slug, domains[], color` | Render `sites/<slug>.caddy` with the upstream on that color's port and reload Caddy. Restores the previous file if Caddy refuses it |
 | `logs.tail` | `slug, color?, lines, follow` | `journalctl -u app-<slug>@*` streamed back |
 | `security.score` | `slug` | Parsed output of `systemd-analyze security` |
 
@@ -237,6 +240,17 @@ The agent is done for the Week 1 actions: `system.info`, `node.install`, `app.cr
 - **Bundle:** `scripts/build-agent.sh` → `dist/agent/layer-agent.mjs` (24KB, Node built-ins only). Unit: `system/layer-agent.service`.
 - **Tests:** 79 vitest tests on the Mac (fake exec checks the exact argv), plus `installer/test/agent-e2e.sh` with 41 checks through the real socket with `socat` (`scripts/dev-vm.sh agent`, and in CI).
 - **Agent itself:** 35MB, restarts within a second after `kill -9`, safety score **3.1 OK**. It was 6.2 before limiting it to the 9 capabilities it needs, plus `@system-service` syscalls.
+
+## Day 4 result (2026-10-28)
+**Done when "the hello app goes blue→green with no dropped request": passed.** Under constant HTTPS traffic through Caddy (a new connection every 20ms), the deploy blue → green and the rollback green → blue each served ~160 requests with **0 failures**. Traffic switched exactly once and never flipped back.
+
+- **New actions:** `unit.write`, `unit.start` (with a health check), `unit.stop`, `unit.status`, `release.point`, `proxy.set`, `logs.tail` (one-shot or `follow` streaming as `{id, chunk}` frames, stopped when the client disconnects), `security.score`, `app.list`. All 14 allowlisted actions are now implemented.
+- **Deploy sequence** (what the panel will run): `release.point` idle color → `unit.start` idle (health check) → `proxy.set` idle → wait 2s for requests in flight → `unit.stop` old. Rollback is the same with the old release.
+- **Guard rails:** you can't repoint or stop the live color without `force`. A release that never answers is stopped and disabled again, the site keeps serving the old one, and the crash shows in `logs.tail`. If Caddy rejects a reload, the previous site file is restored.
+- **Caddy base** is now an installer step (`installer/lib/caddy.sh`): sites in `/etc/caddy/sites/*.caddy`, admin API on `/run/caddy/admin.sock` (dir 700 caddy), nothing on `localhost:2019`. `verify.sh` checks this.
+- **`layer` CLI** (`packages/cli`, bundled to `layer.mjs`, linked as `/usr/local/bin/layer`): `ps`, `status`, `logs [-f]`, `score`, `info`, `call`. It uses the shared `callAgent` client in `packages/protocol`, which the panel will use too.
+- **Numbers:** a small Node app in the sandbox uses 10MB, score 1.3. The agent bundle is 42KB and the CLI 8KB.
+- **Tests:** 108 unit tests; `installer/test/bluegreen-e2e.sh` (29 checks) runs in the VM and in CI after the agent e2e.
 
 ## Day by day
 | Day | Work | Done when |

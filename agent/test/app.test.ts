@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { appActions } from "../src/actions/app.ts";
 import { envActions } from "../src/actions/env.ts";
+import { NO_IO } from "../src/context.ts";
 import { BIN } from "../src/exec.ts";
 import { allocatePortPair } from "../src/ports.ts";
 import { renderColorEnv } from "../src/templates/env-file.ts";
@@ -12,8 +13,8 @@ let env: TestEnv;
 beforeEach(() => (env = testEnv()));
 afterEach(() => env.cleanup());
 
-const create = (slug: string) => appActions["app.create"]!.run({ slug }, env.ctx) as Promise<any>;
-const del = (params: Record<string, unknown>) => appActions["app.delete"]!.run(params, env.ctx) as Promise<any>;
+const create = (slug: string) => appActions["app.create"]!.run({ slug }, env.ctx, NO_IO) as Promise<any>;
+const del = (params: Record<string, unknown>) => appActions["app.delete"]!.run(params, env.ctx, NO_IO) as Promise<any>;
 const mode = (path: string) => (statSync(path).mode & 0o777).toString(8);
 
 describe("app.create", () => {
@@ -99,7 +100,7 @@ describe("app.delete", () => {
 describe("env.write", () => {
   it("writes app.env atomically with mode 600 and returns only keys", async () => {
     await create("piqo");
-    const res = await envActions["env.write"]!.run({ slug: "piqo", vars: { A: "1", B: 'x"y' } }, env.ctx);
+    const res = await envActions["env.write"]!.run({ slug: "piqo", vars: { A: "1", B: 'x"y' } }, env.ctx, NO_IO);
     expect(res).toEqual({ slug: "piqo", keys: ["A", "B"] });
     const file = join(env.paths.appEtcRoot, "piqo", "app.env");
     expect(mode(file)).toBe("600");
@@ -107,7 +108,7 @@ describe("env.write", () => {
   });
 
   it("refuses unknown apps", async () => {
-    await expect(envActions["env.write"]!.run({ slug: "ghost", vars: {} }, env.ctx)).rejects.toMatchObject({
+    await expect(envActions["env.write"]!.run({ slug: "ghost", vars: {} }, env.ctx, NO_IO)).rejects.toMatchObject({
       code: "not_found",
     });
   });

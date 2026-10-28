@@ -53,6 +53,10 @@ check "fail2ban sshd jail watches ssh.service and sshd-session" \
   grep -q "sshd-session" <<<"$(fail2ban-client get sshd journalmatch)"
 check "unattended-upgrades enabled" grep -q 'Unattended-Upgrade "1"' /etc/apt/apt.conf.d/20auto-upgrades
 check "caddy apt key pinned" test -s /usr/share/keyrings/caddy-stable-archive-keyring.gpg
+check "caddy admin API on a private unix socket" test -S /run/caddy/admin.sock
+check "/run/caddy is 700 caddy" mode_is /run/caddy "700 caddy:caddy"
+check "nothing listens on localhost:2019" bash -c '! (exec 3<>/dev/tcp/127.0.0.1/2019) 2>/dev/null'
+check "caddy imports /etc/caddy/sites" grep -q "^import /etc/caddy/sites/\*.caddy" /etc/caddy/Caddyfile
 
 echo "Memory"
 check "swap on (or RAM >= 4GB)" swap_ok

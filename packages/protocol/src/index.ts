@@ -1,4 +1,5 @@
 export * from "./validate.ts";
+export * from "./client.ts";
 
 /**
  * The complete allowlist of agent actions. The agent rejects any action name
@@ -7,6 +8,7 @@ export * from "./validate.ts";
 export const ACTIONS = [
   "system.info",
   "node.install",
+  "app.list",
   "app.create",
   "app.delete",
   "env.write",

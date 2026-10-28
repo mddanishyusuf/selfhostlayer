@@ -17,6 +17,8 @@ const NODE_VERSION = /^\d{1,3}\.\d{1,3}\.\d{1,3}$/;
 const SHA = /^[0-9a-f]{7,40}$/;
 const ENV_KEY = /^[A-Z_][A-Z0-9_]{0,127}$/;
 const PATH_SEGMENT = /^[A-Za-z0-9._-]+$/;
+const DOMAIN_LABEL = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/;
+const HEALTH_PATH = /^\/[A-Za-z0-9._~\/?=&%+-]{0,255}$/;
 // Any C0 control character or DEL. Newlines would let a value inject extra
 // lines into a unit or env file.
 const CONTROL_CHARS = /[\u0000-\u001f\u007f]/;
@@ -87,6 +89,26 @@ export function assertRelativePath(value: unknown, field = "path"): string {
     if (!PATH_SEGMENT.test(segment) || segment === "." || segment === "..") {
       throw new ValidationError(field, "must be a relative path without '.' or '..' segments");
     }
+  }
+  return value;
+}
+
+/** A lowercase hostname like example.com or app.example.internal. No wildcards or IPs. */
+export function assertDomain(value: unknown, field = "domain"): string {
+  if (typeof value !== "string" || value.length > 253) {
+    throw new ValidationError(field, "must be a hostname of at most 253 chars");
+  }
+  const labels = value.split(".");
+  if (labels.length < 2 || !labels.every((l) => DOMAIN_LABEL.test(l)) || /^\d+$/.test(labels.at(-1)!)) {
+    throw new ValidationError(field, "must be a lowercase hostname like app.example.com");
+  }
+  return value;
+}
+
+/** An HTTP path for health checks, e.g. "/" or "/api/health?full=1". */
+export function assertHealthPath(value: unknown, field = "healthPath"): string {
+  if (typeof value !== "string" || !HEALTH_PATH.test(value)) {
+    throw new ValidationError(field, "must be a path starting with / (letters, digits and ._~/?=&%+-)");
   }
   return value;
 }

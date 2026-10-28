@@ -61,11 +61,14 @@ lint() {
 agent() {
   exists || up
   bash "$root/scripts/build-agent.sh" dev
-  multipass transfer "$root/dist/agent/layer-agent.mjs" "$root/system/layer-agent.service" \
-    "$root/scripts/dev-install-agent.sh" "$root/installer/test/agent-e2e.sh" "$vm:/home/ubuntu/"
+  multipass exec "$vm" -- mkdir -p /home/ubuntu/dist
+  multipass transfer "$root/dist/agent/layer-agent.mjs" "$root/dist/agent/layer.mjs" "$vm:/home/ubuntu/dist/"
+  multipass transfer "$root/system/layer-agent.service" "$root/scripts/dev-install-agent.sh" \
+    "$root/installer/test/agent-e2e.sh" "$root/installer/test/bluegreen-e2e.sh" "$vm:/home/ubuntu/"
   multipass exec "$vm" -- sudo bash /home/ubuntu/dev-install-agent.sh \
-    /home/ubuntu/layer-agent.mjs /home/ubuntu/layer-agent.service "$spike_node"
+    /home/ubuntu/dist /home/ubuntu/layer-agent.service "$spike_node"
   multipass exec "$vm" -- sudo bash /home/ubuntu/agent-e2e.sh
+  multipass exec "$vm" -- sudo bash /home/ubuntu/bluegreen-e2e.sh
 }
 
 verify() {

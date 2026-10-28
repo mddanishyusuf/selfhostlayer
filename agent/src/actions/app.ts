@@ -1,6 +1,6 @@
-import { cpSync, existsSync, readFileSync, renameSync, rmSync } from "node:fs";
+import { cpSync, existsSync, readdirSync, readFileSync, renameSync, rmSync } from "node:fs";
 import { join } from "node:path";
-import { assertSlug, ValidationError } from "@layer/protocol";
+import { assertSlug, ValidationError, type Color } from "@layer/protocol";
 import type { ActionTable, Context, Params } from "../context.ts";
 import { ActionError } from "../errors.ts";
 import { BIN } from "../exec.ts";
@@ -8,6 +8,7 @@ import { childOf, ensureDir, lookupUser, writeFileAtomic } from "../fsutil.ts";
 import { allocatePortPair } from "../ports.ts";
 import { parseColorEnvPort, renderColorEnv, renderEnvFile } from "../templates/env-file.ts";
 import { unitName } from "../templates/app-unit.ts";
+import { parseLiveMarker } from "../templates/caddy-site.ts";
 
 export function appLayout(ctx: Context, slug: string) {
   const appDir = childOf(ctx.paths.appsRoot, slug);
@@ -129,7 +130,28 @@ async function appDelete(params: Params, ctx: Context) {
   return { slug, deleted: true, archivedData };
 }
 
+/** Every app, read from /etc/layer/apps and the Caddy sites (no separate registry). */
+async function appList(_params: Params, ctx: Context) {
+  const root = ctx.paths.appEtcRoot;
+  const slugs = existsSync(root) ? readdirSync(root).filter((s) => /^[a-z][a-z0-9-]*$/.test(s)).sort() : [];
+  const apps = slugs.map((slug) => {
+    const app = appLayout(ctx, slug);
+    const site = childOf(ctx.paths.caddySitesDir, `${slug}.caddy`);
+    const live: Color | null = existsSync(site) ? (parseLiveMarker(readFileSync(site, "utf8"))?.color ?? null) : null;
+    const domains = existsSync(site) ? (/^([^#\s][^{]*)\{/m.exec(readFileSync(site, "utf8"))?.[1] ?? "").split(",").map((d) => d.trim()).filter(Boolean) : [];
+    return {
+      slug,
+      ports: readPorts(app),
+      live,
+      domains,
+      unitFile: existsSync(join(ctx.paths.systemdDir, unitName(slug))),
+    };
+  });
+  return { apps };
+}
+
 export const appActions: ActionTable = {
+  "app.list": { mutates: false, run: appList },
   "app.create": { mutates: true, run: appCreate },
   "app.delete": { mutates: true, run: appDelete },
 };

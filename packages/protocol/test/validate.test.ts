@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   assertColor,
+  assertDomain,
+  assertHealthPath,
   assertEnvKey,
   assertInt,
   assertLine,
@@ -114,5 +116,26 @@ describe("isActionName", () => {
     expect(isActionName("unit.start")).toBe(true);
     expect(isActionName("shell.exec")).toBe(false);
     expect(isActionName("__proto__")).toBe(false);
+  });
+});
+
+describe("assertDomain", () => {
+  it.each(["example.com", "app.example.com", "hello.internal", "xn--bcher-kva.example", "a-b.co", "1.example.com"])(
+    "accepts %s",
+    (d) => expect(assertDomain(d)).toBe(d),
+  );
+  it.each(["localhost", "Example.com", "*.example.com", "-a.com", "a-.com", "a..com", "1.2.3.4", "a.com.", "a b.com", "a.com/x", "a".repeat(64) + ".com"])(
+    "rejects %j",
+    (d) => expect(() => assertDomain(d)).toThrow(/domain/),
+  );
+});
+
+describe("assertHealthPath", () => {
+  it("accepts simple paths only", () => {
+    expect(assertHealthPath("/")).toBe("/");
+    expect(assertHealthPath("/api/health?full=1")).toBe("/api/health?full=1");
+    for (const bad of ["", "health", "/a b", "/a\nb", "//evil.com\r\n", "/" + "x".repeat(256)]) {
+      expect(() => assertHealthPath(bad)).toThrow();
+    }
   });
 });

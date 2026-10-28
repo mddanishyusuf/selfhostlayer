@@ -58,8 +58,6 @@ expect "layer (the panel user) can connect" "$out" '.ok == true'
 echo "Protocol"
 expect "invalid JSON → bad_request" "$(req layer '{nope')" '.error.code == "bad_request"'
 expect "unknown action → unknown_action" "$(call shell.exec)" '.error.code == "unknown_action"'
-expect "allowlisted but not built yet → not_implemented" "$(call unit.start '{"slug":"x","color":"blue"}')" \
-  '.error.code == "not_implemented"'
 expect "bad slug → invalid_params" "$(call app.create '{"slug":"../etc"}')" '.error.code == "invalid_params"'
 
 echo "system.info"

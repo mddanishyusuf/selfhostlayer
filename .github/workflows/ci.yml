@@ -64,8 +64,10 @@ jobs:
       - name: agent e2e (real socket, socat client)
         run: |
           bash scripts/build-agent.sh "ci-${GITHUB_SHA::7}"
-          sudo bash scripts/dev-install-agent.sh dist/agent/layer-agent.mjs system/layer-agent.service
+          sudo bash scripts/dev-install-agent.sh dist/agent system/layer-agent.service
           sudo bash installer/test/agent-e2e.sh
+      - name: blue/green deploy with zero dropped requests
+        run: sudo bash installer/test/bluegreen-e2e.sh
       - name: install log
         if: always()
         run: sudo cat /var/log/layer-install.log || true

@@ -2,6 +2,7 @@ import { chmodSync, chownSync, existsSync, mkdirSync, rmSync } from "node:fs";
 import { createServer, type Server, type Socket } from "node:net";
 import { dirname } from "node:path";
 import type { Response } from "@layer/protocol";
+import type { CallIO } from "./context.ts";
 import { MAX_LINE_BYTES, type Dispatcher } from "./dispatch.ts";
 
 const MAX_CONNECTIONS = 16;
@@ -45,6 +46,13 @@ function serve(socket: Socket, dispatcher: Dispatcher): void {
   let buffer = "";
   let pending = 0;
   let clientDone = false;
+  // Aborts every streaming call on this connection when it closes.
+  const closed = new AbortController();
+  socket.on("close", () => closed.abort());
+  const makeIO = (id: string): CallIO => ({
+    emit: (chunk) => send({ id, chunk }),
+    signal: closed.signal,
+  });
 
   const send = (response: Response) => {
     if (!socket.destroyed) socket.write(JSON.stringify(response) + "\n");
@@ -54,7 +62,7 @@ function serve(socket: Socket, dispatcher: Dispatcher): void {
   };
   const dispatch = (line: string) => {
     pending++;
-    void dispatcher.handleLine(line).then(send).finally(() => {
+    void dispatcher.handleLine(line, makeIO).then(send).finally(() => {
       pending--;
       endIfIdle();
     });

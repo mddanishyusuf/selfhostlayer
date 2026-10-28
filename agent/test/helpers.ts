@@ -9,6 +9,8 @@ export interface FakeExec {
   exec: Exec;
   calls: string[][];
   users: Map<string, { uid: number; gid: number }>;
+  /** Return a result to override the default for a command (e.g. make a reload fail). */
+  respond?: (file: string, args: string[]) => ExecResult | undefined;
 }
 
 /**
@@ -21,10 +23,14 @@ export function fakeExec(): FakeExec {
   const users = new Map<string, { uid: number; gid: number }>();
   const ok = (stdout = ""): ExecResult => ({ code: 0, stdout, stderr: "" });
 
-  const exec: Exec = async (file, args, opts = {}) => {
+  const fake: FakeExec = { exec: undefined as unknown as Exec, calls, users };
+  fake.exec = async (file, args, opts = {}) => {
     calls.push([file, ...args]);
     let result: ExecResult = ok();
-    if (file === BIN.getent && args[0] === "passwd") {
+    const override = fake.respond?.(file, args);
+    if (override) {
+      result = override;
+    } else if (file === BIN.getent && args[0] === "passwd") {
       const user = users.get(args[1]!);
       result = user ? ok(`${args[1]}:x:${user.uid}:${user.gid}::/srv/apps:/usr/sbin/nologin\n`) : { code: 2, stdout: "", stderr: "" };
     } else if (file === BIN.useradd) {
@@ -35,7 +41,7 @@ export function fakeExec(): FakeExec {
     if (result.code !== 0 && !opts.allowFail) throw new Error(`fake exec: ${file} failed`);
     return result;
   };
-  return { exec, calls, users };
+  return fake;
 }
 
 export interface TestEnv {

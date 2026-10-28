@@ -9,10 +9,18 @@ export interface Context {
 
 export type Params = Record<string, unknown>;
 
+/** Per-call streaming: emit sends {id, chunk} frames; signal aborts when the client goes away. */
+export interface CallIO {
+  emit: (chunk: string) => void;
+  signal: AbortSignal;
+}
+
+export const NO_IO: CallIO = { emit: () => {}, signal: new AbortController().signal };
+
 export interface ActionDef {
   /** Mutating actions run one at a time under the global lock. */
   mutates: boolean;
-  run: (params: Params, ctx: Context) => Promise<unknown>;
+  run: (params: Params, ctx: Context, io: CallIO) => Promise<unknown>;
   /** What the audit log records instead of the raw params (e.g. env keys, never values). */
   redact?: (params: Params) => unknown;
 }

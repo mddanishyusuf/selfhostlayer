@@ -17,7 +17,8 @@ yarn build:installer   # → dist/install.sh (single file)
 |---|---|
 | `installer/` | `install.sh` plus `lib/*.sh`, bundled into one file by `scripts/build-installer.sh` |
 | `agent/` | Root helper: allowlisted actions over a unix socket, templates for units and Caddy files |
-| `packages/protocol/` | Action allowlist and validators shared by agent and panel |
+| `packages/protocol/` | Action allowlist, validators and the agent client, shared by agent, CLI and panel |
+| `packages/cli/` | The `layer` command: `ps`, `status`, `logs -f`, `score`, `info`, `call` |
 | `spike/` | Throwaway experiments to run on a test VPS |
 
 ## Test in a local Ubuntu VM
@@ -30,7 +31,7 @@ scripts/dev-vm.sh spike     # run the Day 1 sandbox spike inside it
 scripts/dev-vm.sh install --yes   # build and run the installer inside it
 scripts/dev-vm.sh verify    # check the server state the installer promises
 scripts/dev-vm.sh lint      # shellcheck every script inside the VM
-scripts/dev-vm.sh agent     # build + install layer-agent, run its socket e2e test
+scripts/dev-vm.sh agent     # build + install layer-agent and the layer CLI, run the agent and blue/green e2e tests
 scripts/dev-vm.sh reset     # start again from a fresh box
 ```
 
