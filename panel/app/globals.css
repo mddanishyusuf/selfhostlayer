@@ -1,0 +1,81 @@
+@import "tailwindcss";
+
+/* Design tokens. Neutral grays, one accent, status colors only for status.
+   Light and dark follow the system setting. */
+@theme inline {
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, monospace;
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-subtle: var(--subtle);
+  --color-hover: var(--hover);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-accent: var(--accent);
+  --color-inverse: var(--inverse);
+  --color-inverse-fg: var(--inverse-fg);
+  --color-ok: var(--ok);
+  --color-warn: var(--warn);
+  --color-err: var(--err);
+  --color-err-subtle: var(--err-subtle);
+}
+
+:root {
+  color-scheme: light;
+  --background: #ffffff;
+  --foreground: #171717;
+  --muted: #666666;
+  --subtle: #fafafa;
+  --hover: #f2f2f2;
+  --border: #eaeaea;
+  --border-strong: #d4d4d4;
+  --accent: #0a72ef;
+  --inverse: #171717;
+  --inverse-fg: #ffffff;
+  --ok: #16a34a;
+  --warn: #d97706;
+  --err: #e5484d;
+  --err-subtle: #fff0f0;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --background: #0a0a0a;
+    --foreground: #ededed;
+    --muted: #a1a1a1;
+    --subtle: #111111;
+    --hover: #1a1a1a;
+    --border: #1f1f1f;
+    --border-strong: #2e2e2e;
+    --accent: #3291ff;
+    --inverse: #ededed;
+    --inverse-fg: #0a0a0a;
+    --ok: #3fb950;
+    --warn: #f5a524;
+    --err: #ff6369;
+    --err-subtle: #2a1012;
+  }
+}
+
+html {
+  background: var(--background);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--accent) 25%, transparent);
+}
+
+@keyframes shimmer {
+  to { background-position: -200% 0; }
+}

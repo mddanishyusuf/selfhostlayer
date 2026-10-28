@@ -23,6 +23,7 @@ usage() {
 Usage: install.sh [options]
 
   --domain <name>         Serve the panel on this domain instead of <ip>.sslip.io
+  --internal-tls          Use Caddy's local CA instead of Let's Encrypt (test boxes)
   --email <address>       Contact email for TLS certificates
   --from-tarball <path>   Install the panel from a local release tarball (development)
   --no-harden-ssh         Leave SSH settings alone
@@ -32,13 +33,14 @@ EOF
 }
 
 parse_args() {
-  LAYER_DOMAIN="" LAYER_EMAIL="" LAYER_TARBALL="" LAYER_HARDEN_SSH=1 LAYER_YES=0
+  LAYER_DOMAIN="" LAYER_EMAIL="" LAYER_TARBALL="" LAYER_HARDEN_SSH=1 LAYER_YES=0 LAYER_INTERNAL_TLS=0
   while (($# > 0)); do
     case "$1" in
       --domain) LAYER_DOMAIN="${2:?--domain needs a value}"; shift 2 ;;
       --email) LAYER_EMAIL="${2:?--email needs a value}"; shift 2 ;;
       --from-tarball) LAYER_TARBALL="${2:?--from-tarball needs a path}"; shift 2 ;;
       --no-harden-ssh) LAYER_HARDEN_SSH=0; shift ;;
+      --internal-tls) LAYER_INTERNAL_TLS=1; shift ;;
       --yes) LAYER_YES=1; shift ;;
       -h | --help) usage; exit 0 ;;
       *) usage >&2; die "unknown option: $1" ;;
@@ -47,7 +49,10 @@ parse_args() {
   if [[ -n "$LAYER_TARBALL" && ! -f "$LAYER_TARBALL" ]]; then
     die "tarball not found: $LAYER_TARBALL"
   fi
-  export LAYER_DOMAIN LAYER_EMAIL LAYER_TARBALL LAYER_HARDEN_SSH LAYER_YES
+  if [[ -n "$LAYER_DOMAIN" && ! "$LAYER_DOMAIN" =~ ^[a-z0-9]([a-z0-9.-]{0,251}[a-z0-9])?$ ]]; then
+    die "--domain must be a lowercase hostname like panel.example.com"
+  fi
+  export LAYER_DOMAIN LAYER_EMAIL LAYER_TARBALL LAYER_HARDEN_SSH LAYER_YES LAYER_INTERNAL_TLS
 }
 
 on_error() {
@@ -70,12 +75,13 @@ main() {
   install_node
   setup_users
   setup_caddy
+  install_release
+  setup_secrets
+  start_services
+  setup_panel_site
   setup_firewall
   harden_ssh
-  # Day 5: panel + agent, secrets, panel site, services, finish
-
-  printf '\n%sServer is ready for Self Host Layer.%s The panel install arrives later in Week 1.\n' "$C_GREEN" "$C_RESET"
-  info "Full log: $LAYER_LOG"
+  finish
 }
 
 main "$@"

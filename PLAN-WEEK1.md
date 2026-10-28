@@ -36,7 +36,7 @@ selfhostlayer/
 ## Layout on the server
 | Path | Owner / mode | Purpose |
 |---|---|---|
-| `/opt/layer/{agent,panel}/releases/<ver>` + `current` | root, 755 | Panel and agent code, read-only |
+| `/opt/layer/releases/<ver>/` + `current` symlink | root, 755 | One release: `agent/` (agent + CLI), `web/` (panel), `system/` (units). The last 3 are kept |
 | `/opt/layer/node/<ver>/` | root, 755 | Node runtimes shared by all apps |
 | `/etc/layer/config.json` | root:layer 640 | Box config: public IP, panel domain, port range |
 | `/etc/layer/secret.key` | root:layer 640 | Key that encrypts env vars in the panel DB |
@@ -44,7 +44,7 @@ selfhostlayer/
 | `/etc/layer/apps/<slug>/{blue,green}.env` | root 644 | `PORT=`, `HOSTNAME=127.0.0.1`, `NODE_ENV=production` |
 | `/var/lib/layer/panel.db` | layer 600 | Panel state |
 | `/run/layer/agent.sock` | root:layer 660, dir 750 | Agent socket. Only root and the panel's group can connect |
-| `/run/layer-panel/panel.sock` | layer:caddy 660 | Panel HTTP. Only Caddy can reach it. A separate dir, so the panel can't touch the agent's socket |
+| `/run/layer-panel/panel.sock` | layer:layer-web 660 | Panel HTTP. `layer-web` has only two members, `caddy` and `layer`, so only Caddy can reach it. A separate dir, so the panel can't touch the agent's socket |
 | `/var/lib/layer-agent/archive/` | root 700 | `data/` of deleted apps (`app.delete` with `keepData`) |
 | `/opt/layer/runtime` | symlink | The Node version the panel and agent run on |
 | `/var/log/layer/audit.jsonl` | root 600 | Audit log the panel can't erase |
@@ -251,6 +251,20 @@ The agent is done for the Week 1 actions: `system.info`, `node.install`, `app.cr
 - **`layer` CLI** (`packages/cli`, bundled to `layer.mjs`, linked as `/usr/local/bin/layer`): `ps`, `status`, `logs [-f]`, `score`, `info`, `call`. It uses the shared `callAgent` client in `packages/protocol`, which the panel will use too.
 - **Numbers:** a small Node app in the sandbox uses 10MB, score 1.3. The agent bundle is 42KB and the CLI 8KB.
 - **Tests:** 108 unit tests; `installer/test/bluegreen-e2e.sh` (29 checks) runs in the VM and in CI after the agent e2e.
+
+## Day 5 result (2026-10-28)
+**Done when "`curl … | bash` on a clean box prints the URL, and the panel loads over HTTPS": passed** (with `--from-tarball` while the repo is private). Fresh VM → installer → box with `https://<ip>.sslip.io` and the setup token → Chrome completes setup, 2FA, recovery codes, dashboard, sign out, sign in.
+
+- **Panel** (`panel/`): Next.js 16 + Tailwind v4 + Geist + lucide, with design tokens for light and dark. Screens: setup token → create admin → TOTP 2FA (QR + manual key + 6-box input with paste/autofill) → recovery codes (shown once, download) → overview (server stats from `system.info`, projects from `app.list`, empty state) → sign in with 2FA or a recovery code.
+- **Auth, built on `node:crypto` only:** scrypt passwords (N=2^15), RFC 6238 TOTP (checked against the RFC test vectors, ±1 step, no code reuse), hashed sessions in `__Host-` cookies, sessions limited to 5 minutes until 2FA, rate limiting by IP and email (5 per 15 min), a dummy hash so timing doesn't reveal which emails exist. Secrets are encrypted with AES-256-GCM using `/etc/layer/secret.key`.
+- **DB:** Node's built-in `node:sqlite` (no native module, so the same tarball works on x86 and ARM).
+- **Production server:** `panel/server.mjs` runs Next's custom-server API on `/run/layer-panel/panel.sock`. The unit uses `Group=layer-web` so systemd creates the socket dir with the right group; the panel's syscall filter blocks `chown`, which is how the first attempt failed.
+- **Release:** `scripts/build-release.sh` → `dist/layer-<ver>.tar.gz` (~13MB: agent, CLI, standalone panel, units). It refuses to package dev state; that check caught Next's file tracing including `panel/.dev/` (dev DB, key, token), and `outputFileTracingExcludes` now keeps it out.
+- **Installer:** all 12 steps. The new ones are release, secrets (setup token stored only as a sha256, 24h, re-issued on each run until an admin exists), services (health checked *as the caddy user*), the panel site, and the finish box. Every `rm -rf` uses `${var:?}` guards.
+- **Numbers:** idle **PSS 172MB** for panel 59 + agent 64 + Caddy 49 (budget 200MB). Page cache is excluded: the agent's cgroup also showed 137MB of reclaimable cache from Node tarballs it had extracted. Panel safety score **1.3**, agent **3.1**.
+- **Tests:** 116 unit tests. `panel/scripts/ui-tour.ts` drives Chrome through the whole flow over the DevTools protocol and saves screenshots: locally, against the VM (`scripts/dev-vm.sh ui`) and in CI. `verify.sh` gained 11 panel checks.
+- **Bugs the browser tour caught:** the code boxes dropped pasted or autofilled codes (`maxLength=1`), auto-submit sent the code before React rendered it (`flushSync`), and the manual-key box overflowed the card.
+- **Moved to Week 3:** the Caddy `ask` endpoint for on-demand TLS, which belongs with custom domains. Also `proxy.set` / the domain flow should wait until the certificate is issued: a brand-new site can answer its first HTTPS request before Caddy has a certificate.
 
 ## Day by day
 | Day | Work | Done when |

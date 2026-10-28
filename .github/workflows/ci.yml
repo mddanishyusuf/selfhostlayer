@@ -37,11 +37,14 @@ jobs:
           name: install.sh
           path: dist/install.sh
 
-  # GitHub's Ubuntu runners are full x86 VMs with systemd, so the installer can
-  # run for real. SSH hardening is skipped: we don't own the runner's sshd.
+  # GitHub's Ubuntu runners are full x86 VMs with systemd, so the real installer
+  # runs with the real release tarball. SSH hardening is skipped: we don't own
+  # the runner's sshd. The panel is served as layer.internal with Caddy's local CA.
   install-e2e:
     runs-on: ubuntu-24.04
     needs: [test, shell]
+    env:
+      INSTALL_FLAGS: --yes --no-harden-ssh --domain layer.internal --internal-tls
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -49,25 +52,43 @@ jobs:
           node-version-file: .nvmrc
           cache: yarn
       - run: yarn install --frozen-lockfile
-      - run: bash scripts/build-installer.sh "ci-${GITHUB_SHA::7}"
+      - name: build installer and release tarball
+        run: |
+          bash scripts/build-installer.sh "ci-${GITHUB_SHA::7}"
+          bash scripts/build-release.sh ci
       - name: install on a fresh runner
-        run: sudo bash dist/install.sh --yes --no-harden-ssh
+        run: sudo bash dist/install.sh --from-tarball dist/layer-ci.tar.gz $INSTALL_FLAGS
       - run: sudo bash installer/test/verify.sh
-      - name: re-run is safe (idempotent)
-        run: sudo bash dist/install.sh --yes --no-harden-ssh
+      - name: re-run is safe (idempotent), and prints a fresh setup token
+        run: |
+          sudo bash dist/install.sh --from-tarball dist/layer-ci.tar.gz $INSTALL_FLAGS | tee install.out
+          sed 's/\x1b\[[0-9;]*m//g' install.out | awk '/Setup token:/ {print $NF}' > setup-token
+          test -s setup-token
       - run: sudo bash installer/test/verify.sh
       - name: sandbox spike (Next.js in the generated unit, x86)
         run: |
           node agent/scripts/render-unit.ts --slug hello --node 24.13.1 --write .next/cache \
             -- node node_modules/next/dist/bin/next start -H 127.0.0.1 > "$RUNNER_TEMP/app-hello@.service"
           sudo bash spike/next-sandbox.sh "$RUNNER_TEMP/app-hello@.service"
+          sudo bash spike/next-sandbox.sh --cleanup
       - name: agent e2e (real socket, socat client)
-        run: |
-          bash scripts/build-agent.sh "ci-${GITHUB_SHA::7}"
-          sudo bash scripts/dev-install-agent.sh dist/agent system/layer-agent.service
-          sudo bash installer/test/agent-e2e.sh
+        run: sudo bash installer/test/agent-e2e.sh
       - name: blue/green deploy with zero dropped requests
         run: sudo bash installer/test/bluegreen-e2e.sh
+      - name: panel UI tour in Chrome (setup, 2FA, sign in)
+        run: |
+          echo "127.0.0.1 layer.internal" | sudo tee -a /etc/hosts
+          CHROME="$(command -v google-chrome)" node panel/scripts/ui-tour.ts https://layer.internal "$(cat setup-token)" screenshots
+      - name: after setup, a re-run prints no setup token
+        run: |
+          sudo bash dist/install.sh --from-tarball dist/layer-ci.tar.gz $INSTALL_FLAGS | tee install.out
+          ! grep -q "Setup token:" install.out
+          sudo bash installer/test/verify.sh
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: screenshots
+          path: screenshots/*.png
       - name: install log
         if: always()
         run: sudo cat /var/log/layer-install.log || true

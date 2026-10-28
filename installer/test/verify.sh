@@ -58,6 +58,23 @@ check "/run/caddy is 700 caddy" mode_is /run/caddy "700 caddy:caddy"
 check "nothing listens on localhost:2019" bash -c '! (exec 3<>/dev/tcp/127.0.0.1/2019) 2>/dev/null'
 check "caddy imports /etc/caddy/sites" grep -q "^import /etc/caddy/sites/\*.caddy" /etc/caddy/Caddyfile
 
+echo "Panel and agent"
+panel_host="$(awk 'NF && $1 !~ /^#/ {print $1; exit}' /etc/caddy/sites/_panel.caddy 2>/dev/null)"
+check "layer-agent active" active layer-agent
+check "layer-panel active" active layer-panel
+check "agent socket 660 root:layer" mode_is /run/layer/agent.sock "660 root:layer"
+check "panel socket 660 layer:layer-web" mode_is /run/layer-panel/panel.sock "660 layer:layer-web"
+check "caddy can reach the panel" runuser -u caddy -- curl -fsS --unix-socket /run/layer-panel/panel.sock http://panel/api/health
+check "other users can't reach the panel socket" bash -c '! runuser -u nobody -- curl -fsS --unix-socket /run/layer-panel/panel.sock http://panel/api/health'
+panel_pid="$(systemctl show -p MainPID --value layer-panel)"
+check "panel doesn't listen on any TCP port" bash -c "! ss -Hltnp | grep -q 'pid=$panel_pid,'"
+check "panel serves over HTTPS through Caddy ($panel_host)" \
+  bash -c "curl -sk -o /dev/null -w '%{http_code}' --resolve '$panel_host:443:127.0.0.1' 'https://$panel_host/api/health' | grep -q 200"
+check "secret key 640 root:layer" mode_is /etc/layer/secret.key "640 root:layer"
+panel_db_ok() { [[ ! -e /var/lib/layer/panel.db ]] || mode_is /var/lib/layer/panel.db "600 layer:layer-web"; }
+check "panel DB is private to layer" panel_db_ok
+check "layer CLI works" layer info
+
 echo "Memory"
 check "swap on (or RAM >= 4GB)" swap_ok
 check "vm.swappiness = 10" test "$(sysctl -n vm.swappiness)" == 10

@@ -4,3 +4,7 @@ dist/
 *.log
 .env*
 spike/out/
+.next/
+.dev/
+next-env.d.ts
+*.tsbuildinfo

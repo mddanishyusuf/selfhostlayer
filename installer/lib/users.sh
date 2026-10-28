@@ -4,16 +4,20 @@
 
 LAYER_USER=layer
 LAYER_APPS_GROUP=layer-apps
+# Shared only by caddy and layer, so Caddy can reach the panel's socket.
+LAYER_WEB_GROUP=layer-web
 
 setup_users() {
   step "Creating users and directories"
 
   getent group "$LAYER_APPS_GROUP" >/dev/null || run groupadd --system "$LAYER_APPS_GROUP"
+  getent group "$LAYER_WEB_GROUP" >/dev/null || run groupadd --system "$LAYER_WEB_GROUP"
   if ! id "$LAYER_USER" &>/dev/null; then
     run useradd --system --user-group --shell /usr/sbin/nologin \
       --home-dir /var/lib/layer --no-create-home "$LAYER_USER"
   fi
-  ok "Users: $LAYER_USER (panel), group $LAYER_APPS_GROUP (apps)"
+  id -nG "$LAYER_USER" | grep -qw "$LAYER_WEB_GROUP" || run usermod -aG "$LAYER_WEB_GROUP" "$LAYER_USER"
+  ok "Users: $LAYER_USER (panel), groups $LAYER_APPS_GROUP (apps), $LAYER_WEB_GROUP (panel socket)"
 
   # path                owner             mode
   layer_dir /opt/layer      root:root         755

@@ -32,6 +32,17 @@ call() {
 }
 expect() { if jq -e "$3" >/dev/null 2>&1 <<<"$2"; then pass "$1"; else fail "$1" "$2"; fi; }
 get() { curl -sk --max-time 5 --resolve "$domain:443:127.0.0.1" "https://$domain${1:-/}"; }
+# The first request to a brand-new site can beat its certificate (Caddy issues
+# it right after the reload), so wait up to 10s for an expected answer.
+get_eventually() {
+  local want="$1" got="" _
+  for _ in $(seq 1 20); do
+    got="$(get)"
+    [[ "$got" == "$want" ]] && break
+    sleep 0.5
+  done
+  printf '%s' "$got"
+}
 
 # A tiny release: answers its version and logs each request.
 make_release() {
@@ -101,7 +112,7 @@ echo "First deploy (blue)"
 expect "release.point blue → v1" "$(call release.point "{\"slug\":\"$slug\",\"color\":\"blue\",\"sha\":\"aaaaaaa\"}")" '.ok'
 expect "unit.start blue gets healthy" "$(call unit.start "{\"slug\":\"$slug\",\"color\":\"blue\"}")" '.ok and .result.healthy'
 expect "proxy.set → blue" "$(call proxy.set "{\"slug\":\"$slug\",\"color\":\"blue\",\"domains\":[\"$domain\"]}")" '.ok'
-expect "https://$domain serves v1" "\"$(get)\"" '. == "v1"'
+expect "https://$domain serves v1 (once its certificate is issued)" "\"$(get_eventually v1)\"" '. == "v1"'
 
 echo "Blue → green under traffic"
 start_traffic

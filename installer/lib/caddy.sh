@@ -33,3 +33,36 @@ EOF
   run systemctl restart caddy
   ok "Caddy: sites in $CADDY_SITES, admin API on /run/caddy/admin.sock"
 }
+
+# Step 8 (panel): the panel's own site. Caddy reaches the panel through a unix
+# socket shared via the layer-web group (only caddy and layer are members).
+setup_panel_site() {
+  step "Publishing the panel"
+  LAYER_PANEL_HOST="${LAYER_DOMAIN:-${LAYER_PUBLIC_IP//./-}.sslip.io}"
+  local tls=""
+  [[ "$LAYER_INTERNAL_TLS" == 1 ]] && tls=$'\n\ttls internal'
+
+  local changed=0
+  if ! id -nG caddy | grep -qw layer-web; then
+    run usermod -aG layer-web caddy
+    changed=1
+  fi
+  # _panel can't clash with an app: app slugs start with a letter.
+  cat >"$CADDY_SITES/_panel.caddy" <<SITE
+# Self Host Layer panel. Managed by the installer.
+$LAYER_PANEL_HOST {$tls
+	encode zstd gzip
+	reverse_proxy unix//run/layer-panel/panel.sock
+	log {
+		output file /var/log/caddy/_panel.log {
+			roll_size 10MiB
+			roll_keep 5
+		}
+		format json
+	}
+}
+SITE
+  # A new group membership only applies to a freshly started process.
+  if ((changed)); then run systemctl restart caddy; else run systemctl reload caddy; fi
+  ok "Panel at https://$LAYER_PANEL_HOST"
+}

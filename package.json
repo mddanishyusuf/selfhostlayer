@@ -4,6 +4,7 @@
   "type": "module",
   "workspaces": [
     "agent",
+    "panel",
     "packages/*"
   ],
   "engines": {
@@ -11,9 +12,10 @@
   },
   "scripts": {
     "test": "vitest run",
-    "typecheck": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json && tsc -p panel/tsconfig.json",
     "build:installer": "bash scripts/build-installer.sh",
-    "build:agent": "bash scripts/build-agent.sh"
+    "build:agent": "bash scripts/build-agent.sh",
+    "build:panel": "yarn --cwd panel build"
   },
   "devDependencies": {
     "@types/node": "^24",

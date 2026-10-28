@@ -3,9 +3,10 @@
 #
 #   scripts/dev-vm.sh up       # create the VM (2 CPU, 2GB RAM: a small VPS)
 #   scripts/dev-vm.sh spike    # run spike/next-sandbox.sh inside it
-#   scripts/dev-vm.sh install  # build dist/install.sh and run it inside the VM
 #   scripts/dev-vm.sh verify   # check the server state the installer promises
-#   scripts/dev-vm.sh agent    # build + install layer-agent in the VM, run its e2e test
+#   scripts/dev-vm.sh release  # build the release tarball, run the real installer with it
+#   scripts/dev-vm.sh e2e      # agent + blue/green end-to-end tests in the VM
+#   scripts/dev-vm.sh ui       # browser tour of the VM's panel (screenshots in dist/screenshots)
 #   scripts/dev-vm.sh lint     # shellcheck all scripts inside the VM
 #   scripts/dev-vm.sh shell    # open a shell in the VM
 #   scripts/dev-vm.sh reset    # destroy and recreate it (a fresh box)
@@ -49,7 +50,7 @@ lint() {
   bash "$root/scripts/build-installer.sh" dev >/dev/null
   local archive
   archive="$(mktemp -d)/layer-lint.tgz"
-  (cd "$root" && COPYFILE_DISABLE=1 tar --no-xattrs -czf "$archive" installer scripts spike dist)
+  (cd "$root" && COPYFILE_DISABLE=1 tar --no-xattrs -czf "$archive" installer scripts spike dist/install.sh)
   multipass transfer "$archive" "$vm:/home/ubuntu/layer-lint.tgz"
   multipass exec "$vm" -- sh -c '
     command -v shellcheck >/dev/null || sudo apt-get install -y -q shellcheck >/dev/null
@@ -58,17 +59,40 @@ lint() {
     echo "shellcheck: clean"'
 }
 
-agent() {
+vm_ip() { multipass info "$vm" | awk '/IPv4/ {print $2; exit}'; }
+
+# Builds the release tarball and runs the real installer with it. The panel is
+# served at https://<vm-ip>.sslip.io with Caddy's local CA (the VM has no
+# public IP for Let's Encrypt). The setup token is saved for `ui`.
+release() {
   exists || up
-  bash "$root/scripts/build-agent.sh" dev
-  multipass exec "$vm" -- mkdir -p /home/ubuntu/dist
-  multipass transfer "$root/dist/agent/layer-agent.mjs" "$root/dist/agent/layer.mjs" "$vm:/home/ubuntu/dist/"
-  multipass transfer "$root/system/layer-agent.service" "$root/scripts/dev-install-agent.sh" \
-    "$root/installer/test/agent-e2e.sh" "$root/installer/test/bluegreen-e2e.sh" "$vm:/home/ubuntu/"
-  multipass exec "$vm" -- sudo bash /home/ubuntu/dev-install-agent.sh \
-    /home/ubuntu/dist /home/ubuntu/layer-agent.service "$spike_node"
+  bash "$root/scripts/build-installer.sh" dev >/dev/null
+  bash "$root/scripts/build-release.sh" dev
+  multipass transfer "$root/dist/install.sh" "$root/dist/layer-dev.tar.gz" "$vm:/home/ubuntu/"
+  local host out
+  host="$(vm_ip | tr . -).sslip.io"
+  out="$(mktemp)"
+  multipass exec "$vm" -- sudo bash /home/ubuntu/install.sh --from-tarball /home/ubuntu/layer-dev.tar.gz \
+    --domain "$host" --internal-tls --yes "$@" | tee "$out"
+  sed 's/\x1b\[[0-9;]*m//g' "$out" | awk '/Setup token:/ {print $NF}' >"$root/dist/vm-setup-token"
+  echo "https://$host" >"$root/dist/vm-panel-url"
+}
+
+# Agent and blue/green end-to-end tests inside the VM.
+e2e() {
+  exists || up
+  multipass transfer "$root/installer/test/agent-e2e.sh" "$root/installer/test/bluegreen-e2e.sh" "$vm:/home/ubuntu/"
   multipass exec "$vm" -- sudo bash /home/ubuntu/agent-e2e.sh
   multipass exec "$vm" -- sudo bash /home/ubuntu/bluegreen-e2e.sh
+}
+
+# Drives Chrome on this machine through the VM's panel (setup → 2FA → sign in).
+ui() {
+  local url token
+  url="$(cat "$root/dist/vm-panel-url")"
+  token="$(cat "$root/dist/vm-setup-token")"
+  [[ -n "$token" ]] || { echo "no setup token saved: run 'scripts/dev-vm.sh reset && scripts/dev-vm.sh release' first" >&2; exit 1; }
+  node "$root/panel/scripts/ui-tour.ts" "$url" "$token" "$root/dist/screenshots"
 }
 
 verify() {
@@ -77,22 +101,17 @@ verify() {
   multipass exec "$vm" -- sudo bash /home/ubuntu/verify.sh "$@"
 }
 
-install() {
-  exists || up
-  bash "$root/scripts/build-installer.sh" dev >/dev/null
-  multipass transfer "$root/dist/install.sh" "$vm:/home/ubuntu/install.sh"
-  multipass exec "$vm" -- sudo bash /home/ubuntu/install.sh "$@"
-}
-
 case "${1:-}" in
   up) up ;;
   spike) spike ;;
   lint) lint ;;
   verify) shift; verify "$@" ;;
-  agent) agent ;;
-  install) shift; install "$@" ;;
+  release) shift; release "$@" ;;
+  e2e) e2e ;;
+  ui) ui ;;
+  install) shift; release "$@" ;; # older name for release
   shell) multipass shell "$vm" ;;
   reset) multipass delete --purge "$vm" 2>/dev/null || true; up ;;
   down) multipass delete --purge "$vm" ;;
-  *) sed -n '2,15p' "$0" | sed 's/^# \{0,1\}//'; exit 1 ;;
+  *) sed -n '2,16p' "$0" | sed 's/^# \{0,1\}//'; exit 1 ;;
 esac

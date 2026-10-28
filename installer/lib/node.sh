@@ -23,7 +23,7 @@ install_node() {
   run curl -fsSL -o "$tmp/$tarball" "$base/$tarball"
   run curl -fsSL -o "$tmp/SHASUMS256.txt" "$base/SHASUMS256.txt"
   if ! (cd "$tmp" && grep " $tarball\$" SHASUMS256.txt | sha256sum -c --status -); then
-    rm -rf "$tmp"
+    rm -rf "${tmp:?}"
     die "checksum mismatch for $tarball"
   fi
   ok "Checksum verified"
@@ -31,10 +31,10 @@ install_node() {
   # Unpack next to the target, then rename, so a half-extracted runtime never
   # appears at the real path.
   install -d -m 755 "$NODE_ROOT"
-  rm -rf "$dest.partial"
+  rm -rf "${dest:?}.partial"
   install -d -m 755 "$dest.partial"
   run tar -xJf "$tmp/$tarball" -C "$dest.partial" --strip-components=1 --no-same-owner
-  rm -rf "$tmp" "$dest"
+  rm -rf "${tmp:?}" "${dest:?}"
   mv "$dest.partial" "$dest"
   chown -R root:root "$dest"
   chmod -R go-w "$dest"

@@ -1,0 +1,62 @@
+# /etc/systemd/system/layer-panel.service
+# Self Host Layer web panel. Runs as the unprivileged `layer` user, listens on
+# /run/layer-panel/panel.sock (Caddy only) and asks layer-agent for anything
+# that needs root.
+[Unit]
+Description=Self Host Layer panel
+After=network-online.target layer-agent.service
+Wants=layer-agent.service
+
+[Service]
+Type=simple
+User=layer
+# Primary group layer-web: systemd creates /run/layer-panel as layer:layer-web,
+# so Caddy (also in layer-web) can reach the socket without any chown, which the
+# syscall filter below blocks. "layer" still grants /etc/layer (secret key).
+Group=layer-web
+SupplementaryGroups=layer
+WorkingDirectory=/opt/layer/current/web/panel
+ExecStart=/opt/layer/runtime/bin/node --disable-warning=ExperimentalWarning server.mjs
+Restart=always
+RestartSec=1
+Environment=NODE_ENV=production
+Environment=NEXT_TELEMETRY_DISABLED=1
+Environment=LAYER_PANEL_SOCKET=/run/layer-panel/panel.sock
+Environment=LAYER_DB=/var/lib/layer/panel.db
+Environment=LAYER_SECRET_KEY_FILE=/etc/layer/secret.key
+Environment=LAYER_SETUP_TOKEN_FILE=/etc/layer/setup-token
+Environment=LAYER_AGENT_SOCKET=/run/layer/agent.sock
+RuntimeDirectory=layer-panel
+RuntimeDirectoryMode=0750
+UMask=0077
+MemoryMax=384M
+TasksMax=256
+
+# Same sandbox as apps: the panel holds the keys, so it gets no extra rights.
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+ProtectSystem=strict
+ReadWritePaths=/var/lib/layer
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+ProtectProc=invisible
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
+SystemCallFilter=@system-service
+SystemCallFilter=~@privileged @resources
+SystemCallErrorNumber=EPERM
+SystemCallArchitectures=native
+
+[Install]
+WantedBy=multi-user.target
