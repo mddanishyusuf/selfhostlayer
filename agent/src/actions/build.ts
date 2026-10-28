@@ -29,7 +29,10 @@ import { sandboxArgs, SYSTEMD_RUN, type SandboxOptions } from "../sandbox.ts";
 import { appLayout } from "./app.ts";
 
 const MAX_SOURCE_BYTES = 500 * 2 ** 20;
-const TOKEN = /^[A-Za-z0-9_]{20,255}$/;
+// GitHub tokens: legacy installation tokens are ghs_ + ~36 chars of
+// [A-Za-z0-9_]; since 2026-10 they're stateless ghs_<appid>_<JWT>, ~520 chars
+// with dots and dashes (base64url). Allow both, and room to grow.
+const TOKEN = /^gh[a-z]_[A-Za-z0-9_.-]{20,4096}$/;
 
 export const tarballUrl = (owner: string, repo: string, sha: string) =>
   `https://api.github.com/repos/${owner}/${repo}/tarball/${sha}`;

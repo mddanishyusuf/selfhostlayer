@@ -87,6 +87,21 @@ describe("source URLs", () => {
     }
   });
 
+  it("accepts both GitHub installation token formats", async () => {
+    const fetchSource = (token: string) =>
+      buildActions["source.fetch"]!.run({ slug: "hello", owner: "o", repo: "r", sha: SHA, token }, env.ctx, NO_IO);
+    // The release is already on disk in this test, so a token that passes
+    // validation returns early with fetched: false (no network needed).
+    const jwtPart = (n: number) => "A1b2C3d4-_".repeat(n);
+    const stateless = `ghs_1234567_${jwtPart(4)}.${jwtPart(40)}.${jwtPart(8)}`;
+    expect(stateless.length).toBeGreaterThan(500);
+    for (const token of ["ghs_16C7e42F292c6912E7710c838347Ae178B4a", stateless]) {
+      await expect(fetchSource(token)).resolves.toMatchObject({ fetched: false });
+    }
+    await expect(fetchSource("ghs_" + "x".repeat(5000))).rejects.toThrow(/token/);
+    await expect(fetchSource("Bearer ghs_abc def")).rejects.toThrow(/token/);
+  });
+
   it("rejects bad source parameters before any network call", async () => {
     const fetchSource = (p: Record<string, unknown>) =>
       buildActions["source.fetch"]!.run({ slug: "hello", owner: "o", repo: "r", sha: SHA, ...p }, env.ctx, NO_IO);
