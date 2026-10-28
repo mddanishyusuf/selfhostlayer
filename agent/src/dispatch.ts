@@ -7,6 +7,7 @@ import { proxyActions } from "./actions/proxy.ts";
 import { releaseActions } from "./actions/release.ts";
 import { unitActions } from "./actions/unit.ts";
 import { nodeActions } from "./actions/node.ts";
+import { staticActions } from "./actions/static.ts";
 import { systemActions } from "./actions/system.ts";
 import { toolActions } from "./actions/tool.ts";
 import type { Audit } from "./audit.ts";
@@ -25,6 +26,7 @@ export const ACTION_TABLE: ActionTable = {
   ...logsActions,
   ...buildActions,
   ...toolActions,
+  ...staticActions,
 };
 
 export const MAX_LINE_BYTES = 1024 * 1024;

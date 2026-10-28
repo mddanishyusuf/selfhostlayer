@@ -31,6 +31,8 @@ setup_users() {
   layer_dir /var/log/layer  root:root         700
   # 711: app users can reach their own folder but can't list the others.
   layer_dir /srv/apps       root:root         711
+  # Published static sites: each site folder is root:caddy 750 (made by the agent).
+  layer_dir /srv/static     root:root         711
   ok "Directories under /opt/layer, /etc/layer, /var/lib/layer, /var/log/layer, /srv/apps"
 }
 

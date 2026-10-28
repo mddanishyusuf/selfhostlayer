@@ -20,7 +20,7 @@ export interface SystemInfo {
 export interface AppSummary {
   slug: string;
   ports: { blue: number | null; green: number | null };
-  live: "blue" | "green" | null;
+  live: "blue" | "green" | "static" | null;
   domains: string[];
   unitFile: boolean;
 }

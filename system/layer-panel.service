@@ -26,6 +26,7 @@ Environment=LAYER_DB=/var/lib/layer/panel.db
 Environment=LAYER_SECRET_KEY_FILE=/etc/layer/secret.key
 Environment=LAYER_SETUP_TOKEN_FILE=/etc/layer/setup-token
 Environment=LAYER_AGENT_SOCKET=/run/layer/agent.sock
+Environment=LAYER_BOX_CONFIG=/etc/layer/config.json
 RuntimeDirectory=layer-panel
 RuntimeDirectoryMode=0750
 UMask=0077

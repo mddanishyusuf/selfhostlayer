@@ -115,6 +115,56 @@ start_app express /health '["node","server.js"]'
 start_app astro /api/health '["node","dist/server/entry.mjs"]'
 start_app nuxt /api/health '["node",".output/server/index.mjs"]'
 
+echo "Static site (no Node process) and free URLs"
+# LAYER_TEST_SUFFIX=<ip-with-dashes>.sslip.io on a public box tests real certificates;
+# the default .internal uses Caddy's local CA.
+suffix="${LAYER_TEST_SUFFIX:-internal}"
+https_get() {
+  local insecure=()
+  [[ "$suffix" == internal ]] && insecure=(-k)
+  curl -s "${insecure[@]}" --max-time 15 --resolve "$1:443:127.0.0.1" "https://$1${2:-/}" "${@:3}"
+}
+# eventually <domain> <path> <expected substring>: a brand-new site's certificate takes a moment.
+eventually() {
+  local out="" _
+  for _ in $(seq 1 30); do
+    out="$(https_get "$1" "$2")"
+    [[ "$out" == *"$3"* ]] && break
+    sleep 2
+  done
+  printf '%s' "$out"
+}
+publish_vite() {
+  call static.publish "$(jq -nc --arg sha "$sha" '{slug: "ex-vite", sha: $sha, rootDir: "vite", outputDir: "dist"}')"
+}
+expect "static.publish copies vite/dist" "$(publish_vite)" ".ok and (.result.live | startswith(\"$sha-\"))"
+expect "proxy.set serves it at ex-vite.$suffix" \
+  "$(call proxy.set "{\"slug\":\"ex-vite\",\"domains\":[\"ex-vite.$suffix\"],\"static\":true,\"spa\":true}")" '.ok'
+if [[ "$(eventually "ex-vite.$suffix" / example-vite)" == *example-vite* ]]; then pass "https://ex-vite.$suffix serves the site"; else fail "https://ex-vite.$suffix serves the site" "$(https_get "ex-vite.$suffix" / -v 2>&1 | tail -5)"; fi
+[[ "$(https_get "ex-vite.$suffix" /some/client/route)" == *example-vite* ]] && pass "unknown paths fall back to index.html (SPA)" || fail "SPA fallback"
+asset="$(https_get "ex-vite.$suffix" / | grep -o '/assets/[^"]*\.js' | head -1)"
+# Headers into a variable first: `curl | grep -q` under pipefail fails when grep
+# exits early and curl dies of SIGPIPE.
+headers="$(https_get "ex-vite.$suffix" "$asset" -o /dev/null -D -)"
+grep -qi "cache-control: public, max-age=31536000, immutable" <<<"$headers" &&
+  pass "hashed assets are cached forever ($asset)" || fail "asset caching ($asset)" "$headers"
+[[ -z "$(systemctl list-units 'app-ex-vite*' --no-legend)" && -z "$(pgrep -u app-ex-vite)" ]] && pass "no Node process (or any process) runs for the static site" || fail "a process runs for the static site"
+[[ "$(find /srv/static/ex-vite -type l)" == /srv/static/ex-vite/current ]] && pass "the only symlink is current" || fail "unexpected symlinks" "$(find /srv/static/ex-vite -type l)"
+runuser -u app-ex-next -- cat /srv/static/ex-vite/current/index.html >/dev/null 2>&1 && fail "another app can read the static files" || pass "another app can't read the static files"
+build_vite() {
+  call build.run "$(jq -nc --arg sha "$sha" --arg node "$node_version" --arg b "$1" \
+    '{slug: "ex-vite", sha: $sha, nodeVersion: $node, packageManager: "pnpm", rootDir: "vite", buildCommand: $b}')" >/dev/null
+}
+build_vite 'pnpm run build && ln -s /etc/hostname dist/host.txt'
+expect "a symlink in the output is published as a plain copy" "$(publish_vite)" '.ok'
+[[ -f /srv/static/ex-vite/current/host.txt && ! -L /srv/static/ex-vite/current/host.txt ]] && pass "  (host.txt is a regular file)" || fail "host.txt"
+build_vite 'pnpm run build && ln -s /var/lib/caddy dist/keys'
+expect "a symlink to Caddy's private files fails the publish" "$(publish_vite)" '.error.code == "publish_failed"'
+[[ "$(https_get "ex-vite.$suffix" /)" == *example-vite* && ! -e /srv/static/ex-vite/current/keys ]] && pass "  and the live site is unchanged" || fail "live site after failed publish"
+expect "proxy.set gives a Node app its free URL ex-next.$suffix" \
+  "$(call proxy.set "{\"slug\":\"ex-next\",\"domains\":[\"ex-next.$suffix\"],\"color\":\"blue\"}")" '.ok'
+[[ "$(eventually "ex-next.$suffix" /api/health ok)" == ok ]] && pass "https://ex-next.$suffix/api/health answers ok" || fail "ex-next free URL"
+
 echo "The build sandbox"
 # build_cmd <command>: runs a build of ex-express (already fetched) with a custom build command.
 build_cmd() {

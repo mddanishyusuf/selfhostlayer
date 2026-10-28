@@ -24,6 +24,7 @@ export const ACTIONS = [
   "build.cancel",
   "cache.clean",
   "proxy.set",
+  "static.publish",
   "logs.tail",
   "security.score",
 ] as const;

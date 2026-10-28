@@ -89,6 +89,8 @@ export function testEnv(): TestEnv {
     toolsRoot: join(root, "opt", "layer", "tools"),
     systemdDir: join(root, "etc", "systemd", "system"),
     caddySitesDir: join(root, "etc", "caddy", "sites"),
+    staticRoot: join(root, "srv", "static"),
+    staticGroup: null,
     archiveRoot: join(root, "var", "lib", "layer-agent", "archive"),
     // High range, so the real isPortFree check doesn't collide with dev servers.
     portRange: { min: 46000, max: 46099 },

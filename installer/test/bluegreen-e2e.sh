@@ -163,8 +163,11 @@ wait "$follow_pid"
 if grep -q "GET /marker-follow" "$work/follow"; then pass "layer logs -f streams new lines"; else fail "layer logs -f streams new lines" "$(cat "$work/follow")"; fi
 score="$(call security.score "{\"slug\":\"$slug\",\"color\":\"blue\"}")"
 expect "safety score below 3 ($(jq -r '.result.score' <<<"$score"))" "$score" '.result.score < 3'
-if layer ps | grep -qE "^$slug +blue"; then pass "layer ps shows $slug live on blue"; else fail "layer ps shows $slug live on blue" "$(layer ps)"; fi
-if layer status "$slug" | grep -q "aaaaaaa"; then pass "layer status shows the release"; else fail "layer status shows the release"; fi
+# Output into variables first: `cmd | grep -q` under pipefail can fail on SIGPIPE.
+ps_out="$(layer ps)"
+status_out="$(layer status "$slug")"
+if grep -qE "^$slug +blue" <<<"$ps_out"; then pass "layer ps shows $slug live on blue"; else fail "layer ps shows $slug live on blue" "$ps_out"; fi
+if grep -q "aaaaaaa" <<<"$status_out"; then pass "layer status shows the release"; else fail "layer status shows the release"; fi
 if systemctl is-enabled --quiet "app-$slug@blue"; then pass "live color starts on boot (enabled)"; else fail "live color starts on boot (enabled)"; fi
 
 echo "Delete"

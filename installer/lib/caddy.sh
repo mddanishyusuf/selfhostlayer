@@ -61,4 +61,18 @@ SITE
   # setup_users put caddy in layer-web before setup_caddy restarted it.
   run systemctl reload caddy
   ok "Panel at https://$LAYER_PANEL_HOST"
+  write_config
+}
+
+# /etc/layer/config.json: what the panel needs to know about this box. Every
+# app gets a free URL <app>.<appsDomain>, which works without any DNS setup.
+write_config() {
+  local apps_domain="${LAYER_PUBLIC_IP//./-}.sslip.io"
+  install -m 640 -o root -g "$LAYER_USER" /dev/null /etc/layer/config.json.new
+  jq -n --arg panelHost "$LAYER_PANEL_HOST" --arg appsDomain "$apps_domain" --arg publicIp "$LAYER_PUBLIC_IP" \
+    --arg version "$LAYER_INSTALLED_VERSION" --arg node "$LAYER_NODE_DEFAULT" \
+    '{panelHost: $panelHost, appsDomain: $appsDomain, publicIp: $publicIp, version: $version, defaultNode: $node}' \
+    >/etc/layer/config.json.new
+  mv /etc/layer/config.json.new /etc/layer/config.json
+  ok "Apps get free URLs at https://<app>.$apps_domain"
 }

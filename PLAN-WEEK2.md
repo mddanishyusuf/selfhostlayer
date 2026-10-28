@@ -63,7 +63,17 @@ All six examples were built from clean copies the way the server will, with froz
 - **Build sandbox, checked on real boxes:** a build can't write `/etc`, read `/etc/shadow` or list another app's folder, and runs as its own user with the app's env. `%` and `$` in commands reach bash unchanged. Builds run at low CPU and IO priority (`CPUWeight=20`, `Nice=10`) so live apps stay responsive.
 - **Bug the e2e caught:** a cancelled build reported success, because systemd counts the SIGTERM from `systemctl stop` as a clean exit. The cancel flag is now checked before the exit code.
 - **Disk guard** (default 15% free, configurable): it refused the unit tests on a Mac with 6% free, so tests set it to 0.
-- **Tests:** 135 unit tests (77 in the agent), plus `build-e2e.sh` in the VM, on the VPS and in CI.
+- **Tests:** 143 unit tests (77 in the agent), plus `build-e2e.sh` in the VM, on the VPS and in CI.
+
+## Day 3 result (2026-10-28)
+**Done when "detection tests pass for every example; a static site serves with no Node process": passed**, in the VM and on the real VPS, where `https://ex-vite.37-27-25-45.sslip.io` and `https://ex-next.37-27-25-45.sslip.io` got real certificates through their free URLs.
+
+- **Framework detection** (`panel/lib/detect.ts`, pure, 31 tests): Next.js, Nuxt, Astro (server or static), React Router, Remix, Vite, CRA, Node servers and plain HTML. Package manager from `packageManager`, then lockfiles. Start commands run node directly when the start script is a plain `node …` command (npm as a runner needs a writable home the sandbox doesn't give). Node versions come from `.nvmrc` / `.node-version` / `engines`, resolved by `lib/node-version.ts` (an npm-style range resolver that prefers LTS) against Node's release index.
+- **Static sites** (`static.publish` + `proxy.set` with `static: true`): the output is copied as the app user with `cp -L` into `/srv/static/<app>/<sha>-<time>` (setgid `caddy`, 2750), and the root-owned `current` symlink switches atomically. Caddy serves it with `file_server`: SPA fallback or clean URLs with a 404 page, and hashed assets cached forever. No process runs for a static site.
+- **Why the copy and the root-owned `current`:** Caddy follows symlinks, so a link in a build's output to `/var/lib/caddy` would serve Caddy's TLS keys. `cp -L` turns readable links into plain copies and fails on unreadable ones; the app can never repoint `current`. Both are checked on the real boxes.
+- **Free URLs:** the installer writes `/etc/layer/config.json` (panel host, `appsDomain` = `<ip-with-dashes>.sslip.io`, version, default Node); the panel reads it with `lib/box.ts`. Every app can be served at `<slug>.<appsDomain>`.
+- **Bugs found:** app users couldn't reach their own static folder (the site folder is now 751). Re-publishing the *same* commit deleted the live folder before copying, so a failed redeploy would take the site down; every publish now goes to a new folder. Plus one `curl | grep -q` pipefail flake in the tests (fixed in two places).
+- **Risk noted:** `sslip.io` is not on the Public Suffix List, so in principle Let's Encrypt's 50-certificates-per-week limit is shared by every sslip.io user. Caddy falls back to ZeroSSL; free URLs are for trying things, custom domains (Week 3) are for production.
 
 ## Known limits
 - The VM has no public IP, so GitHub can't deliver webhooks to it: push-to-deploy is tested on the VPS. Everything else works in the VM.

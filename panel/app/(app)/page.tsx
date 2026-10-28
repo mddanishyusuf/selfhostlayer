@@ -150,7 +150,9 @@ async function Apps() {
               <p className="truncate text-[13px] text-muted">{app.domains.length ? app.domains.join(", ") : "No domain yet"}</p>
             </div>
             <p className="hidden text-[13px] text-muted tabular-nums sm:block">
-              {app.live ? (
+              {app.live === "static" ? (
+                <span className="text-foreground">static</span>
+              ) : app.live ? (
                 <>
                   <span className="text-foreground">{app.live}</span> :{app.ports[app.live]}
                 </>

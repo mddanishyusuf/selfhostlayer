@@ -13,6 +13,10 @@ export interface Paths {
   toolsRoot: string;
   systemdDir: string;
   caddySitesDir: string;
+  /** Published static sites, served by Caddy's file_server. */
+  staticRoot: string;
+  /** Group that lets Caddy read published files; null uses the owner's group (tests). */
+  staticGroup: string | null;
   /** Where app.delete moves data/ when keepData is set. */
   archiveRoot: string;
   /** Supplementary group for every app user. */
@@ -33,6 +37,8 @@ export const DEFAULT_PATHS: Paths = {
   toolsRoot: "/opt/layer/tools",
   systemdDir: "/etc/systemd/system",
   caddySitesDir: "/etc/caddy/sites",
+  staticRoot: "/srv/static",
+  staticGroup: "caddy",
   archiveRoot: "/var/lib/layer-agent/archive",
   appsGroup: "layer-apps",
   nodeDistBase: "https://nodejs.org/dist",

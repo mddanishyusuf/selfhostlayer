@@ -50,7 +50,8 @@ function colorRelease(app: ReturnType<typeof appLayout>, color: Color): string |
 export function liveColor(ctx: Context, slug: string): Color | null {
   const site = childOf(ctx.paths.caddySitesDir, `${slug}.caddy`);
   if (!existsSync(site)) return null;
-  return parseLiveMarker(readFileSync(site, "utf8"))?.color ?? null;
+  const live = parseLiveMarker(readFileSync(site, "utf8"))?.color ?? null;
+  return live === "static" ? null : live;
 }
 
 async function unitWrite(params: Params, ctx: Context) {

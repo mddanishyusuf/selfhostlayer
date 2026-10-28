@@ -129,6 +129,7 @@ async function appDelete(params: Params, ctx: Context) {
   }
   rmSync(app.appDir, { recursive: true, force: true });
   rmSync(app.etcDir, { recursive: true, force: true });
+  rmSync(childOf(ctx.paths.staticRoot, slug), { recursive: true, force: true });
 
   return { slug, deleted: true, archivedData };
 }
@@ -140,7 +141,7 @@ async function appList(_params: Params, ctx: Context) {
   const apps = slugs.map((slug) => {
     const app = appLayout(ctx, slug);
     const site = childOf(ctx.paths.caddySitesDir, `${slug}.caddy`);
-    const live: Color | null = existsSync(site) ? (parseLiveMarker(readFileSync(site, "utf8"))?.color ?? null) : null;
+    const live: Color | "static" | null = existsSync(site) ? (parseLiveMarker(readFileSync(site, "utf8"))?.color ?? null) : null;
     const domains = existsSync(site) ? (/^([^#\s][^{]*)\{/m.exec(readFileSync(site, "utf8"))?.[1] ?? "").split(",").map((d) => d.trim()).filter(Boolean) : [];
     return {
       slug,
