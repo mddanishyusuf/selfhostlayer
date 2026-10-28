@@ -1,5 +1,6 @@
 import { isActionName, ValidationError, type Response } from "@layer/protocol";
 import { appActions } from "./actions/app.ts";
+import { buildActions } from "./actions/build.ts";
 import { envActions } from "./actions/env.ts";
 import { logsActions } from "./actions/logs.ts";
 import { proxyActions } from "./actions/proxy.ts";
@@ -7,6 +8,7 @@ import { releaseActions } from "./actions/release.ts";
 import { unitActions } from "./actions/unit.ts";
 import { nodeActions } from "./actions/node.ts";
 import { systemActions } from "./actions/system.ts";
+import { toolActions } from "./actions/tool.ts";
 import type { Audit } from "./audit.ts";
 import { NO_IO, type ActionTable, type CallIO, type Context } from "./context.ts";
 import { ActionError } from "./errors.ts";
@@ -21,6 +23,8 @@ export const ACTION_TABLE: ActionTable = {
   ...releaseActions,
   ...proxyActions,
   ...logsActions,
+  ...buildActions,
+  ...toolActions,
 };
 
 export const MAX_LINE_BYTES = 1024 * 1024;

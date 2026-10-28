@@ -61,6 +61,13 @@ describe("renderAppUnit", () => {
     expect(() => renderAppUnit({ ...piqo, writablePaths: ["/etc"] })).toThrow(/writablePaths/);
   });
 
+  it("runs from the root dir for monorepos, with writable paths inside it", () => {
+    const unit = renderAppUnit({ ...piqo, rootDir: "apps/web" });
+    expect(unit).toContain("WorkingDirectory=/srv/apps/piqo/%i/apps/web\n");
+    expect(unit).toContain("ReadWritePaths=/srv/apps/piqo/data -/srv/apps/piqo/%i/apps/web/.next/cache\n");
+    expect(() => renderAppUnit({ ...piqo, rootDir: "../x" })).toThrow(/rootDir/);
+  });
+
   it("always makes data/ writable, even with no extra paths", () => {
     const unit = renderAppUnit({ ...piqo, writablePaths: undefined });
     expect(unit).toContain("ReadWritePaths=/srv/apps/piqo/data\n");

@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import { chmodSync, chownSync, closeSync, fsyncSync, mkdirSync, openSync, renameSync, rmSync, writeSync } from "node:fs";
+import { chmodSync, closeSync, constants, fchmodSync, fchownSync, fsyncSync, mkdirSync, openSync, renameSync, rmSync, writeSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import type { Exec } from "./exec.ts";
 import { BIN } from "./exec.ts";
@@ -32,11 +32,28 @@ export function writeFileAtomic(path: string, content: string, mode: number): vo
   }
 }
 
-/** mkdir -p plus an exact owner and mode, also on dirs that already exist. */
+/**
+ * mkdir -p plus an exact owner and mode, also on dirs that already exist.
+ * The last path component is opened with O_NOFOLLOW and changed through the
+ * file descriptor: an app user can replace a folder inside its own tree with a
+ * symlink (say to /etc), and root must never chown or chmod through it.
+ */
 export function ensureDir(path: string, mode: number, owner?: { uid: number; gid: number }): void {
   mkdirSync(path, { recursive: true, mode });
-  if (owner) chownSync(path, owner.uid, owner.gid);
-  chmodSync(path, mode);
+  let fd: number;
+  try {
+    fd = openSync(path, constants.O_RDONLY | constants.O_DIRECTORY | constants.O_NOFOLLOW);
+  } catch (err) {
+    const code = (err as NodeJS.ErrnoException).code;
+    if (code === "ELOOP" || code === "ENOTDIR") throw new Error(`refusing ${path}: it is not a real directory (symlink?)`);
+    throw err;
+  }
+  try {
+    if (owner) fchownSync(fd, owner.uid, owner.gid);
+    fchmodSync(fd, mode);
+  } finally {
+    closeSync(fd);
+  }
 }
 
 export interface SystemUser {

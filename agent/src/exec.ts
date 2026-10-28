@@ -9,6 +9,7 @@ export const BIN = {
   pkill: "/usr/bin/pkill",
   tar: "/usr/bin/tar",
   chmod: "/usr/bin/chmod",
+  unzip: "/usr/bin/unzip",
   journalctl: "/usr/bin/journalctl",
   systemdAnalyze: "/usr/bin/systemd-analyze",
 } as const;

@@ -54,7 +54,7 @@ describe("assertEnvVars", () => {
 describe("color env", () => {
   it("round-trips the port", () => {
     const file = renderColorEnv(4001);
-    expect(file).toContain("PORT=4001\nHOSTNAME=127.0.0.1\nNODE_ENV=production\n");
+    expect(file).toContain("PORT=4001\nHOSTNAME=127.0.0.1\nHOST=127.0.0.1\nNODE_ENV=production\n");
     expect(parseColorEnvPort(file)).toBe(4001);
     expect(parseColorEnvPort("NOPE=1")).toBeNull();
     expect(() => renderColorEnv(80)).toThrow();

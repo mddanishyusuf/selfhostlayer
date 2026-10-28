@@ -5,7 +5,7 @@
 #   scripts/dev-vm.sh spike    # run spike/next-sandbox.sh inside it
 #   scripts/dev-vm.sh verify   # check the server state the installer promises
 #   scripts/dev-vm.sh release  # build the release tarball, run the real installer with it
-#   scripts/dev-vm.sh e2e      # agent + blue/green end-to-end tests in the VM
+#   scripts/dev-vm.sh e2e      # agent, blue/green and build end-to-end tests in the VM
 #   scripts/dev-vm.sh ui       # browser tour of the VM's panel (screenshots in dist/screenshots)
 #   scripts/dev-vm.sh lint     # shellcheck all scripts inside the VM
 #   scripts/dev-vm.sh shell    # open a shell in the VM
@@ -78,12 +78,14 @@ release() {
   echo "https://$host" >"$root/dist/vm-panel-url"
 }
 
-# Agent and blue/green end-to-end tests inside the VM.
+# Agent, blue/green and build end-to-end tests inside the VM.
 e2e() {
   exists || up
-  multipass transfer "$root/installer/test/agent-e2e.sh" "$root/installer/test/bluegreen-e2e.sh" "$vm:/home/ubuntu/"
+  multipass transfer "$root/installer/test/agent-e2e.sh" "$root/installer/test/bluegreen-e2e.sh" \
+    "$root/installer/test/build-e2e.sh" "$vm:/home/ubuntu/"
   multipass exec "$vm" -- sudo bash /home/ubuntu/agent-e2e.sh
   multipass exec "$vm" -- sudo bash /home/ubuntu/bluegreen-e2e.sh
+  multipass exec "$vm" -- sudo bash /home/ubuntu/build-e2e.sh
 }
 
 # Drives Chrome on this machine through the VM's panel (setup → 2FA → sign in).

@@ -18,6 +18,8 @@ export function appLayout(ctx: Context, slug: string) {
     appDir,
     releases: join(appDir, "releases"),
     data: join(appDir, "data"),
+    /** Package-manager caches and tool shims for builds. */
+    cache: join(appDir, "cache"),
     etcDir,
     appEnv: join(etcDir, "app.env"),
     colorEnv: (color: "blue" | "green") => join(etcDir, `${color}.env`),
@@ -60,6 +62,7 @@ async function appCreate(params: Params, ctx: Context) {
   ensureDir(app.appDir, 0o750, owner);
   ensureDir(app.releases, 0o750, owner);
   ensureDir(app.data, 0o700, owner);
+  ensureDir(app.cache, 0o700, owner);
   ensureDir(app.etcDir, 0o755);
   if (!existsSync(app.appEnv)) writeFileAtomic(app.appEnv, renderEnvFile({}), 0o600);
 

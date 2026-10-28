@@ -4,6 +4,7 @@ import { AGENT_VERSION, DEFAULT_PATHS } from "./config.ts";
 import { createDispatcher } from "./dispatch.ts";
 import { realExec } from "./exec.ts";
 import { lookupGid } from "./fsutil.ts";
+import { realSpawn } from "./sandbox.ts";
 import { listen } from "./server.ts";
 
 async function main(): Promise<void> {
@@ -12,7 +13,7 @@ async function main(): Promise<void> {
     process.exit(1);
   }
   const paths = DEFAULT_PATHS;
-  const ctx = { paths, exec: realExec };
+  const ctx = { paths, exec: realExec, spawn: realSpawn };
 
   let gid: number | null = null;
   if (paths.socketGroup) {

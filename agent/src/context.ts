@@ -1,10 +1,13 @@
 import type { ActionName } from "@layer/protocol";
 import type { Paths } from "./config.ts";
 import type { Exec } from "./exec.ts";
+import type { Spawn } from "./sandbox.ts";
 
 export interface Context {
   paths: Paths;
   exec: Exec;
+  /** Streaming runs (builds); exec is for short commands. */
+  spawn: Spawn;
 }
 
 export type Params = Record<string, unknown>;

@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
   assertColor,
+  assertCommand,
+  assertFullSha,
+  assertGithubOwner,
+  assertGithubRepo,
+  assertPackageManager,
   assertDomain,
   assertHealthPath,
   assertEnvKey,
@@ -137,5 +142,28 @@ describe("assertHealthPath", () => {
     for (const bad of ["", "health", "/a b", "/a\nb", "//evil.com\r\n", "/" + "x".repeat(256)]) {
       expect(() => assertHealthPath(bad)).toThrow();
     }
+  });
+});
+
+describe("GitHub source validators", () => {
+  it("accepts real owner/repo names and full shas only", () => {
+    expect(assertGithubOwner("mddanishyusuf")).toBe("mddanishyusuf");
+    expect(assertGithubRepo("selfhostlayer-examples")).toBe("selfhostlayer-examples");
+    expect(assertGithubRepo("next.js")).toBe("next.js");
+    expect(assertFullSha("a".repeat(40))).toBe("a".repeat(40));
+    for (const bad of ["-x", "a/b", "a b", "x".repeat(40), "../x", ""]) expect(() => assertGithubOwner(bad)).toThrow();
+    for (const bad of [".", "..", "a/b", "a b", "x".repeat(101), "a?b"]) expect(() => assertGithubRepo(bad)).toThrow();
+    for (const bad of ["abc1234", "A".repeat(40), "a".repeat(41), "main"]) expect(() => assertFullSha(bad)).toThrow();
+  });
+
+  it("knows the four package managers", () => {
+    expect(assertPackageManager("pnpm")).toBe("pnpm");
+    expect(() => assertPackageManager("deno")).toThrow(/packageManager/);
+  });
+
+  it("accepts one-line commands", () => {
+    expect(assertCommand("  yarn build && node scripts/x.js ", "buildCommand")).toBe("yarn build && node scripts/x.js");
+    expect(() => assertCommand("a\nb", "buildCommand")).toThrow();
+    expect(() => assertCommand("   ", "buildCommand")).toThrow(/empty/);
   });
 });

@@ -131,3 +131,16 @@ describe("allocatePortPair", () => {
     });
   });
 });
+
+describe("ensureDir and symlinks", () => {
+  it("refuses to chown or chmod through a symlink an app planted", async () => {
+    const { ensureDir } = await import("../src/fsutil.ts");
+    const { symlinkSync, mkdirSync: mk, statSync: st } = await import("node:fs");
+    const target = join(env.root, "outside");
+    mk(target, { mode: 0o755 });
+    const link = join(env.root, "releases-link");
+    symlinkSync(target, link);
+    expect(() => ensureDir(link, 0o700)).toThrow(/not a real directory/);
+    expect((st(target).mode & 0o777).toString(8)).toBe("755");
+  });
+});

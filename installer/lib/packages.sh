@@ -7,7 +7,7 @@ CADDY_KEYRING="/usr/share/keyrings/caddy-stable-archive-keyring.gpg"
 CADDY_LIST="/etc/apt/sources.list.d/caddy-stable.list"
 
 PACKAGES=(
-  ca-certificates curl gnupg xz-utils jq sqlite3
+  ca-certificates curl gnupg xz-utils unzip jq sqlite3
   ufw fail2ban python3-systemd unattended-upgrades
   caddy
 )

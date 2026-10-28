@@ -40,6 +40,7 @@ echo "Users and directories"
 check "layer user has no login shell" test "$(getent passwd layer | cut -d: -f7)" == /usr/sbin/nologin
 check "layer-apps group exists" getent group layer-apps
 check "/opt/layer 755 root:root" mode_is /opt/layer "755 root:root"
+check "/opt/layer/tools 755 root:root" mode_is /opt/layer/tools "755 root:root"
 check "/etc/layer 750 root:layer" mode_is /etc/layer "750 root:layer"
 check "/etc/layer/apps 755 root:root" mode_is /etc/layer/apps "755 root:root"
 check "/var/lib/layer 700 layer:layer" mode_is /var/lib/layer "700 layer:layer"

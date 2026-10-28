@@ -4,6 +4,29 @@ import { join } from "node:path";
 import { DEFAULT_PATHS, type Paths } from "../src/config.ts";
 import type { Context } from "../src/context.ts";
 import { BIN, type Exec, type ExecResult } from "../src/exec.ts";
+import type { Spawn } from "../src/sandbox.ts";
+
+export interface FakeSpawn {
+  spawn: Spawn;
+  calls: string[][];
+  /** Exit code and output for a call; default 0 and no output. */
+  respond?: (
+    file: string,
+    args: string[],
+  ) => { code: number; output?: string } | undefined | Promise<{ code: number; output?: string } | undefined>;
+}
+
+export function fakeSpawn(): FakeSpawn {
+  const fake: FakeSpawn = { spawn: undefined as unknown as Spawn, calls: [] };
+  fake.spawn = async (file, args, opts) => {
+    fake.calls.push([file, ...args]);
+    const r = (await fake.respond?.(file, args)) ?? { code: 0 };
+    if (r.output) opts.onData(r.output);
+    opts.stdin?.resume();
+    return { code: r.code };
+  };
+  return fake;
+}
 
 export interface FakeExec {
   exec: Exec;
@@ -49,6 +72,7 @@ export interface TestEnv {
   paths: Paths;
   ctx: Context;
   fake: FakeExec;
+  spawner: FakeSpawn;
   cleanup: () => void;
 }
 
@@ -62,12 +86,23 @@ export function testEnv(): TestEnv {
     appsRoot: join(root, "srv", "apps"),
     appEtcRoot: join(root, "etc", "layer", "apps"),
     nodeRoot: join(root, "opt", "layer", "node"),
+    toolsRoot: join(root, "opt", "layer", "tools"),
     systemdDir: join(root, "etc", "systemd", "system"),
     caddySitesDir: join(root, "etc", "caddy", "sites"),
     archiveRoot: join(root, "var", "lib", "layer-agent", "archive"),
     // High range, so the real isPortFree check doesn't collide with dev servers.
     portRange: { min: 46000, max: 46099 },
+    // Tests must not depend on how full the developer's disk is.
+    minFreeDisk: 0,
   };
   const fake = fakeExec();
-  return { root, paths, ctx: { paths, exec: fake.exec }, fake, cleanup: () => rmSync(root, { recursive: true, force: true }) };
+  const spawner = fakeSpawn();
+  return {
+    root,
+    paths,
+    ctx: { paths, exec: fake.exec, spawn: spawner.spawn },
+    fake,
+    spawner,
+    cleanup: () => rmSync(root, { recursive: true, force: true }),
+  };
 }

@@ -54,6 +54,17 @@ All six examples were built from clean copies the way the server will, with froz
 - **Installer order:** `caddy` was added to `layer-web` only in the panel-site step, after the caddy-user health check, so a fresh box failed at "Starting services". Now `setup_users` adds it, before Caddy restarts.
 - **`RestrictSUIDSGID=yes` breaks GNU tar on 26.04:** systemd blocks `openat2()` with ENOSYS under that setting, and tar there uses `openat2()` without falling back ("Cannot open: Function not implemented"). Removed from the agent unit. **Day 2 impact:** `source.fetch` unpacks as the app user; either its transient unit leaves out `RestrictSUIDSGID`, or the unpacking happens in Node (whose `fs` uses `openat`) rather than with the tar binary. App runtime units keep it.
 
+## Day 2 result (2026-10-28)
+**Done when "VM e2e builds every example from its GitHub tarball, sandboxed; the broken one fails cleanly": passed**, in the VM (24.04, arm64) and on the real 1GB VPS (26.04, x86, 1 CPU). `installer/test/build-e2e.sh` has 46 checks; on the VPS, Next.js and Nuxt build in about 20s each, the others in under 6s.
+
+- **New agent actions:** `source.fetch`, `build.run` (install and build as two streamed steps with `::layer::step` markers), `build.cancel`, `release.prune`, `cache.clean`, `tool.install` (bun). `unit.write` takes a `rootDir` for monorepos. The per-color env now also sets `HOST`.
+- **Rule: root never touches files in an app's tree while the app can run.** Unpacking, building, pruning and cache cleanup all run as the app user in a transient sandbox (`agent/src/sandbox.ts`); the tarball reaches `tar` through stdin. Root only downloads, sending the token to `api.github.com` and following only the 302 to `codeload.github.com`.
+- **Fixed a latent root bug:** `ensureDir` used to `chown` through symlinks, so a compromised app could swap `releases/` for a link to `/etc` and get root to hand it over on the next `app.create`. It now opens the directory with `O_NOFOLLOW` and changes it through the descriptor.
+- **Build sandbox, checked on real boxes:** a build can't write `/etc`, read `/etc/shadow` or list another app's folder, and runs as its own user with the app's env. `%` and `$` in commands reach bash unchanged. Builds run at low CPU and IO priority (`CPUWeight=20`, `Nice=10`) so live apps stay responsive.
+- **Bug the e2e caught:** a cancelled build reported success, because systemd counts the SIGTERM from `systemctl stop` as a clean exit. The cancel flag is now checked before the exit code.
+- **Disk guard** (default 15% free, configurable): it refused the unit tests on a Mac with 6% free, so tests set it to 0.
+- **Tests:** 135 unit tests (77 in the agent), plus `build-e2e.sh` in the VM, on the VPS and in CI.
+
 ## Known limits
 - The VM has no public IP, so GitHub can't deliver webhooks to it: push-to-deploy is tested on the VPS. Everything else works in the VM.
 - Builds have outbound network access (npm needs it). A malicious install script stays inside the app user's sandbox but can make outbound connections during the build. A per-app "no outbound network" option comes later.

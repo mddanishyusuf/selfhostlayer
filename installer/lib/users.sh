@@ -24,6 +24,7 @@ setup_users() {
 
   # path                owner             mode
   layer_dir /opt/layer      root:root         755
+  layer_dir /opt/layer/tools root:root        755
   layer_dir /etc/layer      "root:$LAYER_USER" 750
   layer_dir /etc/layer/apps root:root         755
   layer_dir /var/lib/layer  "$LAYER_USER:$LAYER_USER" 700

@@ -75,6 +75,8 @@ jobs:
         run: sudo bash installer/test/agent-e2e.sh
       - name: blue/green deploy with zero dropped requests
         run: sudo bash installer/test/bluegreen-e2e.sh
+      - name: fetch and build every example from GitHub, sandboxed
+        run: sudo bash installer/test/build-e2e.sh
       - name: panel UI tour in Chrome (setup, 2FA, sign in)
         run: |
           echo "127.0.0.1 layer.internal" | sudo tee -a /etc/hosts

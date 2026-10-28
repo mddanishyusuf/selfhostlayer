@@ -15,6 +15,11 @@ export class ValidationError extends Error {
 const SLUG = /^[a-z](?:[a-z0-9-]{0,29}[a-z0-9])$/;
 const NODE_VERSION = /^\d{1,3}\.\d{1,3}\.\d{1,3}$/;
 const SHA = /^[0-9a-f]{7,40}$/;
+const FULL_SHA = /^[0-9a-f]{40}$/;
+// GitHub's own rules: owners are 1-39 of [A-Za-z0-9-] not starting with "-";
+// repos are 1-100 of [A-Za-z0-9._-] and never "." or "..".
+const GITHUB_OWNER = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})$/;
+const GITHUB_REPO = /^[A-Za-z0-9._-]{1,100}$/;
 const ENV_KEY = /^[A-Z_][A-Z0-9_]{0,127}$/;
 const PATH_SEGMENT = /^[A-Za-z0-9._-]+$/;
 const DOMAIN_LABEL = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/;
@@ -24,6 +29,8 @@ const HEALTH_PATH = /^\/[A-Za-z0-9._~\/?=&%+-]{0,255}$/;
 const CONTROL_CHARS = /[\u0000-\u001f\u007f]/;
 
 export const COLORS = ["blue", "green"] as const;
+export const PACKAGE_MANAGERS = ["npm", "yarn", "pnpm", "bun"] as const;
+export type PackageManager = (typeof PACKAGE_MANAGERS)[number];
 export type Color = (typeof COLORS)[number];
 
 export function assertSlug(value: unknown, field = "slug"): string {
@@ -111,4 +118,44 @@ export function assertHealthPath(value: unknown, field = "healthPath"): string {
     throw new ValidationError(field, "must be a path starting with / (letters, digits and ._~/?=&%+-)");
   }
   return value;
+}
+
+/** A full 40-char commit sha: builds pin an exact commit, never a branch name. */
+export function assertFullSha(value: unknown, field = "sha"): string {
+  if (typeof value !== "string" || !FULL_SHA.test(value)) {
+    throw new ValidationError(field, "must be a full 40-char lowercase commit sha");
+  }
+  return value;
+}
+
+export function assertGithubOwner(value: unknown, field = "owner"): string {
+  if (typeof value !== "string" || !GITHUB_OWNER.test(value)) {
+    throw new ValidationError(field, "must be a GitHub user or organization name");
+  }
+  return value;
+}
+
+export function assertGithubRepo(value: unknown, field = "repo"): string {
+  if (typeof value !== "string" || !GITHUB_REPO.test(value) || value === "." || value === "..") {
+    throw new ValidationError(field, "must be a GitHub repository name");
+  }
+  return value;
+}
+
+export function assertPackageManager(value: unknown, field = "packageManager"): PackageManager {
+  if (!PACKAGE_MANAGERS.includes(value as PackageManager)) {
+    throw new ValidationError(field, `must be one of ${PACKAGE_MANAGERS.join(", ")}`);
+  }
+  return value as PackageManager;
+}
+
+/**
+ * A shell command from the project's settings (custom install/build command).
+ * It runs as the app's own user inside the build sandbox, like any npm script,
+ * so it only has to be a single line.
+ */
+export function assertCommand(value: unknown, field: string): string {
+  const command = assertLine(value, field, 1000).trim();
+  if (!command) throw new ValidationError(field, "must not be empty");
+  return command;
 }

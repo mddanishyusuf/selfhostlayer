@@ -42,7 +42,10 @@ export function renderColorEnv(port: number): string {
   return [
     "# Managed by layer-agent.",
     `PORT=${port}`,
+    // Next.js and Express examples read HOSTNAME; Astro's Node adapter and
+    // Nuxt/Nitro read HOST. Both, so nothing binds to localhost/IPv6 only.
     "HOSTNAME=127.0.0.1",
+    "HOST=127.0.0.1",
     "NODE_ENV=production",
     "",
   ].join("\n");

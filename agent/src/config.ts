@@ -9,6 +9,8 @@ export interface Paths {
   appsRoot: string;
   appEtcRoot: string;
   nodeRoot: string;
+  /** Other runtimes builds may need (bun), read-only like Node. */
+  toolsRoot: string;
   systemdDir: string;
   caddySitesDir: string;
   /** Where app.delete moves data/ when keepData is set. */
@@ -17,6 +19,8 @@ export interface Paths {
   appsGroup: string;
   nodeDistBase: string;
   portRange: { min: number; max: number };
+  /** Builds refuse to start below this fraction of free disk on appsRoot. */
+  minFreeDisk: number;
 }
 
 export const DEFAULT_PATHS: Paths = {
@@ -26,12 +30,14 @@ export const DEFAULT_PATHS: Paths = {
   appsRoot: "/srv/apps",
   appEtcRoot: "/etc/layer/apps",
   nodeRoot: "/opt/layer/node",
+  toolsRoot: "/opt/layer/tools",
   systemdDir: "/etc/systemd/system",
   caddySitesDir: "/etc/caddy/sites",
   archiveRoot: "/var/lib/layer-agent/archive",
   appsGroup: "layer-apps",
   nodeDistBase: "https://nodejs.org/dist",
   portRange: { min: 4000, max: 4999 },
+  minFreeDisk: 0.15,
 };
 
 // Replaced at bundle time by esbuild --define.

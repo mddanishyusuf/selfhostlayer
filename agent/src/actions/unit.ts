@@ -67,6 +67,7 @@ async function unitWrite(params: Params, ctx: Context) {
     memoryMaxMb: (params.memoryMaxMb ?? 512) as number,
     cpuQuotaPercent: (params.cpuQuotaPercent ?? 100) as number,
     writablePaths: params.writablePaths as string[] | undefined,
+    rootDir: params.rootDir === undefined || params.rootDir === "" ? undefined : (params.rootDir as string),
   });
   ensureDir(ctx.paths.systemdDir, 0o755);
   writeFileAtomic(join(ctx.paths.systemdDir, unitName(slug)), unit, 0o644);
