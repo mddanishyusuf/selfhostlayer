@@ -28,9 +28,10 @@ export interface Request {
   params: Record<string, unknown>;
 }
 
+/** id is null only when the request was too broken to read one. */
 export type Response =
   | { id: string; ok: true; result: unknown }
-  | { id: string; ok: false; error: { code: string; message: string } }
+  | { id: string | null; ok: false; error: { code: string; message: string } }
   | { id: string; chunk: string };
 
 export function isActionName(value: unknown): value is ActionName {

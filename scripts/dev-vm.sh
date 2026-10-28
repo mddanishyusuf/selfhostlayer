@@ -5,6 +5,7 @@
 #   scripts/dev-vm.sh spike    # run spike/next-sandbox.sh inside it
 #   scripts/dev-vm.sh install  # build dist/install.sh and run it inside the VM
 #   scripts/dev-vm.sh verify   # check the server state the installer promises
+#   scripts/dev-vm.sh agent    # build + install layer-agent in the VM, run its e2e test
 #   scripts/dev-vm.sh lint     # shellcheck all scripts inside the VM
 #   scripts/dev-vm.sh shell    # open a shell in the VM
 #   scripts/dev-vm.sh reset    # destroy and recreate it (a fresh box)
@@ -57,6 +58,16 @@ lint() {
     echo "shellcheck: clean"'
 }
 
+agent() {
+  exists || up
+  bash "$root/scripts/build-agent.sh" dev
+  multipass transfer "$root/dist/agent/layer-agent.mjs" "$root/system/layer-agent.service" \
+    "$root/scripts/dev-install-agent.sh" "$root/installer/test/agent-e2e.sh" "$vm:/home/ubuntu/"
+  multipass exec "$vm" -- sudo bash /home/ubuntu/dev-install-agent.sh \
+    /home/ubuntu/layer-agent.mjs /home/ubuntu/layer-agent.service "$spike_node"
+  multipass exec "$vm" -- sudo bash /home/ubuntu/agent-e2e.sh
+}
+
 verify() {
   exists || up
   multipass transfer "$root/installer/test/verify.sh" "$vm:/home/ubuntu/verify.sh"
@@ -75,9 +86,10 @@ case "${1:-}" in
   spike) spike ;;
   lint) lint ;;
   verify) shift; verify "$@" ;;
+  agent) agent ;;
   install) shift; install "$@" ;;
   shell) multipass shell "$vm" ;;
   reset) multipass delete --purge "$vm" 2>/dev/null || true; up ;;
   down) multipass delete --purge "$vm" ;;
-  *) sed -n '2,14p' "$0" | sed 's/^# \{0,1\}//'; exit 1 ;;
+  *) sed -n '2,15p' "$0" | sed 's/^# \{0,1\}//'; exit 1 ;;
 esac

@@ -12,7 +12,8 @@
   "scripts": {
     "test": "vitest run",
     "typecheck": "tsc -p tsconfig.json",
-    "build:installer": "bash scripts/build-installer.sh"
+    "build:installer": "bash scripts/build-installer.sh",
+    "build:agent": "bash scripts/build-agent.sh"
   },
   "devDependencies": {
     "@types/node": "^24",

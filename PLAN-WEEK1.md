@@ -43,8 +43,10 @@ selfhostlayer/
 | `/etc/layer/apps/<slug>/app.env` | root 600 | App env, injected by systemd. The app has no writable env file |
 | `/etc/layer/apps/<slug>/{blue,green}.env` | root 644 | `PORT=`, `HOSTNAME=127.0.0.1`, `NODE_ENV=production` |
 | `/var/lib/layer/panel.db` | layer 600 | Panel state |
-| `/run/layer/agent.sock` | root:layer 660 | Agent socket. Only the panel's group can connect |
-| `/run/layer/panel.sock` | layer:caddy 660 | Panel HTTP. Only Caddy can reach it |
+| `/run/layer/agent.sock` | root:layer 660, dir 750 | Agent socket. Only root and the panel's group can connect |
+| `/run/layer-panel/panel.sock` | layer:caddy 660 | Panel HTTP. Only Caddy can reach it. A separate dir, so the panel can't touch the agent's socket |
+| `/var/lib/layer-agent/archive/` | root 700 | `data/` of deleted apps (`app.delete` with `keepData`) |
+| `/opt/layer/runtime` | symlink | The Node version the panel and agent run on |
 | `/var/log/layer/audit.jsonl` | root 600 | Audit log the panel can't erase |
 | `/srv/apps/<slug>/` | app-slug 750 | `releases/<sha>/`, `blue`→release, `green`→release, `data/` (700) |
 
@@ -117,7 +119,7 @@ The agent's own unit runs as root but still sandboxed: `ProtectHome=yes`, `Priva
 
 ## Panel (`layer-panel.service`)
 - `User=layer`, `NoNewPrivileges=yes`, `ProtectSystem=strict`, `ReadWritePaths=/var/lib/layer`, empty `CapabilityBoundingSet`.
-- Listens on `/run/layer/panel.sock` through a small custom Next.js server calling `listen(path)`, so apps on `127.0.0.1` can never reach it.
+- Listens on `/run/layer-panel/panel.sock` through a small custom Next.js server calling `listen(path)`, so apps on `127.0.0.1` can never reach it.
 - **Week 1 scope:** setup-token page, then create the admin, then mandatory TOTP, login rate limiting, a bare system page showing `system.info`, and the Caddy `ask` endpoint.
 
 ### Week 1 screens (UI rules are in [CLAUDE.md](CLAUDE.md#ui-design-vercel-level-clean-and-smooth))
@@ -225,6 +227,16 @@ Bugs found by testing in the VM, all fixed:
 - The 2GB swapfile left exactly 10GB free, which would have failed preflight on the next run. Re-runs now need only 2GB.
 
 SSH hardening was tested for keys present plus `--yes` (applied), a terminal plus "y" (applied), no terminal (skipped, nothing changed), and Hetzner-like `PasswordAuthentication yes` in `50-cloud-init.conf` (our `10-layer.conf` wins). After hardening, password login is refused and key login works.
+
+## Day 3 result (2026-10-28)
+The agent is done for the Week 1 actions: `system.info`, `node.install`, `app.create`, `app.delete`, `env.write`. The other allowlisted actions answer `not_implemented`.
+
+- **Code:** `agent/src/` has the server (NDJSON over the unix socket, 1MB line limit, half-close safe for `socat`), dispatch (allowlist, error codes, hides internal errors), the audit log (start and end of each call, env values redacted), a global lock for mutating actions, and `execFile` with absolute binary paths only.
+- **Ports** are allocated from the `blue.env`/`green.env` files themselves (4000–4999, also checking nothing else listens). There's no hidden state.
+- **env.write** quoting was checked against systemd's real parser: `$`, backticks, `%`, `#`, quotes and spaces all come back exactly.
+- **Bundle:** `scripts/build-agent.sh` → `dist/agent/layer-agent.mjs` (24KB, Node built-ins only). Unit: `system/layer-agent.service`.
+- **Tests:** 79 vitest tests on the Mac (fake exec checks the exact argv), plus `installer/test/agent-e2e.sh` with 41 checks through the real socket with `socat` (`scripts/dev-vm.sh agent`, and in CI).
+- **Agent itself:** 35MB, restarts within a second after `kill -9`, safety score **3.1 OK**. It was 6.2 before limiting it to the 9 capabilities it needs, plus `@system-service` syscalls.
 
 ## Day by day
 | Day | Work | Done when |

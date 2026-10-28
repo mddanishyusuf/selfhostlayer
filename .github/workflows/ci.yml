@@ -61,6 +61,11 @@ jobs:
           node agent/scripts/render-unit.ts --slug hello --node 24.13.1 --write .next/cache \
             -- node node_modules/next/dist/bin/next start -H 127.0.0.1 > "$RUNNER_TEMP/app-hello@.service"
           sudo bash spike/next-sandbox.sh "$RUNNER_TEMP/app-hello@.service"
+      - name: agent e2e (real socket, socat client)
+        run: |
+          bash scripts/build-agent.sh "ci-${GITHUB_SHA::7}"
+          sudo bash scripts/dev-install-agent.sh dist/agent/layer-agent.mjs system/layer-agent.service
+          sudo bash installer/test/agent-e2e.sh
       - name: install log
         if: always()
         run: sudo cat /var/log/layer-install.log || true

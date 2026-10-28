@@ -1,0 +1,46 @@
+# /etc/systemd/system/layer-agent.service
+# Self Host Layer root helper: the only process with root rights. It accepts an
+# allowlisted set of actions from the panel over /run/layer/agent.sock.
+[Unit]
+Description=Self Host Layer agent
+After=network-online.target
+Wants=network-online.target
+Before=layer-panel.service
+
+[Service]
+Type=simple
+ExecStart=/opt/layer/runtime/bin/node /opt/layer/agent/current/layer-agent.mjs
+Restart=always
+RestartSec=1
+Environment=NODE_ENV=production
+UMask=0077
+MemoryMax=256M
+TasksMax=256
+
+# It must stay root (useradd, systemctl, chown), but it doesn't need home
+# directories, kernel tunables, or a writable /usr.
+ProtectSystem=yes
+ProtectHome=yes
+PrivateTmp=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+RestrictNamespaces=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
+PrivateDevices=yes
+ProtectControlGroups=yes
+# Only what the actions need: chown/chmod app folders (CHOWN, FOWNER, FSETID),
+# manage files owned by app users (DAC_*), stop stray app processes (KILL),
+# and create or delete app users (SETUID, SETGID, AUDIT_WRITE for shadow-utils).
+CapabilityBoundingSet=CAP_CHOWN CAP_DAC_OVERRIDE CAP_DAC_READ_SEARCH CAP_FOWNER CAP_FSETID CAP_KILL CAP_SETUID CAP_SETGID CAP_AUDIT_WRITE
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+SystemCallArchitectures=native
+
+[Install]
+WantedBy=multi-user.target

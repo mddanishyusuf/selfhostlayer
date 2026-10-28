@@ -30,6 +30,7 @@ scripts/dev-vm.sh spike     # run the Day 1 sandbox spike inside it
 scripts/dev-vm.sh install --yes   # build and run the installer inside it
 scripts/dev-vm.sh verify    # check the server state the installer promises
 scripts/dev-vm.sh lint      # shellcheck every script inside the VM
+scripts/dev-vm.sh agent     # build + install layer-agent, run its socket e2e test
 scripts/dev-vm.sh reset     # start again from a fresh box
 ```
 
