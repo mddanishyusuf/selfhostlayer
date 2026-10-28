@@ -67,7 +67,7 @@ SITE
 # /etc/layer/config.json: what the panel needs to know about this box. Every
 # app gets a free URL <app>.<appsDomain>, which works without any DNS setup.
 write_config() {
-  local apps_domain="${LAYER_PUBLIC_IP//./-}.sslip.io"
+  local apps_domain="${LAYER_APPS_DOMAIN:-${LAYER_PUBLIC_IP//./-}.sslip.io}"
   install -m 640 -o root -g "$LAYER_USER" /dev/null /etc/layer/config.json.new
   jq -n --arg panelHost "$LAYER_PANEL_HOST" --arg appsDomain "$apps_domain" --arg publicIp "$LAYER_PUBLIC_IP" \
     --arg version "$LAYER_INSTALLED_VERSION" --arg node "$LAYER_NODE_DEFAULT" \

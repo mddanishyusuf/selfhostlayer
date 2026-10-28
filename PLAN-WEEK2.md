@@ -82,7 +82,17 @@ All six examples were built from clean copies the way the server will, with froz
 - **Flow:** `/github/connect` posts the manifest from the browser (optionally to an organization) with a one-time `state` tied to the user → GitHub → `/api/github/manifest` trades the code for the credentials (private key, webhook and client secrets stored encrypted) → GitHub's install page → `/api/github/installed` confirms the installation with the app's own JWT → `/new` lists repos with search (Import arrives on Day 5).
 - **Webhook** `/api/github/webhook`: the only route without a session. Wrong signature → 401; each `X-GitHub-Delivery` processed once (7 days kept); `installation` events keep the installation list current; `push` is recorded for Day 6.
 - **Root cause of the reload loop you saw on localhost:** `next build` (every release build) and `next dev` shared `panel/.next`, so the dev server's cache went stale after each build. `next dev` now uses `.next-dev` (phase-based `next.config.ts`). The tour's new reload guard caught it straight away.
-- **Tests:** 191 unit tests; the browser tour runs the whole GitHub flow against the fake with `TOUR_GITHUB=1`, plus signed, replayed and forged webhooks.
+- **Tests:** 188 unit tests; the browser tour runs the whole GitHub flow against the fake with `TOUR_GITHUB=1`, plus signed, replayed and forged webhooks.
+
+## Day 5 result (2026-10-28)
+**Done when "repo → live URL in the VM; instant rollback": passed.** Driven entirely through the UI by the browser tour (`TOUR_DEPLOY=1`): import `next/` and `vite/` from the examples repo, follow the live log to Ready, open `https://next.internal` and `https://vite.internal/some/route`, redeploy, then roll back, which reused the build on disk ("build is skipped").
+
+- **Pipeline** (`panel/lib/deploy.ts`): one deployment at a time. Steps: `app.create` → `env.write` → `node.install` (+ bun) → `source.fetch` (read-only token for that one repo) → `build.run` (streamed; step markers drive the status) → Node apps: `unit.write`, idle color, `release.point`, `unit.start` with a health check, `proxy.set`, 2s drain, `unit.stop` old; static: `static.publish` + `proxy.set static` → `release.prune`. A failure anywhere leaves the live version alone. After a panel restart, half-run deployments are marked failed and queued ones resume.
+- **Import** (`panel/lib/import.ts`): repo info, latest commit, root-folder files through the GitHub API (installation token, or none for public repos) → `detect()` → Node version resolved against nodejs.org's index (`.nvmrc` "24" became 24.22.2) → project with a free `<slug>.<appsDomain>` URL. A monorepo folder is named after the folder.
+- **Pages:** `/new` (repo list with Import, plus "any public repo" with root dir and branch), `/projects/[slug]` (status, domains, runtime, deployments with rollback), `/deployments/[id]` (step timings, live log over SSE with ANSI colors, follow/copy/download, cancel).
+- **Push-to-deploy:** a signed `push` webhook queues a deployment of exactly that commit for every project tracking the repo and branch through the same installation.
+- **Bugs found:** the live log never updated, because Next.js gave the server action and the `/events` route separate copies of the deploy module (two event buses). The bus and queue now live on `globalThis`, like the DB. Plus `--apps-domain` for boxes behind NAT (the VM uses `internal`).
+- **Tooling note:** `multipass exec` hangs (burning CPU) in background jobs even with stdin closed; VM steps run in the foreground.
 
 ## Known limits
 - The VM has no public IP, so GitHub can't deliver webhooks to it: push-to-deploy is tested on the VPS. Everything else works in the VM.

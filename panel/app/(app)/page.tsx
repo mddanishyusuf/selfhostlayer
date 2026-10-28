@@ -146,10 +146,10 @@ async function Apps() {
         {apps.map((app) => (
           <div key={app.slug} className="flex items-center gap-4 px-5 py-4 transition-colors duration-150 hover:bg-subtle">
             <StatusDot status={app.live ? "ok" : "idle"} />
-            <div className="grid min-w-0 flex-1 gap-0.5">
+            <Link href={`/projects/${app.slug}`} className="grid min-w-0 flex-1 gap-0.5">
               <p className="font-medium">{app.slug}</p>
               <p className="truncate text-[13px] text-muted">{app.domains.length ? app.domains.join(", ") : "No domain yet"}</p>
-            </div>
+            </Link>
             <p className="hidden text-[13px] text-muted tabular-nums sm:block">
               {app.live === "static" ? (
                 <span className="text-foreground">static</span>

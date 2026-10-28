@@ -2,6 +2,7 @@
 
 import { FolderGit2, GitBranch } from "lucide-react";
 import { useState } from "react";
+import { ImportButton } from "./deploy";
 import { Button, Field, Input } from "./ui";
 
 /**
@@ -24,7 +25,7 @@ export function GithubConnectForm({ manifest, state, githubWeb }: { manifest: st
   );
 }
 
-export function RepoSearch({ repos }: { repos: { fullName: string; private: boolean; pushedAt: string | null; branch: string }[] }) {
+export function RepoSearch({ repos }: { repos: { fullName: string; private: boolean; pushedAt: string | null; branch: string; installationId: number }[] }) {
   const [query, setQuery] = useState("");
   const shown = repos.filter((r) => r.fullName.toLowerCase().includes(query.trim().toLowerCase()));
   return (
@@ -42,9 +43,7 @@ export function RepoSearch({ repos }: { repos: { fullName: string; private: bool
                 {r.pushedAt ? ` · pushed ${timeAgo(r.pushedAt)}` : ""}
               </p>
             </div>
-            <Button variant="secondary" disabled title="Arrives with the deploy pipeline (Week 2, Day 5)" className="h-8 px-3 text-[13px]">
-              Import
-            </Button>
+            <ImportButton repo={r.fullName} installationId={r.installationId} />
           </div>
         ))}
       </div>

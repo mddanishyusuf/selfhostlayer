@@ -63,7 +63,8 @@ vm_ip() { multipass info "$vm" | awk '/IPv4/ {print $2; exit}'; }
 
 # Builds the release tarball and runs the real installer with it. The panel is
 # served at https://<vm-ip>.sslip.io with Caddy's local CA (the VM has no
-# public IP for Let's Encrypt). The setup token is saved for `ui`.
+# public IP for Let's Encrypt); apps get <slug>.internal URLs (also local CA).
+# The setup token is saved for `ui`.
 release() {
   exists || up
   bash "$root/scripts/build-installer.sh" dev >/dev/null
@@ -73,7 +74,7 @@ release() {
   host="$(vm_ip | tr . -).sslip.io"
   out="$(mktemp)"
   multipass exec "$vm" -- sudo bash /home/ubuntu/install.sh --from-tarball /home/ubuntu/layer-dev.tar.gz \
-    --domain "$host" --internal-tls --yes "$@" | tee "$out"
+    --domain "$host" --internal-tls --apps-domain internal --yes "$@" | tee "$out"
   sed 's/\x1b\[[0-9;]*m//g' "$out" | awk '/Setup token:/ {print $NF}' >"$root/dist/vm-setup-token"
   echo "https://$host" >"$root/dist/vm-panel-url"
 }

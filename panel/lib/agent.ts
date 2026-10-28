@@ -1,4 +1,4 @@
-import { callAgent, type ActionName } from "@layer/protocol";
+import { callAgent, type ActionName, type CallOptions } from "@layer/protocol";
 import { config } from "./config";
 
 export interface SystemInfo {
@@ -50,7 +50,7 @@ const FAKE: Partial<Record<ActionName, unknown>> = {
   },
 };
 
-export async function agent<T>(action: ActionName, params: Record<string, unknown> = {}): Promise<T> {
+export async function agent<T>(action: ActionName, params: Record<string, unknown> = {}, opts: Omit<CallOptions, "socket"> = {}): Promise<T> {
   if (config.fakeAgent && action in FAKE) return FAKE[action] as T;
-  return callAgent<T>(action, params, { socket: config.agentSocket });
+  return callAgent<T>(action, params, { ...opts, socket: config.agentSocket });
 }

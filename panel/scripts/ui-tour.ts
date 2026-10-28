@@ -22,7 +22,18 @@ const CHROME = process.env.CHROME ?? "/Applications/Google Chrome.app/Contents/M
 const port = 9300 + Math.floor(Math.random() * 500);
 const chrome = spawn(
   CHROME,
-  ["--headless=new", "--disable-gpu", "--hide-scrollbars", "--ignore-certificate-errors", `--remote-debugging-port=${port}`, `--user-data-dir=${join(outDir, ".chrome")}`, "about:blank"],
+  [
+    "--headless=new",
+    "--disable-gpu",
+    "--hide-scrollbars",
+    "--ignore-certificate-errors",
+    `--remote-debugging-port=${port}`,
+    `--user-data-dir=${join(outDir, ".chrome")}`,
+    // e.g. "--host-resolver-rules=MAP *.internal 192.168.252.9" to reach apps in a VM.
+    // Split only before each "--": an argument's value may contain spaces.
+    ...(process.env.CHROME_EXTRA_ARGS ? process.env.CHROME_EXTRA_ARGS.trim().split(/\s+(?=--)/) : []),
+    "about:blank",
+  ],
   { stdio: "ignore" },
 );
 process.on("exit", () => chrome.kill());
@@ -207,6 +218,78 @@ if (process.env.TOUR_GITHUB === "1") {
   const forged = await deliver("wrong-secret", randomUUID());
   if (forged.status !== 401) throw new Error(`forged webhook: expected 401, got ${forged.status}`);
   console.log("  ✓ webhook with a bad signature refused (401)");
+}
+
+// Deploys from github.com/mddanishyusuf/selfhostlayer-examples through the UI. TOUR_DEPLOY=1,
+// TOUR_APPS_DOMAIN=<the box's appsDomain> (default "internal").
+if (process.env.TOUR_DEPLOY === "1") {
+  console.log("Deploy");
+  const appsDomain = process.env.TOUR_APPS_DOMAIN ?? "internal";
+  await setViewport(1280, 900);
+  const headerText = `document.querySelector("main header")?.innerText ?? ""`;
+  const waitForDeploy = async (what: string) => {
+    await waitFor(`/\\b(Ready|Failed|Cancelled)\\b/.test(${headerText})`, `${what} to finish`, 15 * 60_000);
+    const header = String(await evaluate(headerText));
+    if (!header.includes("Ready")) {
+      throw new Error(`${what} didn't succeed: ${header}\n${String(await evaluate(`document.querySelector('[role=log]')?.innerText ?? ""`)).slice(-1500)}`);
+    }
+  };
+  const openNewestDeployment = async () => {
+    const href = String(await evaluate(`document.querySelector('a[href^="/deployments/"]').getAttribute("href")`));
+    await go(href);
+    await waitForPath(href);
+    return href;
+  };
+  const visit = async (host: string, path: string, expected: string) => {
+    let text = "";
+    for (let i = 0; i < 20 && !text.includes(expected); i++) {
+      await go(`https://${host}${path}`);
+      await sleep(1500);
+      text = String(await evaluate("document.body?.innerText ?? ''").catch(() => ""));
+    }
+    if (!text.includes(expected)) throw new Error(`https://${host}${path} didn't show "${expected}" (got: ${text.slice(0, 200)})`);
+    console.log(`  ✓ https://${host}${path} shows "${expected}"`);
+  };
+  const importFolder = async (rootDir: string) => {
+    await go("/new");
+    await waitForPath("/new");
+    await evaluate(`document.querySelectorAll("details").forEach((d) => (d.open = true)), true`);
+    await fill("#repo", "https://github.com/mddanishyusuf/selfhostlayer-examples");
+    await fill("#rootDir", rootDir);
+    await click("form:has(#repo) button[type=submit]");
+    await waitFor(`location.pathname === "/projects/${rootDir}"`, `project page for ${rootDir}`, 60_000);
+  };
+
+  await importFolder("next");
+  await openNewestDeployment();
+  await waitForDeploy("Next.js deploy");
+  await screenshot("deployment-next-ready");
+  await visit(`next.${appsDomain}`, "/", "example-next");
+  await go("/projects/next");
+  await waitForPath("/projects/next");
+  await screenshot("project-next");
+
+  await importFolder("vite");
+  await openNewestDeployment();
+  await waitForDeploy("Vite (static) deploy");
+  await visit(`vite.${appsDomain}`, "/some/route", "example-vite");
+
+  console.log("Redeploy and rollback");
+  await go("/projects/next");
+  await waitForPath("/projects/next");
+  await click('form:has(input[name=slug]) button[type=submit]');
+  await waitFor(`location.pathname.startsWith("/deployments/")`, "redeploy page", 60_000);
+  await waitForDeploy("redeploy");
+  await go("/projects/next");
+  await waitForPath("/projects/next");
+  await click('button[title="Roll back to this deployment"]');
+  await waitFor(`location.pathname.startsWith("/deployments/")`, "rollback page", 60_000);
+  await waitForDeploy("rollback");
+  const rollbackLog = String(await evaluate(`document.querySelector('[role=log]')?.innerText ?? ""`));
+  if (!rollbackLog.includes("build is skipped")) throw new Error("the rollback rebuilt instead of reusing the build on disk");
+  console.log("  ✓ rollback reused the build on disk (no rebuild)");
+  await screenshot("deployment-rollback");
+  await visit(`next.${appsDomain}`, "/api/health", "ok");
 }
 
 console.log("Guards");

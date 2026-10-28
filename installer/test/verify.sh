@@ -74,7 +74,7 @@ check "panel serves over HTTPS through Caddy ($panel_host)" \
   bash -c "curl -sk -o /dev/null -w '%{http_code}' --resolve '$panel_host:443:127.0.0.1' 'https://$panel_host/api/health' | grep -q 200"
 check "secret key 640 root:layer" mode_is /etc/layer/secret.key "640 root:layer"
 check "config.json 640 root:layer" mode_is /etc/layer/config.json "640 root:layer"
-check "config.json names the apps domain" bash -c "jq -e '.appsDomain | endswith(\".sslip.io\")' /etc/layer/config.json"
+check "config.json names the apps domain" bash -c "jq -e '.appsDomain | length > 0' /etc/layer/config.json"
 panel_db_ok() { [[ ! -e /var/lib/layer/panel.db ]] || mode_is /var/lib/layer/panel.db "600 layer:layer-web"; }
 check "panel DB is private to layer" panel_db_ok
 check "layer CLI works" layer info
