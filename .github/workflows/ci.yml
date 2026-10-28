@@ -23,7 +23,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: shellcheck
-        run: shellcheck --external-sources installer/install.sh installer/lib/*.sh scripts/*.sh spike/*.sh
+        run: shellcheck --external-sources installer/install.sh installer/lib/*.sh installer/test/*.sh scripts/*.sh spike/*.sh
       - name: build single-file installer
         run: bash scripts/build-installer.sh "ci-${GITHUB_SHA::7}"
       - name: shellcheck bundled installer
@@ -36,3 +36,31 @@ jobs:
         with:
           name: install.sh
           path: dist/install.sh
+
+  # GitHub's Ubuntu runners are full x86 VMs with systemd, so the installer can
+  # run for real. SSH hardening is skipped: we don't own the runner's sshd.
+  install-e2e:
+    runs-on: ubuntu-24.04
+    needs: [test, shell]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: yarn
+      - run: yarn install --frozen-lockfile
+      - run: bash scripts/build-installer.sh "ci-${GITHUB_SHA::7}"
+      - name: install on a fresh runner
+        run: sudo bash dist/install.sh --yes --no-harden-ssh
+      - run: sudo bash installer/test/verify.sh
+      - name: re-run is safe (idempotent)
+        run: sudo bash dist/install.sh --yes --no-harden-ssh
+      - run: sudo bash installer/test/verify.sh
+      - name: sandbox spike (Next.js in the generated unit, x86)
+        run: |
+          node agent/scripts/render-unit.ts --slug hello --node 24.13.1 --write .next/cache \
+            -- node node_modules/next/dist/bin/next start -H 127.0.0.1 > "$RUNNER_TEMP/app-hello@.service"
+          sudo bash spike/next-sandbox.sh "$RUNNER_TEMP/app-hello@.service"
+      - name: install log
+        if: always()
+        run: sudo cat /var/log/layer-install.log || true

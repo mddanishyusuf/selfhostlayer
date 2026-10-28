@@ -2,6 +2,9 @@
 # Step 1: refuse to touch boxes we can't support, before changing anything.
 
 MIN_DISK_GB=10
+# A re-run (repair) only needs room for package updates. The first run's swap
+# file alone takes 2GB.
+MIN_DISK_GB_RERUN=2
 
 preflight() {
   step "Checking this server"
@@ -27,10 +30,11 @@ preflight_os() {
     ubuntu:24.04 | ubuntu:26.04 | debian:12) ok "OS: $id $version" ;;
     *) die "unsupported OS: $id $version (supported: Ubuntu 24.04, 26.04, Debian 12)" ;;
   esac
-  LAYER_OS_ID="$id"
 }
 
 preflight_arch() {
+  # LAYER_NODE_ARCH is read by node.sh.
+  # shellcheck disable=SC2034
   case "$(uname -m)" in
     x86_64) LAYER_NODE_ARCH="x64" ;;
     aarch64) LAYER_NODE_ARCH="arm64" ;;
@@ -56,9 +60,10 @@ preflight_ports() {
 }
 
 preflight_disk() {
-  local free_gb
+  local free_gb need_gb=$MIN_DISK_GB
+  [[ -d /opt/layer/node ]] && need_gb=$MIN_DISK_GB_RERUN
   free_gb="$(df -BG --output=avail / | tail -1 | tr -dc '0-9')"
-  ((free_gb >= MIN_DISK_GB)) || die "only ${free_gb}GB free on /, need at least ${MIN_DISK_GB}GB"
+  ((free_gb >= need_gb)) || die "only ${free_gb}GB free on /, need at least ${need_gb}GB"
   ok "Disk: ${free_gb}GB free"
 }
 

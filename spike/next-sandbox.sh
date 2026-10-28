@@ -146,7 +146,22 @@ say "GET /"
 curl -fsS "http://127.0.0.1:$port/" | grep -o '<h1>.*</h1>' || die "page didn't render"
 
 say "GET /api/sandbox"
-curl -fsS "http://127.0.0.1:$port/api/sandbox" | "$node_dir/bin/node" -e 'console.log(JSON.stringify(JSON.parse(require("fs").readFileSync(0, "utf8")), null, 2))'
+# Prints the probes, then fails if any result differs from what its name expects.
+probes="$(curl -fsS "http://127.0.0.1:$port/api/sandbox")"
+"$node_dir/bin/node" -e '
+  const probes = JSON.parse(process.argv[1]);
+  console.log(JSON.stringify(probes, null, 2));
+  const wrong = Object.entries(probes).filter(([name, r]) =>
+    (name.endsWith("_expectOk") && !r.ok) ||
+    (name.endsWith("_expectFail") && r.ok) ||
+    (name.endsWith("_expectNonZero") && !(r.ok && r.value > 0)) ||
+    (name.endsWith("_expectHidden") && !(r.ok && r.value === 1)));
+  if (wrong.length) {
+    console.error("sandbox probes did not match expectations: " + wrong.map(([n]) => n).join(", "));
+    process.exit(1);
+  }
+  console.log("all sandbox probes match expectations");
+' "$probes" || die "sandbox check failed"
 
 say "Resources"
 systemctl show "app-$slug@blue" -p MemoryCurrent -p MemoryMax -p TasksCurrent -p NRestarts

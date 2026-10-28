@@ -27,7 +27,9 @@ Install [Multipass](https://canonical.com/multipass) with `brew install --cask m
 ```sh
 scripts/dev-vm.sh up        # Ubuntu 24.04 VM, 2 CPU / 2GB RAM like a small VPS
 scripts/dev-vm.sh spike     # run the Day 1 sandbox spike inside it
-scripts/dev-vm.sh install   # build and run the installer inside it
+scripts/dev-vm.sh install --yes   # build and run the installer inside it
+scripts/dev-vm.sh verify    # check the server state the installer promises
+scripts/dev-vm.sh lint      # shellcheck every script inside the VM
 scripts/dev-vm.sh reset     # start again from a fresh box
 ```
 

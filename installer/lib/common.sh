@@ -45,10 +45,11 @@ confirm() {
   if [[ "${LAYER_YES:-0}" == 1 ]]; then
     return 0
   fi
-  if [[ ! -r /dev/tty ]]; then
-    return 1
-  fi
-  local answer
-  read -r -p "    $prompt [y/N] " answer </dev/tty
+  # /dev/tty can exist and look readable but fail to open when there's no
+  # controlling terminal (CI, cloud-init, ssh without -t). Treat that as "no".
+  { exec 3</dev/tty; } 2>/dev/null || return 1
+  local answer=""
+  read -r -u 3 -p "    $prompt [y/N] " answer || true
+  exec 3<&-
   [[ "$answer" == [yY] || "$answer" == [yY][eE][sS] ]]
 }

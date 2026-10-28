@@ -214,6 +214,18 @@ Run with `scripts/dev-vm.sh spike` on a Multipass VM: Ubuntu 24.04.5, arm64, 2 C
 
 Still to check: x86 (Hetzner CX), Ubuntu 26.04, Debian 12, and a real app with native modules (`sharp`, `better-sqlite3`).
 
+## Day 2 result (2026-10-28)
+Installer steps 2–5 and 9–10 are done: packages and the Caddy repo (key fingerprint pinned), swap, Node, users and directories, ufw, fail2ban, unattended-upgrades, SSH hardening. A fresh install takes about 16s. Tested on fresh Multipass VMs with **Ubuntu 24.04.5 and 26.04.1** (arm64): fresh install, re-run, `installer/test/verify.sh` (25 checks) and the sandbox spike all pass. CI runs the same on an x86 GitHub runner (`install-e2e` job).
+
+Bugs found by testing in the VM, all fixed:
+- `sshd -T | awk '…exit'` died of SIGPIPE under `pipefail`. Now the output is captured first, then parsed.
+- `getent group sudo wheel` exits 2 when `wheel` doesn't exist (Ubuntu), which aborted the SSH step.
+- `/dev/tty` passes `-r` but can't be opened without a terminal, so the prompt crashed. Now that counts as "no".
+- The fail2ban default watches `sshd.service` (Ubuntu's unit is `ssh.service`), and on 26.04 Debian's `defaults-debian.conf` overrode our jail. Ours is now `zz-layer.conf`, and failed logins are counted on both releases (OpenSSH 10 `sshd-session` included).
+- The 2GB swapfile left exactly 10GB free, which would have failed preflight on the next run. Re-runs now need only 2GB.
+
+SSH hardening was tested for keys present plus `--yes` (applied), a terminal plus "y" (applied), no terminal (skipped, nothing changed), and Hetzner-like `PasswordAuthentication yes` in `50-cloud-init.conf` (our `10-layer.conf` wins). After hardening, password login is refused and key login works.
+
 ## Day by day
 | Day | Work | Done when |
 |---|---|---|

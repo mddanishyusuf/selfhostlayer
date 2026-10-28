@@ -8,6 +8,9 @@ src="$root/installer/install.sh"
 out="$root/dist/install.sh"
 version="${1:-dev}"
 marker="# @layer-inline-libs"
+# The literal source line to rewrite with the release version.
+# shellcheck disable=SC2016
+version_line='LAYER_VERSION="${LAYER_VERSION:-dev}"'
 
 grep -qx "$marker" "$src" || { echo "marker '$marker' missing from $src" >&2; exit 1; }
 mkdir -p "$root/dist"
@@ -21,7 +24,7 @@ mkdir -p "$root/dist"
         echo "# --- ${lib#"$root"/} ---"
         grep -v '^# shellcheck shell=bash$' "$lib"
       done
-    elif [[ "$line" == 'LAYER_VERSION="${LAYER_VERSION:-dev}"' ]]; then
+    elif [[ "$line" == "$version_line" ]]; then
       echo "LAYER_VERSION=\"\${LAYER_VERSION:-$version}\""
     else
       printf '%s\n' "$line"

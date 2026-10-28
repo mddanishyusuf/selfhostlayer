@@ -50,16 +50,31 @@ parse_args() {
   export LAYER_DOMAIN LAYER_EMAIL LAYER_TARBALL LAYER_HARDEN_SSH LAYER_YES
 }
 
+on_error() {
+  # set -E runs this trap in subshells too; only the main shell reports.
+  [[ "$BASHPID" == "$$" ]] || exit 1
+  die "failed at line $1: $2 (see $LAYER_LOG)"
+}
+
 main() {
   parse_args "$@"
   mkdir -p "$(dirname "$LAYER_LOG")"
   log "--- Self Host Layer $LAYER_VERSION install started $(date -u +%FT%TZ)"
+  trap 'on_error "$LINENO" "$BASH_COMMAND"' ERR
   printf '\n%sSelf Host Layer%s %s\n\n' "$C_BOLD" "$C_RESET" "$LAYER_VERSION"
 
   preflight
-  # Day 2: packages, swap, node, users, firewall, ssh hardening
+  # Swap first, so apt and the Node unpack have headroom on tiny boxes.
+  setup_swap
+  install_packages
+  install_node
+  setup_users
+  setup_firewall
+  harden_ssh
   # Day 5: panel + agent, secrets, caddy, services, finish
-  info "Preflight passed. The remaining install steps arrive later in Week 1."
+
+  printf '\n%sServer is ready for Self Host Layer.%s The panel install arrives later in Week 1.\n' "$C_GREEN" "$C_RESET"
+  info "Full log: $LAYER_LOG"
 }
 
 main "$@"
