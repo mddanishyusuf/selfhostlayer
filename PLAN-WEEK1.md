@@ -196,6 +196,24 @@ Notes:
 - **`AF_NETLINK` is allowed** because `os.networkInterfaces()` needs it. **No `ProcSubset=pid`**, because it hides `/proc/cpuinfo` and `os.cpus()` would return `[]`. **`SystemCallErrorNumber=EPERM`** makes a blocked syscall fail with an error instead of killing the process with SIGSYS. The source of truth is `agent/src/templates/app-unit.ts` and its snapshot test.
 - **Known limit:** apps on `127.0.0.1` can still connect to each other's ports (documented in CLAUDE.md).
 
+## Day 1 spike result (2026-10-28)
+Run with `scripts/dev-vm.sh spike` on a Multipass VM: Ubuntu 24.04.5, arm64, 2 CPU, 2GB RAM, Next.js 16.4.3, Node 24.13.1. **Everything passed on the first run, with no changes to the template.**
+
+| Check | Result |
+|---|---|
+| Sandboxed build (`npm install && next build` as `app-hello`, `ProtectSystem=strict`, 1GB cap) | ✓ in 24s |
+| Runs as `app-hello`, page renders on port 4001 | ✓ ready in 290ms |
+| Write `data/`, `.next/cache`, `/tmp` | ✓ allowed |
+| Write the release dir or `/etc` | ✓ blocked (EROFS) |
+| Read `/etc/shadow` or `/root` | ✓ blocked (EACCES) |
+| Other processes in `/proc` | ✓ hidden (only its own is visible) |
+| `os.cpus()` / `os.networkInterfaces()` | ✓ 2 CPUs / works |
+| Blocked syscalls in the journal | none |
+| Memory | 42MB idle (cap 512MB), 11 tasks |
+| `systemd-analyze security` | **1.3 OK** (0 is the safest, 10 the most exposed) |
+
+Still to check: x86 (Hetzner CX), Ubuntu 26.04, Debian 12, and a real app with native modules (`sharp`, `better-sqlite3`).
+
 ## Day by day
 | Day | Work | Done when |
 |---|---|---|
