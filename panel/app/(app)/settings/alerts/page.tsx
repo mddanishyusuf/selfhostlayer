@@ -10,12 +10,13 @@ import { requireUser } from "@/lib/session";
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Alerts" };
 
-const KIND_LABEL = { telegram: "Telegram", discord: "Discord", webhook: "Webhook" } as const;
+const KIND_LABEL = { telegram: "Telegram", discord: "Discord", webhook: "Webhook", email: "Email" } as const;
 
 /** Where a channel sends, without showing secrets. */
 function target(c: ReturnType<typeof listChannels>[number]): string {
   if (c.config.kind === "telegram") return `chat ${c.config.chatId}`;
   if (c.config.kind === "discord") return "Discord webhook";
+  if (c.config.kind === "email") return `${c.config.to.join(", ")} via ${c.config.host}`;
   return new URL(c.config.url).host + (c.config.secret ? " · signed" : "");
 }
 
@@ -30,7 +31,7 @@ export default async function AlertsPage() {
     <div className="mx-auto grid max-w-[760px] gap-6">
       <header className="grid gap-1">
         <h1 className="text-2xl font-semibold tracking-tight">Alerts</h1>
-        <p className="text-muted">One message when something breaks (a failed deploy, a crash-looping app, disk over 80%, a certificate problem, a failed cron job) and one when it recovers.</p>
+        <p className="text-muted">One message when something breaks (a failed deploy, a crash-looping app, disk over 80%, a certificate problem, a failed cron job or backup) and one when it recovers.</p>
       </header>
 
       <section className="grid gap-3">

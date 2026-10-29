@@ -79,10 +79,20 @@ jobs:
         run: sudo bash installer/test/build-e2e.sh
       - name: cron jobs as systemd timers
         run: sudo bash installer/test/cron-e2e.sh
-      - name: panel UI tour in Chrome (setup, 2FA, sign in, deploy, rollback, delete)
+      - name: SQLite-safe backup snapshots and restore
+        run: sudo bash installer/test/backup-e2e.sh
+      - name: a Redis per app
+        run: sudo bash installer/test/redis-e2e.sh
+      - name: a Postgres role and database per app, in backups
+        run: sudo bash installer/test/postgres-e2e.sh
+      - name: fake S3 for the backups tour
+        run: |
+          cp panel/scripts/fake-s3.ts panel/lib/backup/s3.ts installer/test/
+          sudo bash installer/test/fake-s3.sh
+      - name: panel UI tour in Chrome (setup, 2FA, deploy, rollback, crons, backups, databases, delete)
         run: |
           echo "127.0.0.1 layer.internal next.internal vite.internal" | sudo tee -a /etc/hosts
-          TOUR_DEPLOY=1 TOUR_APPS_DOMAIN=internal CHROME="$(command -v google-chrome)" \
+          TOUR_DEPLOY=1 TOUR_BACKUPS=1 TOUR_REDIS=1 TOUR_POSTGRES=1 TOUR_APPS_DOMAIN=internal CHROME="$(command -v google-chrome)" \
             node panel/scripts/ui-tour.ts https://layer.internal "$(cat setup-token)" screenshots
       - name: after setup, a re-run prints no setup token
         run: |

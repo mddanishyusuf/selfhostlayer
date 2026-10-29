@@ -190,6 +190,18 @@ const MIGRATIONS = [
      deleted_at INTEGER
    );
    CREATE INDEX backups_by_slug ON backups (kind, slug, started_at);`,
+  // Email as an alert channel (SQLite can't change a CHECK, so the table is rebuilt).
+  `CREATE TABLE alert_channels_new (
+     id INTEGER PRIMARY KEY,
+     kind TEXT NOT NULL CHECK (kind IN ('telegram', 'discord', 'webhook', 'email')),
+     name TEXT NOT NULL,
+     config_enc TEXT NOT NULL,
+     enabled INTEGER NOT NULL DEFAULT 1,
+     created_at INTEGER NOT NULL
+   );
+   INSERT INTO alert_channels_new SELECT id, kind, name, config_enc, enabled, created_at FROM alert_channels;
+   DROP TABLE alert_channels;
+   ALTER TABLE alert_channels_new RENAME TO alert_channels;`,
 ];
 
 function open(): DatabaseSync {

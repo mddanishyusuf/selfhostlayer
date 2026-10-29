@@ -22,9 +22,23 @@ const field = (form: FormData, name: string) => String(form.get(name) ?? "").tri
 export async function addChannelAction(_prev: ChannelState, form: FormData): Promise<ChannelState> {
   await requireUser();
   const kind = field(form, "kind");
-  const parsed = parseChannel(kind, { botToken: field(form, "botToken"), chatId: field(form, "chatId"), webhookUrl: field(form, "webhookUrl"), url: field(form, "url"), secret: field(form, "secret") });
+  const parsed = parseChannel(kind, {
+    botToken: field(form, "botToken"),
+    chatId: field(form, "chatId"),
+    webhookUrl: field(form, "webhookUrl"),
+    url: field(form, "url"),
+    secret: field(form, "secret"),
+    host: field(form, "host"),
+    port: field(form, "port"),
+    security: field(form, "security"),
+    user: field(form, "user"),
+    // Passwords keep their spaces (Gmail app passwords have some).
+    pass: String(form.get("pass") ?? ""),
+    from: field(form, "from"),
+    to: field(form, "to"),
+  });
   if (!parsed.ok) return { error: parsed.error };
-  const name = field(form, "name") || { telegram: "Telegram", discord: "Discord", webhook: "Webhook" }[parsed.config.kind];
+  const name = field(form, "name") || { telegram: "Telegram", discord: "Discord", webhook: "Webhook", email: "Email" }[parsed.config.kind];
   const id = addChannel(name.slice(0, 60), parsed.config);
   // Prove it works right away: a test message to just this channel.
   const channel = listChannels().find((c) => c.id === id)!;

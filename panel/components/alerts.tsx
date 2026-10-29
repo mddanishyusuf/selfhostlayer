@@ -9,6 +9,7 @@ const KINDS = [
   ["telegram", "Telegram"],
   ["discord", "Discord"],
   ["webhook", "Webhook"],
+  ["email", "Email"],
 ] as const;
 
 export function AddChannelForm() {
@@ -21,7 +22,7 @@ export function AddChannelForm() {
   return (
     <form ref={form} action={action} className="grid gap-4">
       <input type="hidden" name="kind" value={kind} />
-      <div className="grid grid-cols-3 gap-2" role="radiogroup" aria-label="Channel type">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4" role="radiogroup" aria-label="Channel type">
         {KINDS.map(([value, label]) => (
           <button
             key={value}
@@ -58,6 +59,41 @@ export function AddChannelForm() {
           <Field label="Secret (optional)" htmlFor="secret" hint="Signs X-Layer-Signature (HMAC-SHA256).">
             <Input id="secret" name="secret" type="password" autoComplete="off" />
           </Field>
+        </div>
+      )}
+      {kind === "email" && (
+        <div className="grid gap-4">
+          <div className="grid gap-4 sm:grid-cols-[1.6fr_0.6fr_1fr]">
+            <Field label="SMTP server" htmlFor="host">
+              <Input id="host" name="host" autoComplete="off" spellCheck={false} placeholder="smtp.resend.com" className="font-mono text-[13px]" />
+            </Field>
+            <Field label="Port" htmlFor="port">
+              <Input id="port" name="port" inputMode="numeric" defaultValue="587" className="font-mono text-[13px]" />
+            </Field>
+            <Field label="Security" htmlFor="security">
+              <select id="security" name="security" defaultValue="starttls" className="h-9 rounded-md border border-border bg-background px-2 text-sm">
+                <option value="starttls">STARTTLS (587)</option>
+                <option value="tls">TLS (465)</option>
+              </select>
+            </Field>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Username" htmlFor="user">
+              <Input id="user" name="user" autoComplete="off" spellCheck={false} />
+            </Field>
+            <Field label="Password" htmlFor="pass" hint="An API key or app password, not your account password.">
+              <Input id="pass" name="pass" type="password" autoComplete="off" />
+            </Field>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="From" htmlFor="from" hint="An address your mail service lets you send from.">
+              <Input id="from" name="from" type="email" autoComplete="off" placeholder="alerts@example.com" />
+            </Field>
+            <Field label="To" htmlFor="to" hint="Up to 5, separated by commas.">
+              <Input id="to" name="to" autoComplete="off" placeholder="you@example.com" />
+            </Field>
+          </div>
+          <p className="text-[12px] text-muted">Many hosts (Hetzner included) block outgoing ports 25 and 465 on new servers; 587 usually works.</p>
         </div>
       )}
       <Field label="Name (optional)" htmlFor="channelName">
