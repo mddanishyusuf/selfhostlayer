@@ -303,6 +303,32 @@ if (process.env.TOUR_DEPLOY === "1") {
   await screenshot("deployment-rollback");
   await visit(`next.${appsDomain}`, "/api/health", "ok");
 
+  console.log("Crons");
+  await go("/projects/next/crons");
+  await waitForPath("/projects/next/crons");
+  const setValue = (selector: string, value: string) =>
+    evaluate(`(() => { const el = document.querySelector(${JSON.stringify(selector)}); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(el, ${JSON.stringify(value)}); el.dispatchEvent(new Event("input", { bubbles: true })); return true; })()`);
+  await fill("#name", "greet");
+  await setValue("#schedule", "*/30 * * * *");
+  await fill("#command", "node -e console.log(process.env.GREETING)");
+  await click("form:has(#command) button[type=submit]");
+  await waitFor(`document.body.innerText.includes("Saved greet")`, "cron saved", 60_000);
+  await waitFor(`document.body.innerText.includes("Next:")`, "next run shown", 30_000);
+  console.log("  ✓ saved a cron job; its timer is scheduled on the server");
+  await screenshot("crons");
+  await click('button[title="Run now"]');
+  await waitForPath("/projects/next/crons/greet");
+  let runs = "";
+  for (let i = 0; i < 20 && !runs.includes("Succeeded"); i++) {
+    await sleep(1500);
+    await go("/projects/next/crons/greet");
+    await waitForPath("/projects/next/crons/greet");
+    runs = String(await evaluate("document.body.innerText"));
+  }
+  if (!runs.includes("Succeeded") || !runs.includes("hello from the panel")) throw new Error(`the cron run didn't succeed with the env var in its output:\n${runs.slice(0, 600)}`);
+  console.log("  ✓ Run now: succeeded as the app, with its env var in the output");
+  await screenshot("cron-runs");
+
   // TOUR_DOMAIN: a host whose public DNS points at the box (e.g. shop.<ip-with-dashes>.sslip.io).
   const tourDomain = process.env.TOUR_DOMAIN;
   if (tourDomain) {

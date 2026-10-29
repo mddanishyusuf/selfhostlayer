@@ -125,6 +125,19 @@ describe("parseCronHistory", () => {
     expect(runs[2]!.finishedAt).toBe(new Date(1_793_300_002_000).toISOString());
   });
 
+  it("starts a oneshot run at \"Starting…\", not at the \"Finished\" logged after it exits", () => {
+    // Real order from Ubuntu 24.04 for a Type=oneshot cron service.
+    const oneshot: JournalEntry[] = [
+      { __REALTIME_TIMESTAMP: "1793262787983539", MESSAGE: "Starting app-next-cron-greet.service", MESSAGE_ID: "7d4958e842da4a758f6c1cdc7b36dcc5", INVOCATION_ID: "ddd", _PID: "1" },
+      { __REALTIME_TIMESTAMP: "1793262788067674", MESSAGE: "hello from the panel", _PID: "200" },
+      { __REALTIME_TIMESTAMP: "1793262788068947", MESSAGE: "Deactivated successfully.", MESSAGE_ID: "7ad2d189f7e94e70a38c781354912448", INVOCATION_ID: "ddd", _PID: "1" },
+      { __REALTIME_TIMESTAMP: "1793262788069162", MESSAGE: "Finished app-next-cron-greet.service", MESSAGE_ID: "39f53479d3a045ac8e11786248231fbf", INVOCATION_ID: "ddd", _PID: "1" },
+    ];
+    const [run] = parseCronHistory(oneshot);
+    expect(run).toMatchObject({ status: "success", exitStatus: 0, output: ["hello from the panel"] });
+    expect(Date.parse(run!.finishedAt!) - Date.parse(run!.startedAt)).toBe(85);
+  });
+
   it("limits the number of runs", () => {
     expect(parseCronHistory(entries, 1)).toHaveLength(1);
   });

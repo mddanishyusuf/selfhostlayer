@@ -130,6 +130,17 @@ const MIGRATIONS = [
    );
    INSERT INTO project_domains (project_id, host, role, status, created_at, verified_at)
      SELECT p.id, j.value, 'free', 'active', p.created_at, p.created_at FROM projects p, json_each(p.domains) j;`,
+  // Cron jobs as the user wrote them; the agent turns them into systemd timers.
+  `CREATE TABLE project_crons (
+     id INTEGER PRIMARY KEY,
+     project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+     name TEXT NOT NULL,
+     schedule TEXT NOT NULL,
+     command TEXT NOT NULL,
+     timeout_sec INTEGER NOT NULL DEFAULT 3600,
+     created_at INTEGER NOT NULL,
+     UNIQUE (project_id, name)
+   );`,
 ];
 
 function open(): DatabaseSync {

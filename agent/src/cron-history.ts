@@ -3,6 +3,9 @@
 // usually carry it too (_SYSTEMD_INVOCATION_ID), but a process that exits
 // quickly can lose it, so unmatched lines are placed by timestamp.
 
+// For Type=oneshot, "Starting…" (STARTING) comes first and "Finished" (STARTED)
+// only after the job has exited, so a run starts at the earliest of the two.
+const STARTING = "7d4958e842da4a758f6c1cdc7b36dcc5";
 const STARTED = "39f53479d3a045ac8e11786248231fbf";
 const SUCCEEDED = "7ad2d189f7e94e70a38c781354912448";
 const FAILED = "d9b373ed55a64feb8242e02dbe79a49c";
@@ -43,9 +46,11 @@ export function parseCronHistory(entries: JournalEntry[], limit = 20): CronRun[]
         run = { invocation: e.INVOCATION_ID, startedAt: iso, finishedAt: null, status: "running", exitStatus: null, output: [], startUs: us, endUs: Infinity };
         runs.set(e.INVOCATION_ID, run);
       }
-      if (e.MESSAGE_ID === STARTED) {
-        run.startedAt = iso;
-        run.startUs = us;
+      if (e.MESSAGE_ID === STARTING || e.MESSAGE_ID === STARTED) {
+        if (us < run.startUs) {
+          run.startedAt = iso;
+          run.startUs = us;
+        }
       } else if (e.MESSAGE_ID === EXITED) {
         run.exitStatus = e.EXIT_STATUS !== undefined ? Number(e.EXIT_STATUS) : null;
       } else if (e.MESSAGE_ID === SUCCEEDED || e.MESSAGE_ID === FAILED) {

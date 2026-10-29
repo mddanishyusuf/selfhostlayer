@@ -13,6 +13,7 @@ import { config } from "./config";
 import { db, now } from "./db";
 import { installationToken } from "./github";
 import { checkCertificate } from "./cert";
+import { syncCrons } from "./crons";
 import { servingConfig } from "./domains";
 import { getApp } from "./github-store";
 import { latestCommit } from "./github-repo";
@@ -348,6 +349,8 @@ async function run(id: number): Promise<void> {
       color = idle;
     }
     await waitForCertificates(id, serving(p).domains);
+    // Cron jobs follow the project's Node version and folder, and run from this release now.
+    for (const problem of await syncCrons(p)) log(id, `Cron ${problem}\n`);
     await agent("release.prune", { slug: p.slug, keep: 5 }).catch((err) => log(id, `Pruning old releases failed: ${(err as Error).message}\n`));
 
     if (steps.length) steps[steps.length - 1]!.ms = Date.now() - stepStart;

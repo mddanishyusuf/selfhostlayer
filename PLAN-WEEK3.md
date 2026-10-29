@@ -51,4 +51,12 @@
 - **Finding:** a job that exits quickly can lose its `_SYSTEMD_INVOCATION_ID` in the journal, so history groups runs by systemd's own start/end messages and places unmarked output lines by time.
 - **Installer:** apt failing on "not valid yet" (a wrong server clock, e.g. a VM resumed after the host slept) now says so and points at `timedatectl`.
 
+## Day 4 result (2026-10-29)
+**Done when "add, edit, run now, history and logs from the panel": passed** in the VM through the browser tour (save a job, its timer is scheduled, Run now → "Succeeded" with the app's env var in the output).
+
+- **Crons page** (`/projects/[slug]/crons`): jobs with live state from systemd (next run, running, last result), Run now, Delete; add/update form with schedule presets, a plain-language description ("every 30 minutes") and validation (`validateCron`: name, cron expression → OnCalendar, command starting with node/npm/npx).
+- **Runs page** (`/projects/[slug]/crons/[name]`): history with status, exit code, UTC start time, duration and output (newest open).
+- **`project_crons`** keeps jobs as written; every deploy rewrites them (`syncCrons`), so they follow the project's Node version, folder and memory limit.
+- **Bug the screenshot caught:** durations showed "-0.0s". For `Type=oneshot` systemd logs "Starting…" first and "Finished" only after the job exits, and the parser took "Finished" as the start. Runs now start at the earliest of the two (test with the real journal order).
+
 **Needs from the user (optional):** a domain or subdomain that can point at the VPS (37.27.25.45).

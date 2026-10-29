@@ -47,6 +47,9 @@ export default async function ProjectPage({ params }: { params: Promise<{ slug: 
               Redeploy
             </SubmitButton>
           </form>
+          <Link href={`/projects/${project.slug}/crons`} className="inline-flex h-9 items-center rounded-md border border-border px-4 text-sm font-medium transition-colors duration-150 hover:bg-hover">
+            Crons
+          </Link>
           <Link href={`/projects/${project.slug}/domains`} className="inline-flex h-9 items-center rounded-md border border-border px-4 text-sm font-medium transition-colors duration-150 hover:bg-hover">
             Domains
           </Link>

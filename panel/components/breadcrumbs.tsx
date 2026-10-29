@@ -12,6 +12,10 @@ export function Breadcrumbs() {
     crumbs.push({ label: parts[1], href: parts[2] ? `/projects/${parts[1]}` : undefined });
     if (parts[2] === "settings") crumbs.push({ label: "Settings" });
     if (parts[2] === "domains") crumbs.push({ label: "Domains" });
+    if (parts[2] === "crons") {
+      crumbs.push({ label: "Crons", href: parts[3] ? `/projects/${parts[1]}/crons` : undefined });
+      if (parts[3]) crumbs.push({ label: parts[3] });
+    }
   } else if (parts[0] === "deployments" && parts[1]) {
     crumbs.push({ label: `Deployment #${parts[1]}` });
   } else if (parts[0] === "new") {
