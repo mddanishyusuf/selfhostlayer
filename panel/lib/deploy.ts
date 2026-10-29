@@ -8,7 +8,7 @@ import { EventEmitter } from "node:events";
 import { appendFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { AgentError } from "@layer/protocol";
-import { agent } from "./agent";
+import { agent, type SystemInfo } from "./agent";
 import { config } from "./config";
 import { db, now } from "./db";
 import { installationToken } from "./github";
@@ -21,7 +21,7 @@ import { servingConfig } from "./domains";
 import { getApp } from "./github-store";
 import { BUILD_SLOTS, readState } from "./panel-state";
 import { latestCommit } from "./github-repo";
-import { getProject, projectEnv, type Project } from "./projects";
+import { getProject, listProjects, projectEnv, type Project } from "./projects";
 
 export const BUN_VERSION = "1.3.9";
 const DRAIN_MS = 2000;
@@ -148,6 +148,38 @@ const STEP_TITLES: Record<string, string> = {
   switch: "Switching traffic",
 };
 const heading = (text: string) => `\n\x1b[1m▸ ${text}\x1b[0m\n`;
+
+// --- disk space ---------------------------------------------------------------
+
+/** Below this much free disk, builds empty the apps' package caches first. The agent refuses builds below 15%. */
+const TRIM_BELOW_FREE = 0.25;
+
+/**
+ * Package caches (npm, yarn, pnpm, bun) grow without limit, one per app, and
+ * filled a 19 GB server. Below 25% free disk, every app's cache over 256 MB is
+ * emptied; caches refill on each app's next build, so they stay while there's
+ * room and builds stay fast. Apps building right now are skipped (other than
+ * this one, which hasn't started installing). Returns what was freed, for the build log.
+ */
+async function freeSpaceIfLow(self: number): Promise<string | null> {
+  const disk = (await agent<SystemInfo>("system.info").catch(() => null))?.diskGb;
+  if (!disk || disk.free / disk.total >= TRIM_BELOW_FREE) return null;
+  let freedMb = 0;
+  const cleaned: string[] = [];
+  const building = new Set([...builds.running].map((id) => getDeployment(id)?.projectId));
+  for (const project of listProjects()) {
+    if (project.id !== self && building.has(project.id)) continue;
+    const r = await agent<{ beforeMb: number; afterMb: number }>("cache.clean", { slug: project.slug, maxMb: 256 }).catch(() => null);
+    if (r && r.beforeMb > r.afterMb) {
+      freedMb += r.beforeMb - r.afterMb;
+      cleaned.push(project.slug);
+    }
+  }
+  const pct = Math.round((disk.free / disk.total) * 100);
+  return cleaned.length
+    ? `Only ${pct}% disk free: emptied the package caches of ${cleaned.join(", ")} (${(freedMb / 1024).toFixed(1)} GB). They refill on each app's next build.\n`
+    : `Only ${pct}% disk free, and no package cache was big enough to help. Old builds and app data use the rest.\n`;
+}
 
 // --- queue -------------------------------------------------------------------
 
@@ -319,6 +351,8 @@ async function run(id: number): Promise<void> {
   update(id, { started_at: now() });
   log(id, `Deploying ${p.repoOwner}/${p.repoName}@${d.sha.slice(0, 7)}${d.commitMessage ? ` "${d.commitMessage}"` : ""} (${d.trigger})\n`);
   try {
+    const freed = await freeSpaceIfLow(p.id);
+    if (freed) log(id, freed);
     await agent("app.create", { slug: p.slug });
     await agent("env.write", { slug: p.slug, vars: projectEnv(p.id) });
     const node = await agent<{ installed: boolean }>("node.install", { version: p.nodeVersion });

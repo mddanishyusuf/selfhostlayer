@@ -38,7 +38,7 @@ async function checkDisk(): Promise<void> {
   const used = (info.diskGb.total - info.diskGb.free) / info.diskGb.total;
   await apply(diskVerdict(used, !!openIncident("disk")), "disk", () => ({
     title: `Disk ${Math.round(used * 100)}% full on ${info.hostname}`,
-    detail: `${info.diskGb.free} GB free of ${info.diskGb.total} GB. Old releases and package caches can be cleaned from each project; builds stop below 15% free.`,
+    detail: `${info.diskGb.free} GB free of ${info.diskGb.total} GB. Package caches are emptied automatically before a build when under 25% is free, and builds stop below 15%. Old builds and app data use the rest.`,
     link: panelUrl("/"),
   }), `Disk back to ${Math.round(used * 100)}%.`);
 }

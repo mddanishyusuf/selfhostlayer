@@ -45,7 +45,9 @@ Every deployment of the project, newest first, with its commit, what started it 
 What one deploy does, step by step:
 
 1. **Fetch:** downloads the commit's tarball from GitHub into `/srv/apps/<app>/releases/<sha>/`. The server never holds git credentials.
-2. **Build:** runs the install and build commands as `app-<app>` in a sandbox (`systemd-run` with the same restrictions as the app, plus network access for the package registry). The output streams to the page. One build runs at a time by default; Settings → Builds allows up to 4, never two of the same project. The rest wait in line and start on their own, and a waiting deployment's page says what it's waiting for. Builds stop if the disk is under 15% free.
+2. **Build:** runs the install and build commands as `app-<app>` in a sandbox (`systemd-run` with the same restrictions as the app, plus network access for the package registry). The output streams to the page. One build runs at a time by default; Settings → Builds allows up to 4, never two of the same project. The rest wait in line and start on their own, and a waiting deployment's page says what it's waiting for.
+
+Each app keeps its own package cache (npm, yarn, pnpm, bun) to make builds fast. Apps don't share caches, so one app can't tamper with another's packages. When the disk is under 25% free, a build first empties every app's cache over 256 MB, and its log says what was freed. Builds stop if the disk is under 15% free.
 3. **Start:** writes the app's unit and env file, then starts the new build on the idle color (blue or green) and waits for its health check.
 4. **Switch:** points the app's Caddy site at the new color, waits for requests in flight, then stops the old color. Visitors never see a gap.
 
