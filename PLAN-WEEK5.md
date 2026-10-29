@@ -1,42 +1,45 @@
-# Week 5 plan: marketplace v0
+# Weeks 5–6 plan: launch prep
 
-> Drafted 2026-10-29. Builds on [PLAN-WEEK4.md](PLAN-WEEK4.md); product context in [CLAUDE.md](CLAUDE.md). The redesign (done 2026-10-29) left the Integrations page as "Coming soon"; this week makes it real.
+> Drafted 2026-10-29; Weeks 5 and 6 combined at the user's request. Builds on [PLAN-WEEK4.md](PLAN-WEEK4.md) and the redesign; product context in [CLAUDE.md](CLAUDE.md).
 
-**Goal:** from Integrations, install one of our own apps in one click and get a live HTTPS app: secrets generated, data in `DATA_DIR`, backups and domains working like any other project. Three first-party apps in the catalog: **Piqo** (analytics), **maillayer** (email marketing) and **Scheduling Layer** (social post scheduler).
+**Goal:** everything the original plan still needs before a public launch. You can move real apps (with their data) onto a box, run the panel on your own domain and lock it to yourself, update it with one click, and read what happened on the server. Proven by **moving the 7 apps still on DigitalOcean** (the launch story), with docs and a landing page.
 
-**Correction to the original plan:** `postscheduler` is the postscheduler.com directory site, not an app. The self-hosted scheduler is **`schedulinglayer`** (Twitter/X, Threads, LinkedIn).
-
-## What the three apps need (read from their repos, 2026-10-29)
-| App | Repo (all private) | Runs as | Data | Needs | Ready? |
-|---|---|---|---|---|---|
-| Piqo | `piqo-selfhost`, tag v0.1.5 | Next.js + custom `server.js`, Node ≥ 22, reads `HOST`/`PORT` | SQLite at `DATABASE_PATH`, GeoIP file | `AUTH_SECRET` (generated), `APP_URL`; optional license key, MaxMind key, SMTP | Yes. Migrates itself on start, `/api/health` exists |
-| maillayer | `maillayer-pro`, tag v1.7.0 | Next.js + `server.js`, reads `HOST`/`PORT` | SQLite at `DATABASE_PATH`, logs, its own backups dir | `AUTH_SECRET`, `APP_URL`; it can drive Caddy itself, which must be off here (`MAILLAYER_NO_CADDY=1`) | Yes. Migrates on start, `/api/health` exists, GeoIP download skips without a key |
-| Scheduling Layer | `schedulinglayer`, no tags | Next.js + `server.js` **hard-coded to port 3000 on all interfaces** | SQLite through Prisma (`DATABASE_URL=file:…`), uploaded media | `ENCRYPTION_KEY` (generated); optional DigitalOcean Spaces keys | **Needs a small fix:** read `HOST`/`PORT`, and run `prisma migrate deploy` before start. Also has `app.db`/`dev.db` committed: check they hold no real tokens |
+**Changed 2026-10-29: the marketplace moves after launch.** Its apps will be built fresh for Self Host Layer, not taken from the existing Piqo or maillayer code. The manifest and the Integrations install flow get built together with the first of those apps.
 
 ## Decisions (recommended 2026-10-29, change any of them)
-1. **An installed app is a normal project.** Installing creates a project from the manifest and deploys it through the existing pipeline, so domains, env, logs, backups, crons, rollback and delete work unchanged. The project remembers its catalog entry and version.
-2. **The manifest is `layer.yaml` in the app's repo** (or a `"layer"` key in `package.json`), parsed with the `yaml` package (no dependencies). It says how to run the app: Node version, build and start commands, health path, memory, env (asked, generated or templated), services (`redis`, `postgres`), crons, writable folders, and an optional `migrate` command. The spec gets its own page and an MIT license, as planned.
-3. **Env templates are resolved at every deploy:** `${APP_URL}` (the app's main domain, so adding a custom domain updates it), `${DATA_DIR}`, `${SLUG}`. Generated secrets (`generate: hex-32`, `base64-48`) are made once at install and stored encrypted like other env vars.
-4. **The catalog ships with the panel:** `catalog/<app>.yaml` in this repo holds the listing (name, category, description, icon, rough RAM) and a pinned source. A panel update can bring newer app versions; the project then shows "Update to vX".
-5. **Updates take a backup first** (when backups are on), then deploy the new version. Rollback stays instant, but a database migration may not undo itself, so the backup is the real undo.
-6. **`migrate` runs before traffic switches:** a new agent action runs it once in the new release, as the app user, in the app's sandbox with its env and `DATA_DIR`. If it fails, the old version keeps serving. Piqo and maillayer don't need it (they migrate on start); Scheduling Layer does.
-7. **Where the code comes from. Your call:** the three repos are private, so other people's servers can't fetch them.
-   - **This week:** the catalog builds from your GitHub repos at a pinned tag. That works on your own box once the GitHub App is installed on those repos, and it reuses the deploy pipeline unchanged.
-   - **For launch, pick one:** (a) prebuilt release tarballs (recommended: the apps' CI already builds Docker images, so it adds one artifact per architecture, and installs skip `next build`, which is slow on a 1GB box), or (b) make the repos public, with the license key still gating paid features.
-8. **Automated tests use a public example:** a `catalog-demo` app in `selfhostlayer-examples` uses every manifest feature (asked and generated env, templates, Redis, a cron, `migrate`). The VM tour installs it; the private apps are tested on your VPS.
+1. **Bringing data in reuses restore:** a `tar.gz` of a `data/` folder, uploaded in the panel or given to `layer import <app> <file>` on the box, goes through the same steps as a restore: SQLite files checked, the app stopped and started, the replaced data kept aside. A guide shows how to copy SQLite safely off a pm2 box (`.backup` or `VACUUM INTO`, never a raw copy of a live file).
+2. **Your own domain, checked first:** Settings → Panel address takes a name like `panel.example.com`, shows the DNS record, checks public DNS (the same check as project domains), then switches. The old address redirects for a day, so you can't lock yourself out by mistake. A wildcard like `*.apps.example.com` can replace `sslip.io` for free app URLs. Office and school networks block `sslip.io` (seen 2026-10-29).
+3. **Panel lockdown:** Settings → Access offers anyone (password + 2FA, today), only these IPs (your current IP filled in), or Tailscale only. It's a match in the panel's Caddy site, so blocked requests never reach the panel. `layer access reset` on the box undoes it.
+4. **One-click updates:** Settings → Version shows "Update to vX" from a release feed. An allowlisted agent action downloads only from the configured release URL, checks the checksum and runs the installer in its own unit, then the page reloads. `layer update` does the same on the box. `layer repair` rewrites units, Caddy files and env files from the saved state and restarts what changed.
+5. **Metrics without a new daemon:** the panel's monitor (already running every minute) samples each app's CPU, memory and disk, plus the box's. It keeps 24 hours at one-minute steps and 7 days hourly in SQLite. Small charts go on the project Overview and in the server popup.
+6. **Request logs already exist:** Caddy writes `/var/log/caddy/<app>.log` for every app. Logs gets a "Requests" tab (time, status, method, path, duration, IP) read through the agent.
+7. **MySQL from the original v1 list, as MariaDB** (in Ubuntu and Debian, lighter): one shared server installed on first use, a user and database per app, `mysqldump` in backups. The same pattern as Postgres.
+8. **The audit log gets a page:** the agent already appends every privileged action to `/var/log/layer/audit.jsonl`. Settings → Activity shows it.
+9. **Account basics:** change password, make new recovery codes, sign out other sessions.
+10. **The idle budget is checked in CI:** after the install in CI, panel + agent + Caddy memory is measured, and the job fails above 200MB.
 
 ## Day by day
 | Day | Work | Done when |
 |---|---|---|
-| **1** | Manifest spec, parser and validator (clear errors per field), catalog format, `catalog-demo` example with a `layer.yaml` | Unit tests cover every field and error; the example's manifest validates |
-| **2** | Pipeline: env templates resolved per deploy, `migrate` agent action before the switch, services and crons created from the manifest | VM e2e: `catalog-demo` deploys with a generated secret, Redis and a cron; a failing `migrate` leaves the old version serving |
-| **3** | Integrations page: catalog list, app page (what it does, what it needs, RAM), install form (asked values; generated ones hidden), install creates the project and deploys; "Installed · Open" state, catalog badge on the project | VM tour: install `catalog-demo` from Integrations and reach it over HTTPS |
-| **4** | Updates ("Update to vX", backup first), projects imported from GitHub that contain a `layer.yaml` get its settings applied, manifest docs | An update deploys the new version after a backup; a GitHub import with `layer.yaml` needs no manual settings |
-| **5** | The three apps: add `layer.yaml` to each repo, fix Scheduling Layer's `HOST`/`PORT` and migrations, tag releases, catalog entries | Each installs on the VPS from Integrations and answers on its health path |
-| **6** | VPS run-through, tour screenshots, results in this file | All three live on the VPS; the VM tour passes |
+| **1** | Import data: panel upload and `layer import`; guide for pm2 boxes | VM e2e: a `data/` archive with SQLite is imported and served; a corrupt database is refused and nothing changes |
+| **2** | Panel on your own domain (DNS check, switch, old address redirects); wildcard domain for app URLs | VM: move the panel to a test domain and back without losing access |
+| **3** | Panel lockdown (IP allowlist, Tailscale only), `layer access reset` | VM: an allowlist without your IP blocks you; the reset brings you back |
+| **4** | Updates: release feed, Update button, `layer update`, `layer repair` | VM: update from one build to the next from the UI; repair fixes a hand-edited unit and Caddy file |
+| **5** | Metrics: sampling, storage, charts | An app under load shows its CPU and memory on the Overview |
+| **6** | Requests tab, Activity (audit log) page, Account (password, recovery codes, sessions) | The tour sees its own requests and actions listed |
+| **7** | MariaDB per app, `mysqldump` in backups | e2e like Postgres: an app on MySQL is backed up and restored |
+| **8** | Idle budget in CI; docs (install, each panel page, security model and limits, the raw commands behind each button, moving from pm2) | CI fails above 200MB; every panel page has a docs section |
+| **9** | Landing page at selfhostlayer.com, deployed by Self Host Layer itself | Live with HTTPS |
+| **10** | Dogfood: move the 7 apps off DigitalOcean, one at a time (deploy, import data, check, switch DNS, verify) | All 7 serve from the new box; the DigitalOcean apps are stopped |
 
 ## Needs from you
-1. **OK to change the three app repos:** add `layer.yaml` (and tags) to each; in `schedulinglayer`, read `HOST`/`PORT` and run migrations. Small PRs you can review.
-2. **Install the GitHub App on those three repos** on the VPS panel (Settings → GitHub → Install on more repositories), so the box can fetch them.
-3. **Decision 7 for launch:** tarballs or public repos. Not needed until Week 6.
-4. **Optional:** a Piqo and a maillayer license key for the VPS test.
+1. **Day 2:** a name to test the panel address with (e.g. `panel.selfhostlayer.com`) and the DNS record for it.
+2. **Day 9:** what the landing page should say and look like.
+3. **Day 10:** SSH access to the DigitalOcean box and the DNS for the 7 apps' domains. DNS switches are yours to make.
+4. **Before launch:** the license (AGPL-3.0 + CLA is the leading option), and a public place for releases. One-click updates and `get.selfhostlayer.com` need it; until then updates are tested on the VM.
+
+## After launch
+- **Marketplace:** apps built fresh for Self Host Layer (analytics, email, scheduler, …), with the manifest (`layer.yaml`) and the Integrations install flow.
+- **Platform:** server-to-server migration assistant, per-app outbound network rules, MongoDB, AppArmor/Landlock.
+- **Panel:** firewall rule editing and unban, alert on/off switches, Databases' Manage opening a page like Domains, real screenshots as an option.
+- **Pro (paid):** multi-server, teams, preview deploys.
