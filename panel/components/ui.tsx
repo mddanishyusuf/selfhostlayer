@@ -14,10 +14,10 @@ export function Button({
   return (
     <button
       className={cx(
-        "inline-flex h-9 select-none items-center justify-center gap-2 rounded-md px-4 text-sm font-medium transition-colors duration-150 ease-out disabled:pointer-events-none disabled:opacity-50",
+        "inline-flex h-9 select-none items-center justify-center gap-2 rounded-full px-4 text-sm font-bold transition-colors duration-150 ease-out disabled:pointer-events-none disabled:opacity-50",
         focus,
         variant === "primary" && "bg-inverse text-inverse-fg hover:opacity-90",
-        variant === "secondary" && "border border-border bg-background hover:bg-hover",
+        variant === "secondary" && "border border-border-strong bg-background hover:bg-hover",
         variant === "ghost" && "text-muted hover:bg-hover hover:text-foreground",
         className,
       )}
@@ -30,7 +30,7 @@ export function Input({ className, ...props }: ComponentProps<"input">) {
   return (
     <input
       className={cx(
-        "h-9 w-full rounded-md border border-border bg-background px-3 text-sm transition-colors duration-150 placeholder:text-muted/70 hover:border-border-strong focus:border-muted",
+        "h-10 w-full rounded-md border border-border-strong bg-background px-3 text-sm transition-colors duration-150 placeholder:text-muted/70 focus:border-accent",
         focus,
         "aria-invalid:border-err",
         className,
@@ -55,7 +55,7 @@ export function Field({ label, htmlFor, hint, children }: { label: string; htmlF
 }
 
 export function Card({ className, ...props }: ComponentProps<"div">) {
-  return <div className={cx("rounded-lg border border-border bg-background", className)} {...props} />;
+  return <div className={cx("rounded-2xl border border-border bg-background", className)} {...props} />;
 }
 
 export function FormError({ message }: { message?: string | null }) {

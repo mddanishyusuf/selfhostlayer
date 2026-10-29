@@ -4,6 +4,7 @@ import { DeleteProject, SettingsForm } from "@/components/settings";
 import { frameworkLabel } from "@/lib/detect";
 import { listDeployments } from "@/lib/deploy";
 import { getProjectBySlug, projectEnv } from "@/lib/projects";
+import { PageBody, PageHeader } from "@/components/page";
 import { requireUser } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
@@ -20,16 +21,20 @@ export default async function SettingsPage({ params, searchParams }: { params: P
   const r = project.runtime;
 
   return (
-    <div className="mx-auto grid max-w-[760px] gap-6">
-      <header className="grid gap-1">
-        <h1 className="text-2xl font-semibold tracking-tight">{isNew ? `Configure ${project.slug}` : "Settings"}</h1>
-        <p className="text-muted">
-          <Link href={`/projects/${project.slug}`} className="underline-offset-4 hover:underline">
+    <>
+      <PageHeader
+        title={isNew ? `Configure ${project.slug}` : "Settings"}
+        back={isNew ? "/" : undefined}
+        subtitle={
+          <>
+            <Link href={`/projects/${project.slug}`} className="underline-offset-4 hover:underline">
             {project.repoOwner}/{project.repoName}
           </Link>
           {project.rootDir && ` · ${project.rootDir}`} · will be live at <span className="text-foreground">{project.domains[0]}</span>
-        </p>
-      </header>
+          </>
+        }
+      />
+      <PageBody>
       <SettingsForm
         isNew={isNew}
         framework={frameworkLabel(project.framework)}
@@ -51,6 +56,7 @@ export default async function SettingsPage({ params, searchParams }: { params: P
         }}
       />
       {!isNew && <DeleteProject slug={project.slug} />}
-    </div>
+      </PageBody>
+    </>
   );
 }

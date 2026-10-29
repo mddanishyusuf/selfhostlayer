@@ -5,6 +5,7 @@ import { SubmitButton } from "@/components/form";
 import { timeAgo } from "@/components/status";
 import { Card } from "@/components/ui";
 import { listChannels, listIncidents } from "@/lib/alerts/engine";
+import { PageBody, PageHeader } from "@/components/page";
 import { requireUser } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
@@ -28,14 +29,15 @@ export default async function AlertsPage() {
   const resolved = incidents.filter((i) => i.resolvedAt);
 
   return (
-    <div className="mx-auto grid max-w-[760px] gap-6">
-      <header className="grid gap-1">
-        <h1 className="text-2xl font-semibold tracking-tight">Alerts</h1>
-        <p className="text-muted">One message when something breaks (a failed deploy, a crash-looping app, disk over 80%, a certificate problem, a failed cron job or backup) and one when it recovers.</p>
-      </header>
+    <>
+      <PageHeader
+        title="Alerts"
+      />
+      <PageBody>
+        <p className="text-[13px] text-muted">One message when something breaks (a failed deploy, a crash-looping app, disk over 80%, a certificate problem, a failed cron job or backup) and one when it recovers.</p>
 
       <section className="grid gap-3">
-        <h2 className="text-base font-semibold tracking-tight">Open incidents</h2>
+        <h2 className="text-[17px] font-bold tracking-tight">Open incidents</h2>
         <Card className="divide-y divide-border overflow-hidden">
           {open.length === 0 && (
             <p className="flex items-center gap-2 px-5 py-6 text-muted">
@@ -61,7 +63,7 @@ export default async function AlertsPage() {
       </section>
 
       <section className="grid gap-3">
-        <h2 className="text-base font-semibold tracking-tight">Channels</h2>
+        <h2 className="text-[17px] font-bold tracking-tight">Channels</h2>
         {channels.length > 0 && (
           <Card className="divide-y divide-border overflow-hidden">
             {channels.map((c) => (
@@ -96,7 +98,7 @@ export default async function AlertsPage() {
 
       {resolved.length > 0 && (
         <section className="grid gap-3">
-          <h2 className="text-base font-semibold tracking-tight">Recently resolved</h2>
+          <h2 className="text-[17px] font-bold tracking-tight">Recently resolved</h2>
           <Card className="divide-y divide-border overflow-hidden">
             {resolved.map((i) => (
               <div key={i.id} className="flex items-center gap-3 px-5 py-3 text-[13px]">
@@ -108,6 +110,7 @@ export default async function AlertsPage() {
           </Card>
         </section>
       )}
-    </div>
+      </PageBody>
+    </>
   );
 }

@@ -235,7 +235,7 @@ if (process.env.TOUR_DEPLOY === "1") {
     }
   };
   const openNewestDeployment = async () => {
-    const href = String(await evaluate(`document.querySelector('a[href^="/deployments/"]').getAttribute("href")`));
+    const href = String(await evaluate(`document.querySelector('main a[href*="/deployments/"]').getAttribute("href")`));
     await go(href);
     await waitForPath(href);
     return href;
@@ -262,7 +262,7 @@ if (process.env.TOUR_DEPLOY === "1") {
   };
   const deployFromSettings = async () => {
     await click('button[value="deploy"]');
-    await waitFor(`location.pathname.startsWith("/deployments/")`, "deployment page", 60_000);
+    await waitFor(`/\\/deployments\\/\\d+$/.test(location.pathname)`, "deployment page", 60_000);
   };
 
   await importFolder("next");
@@ -290,12 +290,12 @@ if (process.env.TOUR_DEPLOY === "1") {
   await go("/projects/next");
   await waitForPath("/projects/next");
   await click('form:has(input[name=slug]) button[type=submit]');
-  await waitFor(`location.pathname.startsWith("/deployments/")`, "redeploy page", 60_000);
+  await waitFor(`/\\/deployments\\/\\d+$/.test(location.pathname)`, "redeploy page", 60_000);
   await waitForDeploy("redeploy");
   await go("/projects/next");
   await waitForPath("/projects/next");
   await click('button[title="Roll back to this deployment"]');
-  await waitFor(`location.pathname.startsWith("/deployments/")`, "rollback page", 60_000);
+  await waitFor(`/\\/deployments\\/\\d+$/.test(location.pathname)`, "rollback page", 60_000);
   await waitForDeploy("rollback");
   const rollbackLog = String(await evaluate(`document.querySelector('[role=log]')?.innerText ?? ""`));
   if (!rollbackLog.includes("build is skipped")) throw new Error("the rollback rebuilt instead of reusing the build on disk");
@@ -556,6 +556,56 @@ if (process.env.TOUR_DEPLOY === "1") {
     await waitForPath("/projects/next/domains");
     if (String(await evaluate("document.body.innerText")).includes("github.com")) throw new Error("removing the pending domain didn't work");
     console.log("  ✓ removed the pending domain");
+  }
+
+  console.log("Navigation");
+  {
+    await setViewport(1440, 900);
+    const navText = () => evaluate(`document.querySelector("aside nav")?.innerText ?? ""`).then(String);
+    for (const [path, label, shot] of [
+      ["/", "Projects", "nav-projects"],
+      ["/deployments", "Deployments", "nav-deployments"],
+      ["/domains", "Domains", "nav-domains"],
+      ["/databases", "Databases", "nav-databases"],
+      ["/integrations", "Integrations", "nav-integrations"],
+      ["/firewall", "Firewall", "nav-firewall"],
+      ["/analytics", "Analytics", "nav-analytics"],
+    ] as const) {
+      await go(path);
+      await waitForPath(path);
+      await waitFor(`document.querySelector("main header h1")?.innerText === ${JSON.stringify(label)}`, `${label} page`);
+      const current = String(await evaluate(`document.querySelector('aside nav [aria-current="page"]')?.innerText ?? ""`));
+      if (current.trim() !== label) throw new Error(`on ${path} the sidebar highlights "${current}", not ${label}`);
+      await screenshot(shot);
+    }
+    const global = await navText();
+    for (const label of ["Projects", "Deployments", "Analytics", "Firewall", "Domains", "Integrations", "Databases", "Backups", "Alerts"]) {
+      if (!global.includes(label)) throw new Error(`the sidebar has no ${label}`);
+    }
+    console.log("  ✓ global sidebar: every section opens and is highlighted");
+    await go("/projects/next");
+    await waitForPath("/projects/next");
+    const scoped = await navText();
+    for (const label of ["Overview", "Deployments", "Domains", "Databases", "Backups", "Cron jobs", "Settings"]) {
+      if (!scoped.includes(label)) throw new Error(`the project sidebar has no ${label}: ${scoped}`);
+    }
+    if (scoped.includes("Firewall")) throw new Error("the project sidebar still shows global sections");
+    console.log("  ✓ inside a project the sidebar switches to that project's sections");
+    await screenshot("nav-project");
+    await setViewport(1440, 900, true);
+    await screenshot("nav-project-dark");
+    await setViewport(390, 844);
+    await go("/");
+    await waitForPath("/");
+    await click('button[aria-label="Open menu"]');
+    await waitFor(`!!document.querySelector('[role=dialog] nav')`, "the phone menu");
+    await screenshot("nav-phone-menu");
+    console.log("  ✓ phones get a menu button and a drawer");
+    await setViewport(900, 900);
+    await go("/projects/next");
+    await waitForPath("/projects/next");
+    await screenshot("nav-tablet");
+    await setViewport(1280, 900);
   }
 
   console.log("Settings and delete");

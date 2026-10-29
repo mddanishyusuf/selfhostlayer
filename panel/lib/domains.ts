@@ -42,6 +42,12 @@ export function listDomains(projectId: number): ProjectDomain[] {
   return (db().prepare("SELECT * FROM project_domains WHERE project_id = ? ORDER BY role = 'free', created_at").all(projectId) as unknown as Row[]).map(fromRow);
 }
 
+/** Every project's domains, with the project's slug: custom ones first. */
+export function listAllDomains(): (ProjectDomain & { slug: string })[] {
+  const rows = db().prepare("SELECT d.*, p.slug FROM project_domains d JOIN projects p ON p.id = d.project_id ORDER BY d.role = 'free', p.slug, d.created_at").all() as unknown as (Row & { slug: string })[];
+  return rows.map((r) => ({ ...fromRow(r), slug: r.slug }));
+}
+
 export function getDomain(id: number): ProjectDomain | null {
   const row = db().prepare("SELECT * FROM project_domains WHERE id = ?").get(id) as Row | undefined;
   return row ? fromRow(row) : null;

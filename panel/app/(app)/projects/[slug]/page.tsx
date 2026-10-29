@@ -1,10 +1,11 @@
-import { ArrowUpRight, RotateCcw } from "lucide-react";
+import { ArrowUpRight } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { redeploy, rollback } from "@/app/actions/projects";
+import { redeploy } from "@/app/actions/projects";
+import { DeploymentRows } from "@/components/deployment-rows";
 import { SubmitButton } from "@/components/form";
-import { DeployStatusBadge, timeAgo } from "@/components/status";
-import { Card } from "@/components/ui";
+import { PageBody, PageHeader, PillLink, Section } from "@/components/page";
+import { DeployStatusBadge } from "@/components/status";
 import { frameworkLabel } from "@/lib/detect";
 import { listDeployments, liveDeployment } from "@/lib/deploy";
 import { servingConfig } from "@/lib/domains";
@@ -21,7 +22,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ slug: 
   await requireUser();
   const project = getProjectBySlug((await params).slug);
   if (!project) notFound();
-  const deployments = listDeployments(project.id);
+  const deployments = listDeployments(project.id, 5);
   const live = liveDeployment(project.id);
   const serving = servingConfig(project.id);
   const hosts = serving.domains.length ? serving.domains : project.domains;
@@ -29,102 +30,62 @@ export default async function ProjectPage({ params }: { params: Promise<{ slug: 
   const url = `https://${hosts.find((h) => h !== project.domains[0]) ?? hosts[0]}`;
 
   return (
-    <div className="grid gap-8">
-      <header className="flex flex-wrap items-end justify-between gap-4">
-        <div className="grid gap-1">
-          <h1 className="text-2xl font-semibold tracking-tight">{project.slug}</h1>
-          <p className="text-muted">
-            <a href={`https://github.com/${project.repoOwner}/${project.repoName}`} className="underline-offset-4 hover:underline">
-              {project.repoOwner}/{project.repoName}
-            </a>
+    <>
+      <PageHeader
+        title={project.slug}
+        subtitle={
+          <a href={`https://github.com/${project.repoOwner}/${project.repoName}`} className="underline-offset-4 hover:underline">
+            {project.repoOwner}/{project.repoName}
             {project.rootDir && ` · ${project.rootDir}`} · {project.branch}
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <form action={redeploy}>
-            <input type="hidden" name="slug" value={project.slug} />
-            <SubmitButton pending="Starting…" className="h-9 w-auto px-4">
-              Redeploy
-            </SubmitButton>
-          </form>
-          <Link href={`/projects/${project.slug}/crons`} className="inline-flex h-9 items-center rounded-md border border-border px-4 text-sm font-medium transition-colors duration-150 hover:bg-hover">
-            Crons
-          </Link>
-          {project.runtime.kind !== "static" && (
-            <Link href={`/projects/${project.slug}/backups`} className="inline-flex h-9 items-center rounded-md border border-border px-4 text-sm font-medium transition-colors duration-150 hover:bg-hover">
-              Backups
-            </Link>
-          )}
-          {project.runtime.kind !== "static" && (
-            <Link href={`/projects/${project.slug}/databases`} className="inline-flex h-9 items-center rounded-md border border-border px-4 text-sm font-medium transition-colors duration-150 hover:bg-hover">
-              Databases
-            </Link>
-          )}
-          <Link href={`/projects/${project.slug}/domains`} className="inline-flex h-9 items-center rounded-md border border-border px-4 text-sm font-medium transition-colors duration-150 hover:bg-hover">
-            Domains
-          </Link>
-          <Link href={`/projects/${project.slug}/settings`} className="inline-flex h-9 items-center rounded-md border border-border px-4 text-sm font-medium transition-colors duration-150 hover:bg-hover">
-            Settings
-          </Link>
-          <a href={url} target="_blank" rel="noreferrer" className="inline-flex h-9 items-center gap-1.5 rounded-md border border-border px-4 text-sm font-medium transition-colors duration-150 hover:bg-hover">
-            Visit <ArrowUpRight className="size-3.5" aria-hidden />
           </a>
+        }
+        actions={
+          <>
+            <PillLink href={url} external>
+              Visit <ArrowUpRight className="size-3.5" aria-hidden />
+            </PillLink>
+            <form action={redeploy}>
+              <input type="hidden" name="slug" value={project.slug} />
+              <SubmitButton pending="Starting…" className="w-auto">
+                Redeploy
+              </SubmitButton>
+            </form>
+          </>
+        }
+      />
+      <PageBody>
+        <div className="grid divide-y divide-border rounded-2xl border border-border sm:grid-cols-[1fr_2fr_1.3fr] sm:divide-x sm:divide-y-0">
+          <div className="grid content-start gap-1.5 px-4 py-4">
+            <p className="text-[13px] text-muted">Status</p>
+            {live ? <DeployStatusBadge status="ready" /> : deployments[0] ? <DeployStatusBadge status={deployments[0].status} /> : <span>Not deployed</span>}
+          </div>
+          <div className="grid min-w-0 content-start gap-1.5 px-4 py-4">
+            <p className="text-[13px] text-muted">Domains</p>
+            {hosts.map((d) => (
+              <a key={d} href={`https://${d}`} className="truncate text-[15px] font-bold underline-offset-4 hover:underline">
+                {d}
+              </a>
+            ))}
+          </div>
+          <div className="grid content-start gap-1.5 px-4 py-4">
+            <p className="text-[13px] text-muted">Runtime</p>
+            <p className="text-[15px] font-bold">
+              {frameworkLabel(project.framework)} · {project.runtime.kind === "static" ? "static" : `Node ${project.nodeVersion}`}
+            </p>
+          </div>
         </div>
-      </header>
 
-      <Card className="grid gap-4 p-5 sm:grid-cols-4">
-        <div className="grid gap-1">
-          <p className="text-[13px] text-muted">Status</p>
-          {live ? <DeployStatusBadge status="ready" /> : deployments[0] ? <DeployStatusBadge status={deployments[0].status} /> : <span>Not deployed</span>}
-        </div>
-        <div className="grid gap-1 sm:col-span-2">
-          <p className="text-[13px] text-muted">Domains</p>
-          {hosts.map((d) => (
-            <a key={d} href={`https://${d}`} className="truncate font-medium underline-offset-4 hover:underline">
-              {d}
-            </a>
-          ))}
-        </div>
-        <div className="grid gap-1">
-          <p className="text-[13px] text-muted">Runtime</p>
-          <p className="font-medium">
-            {frameworkLabel(project.framework)} · {project.runtime.kind === "static" ? "static" : `Node ${project.nodeVersion}`}
-          </p>
-        </div>
-      </Card>
-
-      <section className="grid gap-3">
-        <h2 className="text-base font-semibold tracking-tight">Deployments</h2>
-        <Card className="divide-y divide-border overflow-hidden">
-          {deployments.length === 0 && <p className="px-5 py-8 text-center text-muted">No deployments yet.</p>}
-          {deployments.map((d) => (
-            <div key={d.id} className="flex items-center gap-4 px-5 py-3.5 transition-colors duration-150 hover:bg-subtle">
-              <div className="w-28 shrink-0">
-                <DeployStatusBadge status={d.status} />
-              </div>
-              <Link href={`/deployments/${d.id}`} className="grid min-w-0 flex-1 gap-0.5">
-                <p className="truncate font-medium">{d.commitMessage || "Deployment"}</p>
-                <p className="text-[12px] text-muted">
-                  <code className="font-mono">{d.sha.slice(0, 7)}</code> · {d.trigger}
-                  {live?.id === d.id && <span className="text-ok"> · live</span>}
-                </p>
-              </Link>
-              <p className="hidden text-[12px] text-muted tabular-nums sm:block">{timeAgo(d.createdAt)}</p>
-              {d.status === "ready" && live?.id !== d.id ? (
-                <form action={rollback}>
-                  <input type="hidden" name="deploymentId" value={d.id} />
-                  <button type="submit" title="Roll back to this deployment" className="grid size-8 place-items-center rounded-md text-muted transition-colors duration-150 hover:bg-hover hover:text-foreground">
-                    <RotateCcw className="size-4" aria-hidden />
-                    <span className="sr-only">Roll back to this deployment</span>
-                  </button>
-                </form>
-              ) : (
-                <span className="size-8" aria-hidden />
-              )}
-            </div>
-          ))}
-        </Card>
-      </section>
-    </div>
+        <Section
+          title="Recent deployments"
+          aside={
+            <Link href={`/projects/${project.slug}/deployments`} className="text-[14px] text-accent hover:underline">
+              Show all
+            </Link>
+          }
+        >
+          <DeploymentRows slug={project.slug} deployments={deployments} liveIds={live ? [live.id] : []} rollbacks />
+        </Section>
+      </PageBody>
+    </>
   );
 }

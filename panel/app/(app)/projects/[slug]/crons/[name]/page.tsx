@@ -7,6 +7,7 @@ import { Card, StatusDot } from "@/components/ui";
 import { describeCron } from "@/lib/cron";
 import { cronHistory, getCron } from "@/lib/crons";
 import { getProjectBySlug } from "@/lib/projects";
+import { PageBody, PageHeader } from "@/components/page";
 import { requireUser } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
@@ -21,25 +22,26 @@ export default async function CronRunsPage({ params }: { params: Promise<{ slug:
   const runs = await cronHistory(project.slug, cron.name, cron.createdAt).catch(() => []);
 
   return (
-    <div className="mx-auto grid max-w-[760px] gap-6">
-      <header className="flex flex-wrap items-end justify-between gap-4">
-        <div className="grid gap-1">
-          <h1 className="text-2xl font-semibold tracking-tight">{cron.name}</h1>
-          <p className="text-muted">
-            <code className="font-mono text-[13px]">{cron.command}</code> · {describeCron(cron.schedule)} ·{" "}
-            <Link href={`/projects/${project.slug}/crons`} className="underline-offset-4 hover:underline">
-              all jobs
-            </Link>
-          </p>
-        </div>
-        <form action={runCronAction}>
-          <input type="hidden" name="slug" value={project.slug} />
-          <input type="hidden" name="name" value={cron.name} />
-          <SubmitButton pending="Starting…" className="w-auto px-4">
-            Run now
-          </SubmitButton>
-        </form>
-      </header>
+    <>
+      <PageHeader
+        title={cron.name}
+        back={`/projects/${project.slug}/crons`}
+        subtitle={
+          <>
+            <code className="font-mono">{cron.command}</code> · {describeCron(cron.schedule)}
+          </>
+        }
+        actions={
+          <form action={runCronAction}>
+            <input type="hidden" name="slug" value={project.slug} />
+            <input type="hidden" name="name" value={cron.name} />
+            <SubmitButton pending="Starting…" className="w-auto px-4">
+              Run now
+            </SubmitButton>
+          </form>
+        }
+      />
+      <PageBody>
       <Card className="divide-y divide-border overflow-hidden">
         {runs.length === 0 && <p className="px-5 py-8 text-center text-muted">No runs yet. Reload after a run starts.</p>}
         {runs.map((r) => (
@@ -56,6 +58,7 @@ export default async function CronRunsPage({ params }: { params: Promise<{ slug:
           </details>
         ))}
       </Card>
-    </div>
+      </PageBody>
+    </>
   );
 }

@@ -7,6 +7,7 @@ import { Card, StatusDot } from "@/components/ui";
 import { listBackups } from "@/lib/backup/runner";
 import { getProjectBySlug } from "@/lib/projects";
 import { serviceStatus } from "@/lib/services";
+import { PageBody, PageHeader } from "@/components/page";
 import { requireUser } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
@@ -32,19 +33,21 @@ export default async function DatabasesPage({ params, searchParams }: { params: 
   const postgres = status?.postgres;
 
   return (
-    <div className="mx-auto grid max-w-[760px] gap-6">
-      <header className="grid gap-1">
-        <h1 className="text-2xl font-semibold tracking-tight">Databases</h1>
-        <p className="text-muted">Each one belongs to this app alone: its own credentials, running as the app&apos;s user, backed up with its data.</p>
-      </header>
+    <>
+      <PageHeader
+        title="Databases"
+        subtitle={project.slug}
+      />
+      <PageBody>
+        <p className="text-[13px] text-muted">Each one belongs to this app alone: its own credentials, running as the app&apos;s user, backed up with its data.</p>
 
       {notice && NOTICES[notice] && (
-        <p className="rounded-md border border-border px-4 py-3 text-[13px]" data-testid="notice">
+        <p className="rounded-2xl border border-accent/40 bg-accent/5 px-4 py-3 text-[14px]" data-testid="notice">
           {NOTICES[notice]}{" "}
           {restart && /^\d+$/.test(restart) ? (
             <>
               Restarting {project.slug} on the same build so it gets the new connection URL:{" "}
-              <Link href={`/deployments/${restart}`} className="font-medium underline underline-offset-4">
+              <Link href={`/projects/${project.slug}/deployments/${restart}`} className="font-medium underline underline-offset-4">
                 deployment #{restart}
               </Link>
               .
@@ -56,7 +59,7 @@ export default async function DatabasesPage({ params, searchParams }: { params: 
       )}
 
       <section className="grid gap-3">
-        <h2 className="flex items-center gap-2 text-base font-semibold tracking-tight">
+        <h2 className="flex items-center gap-2 text-[17px] font-bold tracking-tight">
           <HardDrive className="size-4 text-muted" aria-hidden /> SQLite
         </h2>
         <Card className="grid gap-3 p-5 text-[13px]">
@@ -78,7 +81,7 @@ export default async function DatabasesPage({ params, searchParams }: { params: 
       </section>
 
       <section className="grid gap-3">
-        <h2 className="flex items-center gap-2 text-base font-semibold tracking-tight">
+        <h2 className="flex items-center gap-2 text-[17px] font-bold tracking-tight">
           <Database className="size-4 text-muted" aria-hidden /> Postgres
         </h2>
         <Card className="grid gap-4 p-5" data-testid="postgres-card">
@@ -113,7 +116,7 @@ export default async function DatabasesPage({ params, searchParams }: { params: 
       </section>
 
       <section className="grid gap-3">
-        <h2 className="flex items-center gap-2 text-base font-semibold tracking-tight">
+        <h2 className="flex items-center gap-2 text-[17px] font-bold tracking-tight">
           <Database className="size-4 text-muted" aria-hidden /> Redis
         </h2>
         <Card className="grid gap-4 p-5" data-testid="redis-card">
@@ -148,6 +151,7 @@ export default async function DatabasesPage({ params, searchParams }: { params: 
           )}
         </Card>
       </section>
-    </div>
+      </PageBody>
+    </>
   );
 }

@@ -2,6 +2,7 @@ import { FolderGit2 } from "lucide-react";
 import Link from "next/link";
 import { PublicRepoForm } from "@/components/deploy";
 import { RepoSearch } from "@/components/github-connect";
+import { PageBody, PageHeader } from "@/components/page";
 import { Card, FormError } from "@/components/ui";
 import { GITHUB_WEB, listInstallationRepos } from "@/lib/github";
 import { getApp, listInstallations } from "@/lib/github-store";
@@ -16,24 +17,24 @@ export default async function NewProjectPage({ searchParams }: { searchParams: P
   const { error } = await searchParams;
   if (!app) {
     return (
-      <div className="mx-auto grid max-w-[720px] gap-6">
-        <header className="grid gap-1.5">
-          <h1 className="text-2xl font-semibold tracking-tight">New project</h1>
-          <p className="text-muted">Connect GitHub for your private repositories and deploy on push, or deploy any public repository now.</p>
-        </header>
+      <>
+        <PageHeader title="New project" back="/" />
+        <PageBody>
+          <p className="text-[13px] text-muted">Connect GitHub for your private repositories and deploy on push, or deploy any public repository now.</p>
         <Card className="flex flex-wrap items-center justify-between gap-4 p-5">
           <div className="grid gap-0.5">
             <p className="font-medium">Your repositories</p>
             <p className="text-[13px] text-muted">Creates a private GitHub App owned by you.</p>
           </div>
-          <Link href="/github/connect" className="inline-flex h-9 items-center rounded-md bg-inverse px-4 text-sm font-medium text-inverse-fg transition-opacity duration-150 hover:opacity-90">
+          <Link href="/github/connect" className="inline-flex h-9 items-center rounded-full bg-inverse px-4 text-sm font-bold text-inverse-fg transition-opacity duration-150 hover:opacity-90">
             Connect GitHub
           </Link>
         </Card>
         <Card className="p-5">
           <PublicRepoForm />
         </Card>
-      </div>
+        </PageBody>
+      </>
     );
   }
   const installs = listInstallations().filter((i) => !i.suspended);
@@ -49,16 +50,18 @@ export default async function NewProjectPage({ searchParams }: { searchParams: P
   repos.sort((a, b) => (b.pushed_at ?? "").localeCompare(a.pushed_at ?? ""));
 
   return (
-    <div className="mx-auto grid max-w-[720px] gap-6">
-      <header className="flex flex-wrap items-end justify-between gap-3">
-        <div className="grid gap-1.5">
-          <h1 className="text-2xl font-semibold tracking-tight">New project</h1>
-          <p className="text-muted">Pick a repository to deploy on this server.</p>
-        </div>
-        <a href={installUrl} className="text-[13px] text-muted underline-offset-4 transition-colors duration-150 hover:text-foreground hover:underline">
-          Missing a repository? Adjust GitHub access
-        </a>
-      </header>
+    <>
+      <PageHeader
+        title="New project"
+        subtitle="Pick a repository to deploy on this server"
+        back="/"
+        actions={
+          <a href={installUrl} className="hidden text-[13px] text-accent hover:underline sm:inline">
+            Adjust GitHub access
+          </a>
+        }
+      />
+      <PageBody>
       <FormError message={error === "installation" ? "GitHub didn't confirm that installation. Try installing the app again." : loadError} />
       {installs.length === 0 ? (
         <Card className="grid place-items-center gap-4 border-dashed px-6 py-14 text-center">
@@ -67,14 +70,14 @@ export default async function NewProjectPage({ searchParams }: { searchParams: P
             <p className="font-medium">Install the app on your repositories</p>
             <p className="text-muted">The GitHub App exists, but it can't see any repositories yet.</p>
           </div>
-          <a href={installUrl} className="inline-flex h-9 items-center rounded-md bg-inverse px-4 text-sm font-medium text-inverse-fg transition-opacity duration-150 hover:opacity-90">
+          <a href={installUrl} className="inline-flex h-9 items-center rounded-full bg-inverse px-4 text-sm font-bold text-inverse-fg transition-opacity duration-150 hover:opacity-90">
             Install on GitHub
           </a>
         </Card>
       ) : (
         <RepoSearch repos={repos.map((r) => ({ fullName: r.full_name, private: r.private, pushedAt: r.pushed_at, branch: r.default_branch, installationId: r.installationId }))} />
       )}
-      <details className="rounded-lg border border-border">
+      <details className="rounded-2xl border border-border">
         <summary className="cursor-pointer px-5 py-3.5 text-[13px] font-medium">Deploy a public repository or a monorepo folder</summary>
         <div className="border-t border-border p-5">
           <PublicRepoForm />
@@ -83,6 +86,7 @@ export default async function NewProjectPage({ searchParams }: { searchParams: P
       <p className="text-[12px] text-muted">
         Connected through <Link href="/github/connect" className="underline-offset-4 hover:underline">{app.name}</Link>.
       </p>
-    </div>
+      </PageBody>
+    </>
   );
 }

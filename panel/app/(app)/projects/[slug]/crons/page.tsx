@@ -8,6 +8,7 @@ import { describeCron } from "@/lib/cron";
 import { listCrons, liveCrons } from "@/lib/crons";
 import { liveDeployment } from "@/lib/deploy";
 import { getProjectBySlug } from "@/lib/projects";
+import { PageBody, PageHeader } from "@/components/page";
 import { requireUser } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
@@ -25,16 +26,15 @@ export default async function CronsPage({ params }: { params: Promise<{ slug: st
   const deployed = !!liveDeployment(project.id);
 
   return (
-    <div className="mx-auto grid max-w-[760px] gap-6">
-      <header className="grid gap-1">
-        <h1 className="text-2xl font-semibold tracking-tight">Cron jobs</h1>
-        <p className="text-muted">
-          <Link href={`/projects/${project.slug}`} className="underline-offset-4 hover:underline">
-            {project.slug}
-          </Link>{" "}
-          · each job is a systemd timer on the server (<code className="font-mono text-[12px]">systemctl list-timers</code>), sandboxed like the app.
+    <>
+      <PageHeader
+        title="Cron jobs"
+        subtitle={project.slug}
+      />
+      <PageBody>
+        <p className="text-[13px] text-muted">
+          Each job is a systemd timer on the server (<code className="font-mono text-[12px]">systemctl list-timers</code>), sandboxed like the app.
         </p>
-      </header>
       {!deployed && <Card className="p-4 text-[13px] text-muted">Jobs run from the live release, so they'll work once the project has been deployed.</Card>}
       {crons.length > 0 && (
         <Card className="divide-y divide-border overflow-hidden">
@@ -74,9 +74,10 @@ export default async function CronsPage({ params }: { params: Promise<{ slug: st
         </Card>
       )}
       <Card className="p-5">
-        <h2 className="mb-4 text-base font-semibold tracking-tight">{crons.length ? "Add or update a job" : "Add a cron job"}</h2>
+        <h2 className="mb-4 text-[17px] font-bold tracking-tight">{crons.length ? "Add or update a job" : "Add a cron job"}</h2>
         <CronForm slug={project.slug} nodeVersion={project.nodeVersion} />
       </Card>
-    </div>
+      </PageBody>
+    </>
   );
 }

@@ -203,6 +203,8 @@ async function redisRemove(params: Params, ctx: Context) {
 }
 
 async function serviceStatus(params: Params, ctx: Context) {
+  // Without an app: just which engines are installed on the server.
+  if (params.slug === undefined) return { installed: { redis: redisBinary() !== null, postgres: postgresCluster() !== null } };
   const slug = assertSlug(params.slug);
   const app = appLayout(ctx, slug);
   if (!existsSync(app.etcDir)) throw new ActionError("not_found", `app ${slug} doesn't exist`);

@@ -31,7 +31,7 @@ export function RepoSearch({ repos }: { repos: { fullName: string; private: bool
   return (
     <div className="grid gap-3">
       <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={`Search ${repos.length} repositories`} aria-label="Search repositories" autoFocus />
-      <div className="divide-y divide-border overflow-hidden rounded-lg border border-border">
+      <div className="divide-y divide-border overflow-hidden rounded-2xl border border-border">
         {shown.length === 0 && <p className="px-5 py-8 text-center text-muted">No repositories match “{query}”.</p>}
         {shown.slice(0, 100).map((r) => (
           <div key={r.fullName} className="flex items-center gap-3 px-5 py-3.5 transition-colors duration-150 hover:bg-subtle">

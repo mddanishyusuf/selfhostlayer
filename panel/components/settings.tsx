@@ -28,7 +28,7 @@ function Section({ title, description, children }: { title: string; description?
   return (
     <Card className="grid gap-5 p-6">
       <div className="grid gap-1">
-        <h2 className="text-base font-semibold tracking-tight">{title}</h2>
+        <h2 className="text-[17px] font-bold tracking-tight">{title}</h2>
         {description && <p className="text-[13px] text-muted">{description}</p>}
       </div>
       {children}
@@ -205,7 +205,7 @@ export function DeleteProject({ slug }: { slug: string }) {
   return (
     <Card className="grid gap-4 border-err/40 p-6">
       <div className="grid gap-1">
-        <h2 className="text-base font-semibold tracking-tight">Delete project</h2>
+        <h2 className="text-[17px] font-bold tracking-tight">Delete project</h2>
         <p className="text-[13px] text-muted">Stops the app and removes its user, files, unit and Caddy site from the server. Its data/ folder is archived on the server unless you tick the box.</p>
       </div>
       <form action={action} className="grid gap-3">

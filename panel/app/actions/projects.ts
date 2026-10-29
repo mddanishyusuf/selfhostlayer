@@ -3,11 +3,11 @@
 import { redirect } from "next/navigation";
 import { AgentError } from "@layer/protocol";
 import { agent } from "@/lib/agent";
-import { activeDeployment, cancelDeployment, deployProject, getDeployment, rollbackTo } from "@/lib/deploy";
+import { activeDeployment, cancelDeployment, deploymentPath, deployProject, getDeployment, rollbackTo } from "@/lib/deploy";
 import { parseRepoUrl } from "@/lib/github-repo";
 import { importRepo } from "@/lib/import";
 import { parseSettings } from "@/lib/project-settings";
-import { deleteProject, getProjectBySlug, setProjectEnv, updateProjectSettings } from "@/lib/projects";
+import { deleteProject, getProject, getProjectBySlug, setProjectEnv, updateProjectSettings } from "@/lib/projects";
 import { requireUser } from "@/lib/session";
 
 export interface ImportState {
@@ -54,7 +54,7 @@ export async function saveSettings(_prev: SettingsState, form: FormData): Promis
   } catch (err) {
     return { errors: { form: err instanceof Error ? err.message : "Couldn't start the deployment." } };
   }
-  redirect(`/deployments/${deploymentId}`);
+  redirect(deploymentPath(project.slug, deploymentId));
 }
 
 /** Deletes the project and its app on the server (data/ is archived unless asked otherwise). */
@@ -80,7 +80,7 @@ export async function redeploy(form: FormData): Promise<void> {
   const project = getProjectBySlug(field(form, "slug"));
   if (!project) redirect("/");
   const d = await deployProject(project, "manual");
-  redirect(`/deployments/${d.id}`);
+  redirect(deploymentPath(project.slug, d.id));
 }
 
 export async function rollback(form: FormData): Promise<void> {
@@ -88,12 +88,14 @@ export async function rollback(form: FormData): Promise<void> {
   const target = getDeployment(Number(field(form, "deploymentId")));
   if (!target || target.status !== "ready") redirect("/");
   const d = rollbackTo(target);
-  redirect(`/deployments/${d.id}`);
+  const project = getProject(d.projectId);
+  redirect(project ? deploymentPath(project.slug, d.id) : `/deployments/${d.id}`);
 }
 
 export async function cancel(form: FormData): Promise<void> {
   await requireUser();
   const id = Number(field(form, "deploymentId"));
   await cancelDeployment(id);
+  // The old URL redirects to the deployment's place under its project.
   redirect(`/deployments/${id}`);
 }

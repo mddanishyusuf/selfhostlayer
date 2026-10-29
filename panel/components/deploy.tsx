@@ -102,7 +102,7 @@ export function LogViewer({ deploymentId, initialStatus }: { deploymentId: numbe
 
   const segments = useMemo(() => toSegments(log), [log]);
   return (
-    <div className="overflow-hidden rounded-lg border border-border bg-[#0a0a0a] text-[#ededed]">
+    <div className="overflow-hidden rounded-2xl border border-border bg-[#0a0a0a] text-[#ededed]">
       <div className="flex items-center justify-between border-b border-white/10 px-4 py-2 text-[12px] text-white/60">
         <span>Build log</span>
         <div className="flex items-center gap-1">

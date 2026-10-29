@@ -89,6 +89,15 @@ export function listDeployments(projectId: number, limit = 30): Deployment[] {
   return (db().prepare("SELECT * FROM deployments WHERE project_id = ? ORDER BY id DESC LIMIT ?").all(projectId, limit) as unknown as Row[]).map(fromRow);
 }
 
+/** Where a deployment's page is: under its project, so the project's sidebar shows. */
+export const deploymentPath = (slug: string, id: number) => `/projects/${slug}/deployments/${id}`;
+
+/** Every project's deployments, newest first, with the project's slug. */
+export function listAllDeployments(limit = 50): (Deployment & { slug: string })[] {
+  const rows = db().prepare("SELECT d.*, p.slug FROM deployments d JOIN projects p ON p.id = d.project_id ORDER BY d.id DESC LIMIT ?").all(limit) as unknown as (Row & { slug: string })[];
+  return rows.map((r) => ({ ...fromRow(r), slug: r.slug }));
+}
+
 /** The deployment currently serving traffic: the newest ready one. */
 export function liveDeployment(projectId: number): Deployment | null {
   const row = db().prepare("SELECT * FROM deployments WHERE project_id = ? AND status = 'ready' ORDER BY finished_at DESC, id DESC LIMIT 1").get(projectId) as Row | undefined;
@@ -231,7 +240,7 @@ async function alertOnDeploy(id: number, status: DeployStatus, error: string | n
   if (status === "failed") {
     let link: string | null = null;
     try {
-      link = `https://${boxConfig().panelHost}/deployments/${id}`;
+      link = `https://${boxConfig().panelHost}${deploymentPath(p.slug, id)}`;
     } catch {
       // no box config (dev)
     }

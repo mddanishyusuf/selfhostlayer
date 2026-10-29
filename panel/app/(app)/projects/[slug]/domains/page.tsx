@@ -11,6 +11,7 @@ import { checkCertificate } from "@/lib/cert";
 import { suggestedRecord } from "@/lib/dns";
 import { listDomains, type ProjectDomain } from "@/lib/domains";
 import { getProjectBySlug } from "@/lib/projects";
+import { PageBody, PageHeader } from "@/components/page";
 import { requireUser } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
@@ -122,16 +123,12 @@ export default async function DomainsPage({ params }: { params: Promise<{ slug: 
   const freeHost = domains.find((d) => d.role === "free")?.host ?? project.domains[0]!;
 
   return (
-    <div className="mx-auto grid max-w-[760px] gap-6">
-      <header className="grid gap-1">
-        <h1 className="text-2xl font-semibold tracking-tight">Domains</h1>
-        <p className="text-muted">
-          <Link href={`/projects/${project.slug}`} className="underline-offset-4 hover:underline">
-            {project.slug}
-          </Link>{" "}
-          · certificates are issued and renewed automatically.
-        </p>
-      </header>
+    <>
+      <PageHeader
+        title="Domains"
+        subtitle={`${project.slug} · certificates are issued and renewed automatically`}
+      />
+      <PageBody>
       <Card className="p-5">
         <AddDomainForm slug={project.slug} />
       </Card>
@@ -140,6 +137,7 @@ export default async function DomainsPage({ params }: { params: Promise<{ slug: 
           <DomainRow key={d.id} d={d} freeHost={freeHost} serverIp={box.publicIp} />
         ))}
       </Card>
-    </div>
+      </PageBody>
+    </>
   );
 }
