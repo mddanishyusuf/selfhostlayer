@@ -14,7 +14,7 @@ import { config } from "../config";
 import { db } from "../db";
 import { listProjects, type Project } from "../projects";
 import { decryptStream, encryptStream } from "./crypt";
-import { getBackupSettings, recoveryKeyBytes, storage, type BackupSettings } from "./settings";
+import { getBackupSettings, pinServerFolder, recoveryKeyBytes, storage, type BackupSettings } from "./settings";
 import { tarGz } from "./tar";
 
 export const STAGING_DIR = "/var/lib/layer-staging";
@@ -76,15 +76,25 @@ export function getBackup(id: number): Backup | null {
   return row ? fromRow(row) : null;
 }
 
-/** Folder for this server's backups in the bucket: <prefix><panel host>/. */
-export function serverPrefix(settings: BackupSettings): string {
+/** This server's folder name in the bucket: its panel address when backups began. */
+function hostFolder(): string {
   let host = "server";
   try {
     host = boxConfig().panelHost;
   } catch {
     // dev: no box config
   }
-  return `${settings.destination.prefix}${host.replace(/[^A-Za-z0-9.-]/g, "-")}/`;
+  return host.replace(/[^A-Za-z0-9.-]/g, "-");
+}
+
+/** Fixes the folder before the panel's address changes (no-op without backups). */
+export function pinBackupFolder(): void {
+  if (getBackupSettings()) pinServerFolder(hostFolder());
+}
+
+/** Folder for this server's backups in the bucket: <prefix><folder>/, fixed by the first backup. */
+export function serverPrefix(settings: BackupSettings): string {
+  return `${settings.destination.prefix}${settings.serverFolder ?? pinServerFolder(hostFolder())}/`;
 }
 
 function panelLink(path: string): string | null {

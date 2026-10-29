@@ -107,6 +107,13 @@ export function projectsForPush(owner: string, repo: string, branch: string): Pr
   ).map(fromRow);
 }
 
+/** The free URL is the first of a project's domains (<slug>.<appsDomain>). */
+export function setFreeHost(id: number, host: string): void {
+  const project = getProject(id);
+  if (!project) return;
+  db().prepare("UPDATE projects SET domains = ? WHERE id = ?").run(JSON.stringify([host, ...project.domains.slice(1)]), id);
+}
+
 export function deleteProject(id: number): void {
   db().prepare("DELETE FROM projects WHERE id = ?").run(id);
 }

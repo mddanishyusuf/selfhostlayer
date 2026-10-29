@@ -62,3 +62,26 @@
   - The kept folder's name had one-second resolution. Two restores or imports in the same second collided, and the failed swap left a half-imported folder behind. Each run now gets a unique suffix, and the work folder is always removed.
   - Restore (Week 4) never restarted the app's Redis. Redis kept writing into the folder that was moved aside and never loaded the restored `dump.rdb`. Restore and import now stop Redis after the app, make sure `data/redis` exists, and start Redis before the app.
   - The browser tour could hang forever when headless Chrome stopped answering a screenshot (macOS throttles background apps). Every DevTools call now fails after 60 seconds, and Chrome runs with background throttling off.
+
+## Day 2 result (2026-10-29)
+**Done when "move the panel to a test domain and back without losing access": passed.** In the VM tour the panel moves from `192-168-252-7.sslip.io` to `panel2.internal`: the old address redirects (path kept) and you sign in on the new one, then it moves back. The app URLs go to `*.apps2.internal` and back too. `installer/test/address-e2e.sh` checks it through Caddy, and a re-run of the installer without `--domain` keeps a moved address.
+
+- **The agent owns the panel's Caddy site.**
+  - `panel.site` writes `_panel.caddy` from `/etc/layer/config.json`, and the installer now calls it instead of writing the file itself. So an update never undoes an address set in the panel.
+  - `config.json` keeps `panelPending`, `panelAliases` and `internalTls` across re-runs.
+- **Moving takes two steps, so a certificate that won't issue can't lock you out:**
+  - Settings → Panel address checks public DNS (skipped on test boxes, which use Caddy's local CA), then serves the panel on both addresses.
+  - It waits up to 90 seconds for the new certificate (a real TLS handshake through Caddy), and only then makes the old address redirect. Without a certificate, nothing else changes.
+  - The GitHub App's webhook URL moves along (`PATCH /app/hook/config`), because webhook deliveries don't follow redirects.
+  - Each address has its own sign-in.
+- **Apps domain:** a wildcard record is checked on a random name. Then `apps.domain` changes `config.json`, every project's free URL moves, the old URL becomes a redirect, and live sites are re-pointed. Moving back drops the redirects in the way.
+- **Backups stay together:** the bucket folder is now pinned (`backup_settings.server_folder`), by the first backup or right before the panel moves.
+
+## Day 3 result (2026-10-29)
+**Done when "an allowlist without your IP blocks you; the reset brings you back": passed.** `installer/test/access-e2e.sh` (13 checks) runs in the VM, and the tour locks the panel to the browser's own address, then opens it again.
+
+- **`panel.access`** writes an `@outside { not remote_ip …; not path /api/github/webhook }` match with a plain 403 into the panel's site.
+  - Blocked requests stop at Caddy. Caddy's `remote_ip` is the real peer, so a forged header doesn't help.
+  - GitHub's webhook still gets through: it's signed, and blocking it would stop deploys on push.
+- **Settings → Access:** anyone, only these addresses (yours filled in), or Tailscale only (`100.64.0.0/10`, `fd7a:115c:a1e0::/48`). A list that leaves out the address you're using is refused (`lib/ip.ts` matches IPv4/IPv6 ranges).
+- **`layer access`** shows the list, and **`layer access reset`** lets everyone reach the sign-in page again. That's the way back over SSH.

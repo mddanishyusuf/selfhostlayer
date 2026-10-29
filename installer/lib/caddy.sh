@@ -36,42 +36,34 @@ EOF
 
 # Step 8 (panel): the panel's own site. Caddy reaches the panel through a unix
 # socket shared via the layer-web group (only caddy and layer are members;
-# setup_users adds them).
+# setup_users adds them). The agent writes the site from config.json: the same
+# code Settings → Panel address uses, so a re-run keeps an address set there.
 setup_panel_site() {
   step "Publishing the panel"
-  LAYER_PANEL_HOST="${LAYER_DOMAIN:-${LAYER_PUBLIC_IP//./-}.sslip.io}"
-  local tls=""
-  [[ "$LAYER_INTERNAL_TLS" == 1 ]] && tls=$'\n\ttls internal'
-
-  # _panel can't clash with an app: app slugs start with a letter.
-  cat >"$CADDY_SITES/_panel.caddy" <<SITE
-# Self Host Layer panel. Managed by the installer.
-$LAYER_PANEL_HOST {$tls
-	encode zstd gzip
-	reverse_proxy unix//run/layer-panel/panel.sock
-	log {
-		output file /var/log/caddy/_panel.log {
-			roll_size 10MiB
-			roll_keep 5
-		}
-		format json
-	}
-}
-SITE
-  # setup_users put caddy in layer-web before setup_caddy restarted it.
-  run systemctl reload caddy
-  ok "Panel at https://$LAYER_PANEL_HOST"
+  local current=""
+  [[ -f /etc/layer/config.json ]] && current="$(jq -r '.panelHost // empty' /etc/layer/config.json)"
+  LAYER_PANEL_HOST="${LAYER_DOMAIN:-${current:-${LAYER_PUBLIC_IP//./-}.sslip.io}}"
   write_config
+  # setup_users put caddy in layer-web before setup_caddy restarted it.
+  run layer call panel.site
+  ok "Panel at https://$LAYER_PANEL_HOST"
 }
 
 # /etc/layer/config.json: what the panel needs to know about this box. Every
 # app gets a free URL <app>.<appsDomain>, which works without any DNS setup.
+# Keys this run doesn't set (old addresses that redirect, an apps domain set
+# in the panel) are kept.
 write_config() {
-  local apps_domain="${LAYER_APPS_DOMAIN:-${LAYER_PUBLIC_IP//./-}.sslip.io}"
+  local old='{}'
+  [[ -f /etc/layer/config.json ]] && old="$(cat /etc/layer/config.json)"
+  local apps_domain="${LAYER_APPS_DOMAIN:-$(jq -r '.appsDomain // empty' <<<"$old")}"
+  apps_domain="${apps_domain:-${LAYER_PUBLIC_IP//./-}.sslip.io}"
+  local internal=false
+  [[ "$LAYER_INTERNAL_TLS" == 1 ]] && internal=true
   install -m 640 -o root -g "$LAYER_USER" /dev/null /etc/layer/config.json.new
-  jq -n --arg panelHost "$LAYER_PANEL_HOST" --arg appsDomain "$apps_domain" --arg publicIp "$LAYER_PUBLIC_IP" \
-    --arg version "$LAYER_INSTALLED_VERSION" --arg node "$LAYER_NODE_DEFAULT" \
-    '{panelHost: $panelHost, appsDomain: $appsDomain, publicIp: $publicIp, version: $version, defaultNode: $node}' \
+  jq -n --argjson old "$old" --arg panelHost "$LAYER_PANEL_HOST" --arg appsDomain "$apps_domain" --arg publicIp "$LAYER_PUBLIC_IP" \
+    --arg version "$LAYER_INSTALLED_VERSION" --arg node "$LAYER_NODE_DEFAULT" --argjson internalTls "$internal" \
+    '$old + {panelHost: $panelHost, appsDomain: $appsDomain, publicIp: $publicIp, version: $version, defaultNode: $node, internalTls: $internalTls}' \
     >/etc/layer/config.json.new
   mv /etc/layer/config.json.new /etc/layer/config.json
   ok "Apps get free URLs at https://<app>.$apps_domain"

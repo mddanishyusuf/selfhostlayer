@@ -87,14 +87,20 @@ jobs:
         run: sudo bash installer/test/postgres-e2e.sh
       - name: importing a data folder from another server
         run: sudo bash installer/test/import-e2e.sh
+      - name: moving the panel to another address and back
+        run: |
+          echo "127.0.0.1 panel2.internal" | sudo tee -a /etc/hosts
+          sudo bash installer/test/address-e2e.sh panel2.internal
+      - name: locking the panel to some addresses, and getting back in
+        run: sudo bash installer/test/access-e2e.sh
       - name: fake S3 for the backups tour
         run: |
           cp panel/scripts/fake-s3.ts panel/lib/backup/s3.ts installer/test/
           sudo bash installer/test/fake-s3.sh
       - name: panel UI tour in Chrome (setup, 2FA, deploy, rollback, crons, backups, databases, import, delete)
         run: |
-          echo "127.0.0.1 layer.internal next.internal vite.internal" | sudo tee -a /etc/hosts
-          TOUR_DEPLOY=1 TOUR_BACKUPS=1 TOUR_REDIS=1 TOUR_POSTGRES=1 TOUR_APPS_DOMAIN=internal CHROME="$(command -v google-chrome)" \
+          echo "127.0.0.1 layer.internal next.internal vite.internal panel2.internal next.apps2.internal" | sudo tee -a /etc/hosts
+          TOUR_DEPLOY=1 TOUR_BACKUPS=1 TOUR_REDIS=1 TOUR_POSTGRES=1 TOUR_APPS_DOMAIN=internal TOUR_PANEL_ADDRESS=panel2.internal TOUR_ACCESS=1 CHROME="$(command -v google-chrome)" \
             node panel/scripts/ui-tour.ts https://layer.internal "$(cat setup-token)" screenshots
       - name: after setup, a re-run prints no setup token
         run: |

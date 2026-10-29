@@ -2,7 +2,7 @@
 // command goes through the agent, so it sees exactly what the panel sees.
 import { execFileSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
-import { chmodSync, chownSync, constants, copyFileSync, existsSync, mkdirSync, rmSync, statSync } from "node:fs";
+import { chmodSync, chownSync, constants, copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { parseArgs } from "node:util";
 import { AgentError, assertSlug, callAgent, isActionName } from "@layer/protocol";
@@ -24,6 +24,7 @@ const HELP = `${bold("layer")}: Self Host Layer on this server
   layer info                       server summary
   layer import <app> <file>        replace the app's data/ with a .tar.gz from another server
                                    (SQLite checked first; the replaced data is kept)
+  layer access [reset]             who may open the panel; reset lets everyone reach the sign-in again
   layer call <action> [json]       send a raw agent action (debugging)
 
 Raw commands behind these: journalctl -u 'app-<app>@*', systemctl status 'app-<app>@*',
@@ -141,6 +142,19 @@ async function importData(slug: string, source: string) {
   }
 }
 
+async function access(sub: string | undefined) {
+  if (sub === "reset") {
+    await callAgent("panel.access", { allow: [] });
+    return console.log(`${green("✓")} Anyone can reach the panel's sign-in page again (password and 2FA still apply).`);
+  }
+  if (sub !== undefined) throw new Error("usage: layer access [reset]");
+  const box = JSON.parse(readFileSync("/etc/layer/config.json", "utf8")) as { panelHost: string; panelAllow?: string[] };
+  const allow = box.panelAllow ?? [];
+  if (!allow.length) return console.log(`${bold(box.panelHost)}: anyone can reach the sign-in page (password and 2FA still apply).`);
+  console.log(`${bold(box.panelHost)} answers only from: ${allow.join(", ")}`);
+  console.log(dim("  Locked out? `layer access reset` lets everyone reach the sign-in page again."));
+}
+
 async function main() {
   const { positionals, values } = parseArgs({
     allowPositionals: true,
@@ -163,6 +177,7 @@ async function main() {
     case "logs": return logs(need("app"), { follow: values.follow, lines: Number(values.lines), color: values.color });
     case "score": return score(need("app"), values.color ?? "blue");
     case "info": return info();
+    case "access": return access(arg);
     case "import": {
       if (!arg || !extra) throw new Error("usage: layer import <app> <file.tar.gz>");
       return importData(arg, extra);

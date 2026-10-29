@@ -90,6 +90,7 @@ export function testEnv(): TestEnv {
     toolsRoot: join(root, "opt", "layer", "tools"),
     systemdDir: join(root, "etc", "systemd", "system"),
     caddySitesDir: join(root, "etc", "caddy", "sites"),
+    boxConfig: join(root, "etc", "layer", "config.json"),
     staticRoot: join(root, "srv", "static"),
     staticGroup: null,
     archiveRoot: join(root, "var", "lib", "layer-agent", "archive"),

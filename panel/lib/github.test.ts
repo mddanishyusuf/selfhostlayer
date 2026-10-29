@@ -1,6 +1,6 @@
 import { createHmac, createVerify, generateKeyPairSync } from "node:crypto";
 import { describe, expect, it } from "vitest";
-import { appJwt, buildManifest, convertManifest, listInstallationRepos, manifestFormAction, verifyWebhookSignature } from "./github";
+import { appJwt, buildManifest, convertManifest, listInstallationRepos, manifestFormAction, setWebhookUrl, verifyWebhookSignature } from "./github";
 
 const { privateKey, publicKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
 const app = { appId: 1, clientId: "Iv23liTEST", privateKey: privateKey.export({ type: "pkcs1", format: "pem" }).toString() };
@@ -66,5 +66,18 @@ describe("API calls", () => {
     expect(calls[0]!.url).toBe("https://api.github.com/app/installations/42/access_tokens");
     expect(JSON.parse(calls[0]!.body!)).toEqual({ permissions: { metadata: "read" } });
     expect(calls.filter((c) => c.url.includes("/installation/repositories"))).toHaveLength(2);
+  });
+
+  it("points the webhook at the panel's new address, as the app", async () => {
+    let call: { url: string; init?: RequestInit } | undefined;
+    const fake = (async (url: string, init?: RequestInit) => {
+      call = { url, init };
+      return Response.json({ url: "https://panel.example.com/api/github/webhook", content_type: "json" });
+    }) as typeof fetch;
+    await setWebhookUrl(app, "https://panel.example.com/api/github/webhook", fake);
+    expect(call!.url).toBe("https://api.github.com/app/hook/config");
+    expect(call!.init!.method).toBe("PATCH");
+    expect(JSON.parse(call!.init!.body as string)).toEqual({ url: "https://panel.example.com/api/github/webhook" });
+    expect(String((call!.init!.headers as Record<string, string>).Authorization)).toMatch(/^Bearer ey/);
   });
 });

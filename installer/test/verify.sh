@@ -61,7 +61,7 @@ check "nothing listens on localhost:2019" bash -c '! (exec 3<>/dev/tcp/127.0.0.1
 check "caddy imports /etc/caddy/sites" grep -q "^import /etc/caddy/sites/\*.caddy" /etc/caddy/Caddyfile
 
 echo "Panel and agent"
-panel_host="$(awk 'NF && $1 !~ /^#/ {print $1; exit}' /etc/caddy/sites/_panel.caddy 2>/dev/null)"
+panel_host="$(jq -r '.panelHost // empty' /etc/layer/config.json 2>/dev/null)"
 check "layer-agent active" active layer-agent
 check "layer-panel active" active layer-panel
 check "agent socket 660 root:layer" mode_is /run/layer/agent.sock "660 root:layer"
@@ -75,6 +75,7 @@ check "panel serves over HTTPS through Caddy ($panel_host)" \
 check "secret key 640 root:layer" mode_is /etc/layer/secret.key "640 root:layer"
 check "config.json 640 root:layer" mode_is /etc/layer/config.json "640 root:layer"
 check "config.json names the apps domain" bash -c "jq -e '.appsDomain | length > 0' /etc/layer/config.json"
+check "the panel's site serves its address" grep -qE "^${panel_host}[ ,]" /etc/caddy/sites/_panel.caddy
 panel_db_ok() { [[ ! -e /var/lib/layer/panel.db ]] || mode_is /var/lib/layer/panel.db "600 layer:layer-web"; }
 check "panel DB is private to layer" panel_db_ok
 check "layer CLI works" layer info

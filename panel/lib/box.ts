@@ -11,6 +11,14 @@ export interface BoxConfig {
   publicIp: string;
   version: string;
   defaultNode: string;
+  /** Hosts the panel also answers on while it moves there. */
+  panelPending?: string[];
+  /** Old addresses that redirect to panelHost. */
+  panelAliases?: string[];
+  /** Caddy's local CA instead of Let's Encrypt (test boxes). */
+  internalTls?: boolean;
+  /** IPs or ranges the panel answers; empty or missing: anyone. */
+  panelAllow?: string[];
 }
 
 const DEV_BOX: BoxConfig = {

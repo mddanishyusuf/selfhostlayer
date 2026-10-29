@@ -7,6 +7,7 @@ import { firewallActions } from "./actions/firewall.ts";
 import { serviceActions } from "./actions/service.ts";
 import { envActions } from "./actions/env.ts";
 import { logsActions } from "./actions/logs.ts";
+import { panelActions } from "./actions/panel.ts";
 import { proxyActions } from "./actions/proxy.ts";
 import { releaseActions } from "./actions/release.ts";
 import { unitActions } from "./actions/unit.ts";
@@ -35,6 +36,7 @@ export const ACTION_TABLE: ActionTable = {
   ...backupActions,
   ...serviceActions,
   ...firewallActions,
+  ...panelActions,
 };
 
 export const MAX_LINE_BYTES = 1024 * 1024;

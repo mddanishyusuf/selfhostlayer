@@ -683,6 +683,113 @@ if (process.env.TOUR_DEPLOY === "1") {
   console.log("  ✓ deleted the vite project; it's gone from the overview");
 }
 
+// TOUR_PANEL_ADDRESS=<host>: move the panel there from Settings and back. On a
+// test box (apps at .internal) the DNS check is skipped; the host must reach the box.
+const newAddress = process.env.TOUR_PANEL_ADDRESS;
+if (newAddress) {
+  console.log("Panel address");
+  const original = new URL(base).host;
+  /** Each address has its own sign-in: sign in if this one asks. */
+  const signInIfAsked = async (host: string) => {
+    await waitFor(`location.host === ${JSON.stringify(host)} && document.readyState === "complete"`, `${host} to load`, 30_000);
+    if (String(await evaluate("location.pathname")) !== "/login") return;
+    await fill("#email", email);
+    await fill("#password", password);
+    await click("button[type=submit]");
+    await waitForPath("/login/2fa");
+    await typeCode(nextCode(secret));
+    await waitFor(`location.pathname === "/"`, `signed in on ${host}`, 30_000);
+  };
+  const move = async (from: string, to: string) => {
+    await go(`https://${from}/settings`);
+    await waitForPath("/settings");
+    await fill('[data-testid="move-panel"] input[name="host"]', to);
+    await click('[data-testid="move-panel"] button[type=submit]');
+    await waitFor(`!!document.querySelector('[data-testid="moved"]') || !!document.querySelector('[data-testid="move-panel"] [role=alert]')`, `the move to ${to}`, 150_000);
+    const result = String(await evaluate(`document.querySelector('[data-testid="move-panel"]').innerText`));
+    if (!result.includes("Moved")) throw new Error(`moving the panel to ${to} failed: ${result}`);
+  };
+
+  await move(original, newAddress);
+  // The old address redirects, keeping the path.
+  await go(`https://${original}/settings`);
+  await signInIfAsked(newAddress);
+  await go(`https://${newAddress}/settings`);
+  await waitForPath("/settings");
+  const settings = String(await evaluate("document.body.innerText"));
+  if (!settings.includes(`Redirects here\n${original}`) && !settings.includes(`Redirects here\t${original}`)) throw new Error(`Settings doesn't list ${original} as redirecting: ${settings.slice(0, 400)}`);
+  console.log(`  ✓ moved the panel to ${newAddress}; ${original} redirects there, keeping the path`);
+  await screenshot("panel-address-moved");
+
+  await move(newAddress, original);
+  await go(`https://${original}/settings`);
+  await signInIfAsked(original);
+  await go(`https://${original}/settings`);
+  await waitForPath("/settings");
+  await evaluate(`[...document.querySelectorAll("form")].find((f) => f.querySelector('input[name="host"]')?.value === ${JSON.stringify(newAddress)})?.querySelector("button").click(), true`);
+  await waitFor(`!document.body.innerText.includes(${JSON.stringify(newAddress)})`, `${newAddress} to be removed`, 30_000);
+  console.log(`  ✓ moved back to ${original} and removed ${newAddress}`);
+
+  // The deployed example's free URL moves with the apps domain, and back.
+  if (process.env.TOUR_DEPLOY === "1") {
+    const appsDomain = process.env.TOUR_APPS_DOMAIN ?? "internal";
+    const health = async (host: string) => {
+      for (let i = 0; i < 20; i++) {
+        await go(`https://${host}/api/health`);
+        await sleep(800);
+        const text = String(await evaluate("document.body?.innerText ?? ''").catch(() => ""));
+        if (text.trim() === "ok") return String(await evaluate("location.host"));
+      }
+      throw new Error(`https://${host}/api/health didn't answer ok`);
+    };
+    const moveApps = async (to: string) => {
+      await go(`https://${original}/settings`);
+      await waitForPath("/settings");
+      await fill('[data-testid="move-apps"] input[name="domain"]', to);
+      await click('[data-testid="move-apps"] button[type=submit]');
+      await waitFor(`/Free URLs are now|\\*\\.|failed/.test(document.querySelector('[data-testid="move-apps"]').innerText)`, `apps moving to ${to}`, 120_000);
+      const result = String(await evaluate(`document.querySelector('[data-testid="move-apps"]').innerText`));
+      if (!result.includes("Free URLs are now")) throw new Error(`moving the apps to ${to} failed: ${result}`);
+    };
+    await moveApps(`apps2.${appsDomain}`);
+    await health(`next.apps2.${appsDomain}`);
+    const landed = await health(`next.${appsDomain}`);
+    if (landed !== `next.apps2.${appsDomain}`) throw new Error(`the old free URL didn't redirect (ended on ${landed})`);
+    console.log(`  ✓ app URLs moved to *.apps2.${appsDomain}; the old ones redirect`);
+    await moveApps(appsDomain);
+    if ((await health(`next.${appsDomain}`)) !== `next.${appsDomain}`) throw new Error("next didn't come back to its old URL");
+    console.log(`  ✓ and back to *.${appsDomain}`);
+  }
+}
+
+// TOUR_ACCESS=1: lock the panel to the address the tour comes from, refuse a list
+// that would lock it out, then open it to anyone again.
+if (process.env.TOUR_ACCESS === "1") {
+  console.log("Access");
+  const mode = (label: string) => evaluate(`[...document.querySelectorAll('[data-testid="access"] button[role=radio]')].find((b) => b.textContent === ${JSON.stringify(label)}).click(), true`);
+  const save = async (expect: RegExp, what: string) => {
+    await click('[data-testid="access"] button[type=submit]');
+    await waitFor(`${expect}.test(document.querySelector('[data-testid="access"]').innerText)`, what, 30_000);
+  };
+  await go("/settings");
+  await waitForPath("/settings");
+  await mode("Only these addresses");
+  await waitFor(`!!document.querySelector('[data-testid="access"] textarea')?.value`, "your address filled in");
+  const you = String(await evaluate(`document.querySelector('[data-testid="access"] textarea').value`)).trim();
+  await save(/can open the panel now/, "the allowlist saved");
+  await go("/settings");
+  await waitForPath("/settings");
+  console.log(`  ✓ only ${you} (this browser) can open the panel, and it still can`);
+  await mode("Only these addresses");
+  await fill('[data-testid="access"] textarea', "203.0.113.7");
+  await save(/locked out/, "the lockout refusal");
+  console.log("  ✓ a list without your own address is refused");
+  await screenshot("access");
+  await mode("Anyone");
+  await save(/Anyone can reach/, "anyone again");
+  console.log("  ✓ open to anyone again");
+}
+
 console.log("Guards");
 await send("Network.enable");
 await send("Network.clearBrowserCookies");

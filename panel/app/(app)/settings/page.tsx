@@ -1,11 +1,15 @@
 import { CheckmarkCircle02Icon, GithubIcon } from "@hugeicons/core-free-icons";
+import { dropAddressAction } from "@/app/actions/address";
+import { AccessForm } from "@/components/access";
+import { MoveAppsForm, MovePanelForm } from "@/components/address";
 import { Icon } from "@/components/icon";
 import { KeyValues, PageHeader, PillLink, SettingsRow } from "@/components/page";
-import { Pill } from "@/components/ui";
+import { Button, Pill } from "@/components/ui";
 import { agent, type SystemInfo } from "@/lib/agent";
 import { boxConfig } from "@/lib/box";
 import { GITHUB_WEB } from "@/lib/github";
 import { getApp, listInstallations } from "@/lib/github-store";
+import { requesterIp } from "@/lib/request";
 import { requireUser } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
@@ -17,18 +21,31 @@ export default async function ServerSettingsPage() {
   const app = getApp();
   const installs = app ? listInstallations() : [];
   const info = await agent<SystemInfo>("system.info").catch(() => null);
+  const you = await requesterIp();
   return (
     <>
       <PageHeader title="Settings" meta="This server and your account" />
-      <SettingsRow title="Panel address" description="Where you open this panel. Apps get free URLs under the apps domain.">
+      <SettingsRow
+        title="Panel address"
+        description="Where you open this panel. To move it, point a name you own at this server first: the panel checks public DNS, waits for the certificate, then the old address redirects."
+      >
         <KeyValues
           inset
           items={[
             ["Panel", <code key="p" className="font-mono text-[13.5px]">{box.panelHost}</code>],
-            ["Apps domain", <code key="a" className="font-mono text-[13.5px]">*.{box.appsDomain}</code>],
+            ...(box.panelPending ?? []).map((h): [React.ReactNode, React.ReactNode] => ["Moving to", <AddressLine key={h} host={h} label="Stop" />]),
+            ...(box.panelAliases ?? []).map((h): [React.ReactNode, React.ReactNode] => ["Redirects here", <AddressLine key={h} host={h} label="Remove" />]),
             ["Public IP", <code key="i" className="font-mono text-[13.5px]">{box.publicIp}</code>],
           ]}
         />
+        <MovePanelForm />
+      </SettingsRow>
+      <SettingsRow title="Apps domain" description="Every app gets a free URL under it. Your own domain needs one wildcard record; the old URLs keep redirecting.">
+        <KeyValues inset items={[["Free URLs", <code key="a" className="font-mono text-[13.5px]">&lt;app&gt;.{box.appsDomain}</code>]]} />
+        <MoveAppsForm current={box.appsDomain} />
+      </SettingsRow>
+      <SettingsRow title="Access" description="Who can reach the panel at all. Blocked requests stop at Caddy and never reach the panel; locked out, run layer access reset on the server.">
+        <AccessForm allow={box.panelAllow ?? []} you={you} />
       </SettingsRow>
       <SettingsRow title="GitHub" description="A private GitHub App owned by you. Its key never leaves this server.">
         {app ? (
@@ -88,5 +105,20 @@ export default async function ServerSettingsPage() {
         </p>
       </SettingsRow>
     </>
+  );
+}
+
+/** An address the panel answers on besides its own, with a button to drop it. */
+function AddressLine({ host, label }: { host: string; label: string }) {
+  return (
+    <span className="flex items-center justify-between gap-3">
+      <code className="min-w-0 truncate font-mono text-[13.5px]">{host}</code>
+      <form action={dropAddressAction}>
+        <input type="hidden" name="host" value={host} />
+        <Button type="submit" variant="ghost" size="sm">
+          {label}
+        </Button>
+      </form>
+    </span>
   );
 }

@@ -124,6 +124,10 @@ export interface Installation {
 export const getInstallation = (app: GithubAppCredentials, id: number, fetchImpl?: Fetch) =>
   github<Installation>(`/app/installations/${id}`, { token: appJwt(app) }, fetchImpl);
 
+/** Points the app's webhook at the panel's new address: GitHub doesn't follow redirects for deliveries. */
+export const setWebhookUrl = (app: GithubAppCredentials, url: string, fetchImpl?: Fetch) =>
+  github<unknown>("/app/hook/config", { method: "PATCH", token: appJwt(app), body: JSON.stringify({ url }) }, fetchImpl);
+
 export interface InstallationToken {
   token: string;
   expires_at: string;

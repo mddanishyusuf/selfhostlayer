@@ -202,6 +202,8 @@ const MIGRATIONS = [
    INSERT INTO alert_channels_new SELECT id, kind, name, config_enc, enabled, created_at FROM alert_channels;
    DROP TABLE alert_channels;
    ALTER TABLE alert_channels_new RENAME TO alert_channels;`,
+  // The bucket folder for this server's backups, fixed when they start: moving the panel keeps them together.
+  `ALTER TABLE backup_settings ADD COLUMN server_folder TEXT;`,
 ];
 
 function open(): DatabaseSync {

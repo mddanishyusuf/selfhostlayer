@@ -27,6 +27,8 @@ export interface BackupSettings {
   keyConfirmed: boolean;
   scheduleHour: number;
   keep: number;
+  /** <prefix><serverFolder>/ in the bucket; fixed by the first backup (or a panel move). */
+  serverFolder: string | null;
 }
 
 type Parsed = { ok: true; provider: Provider; destination: Destination } | { ok: false; error: string };
@@ -64,6 +66,7 @@ interface Row {
   key_confirmed_at: number | null;
   schedule_hour: number;
   keep: number;
+  server_folder: string | null;
 }
 
 export function getBackupSettings(): BackupSettings | null {
@@ -76,7 +79,15 @@ export function getBackupSettings(): BackupSettings | null {
     keyConfirmed: row.key_confirmed_at !== null,
     scheduleHour: row.schedule_hour,
     keep: row.keep,
+    serverFolder: row.server_folder,
   };
+}
+
+/** Fixes the bucket folder, if it isn't yet; returns the one in use. */
+export function pinServerFolder(folder: string): string {
+  db().prepare("UPDATE backup_settings SET server_folder = ? WHERE id = 1 AND server_folder IS NULL").run(folder);
+  const row = db().prepare("SELECT server_folder FROM backup_settings WHERE id = 1").get() as { server_folder: string | null } | undefined;
+  return row?.server_folder ?? folder;
 }
 
 /** Saves the destination. The recovery key is made once and kept when the destination changes, so older backups stay readable. */
