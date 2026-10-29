@@ -10,8 +10,8 @@ import { Dot, ListRow, RowIcon } from "./page";
 import { StatusText } from "./status";
 import { Pill, Skeleton } from "./ui";
 
-/** Certificate state from a real TLS handshake through Caddy. */
-async function CertLine({ host, free }: { host: string; free: boolean }) {
+/** Certificate state from a real TLS handshake through Caddy: this server's own, even behind Cloudflare. */
+async function CertLine({ host, free, proxied }: { host: string; free: boolean; proxied: boolean }) {
   const cert = await checkCertificate(host);
   if (cert.ok) {
     return (
@@ -22,6 +22,11 @@ async function CertLine({ host, free }: { host: string; free: boolean }) {
         {cert.issuer}
         <Dot />
         <span className={cert.daysLeft < 20 ? "text-gold" : undefined}>renews in {cert.daysLeft} days</span>
+        {proxied && (
+          <>
+            <Dot /> through Cloudflare
+          </>
+        )}
         {free && (
           <>
             <Dot /> free URL
@@ -29,6 +34,9 @@ async function CertLine({ host, free }: { host: string; free: boolean }) {
         )}
       </>
     );
+  }
+  if (proxied && cert.reason === "issuing") {
+    return <span className="text-gold">Issuing a certificate… If it takes more than a few minutes, turn off Always Use HTTPS in Cloudflare.</span>;
   }
   const text = {
     issuing: "Issuing a certificate… (usually under a minute)",
@@ -41,7 +49,9 @@ async function CertLine({ host, free }: { host: string; free: boolean }) {
 
 export function DomainRow({ d, serverIp, removable, indent }: { d: ProjectDomain; serverIp: string; removable: boolean; indent?: boolean }) {
   const pending = d.status === "pending";
-  const record = pending ? suggestedRecord(d.host, serverIp) : null;
+  // The record exists but goes through Cloudflare's proxy: keep it, or switch it to DNS only.
+  const behindCloudflare = pending && d.dnsStatus === "cloudflare";
+  const record = pending && !behindCloudflare ? suggestedRecord(d.host, serverIp) : null;
   const sub = pending ? (
     <>
       <span className="text-gold">Waiting for DNS</span>
@@ -58,7 +68,7 @@ export function DomainRow({ d, serverIp, removable, indent }: { d: ProjectDomain
     </>
   ) : (
     <Suspense fallback={<Skeleton className="h-3.5 w-56" />}>
-      <CertLine host={d.host} free={d.role === "free"} />
+      <CertLine host={d.host} free={d.role === "free"} proxied={d.proxied} />
     </Suspense>
   );
   return (
@@ -92,6 +102,31 @@ export function DomainRow({ d, serverIp, removable, indent }: { d: ProjectDomain
         </>
       }
     >
+      {behindCloudflare && (
+        <div className="col-span-full mt-3.5 grid gap-3 border-l-2 border-gold bg-gold/7 px-[18px] py-3.5 md:col-start-2" data-testid="cloudflare-proxy">
+          <p className="text-[13.5px] text-muted">
+            To keep the orange cloud, in Cloudflare set <b className="font-medium text-foreground">SSL/TLS</b> to <b className="font-medium text-foreground">Full (strict)</b> and turn off{" "}
+            <b className="font-medium text-foreground">Always Use HTTPS</b>: this server redirects to HTTPS itself, and its first certificate needs plain HTTP to get through. The record behind the proxy must point at{" "}
+            <code className="font-mono text-[13px] text-foreground">{serverIp}</code>.
+          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <form action={verifyDomainAction}>
+              <input type="hidden" name="domainId" value={d.id} />
+              <input type="hidden" name="proxy" value="1" />
+              <SubmitButton pending="Adding…" size="sm" className="w-auto">
+                Keep the proxy
+              </SubmitButton>
+            </form>
+            <form action={verifyDomainAction}>
+              <input type="hidden" name="domainId" value={d.id} />
+              <SubmitButton pending="Checking…" variant="secondary" size="sm" className="w-auto">
+                Check again
+              </SubmitButton>
+            </form>
+            <span className="text-[12.5px] text-dim">Or set the record to DNS only, then check again.</span>
+          </div>
+        </div>
+      )}
       {record && (
         <div className="col-span-full mt-3.5 grid gap-3 border-l-2 border-gold bg-gold/7 px-[18px] py-3.5 md:col-start-2" data-testid="dns-record">
           <p className="text-[13.5px] text-muted">Add this record at your DNS provider. The domain goes live once public DNS points it here, so visitors never land on a broken site.</p>

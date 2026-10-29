@@ -17,20 +17,32 @@ RuntimeDirectory=caddy
 RuntimeDirectoryMode=0700
 EOF
 
+  # Behind Cloudflare's proxy (orange cloud), the visitor's address arrives in
+  # CF-Connecting-IP. It's trusted only from Cloudflare's published ranges
+  # (cloudflare.com/ips), so nobody else can fake it.
   cat >/etc/caddy/Caddyfile.new <<'EOF'
 # Managed by Self Host Layer. Per-app sites live in /etc/caddy/sites/.
 {
 	admin unix//run/caddy/admin.sock
+	servers {
+		trusted_proxies static 173.245.48.0/20 103.21.244.0/22 103.22.200.0/22 103.31.4.0/22 141.101.64.0/18 108.162.192.0/18 190.93.240.0/20 188.114.96.0/20 197.234.240.0/22 198.41.128.0/17 162.158.0.0/15 104.16.0.0/13 104.24.0.0/14 172.64.0.0/13 131.0.72.0/22 2400:cb00::/32 2606:4700::/32 2803:f800::/32 2405:b500::/32 2405:8100::/32 2a06:98c0::/29 2c0f:f248::/32
+		client_ip_headers CF-Connecting-IP X-Forwarded-For
+	}
 }
 
 import /etc/caddy/sites/*.caddy
 EOF
   run caddy validate --config /etc/caddy/Caddyfile.new --adapter caddyfile
-  mv /etc/caddy/Caddyfile.new /etc/caddy/Caddyfile
-
   run systemctl daemon-reload
-  # Restart (not reload): the admin endpoint itself moves.
-  run systemctl restart caddy
+  if cmp -s /etc/caddy/Caddyfile.new /etc/caddy/Caddyfile; then
+    rm -f /etc/caddy/Caddyfile.new
+    # Unchanged: no restart, so a re-run or an update doesn't interrupt live sites.
+    systemctl is-active --quiet caddy || run systemctl restart caddy
+  else
+    mv /etc/caddy/Caddyfile.new /etc/caddy/Caddyfile
+    # Restart (not reload): the admin endpoint itself may move.
+    run systemctl restart caddy
+  fi
   ok "Caddy: sites in $CADDY_SITES, admin API on /run/caddy/admin.sock"
 }
 

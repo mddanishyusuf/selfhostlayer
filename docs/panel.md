@@ -79,6 +79,13 @@ Add your own domain:
 
 Adding a domain can also add `www.` in front of it, redirecting to it.
 
+**Behind Cloudflare's proxy (orange cloud).** Public DNS then shows Cloudflare's addresses, not this server's. The domain waits until you choose: set the record to "DNS only", or press **Keep the proxy**. To keep it, set these in Cloudflare:
+
+- **SSL/TLS** to **Full (strict)**.
+- **Always Use HTTPS** off. This server redirects to HTTPS itself, and its first certificate needs plain HTTP to reach the server.
+
+The certificate status on the page is this server's own, checked directly, so it stays accurate behind the proxy. Apps and the Requests tab see the visitor's real address: Caddy takes `CF-Connecting-IP` from Cloudflare's published address ranges, and from nowhere else.
+
 The free `<app>.<apps domain>` address keeps working next to your domains. Once one of your own domains is live, its remove button turns it off, and **Add it back** restores it. A project's last live domain can't be removed, so the app always answers somewhere.
 
 ```sh

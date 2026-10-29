@@ -62,7 +62,7 @@ export function explainDns(v: DnsVerdict, host: string, serverIp: string): strin
     case "wrong_ip":
       return `${host} points at ${v.found.join(", ")}, not this server (${serverIp}). Update the record.`;
     case "cloudflare":
-      return `${host} is proxied by Cloudflare (orange cloud). Set the record to "DNS only", or keep the proxy and set SSL/TLS to "Full (strict)" after the certificate is issued.`;
+      return `${host} is behind Cloudflare's proxy (orange cloud). Keep the proxy, or set the record to "DNS only".`;
     case "ipv6_mismatch":
       return `${host} also has an AAAA (IPv6) record (${v.found.join(", ")}) that doesn't point here. Remove it, or Let's Encrypt validation will fail.`;
     case "resolvers_disagree":
@@ -93,6 +93,12 @@ export async function lookupDomain(host: string): Promise<DnsAnswers[]> {
     }),
   );
 }
+
+/**
+ * Whether a domain can go live: it points here, or it's behind Cloudflare's
+ * proxy and the owner chose to keep it (Cloudflare then forwards to this server).
+ */
+export const canGoLive = (status: DnsVerdict["status"], keepProxy: boolean) => status === "ok" || (keepProxy && status === "cloudflare");
 
 export async function checkDomain(host: string, serverIp: string): Promise<{ verdict: DnsVerdict; message: string; answers: DnsAnswers[] }> {
   const answers = await lookupDomain(host);

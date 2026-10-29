@@ -15,6 +15,10 @@ export interface ProjectDomain {
   message: string | null;
   /** When DNS was verified (seconds). */
   verifiedAt: number | null;
+  /** Served through Cloudflare's proxy (orange cloud), as the owner chose. */
+  proxied: boolean;
+  /** What the last DNS check found (a DnsVerdict status), or null before the first. */
+  dnsStatus: string | null;
 }
 
 interface Row {
@@ -26,9 +30,22 @@ interface Row {
   status: ProjectDomain["status"];
   message: string | null;
   verified_at: number | null;
+  proxied: number;
+  dns_status: string | null;
 }
 
-const fromRow = (r: Row): ProjectDomain => ({ id: r.id, projectId: r.project_id, host: r.host, role: r.role, redirectTo: r.redirect_to, status: r.status, message: r.message, verifiedAt: r.verified_at });
+const fromRow = (r: Row): ProjectDomain => ({
+  id: r.id,
+  projectId: r.project_id,
+  host: r.host,
+  role: r.role,
+  redirectTo: r.redirect_to,
+  status: r.status,
+  message: r.message,
+  verifiedAt: r.verified_at,
+  proxied: r.proxied === 1,
+  dnsStatus: r.dns_status,
+});
 
 const HOST = /^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z][a-z0-9-]{0,61}[a-z0-9]$/;
 
@@ -62,8 +79,14 @@ export function addDomain(projectId: number, host: string, role: "free" | "prima
   return getDomain(Number(r.lastInsertRowid))!;
 }
 
-export function setDomainStatus(id: number, status: "pending" | "active", message: string | null): void {
-  db().prepare("UPDATE project_domains SET status = ?, message = ?, verified_at = CASE WHEN ? = 'active' THEN ? ELSE verified_at END WHERE id = ?").run(status, message, status, now(), id);
+export function setDomainStatus(id: number, status: "pending" | "active", message: string | null, dnsStatus?: string): void {
+  db()
+    .prepare("UPDATE project_domains SET status = ?, message = ?, dns_status = coalesce(?, dns_status), verified_at = CASE WHEN ? = 'active' THEN ? ELSE verified_at END WHERE id = ?")
+    .run(status, message, dnsStatus ?? null, status, now(), id);
+}
+
+export function setDomainProxied(id: number, proxied: boolean): void {
+  db().prepare("UPDATE project_domains SET proxied = ? WHERE id = ?").run(proxied ? 1 : 0, id);
 }
 
 export function removeDomain(id: number): void {

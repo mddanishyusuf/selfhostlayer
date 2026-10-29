@@ -220,6 +220,9 @@ const MIGRATIONS = [
      value TEXT NOT NULL,
      updated_at INTEGER NOT NULL
    );`,
+  // Domains behind Cloudflare's proxy (orange cloud), and what the last DNS check found.
+  `ALTER TABLE project_domains ADD COLUMN proxied INTEGER NOT NULL DEFAULT 0;
+   ALTER TABLE project_domains ADD COLUMN dns_status TEXT;`,
 ];
 
 function open(): DatabaseSync {

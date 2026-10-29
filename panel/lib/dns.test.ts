@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { evaluateDns, explainDns, isCloudflareIp, suggestedRecord, type DnsAnswers, type DnsVerdict } from "./dns";
+import { canGoLive, evaluateDns, explainDns, isCloudflareIp, suggestedRecord, type DnsAnswers, type DnsVerdict } from "./dns";
 
 const IP = "37.27.25.45";
 const ans = (a: string[], aaaa: string[] = []): DnsAnswers => ({ a, aaaa, cname: [] });
@@ -35,7 +35,7 @@ describe("evaluateDns", () => {
     for (const v of verdicts) {
       expect(explainDns(v, "piqo.app", IP).length).toBeGreaterThan(20);
     }
-    expect(explainDns({ status: "cloudflare", found: [] }, "piqo.app", IP)).toContain("Full (strict)");
+    expect(explainDns({ status: "cloudflare", found: [] }, "piqo.app", IP)).toMatch(/Keep the proxy, or set the record to "DNS only"/);
   });
 });
 
@@ -55,5 +55,14 @@ describe("suggestedRecord", () => {
     expect(suggestedRecord("example.co.uk", IP)).toEqual({ type: "A", name: "@", value: IP });
     expect(suggestedRecord("shop.example.co.uk", IP)).toEqual({ type: "A", name: "shop", value: IP });
     expect(suggestedRecord("app.staging.piqo.app", IP)).toEqual({ type: "A", name: "app.staging", value: IP });
+  });
+});
+
+describe("canGoLive", () => {
+  it("needs DNS pointing here, or Cloudflare's proxy kept on purpose", () => {
+    expect(canGoLive("ok", false)).toBe(true);
+    expect(canGoLive("cloudflare", false)).toBe(false);
+    expect(canGoLive("cloudflare", true)).toBe(true);
+    for (const status of ["none", "wrong_ip", "ipv6_mismatch", "resolvers_disagree"] as const) expect(canGoLive(status, true)).toBe(false);
   });
 });
