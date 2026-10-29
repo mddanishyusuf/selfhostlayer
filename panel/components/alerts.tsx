@@ -22,7 +22,7 @@ export function AddChannelForm() {
   return (
     <form ref={form} action={action} className="grid gap-4">
       <input type="hidden" name="kind" value={kind} />
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4" role="radiogroup" aria-label="Channel type">
+      <div className="inline-flex flex-wrap gap-0.5 justify-self-start rounded-[20px] border border-border-strong p-[3px]" role="radiogroup" aria-label="Channel type">
         {KINDS.map(([value, label]) => (
           <button
             key={value}
@@ -30,7 +30,7 @@ export function AddChannelForm() {
             role="radio"
             aria-checked={kind === value}
             onClick={() => setKind(value)}
-            className={cx("rounded-md border px-3 py-2 text-[13px] font-medium transition-colors duration-150", kind === value ? "border-foreground" : "border-border text-muted hover:bg-hover")}
+            className={cx("h-7 rounded-full px-3.5 text-[13px] font-medium transition-colors duration-150", kind === value ? "bg-selected text-foreground" : "text-muted hover:text-foreground")}
           >
             {label}
           </button>

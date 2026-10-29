@@ -1,9 +1,14 @@
-import { Database, HardDrive, Leaf, Plus } from "lucide-react";
+import { ArrowUpRight01Icon, Database01Icon, HardDriveIcon } from "@hugeicons/core-free-icons";
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { PageBody, PageHeader } from "@/components/page";
-import { StatusDot, cx } from "@/components/ui";
+import { Collapsible } from "@/components/collapsible";
+import { CopyButton } from "@/components/form";
+import { Icon } from "@/components/icon";
+import { Dot, Notice, PageHeader, Section, TileIcon } from "@/components/page";
+import { StatusText } from "@/components/status";
+import { Mark, Pill } from "@/components/ui";
 import { agent } from "@/lib/agent";
+import { listBackups } from "@/lib/backup/runner";
 import { listProjects } from "@/lib/projects";
 import { serviceStatus, type ServiceStatus } from "@/lib/services";
 import { requireUser } from "@/lib/session";
@@ -11,78 +16,135 @@ import { requireUser } from "@/lib/session";
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Databases" };
 
-function Engine({ icon, name, status, children, soon }: { icon: ReactNode; name: string; status: ReactNode; children?: ReactNode; soon?: boolean }) {
+function Instance({ slug, index, name, detail, ok, url }: { slug: string; index: number; name: string; detail: ReactNode; ok: boolean; url?: string }) {
   return (
-    <section className={cx("overflow-hidden rounded-2xl border border-border", soon && "border-dashed")}>
-      <div className="flex items-center gap-3 px-4 py-4 sm:px-5">
-        <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-subtle">{icon}</span>
-        <div className="grid min-w-0 flex-1">
-          <h2 className="text-[17px] font-bold">{name}</h2>
-          <p className="text-[13px] text-muted">{status}</p>
+    <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-3.5 border-t border-border py-3.5 pl-4 pr-4 sm:pr-7 md:pl-[82px]">
+      <Mark name={slug} index={index} size="sm" />
+      <div className="grid min-w-0 gap-0.5">
+        <div className="flex min-w-0 items-center gap-2 text-[15px] font-semibold">
+          {slug} <code className="truncate font-mono text-[13px] font-normal text-muted">{name}</code>
         </div>
-        {soon && <span className="rounded-full border border-border-strong px-2.5 py-0.5 text-[12px] font-bold text-muted">Soon</span>}
+        <div className="truncate text-[13px] text-muted">{detail}</div>
       </div>
-      {children && <div className="divide-y divide-border border-t border-border">{children}</div>}
-    </section>
-  );
-}
-
-function Instance({ href, project, detail, ok }: { href: string; project: string; detail: string; ok: boolean }) {
-  return (
-    <Link href={href} className="flex items-center gap-3 px-4 py-3 transition-colors duration-150 hover:bg-subtle sm:px-5">
-      <StatusDot status={ok ? "ok" : "err"} />
-      <span className="text-[15px] font-bold">{project}</span>
-      <span className="ml-auto truncate text-[13px] text-muted tabular-nums">{detail}</span>
-    </Link>
-  );
-}
-
-function AddTo({ engine, slugs }: { engine: string; slugs: string[] }) {
-  if (slugs.length === 0) return null;
-  return (
-    <div className="flex flex-wrap items-center gap-2 px-4 py-3 sm:px-5">
-      <span className="text-[13px] text-muted">Add {engine} to</span>
-      {slugs.map((slug) => (
-        <Link key={slug} href={`/projects/${slug}/databases`} className="inline-flex h-7 items-center gap-1 rounded-full border border-border-strong px-3 text-[13px] font-bold transition-colors duration-150 hover:bg-hover">
-          <Plus className="size-3.5" aria-hidden /> {slug}
+      <div className="flex items-center gap-2">
+        <span className="max-sm:hidden">{ok ? <StatusText status="ok" label="Answering" /> : <StatusText status="err" label="Not answering" />}</span>
+        {url && <CopyButton text={url} label="Copy URL" />}
+        <Link href={`/projects/${slug}/databases`} title={`Open ${slug}`} className="grid size-8 place-items-center rounded-lg text-muted transition-colors hover:bg-hover hover:text-foreground">
+          <Icon icon={ArrowUpRight01Icon} size={16} />
         </Link>
-      ))}
+      </div>
+    </div>
+  );
+}
+
+function Footer({ add, note }: { add?: ReactNode; note: string }) {
+  return (
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-border py-3 pl-4 pr-4 text-[13px] sm:pr-7 md:pl-[82px]">
+      {add}
+      <span className="ml-auto text-dim">{note}</span>
     </div>
   );
 }
 
 export default async function DatabasesOverviewPage() {
   await requireUser();
-  const projects = listProjects().filter((p) => p.runtime.kind !== "static");
-  const statuses = (await Promise.all(projects.map((p) => serviceStatus(p.slug).catch(() => null)))).filter((s): s is ServiceStatus => s !== null);
+  const all = listProjects();
+  const apps = all.filter((p) => p.runtime.kind !== "static");
+  const statuses = (await Promise.all(apps.map((p) => serviceStatus(p.slug).catch(() => null)))).filter((s): s is ServiceStatus => s !== null);
   const installed = statuses[0]?.installed ?? (await agent<{ installed: ServiceStatus["installed"] }>("service.status").then((r) => r.installed).catch(() => ({ redis: false, postgres: false })));
+  const indexOf = (slug: string) => all.findIndex((p) => p.slug === slug);
   const pg = statuses.filter((s) => s.postgres);
   const redis = statuses.filter((s) => s.redis);
-  const count = (n: number, what: string) => `${n} ${what}${n === 1 ? "" : "s"}`;
+  // SQLite files as the last successful backup found them.
+  const sqlite = apps
+    .map((p) => ({ p, files: listBackups({ slug: p.slug, limit: 5 }).find((b) => b.status === "ok")?.contents?.sqlite ?? [] }))
+    .filter((x) => x.files.length > 0);
+  const down = [...pg.filter((s) => !s.postgres!.answering), ...redis.filter((s) => !s.redis!.answering)];
+  const total = pg.length + redis.length + sqlite.reduce((n, x) => n + x.files.length, 0);
+  const without = (key: "postgres" | "redis") => statuses.filter((s) => !s[key]).map((s) => s.slug);
+  const addLinks = (engine: string, slugs: string[]) =>
+    slugs.length ? (
+      <span className="flex flex-wrap items-center gap-1.5">
+        <span className="text-muted">Add {engine} to</span>
+        {slugs.map((slug) => (
+          <Link key={slug} href={`/projects/${slug}/databases`} className="text-lavender hover:underline">
+            {slug}
+          </Link>
+        ))}
+      </span>
+    ) : undefined;
+  const pgMb = pg.reduce((n, s) => n + (s.postgres!.sizeMb ?? 0), 0);
+  const redisUsed = redis.reduce((n, s) => n + (s.redis!.memoryUsedMb ?? 0), 0);
+  const redisCap = redis.reduce((n, s) => n + s.redis!.memoryMb, 0);
 
   return (
     <>
-      <PageHeader title="Databases" subtitle="Each app gets its own database and credentials, running natively on this server" />
-      <PageBody className="gap-4">
-        <Engine icon={<Database className="size-5" aria-hidden />} name="PostgreSQL" status={installed.postgres ? `Installed · ${count(pg.length, "database")}` : "Installed the first time you add it to a project"}>
-          {pg.map((s) => (
-            <Instance key={s.slug} href={`/projects/${s.slug}/databases`} project={s.slug} detail={`${s.postgres!.database}${s.postgres!.sizeMb !== null ? ` · ${s.postgres!.sizeMb} MB` : ""}`} ok={s.postgres!.answering} />
-          ))}
-          <AddTo engine="Postgres" slugs={statuses.filter((s) => !s.postgres).map((s) => s.slug)} />
-        </Engine>
+      <PageHeader title="Databases" meta="Native, no Docker · one per app" />
+      {down.length ? (
+        <Notice lead="Not answering" tone="err">
+          {down.map((s) => s.slug).join(", ")}: check the project&apos;s Databases page.
+        </Notice>
+      ) : total > 0 ? (
+        <Notice lead="Healthy" tone="ok">
+          All {total} database{total === 1 ? " is" : "s are"} answering.
+        </Notice>
+      ) : null}
 
-        <Engine icon={<Database className="size-5 text-err" aria-hidden />} name="Redis" status={installed.redis ? `Installed · ${count(redis.length, "instance")}, one per app` : "Installed the first time you add it to a project"}>
-          {redis.map((s) => (
-            <Instance key={s.slug} href={`/projects/${s.slug}/databases`} project={s.slug} detail={`port ${s.redis!.port} · ${s.redis!.memoryUsedMb ?? "?"} / ${s.redis!.memoryMb} MB`} ok={s.redis!.answering} />
-          ))}
-          <AddTo engine="Redis" slugs={statuses.filter((s) => !s.redis).map((s) => s.slug)} />
-        </Engine>
+      <Collapsible
+        testId="engine-postgres"
+        lead={<TileIcon tone="blue"><Icon icon={Database01Icon} size={20} /></TileIcon>}
+        title={<>PostgreSQL {installed.postgres ? <Pill outline>Installed</Pill> : <Pill outline>Not installed</Pill>}</>}
+        sub={installed.postgres ? <>{pg.length} database{pg.length === 1 ? "" : "s"}<Dot />{pgMb.toFixed(1)} MB</> : "Installed the first time you add it to a project"}
+        side={installed.postgres ? <span className="max-sm:hidden"><StatusText status="ok" label="Running" /></span> : undefined}
+      >
+        {pg.map((s) => (
+          <Instance key={s.slug} slug={s.slug} index={indexOf(s.slug)} name={s.postgres!.database} ok={s.postgres!.answering} url={s.postgres!.url} detail={<>{s.postgres!.sizeMb !== null ? `${s.postgres!.sizeMb} MB` : "size unknown"}<Dot />a pg_dump in every backup</>} />
+        ))}
+        <Footer add={addLinks("Postgres", without("postgres"))} note="One server · a role and database per app · 127.0.0.1 only" />
+      </Collapsible>
 
-        <Engine icon={<HardDrive className="size-5" aria-hidden />} name="SQLite" status="Built in: keep database files in each app's DATA_DIR. Backups copy them safely and check them." />
+      <Collapsible
+        testId="engine-redis"
+        lead={<TileIcon tone="coral"><Icon icon={Database01Icon} size={20} /></TileIcon>}
+        title={<>Redis {installed.redis ? <Pill outline>Installed</Pill> : <Pill outline>Not installed</Pill>}</>}
+        sub={installed.redis ? <>{redis.length} instance{redis.length === 1 ? "" : "s"}<Dot />{redisUsed} MB used of {redisCap} MB</> : "Installed the first time you add it to a project"}
+        side={installed.redis ? <span className="max-sm:hidden"><StatusText status="ok" label="Running" /></span> : undefined}
+      >
+        {redis.map((s) => (
+          <Instance key={s.slug} slug={s.slug} index={indexOf(s.slug)} name={`port ${s.redis!.port}`} ok={s.redis!.answering} url={s.redis!.url} detail={<>{s.redis!.memoryUsedMb ?? "?"} MB of {s.redis!.memoryMb} MB<Dot />noeviction</>} />
+        ))}
+        <Footer add={addLinks("Redis", without("redis"))} note="One small Redis per app · its own password and memory cap" />
+      </Collapsible>
 
-        <Engine icon={<Leaf className="size-5 text-ok" aria-hidden />} name="MongoDB" status="Not in Ubuntu's packages; it needs MongoDB's own repository." soon />
-        <Engine icon={<Database className="size-5 text-accent" aria-hidden />} name="MySQL / MariaDB" status="For apps that need it, like Ghost." soon />
-      </PageBody>
+      <Collapsible
+        testId="engine-sqlite"
+        lead={<TileIcon tone="lav"><Icon icon={HardDriveIcon} size={20} /></TileIcon>}
+        title={<>SQLite <Pill outline>Built in</Pill></>}
+        sub={<>{sqlite.length} app{sqlite.length === 1 ? "" : "s"} with SQLite files<Dot />checked at every backup</>}
+      >
+        {sqlite.flatMap(({ p, files }) =>
+          files.map((f) => <Instance key={`${p.slug}/${f.path}`} slug={p.slug} index={indexOf(p.slug)} name={f.path} ok detail={<>{(f.bytes / 1048576).toFixed(1)} MB<Dot />integrity ok at the last backup</>} />),
+        )}
+        <Footer note="Files in each app's DATA_DIR are found by their header and copied safely, even while the app writes" />
+      </Collapsible>
+
+      <Section title="More engines" description="Installed the first time an app asks for one.">
+        {[
+          ["MongoDB", "Document data. Not in Ubuntu's packages; it needs MongoDB's own repository.", "teal"],
+          ["MySQL / MariaDB", "For apps that need it, like Ghost.", "dim"],
+        ].map(([name, what, tone]) => (
+          <div key={name} className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-3.5 border-t border-border px-4 py-3.5 sm:px-7">
+            <TileIcon tone={tone as "teal" | "dim"}>
+              <Icon icon={Database01Icon} size={20} />
+            </TileIcon>
+            <div className="grid min-w-0 gap-0.5">
+              <b className="text-[15px] font-semibold">{name}</b>
+              <span className="truncate text-[13px] text-muted">{what}</span>
+            </div>
+            <Pill outline>Coming soon</Pill>
+          </div>
+        ))}
+      </Section>
     </>
   );
 }

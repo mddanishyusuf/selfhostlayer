@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cronToCalendar, describeCron } from "./cron";
+import { cronToCalendar, describeCron, parseSystemdTime } from "./cron";
 
 describe("cronToCalendar", () => {
   it.each([
@@ -45,5 +45,14 @@ describe("describeCron", () => {
     expect(describeCron("15 * * * *")).toBe("every hour at :15");
     expect(describeCron("@daily")).toBe("every day at 00:00");
     expect(describeCron("0 8 * * 1-5")).toBe("0 8 * * 1-5");
+  });
+});
+
+describe("parseSystemdTime", () => {
+  it("reads systemctl's UTC timestamps and nothing else", () => {
+    expect(parseSystemdTime("Thu 2026-10-29 13:00:00 UTC")).toBe(Date.UTC(2026, 9, 29, 13, 0, 0));
+    expect(parseSystemdTime("n/a")).toBeNull();
+    expect(parseSystemdTime("Thu 2026-10-29 13:00:00 CET")).toBeNull();
+    expect(parseSystemdTime(null)).toBeNull();
   });
 });

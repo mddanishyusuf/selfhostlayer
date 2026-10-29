@@ -16,6 +16,7 @@ export const BIN = {
   runuser: "/usr/sbin/runuser",
   psql: "/usr/bin/psql",
   pgDump: "/usr/bin/pg_dump",
+  fail2banClient: "/usr/bin/fail2ban-client",
 } as const;
 
 export interface ExecResult {

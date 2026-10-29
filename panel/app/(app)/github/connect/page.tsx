@@ -1,8 +1,6 @@
-import { CircleCheck } from "lucide-react";
-import Link from "next/link";
 import { GithubConnectForm } from "@/components/github-connect";
-import { PageBody, PageHeader } from "@/components/page";
-import { Card, FormError } from "@/components/ui";
+import { KeyValues, Notice, PageHeader, PillLink, SettingsRow } from "@/components/page";
+import { FormError } from "@/components/ui";
 import { randomToken } from "@/lib/crypto";
 import { buildManifest, GITHUB_WEB } from "@/lib/github";
 import { createState, getApp, listInstallations } from "@/lib/github-store";
@@ -26,25 +24,33 @@ export default async function ConnectGithubPage({ searchParams }: { searchParams
     const installs = listInstallations();
     return (
       <>
-        <PageHeader title="GitHub" back="/new" />
-        <PageBody>
-        <Card className="grid gap-4 p-6">
-          <p className="flex items-center gap-2 font-medium">
-            <CircleCheck className="size-4 text-ok" aria-hidden /> Connected: <a className="underline-offset-4 hover:underline" href={app.htmlUrl}>{app.name}</a>
-          </p>
-          <p className="text-muted">
-            Installed on {installs.length === 0 ? "no accounts yet" : installs.map((i) => i.accountLogin).join(", ")}. The app belongs to {app.ownerLogin}, not to us: its private key lives only on this server.
-          </p>
-          <div className="flex flex-wrap gap-2">
-            <a href={`${GITHUB_WEB}/apps/${app.slug}/installations/new`} className="inline-flex h-9 items-center rounded-full border border-border-strong px-4 text-sm font-bold transition-colors duration-150 hover:bg-hover">
-              Install on more repositories
-            </a>
-            <Link href="/new" className="inline-flex h-9 items-center rounded-full bg-inverse px-4 text-sm font-bold text-inverse-fg transition-opacity duration-150 hover:opacity-90">
+        <PageHeader
+          title="GitHub"
+          back="/new"
+          actions={
+            <PillLink href="/new" primary>
               Import a project
-            </Link>
+            </PillLink>
+          }
+        />
+        <Notice lead="Connected" tone="ok">
+          <a className="text-foreground hover:underline" href={app.htmlUrl}>
+            {app.name}
+          </a>{" "}
+          belongs to {app.ownerLogin}, not to us: its private key lives only on this server.
+        </Notice>
+        <SettingsRow title="Access" description="Which accounts' repositories this server can deploy. Change it on GitHub any time.">
+          <KeyValues
+            inset
+            items={[
+              ["Installed on", installs.length === 0 ? <span key="i" className="text-muted">No accounts yet</span> : installs.map((i) => i.accountLogin).join(", ")],
+              ["Permissions", "Read code, write commit statuses, push webhooks"],
+            ]}
+          />
+          <div>
+            <PillLink href={`${GITHUB_WEB}/apps/${app.slug}/installations/new`}>Install on more repositories</PillLink>
           </div>
-        </Card>
-        </PageBody>
+        </SettingsRow>
       </>
     );
   }
@@ -57,24 +63,23 @@ export default async function ConnectGithubPage({ searchParams }: { searchParams
 
   return (
     <>
-      <PageHeader title="Connect GitHub" back="/new" />
-      <PageBody className="max-w-[560px]">
-        <p className="text-[13px] text-muted">
-          This creates a private GitHub App that belongs to you. GitHub hands its key straight to this server: nothing passes through anyone else.
-        </p>
-      <Card className="grid gap-5 p-6">
-        <ol className="grid gap-2 text-[13px] text-muted">
-          <li>
-            <span className="text-foreground">1.</span> GitHub opens with the app filled in (read code, commit statuses). Click <span className="text-foreground">Create GitHub App</span>.
-          </li>
-          <li>
-            <span className="text-foreground">2.</span> Pick the repositories to deploy, then come back here automatically.
-          </li>
-        </ol>
+      <PageHeader title="Connect GitHub" back="/new" meta="A private GitHub App that belongs to you" />
+      <Notice lead="Private" tone="lav">
+        GitHub hands the app&apos;s key straight to this server. Nothing passes through anyone else.
+      </Notice>
+      <SettingsRow
+        title="Create the app"
+        description={
+          <>
+            1. GitHub opens with the app filled in (read code, commit statuses). Click Create GitHub App.
+            <br />
+            2. Pick the repositories to deploy, then you come back here automatically.
+          </>
+        }
+      >
         <FormError message={error ? (ERRORS[error] ?? "Something went wrong. Try again.") : null} />
         <GithubConnectForm manifest={manifest} state={state} githubWeb={GITHUB_WEB} />
-      </Card>
-      </PageBody>
+      </SettingsRow>
     </>
   );
 }

@@ -117,3 +117,9 @@ export function describeCron(expression: string): string {
   if (m) return `every day at ${m[2]!.padStart(2, "0")}:${m[1]!.padStart(2, "0")}`;
   return t;
 }
+
+/** A timestamp from `systemctl show` ("Thu 2026-10-29 13:00:00 UTC") in ms; null for "n/a" or a zone other than UTC. */
+export function parseSystemdTime(value: string | null): number | null {
+  const m = /^(?:\w{3} )?(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}:\d{2}) (UTC|GMT)$/.exec(value?.trim() ?? "");
+  return m ? Date.parse(`${m[1]}T${m[2]}Z`) : null;
+}

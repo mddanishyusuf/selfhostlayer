@@ -6,6 +6,7 @@ dist/
 spike/out/
 .next/
 .next-dev/
+.next-preview/
 .dev/
 next-env.d.ts
 *.tsbuildinfo

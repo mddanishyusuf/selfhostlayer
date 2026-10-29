@@ -1,11 +1,13 @@
-import { RotateCcw } from "lucide-react";
+import { Undo02Icon } from "@hugeicons/core-free-icons";
 import Link from "next/link";
 import { rollback } from "@/app/actions/projects";
 import { deploymentPath, type Deployment } from "@/lib/deploy";
-import { RowList } from "./page";
-import { DeployStatusBadge, timeAgo } from "./status";
+import { Icon } from "./icon";
+import { Empty, TableHead, TableRow } from "./page";
+import { DeployStatusBadge, timeAgo, duration } from "./status";
+import { Pill } from "./ui";
 
-/** Deployment rows: status, commit, sha, trigger, age; optionally the project and a rollback button. */
+/** Deployments as rows: status, commit, (project), trigger, duration, age, and a rollback button. */
 export function DeploymentRows({
   deployments,
   slug,
@@ -13,6 +15,7 @@ export function DeploymentRows({
   showProject = false,
   rollbacks = false,
   empty = "No deployments yet.",
+  head,
 }: {
   deployments: (Deployment & { slug?: string })[];
   /** The project, when every row belongs to it (otherwise each row has its own slug). */
@@ -21,43 +24,64 @@ export function DeploymentRows({
   showProject?: boolean;
   rollbacks?: boolean;
   empty?: string;
+  /** A section title rendered above the column labels. */
+  head?: React.ReactNode;
 }) {
+  const columns = `112px minmax(220px,1fr) ${showProject ? "140px " : ""}90px 80px 64px${rollbacks ? " 36px" : ""}`;
   return (
-    <RowList data-testid="deployment-rows">
-      {deployments.length === 0 && <p className="px-5 py-10 text-center text-muted">{empty}</p>}
+    <section className="border-b border-border" data-testid="deployment-rows">
+      {head}
+      <TableHead columns={columns}>
+        <span>Status</span>
+        <span>Commit</span>
+        {showProject && <span>Project</span>}
+        <span>Trigger</span>
+        <span className="text-right">Duration</span>
+        <span className="text-right">Age</span>
+        {rollbacks && <span />}
+      </TableHead>
+      {deployments.length === 0 && <Empty>{empty}</Empty>}
       {deployments.map((d) => {
         const live = liveIds.includes(d.id);
+        const building = !["ready", "failed", "cancelled"].includes(d.status);
         return (
-          <div key={d.id} className="relative flex items-center gap-4 px-4 py-3.5 transition-colors duration-150 hover:bg-subtle sm:px-5">
-            <div className="w-[84px] shrink-0">
+          // A stretched link on the commit, not a link around the row: the
+          // rollback button can't live inside an <a>.
+          <TableRow key={d.id} columns={columns} highlight={building} className="hover:bg-hover" data-testid="deployment-row">
+            <span>
               <DeployStatusBadge status={d.status} />
-            </div>
-            <div className="grid min-w-0 flex-1 gap-0.5">
-              <Link href={deploymentPath(d.slug ?? slug ?? "", d.id)} className="truncate text-[15px] font-bold after:absolute after:inset-0">
-                {d.commitMessage || "Deployment"}
-              </Link>
-              <p className="truncate text-[13px] text-muted">
-                {showProject && d.slug && <span className="font-bold text-foreground">{d.slug} · </span>}
+            </span>
+            <div className="grid min-w-0 flex-1 gap-px">
+              <span className="flex min-w-0 items-center gap-2.5 font-medium">
+                <Link href={deploymentPath(d.slug ?? slug ?? "", d.id)} className="truncate after:absolute after:inset-0">
+                  {d.commitMessage || "Deployment"}
+                </Link>
+                {live && <Pill outline>Live</Pill>}
+              </span>
+              <span className="truncate text-[12.5px] text-muted">
                 <code className="font-mono">{d.sha.slice(0, 7)}</code> · {d.trigger}
-                {live && <span className="font-bold text-ok"> · live</span>}
-              </p>
+                {d.error && <span className="text-rose"> · {d.error}</span>}
+              </span>
             </div>
-            <p className="hidden shrink-0 text-[13px] text-muted tabular-nums sm:block">{timeAgo(d.createdAt)}</p>
+            {showProject && <span className="truncate max-md:hidden">{d.slug}</span>}
+            <span className="text-muted max-md:hidden">{d.trigger}</span>
+            <span className="text-right tabular-nums text-muted max-md:hidden">{d.startedAt && d.finishedAt ? duration((d.finishedAt - d.startedAt) * 1000) : building ? "…" : "—"}</span>
+            <span className="text-right tabular-nums text-muted max-md:ml-auto">{timeAgo(d.createdAt)}</span>
             {rollbacks &&
               (d.status === "ready" && !live ? (
-                <form action={rollback} className="relative z-[1]">
+                <form action={rollback} className="relative z-[1] max-md:hidden">
                   <input type="hidden" name="deploymentId" value={d.id} />
-                  <button type="submit" title="Roll back to this deployment" className="grid size-9 place-items-center rounded-full text-muted transition-colors duration-150 hover:bg-accent/10 hover:text-accent">
-                    <RotateCcw className="size-4" aria-hidden />
+                  <button type="submit" title="Roll back to this deployment" className="grid size-8 place-items-center rounded-lg text-muted transition-colors duration-150 hover:bg-hover hover:text-foreground">
+                    <Icon icon={Undo02Icon} size={16} />
                     <span className="sr-only">Roll back to this deployment</span>
                   </button>
                 </form>
               ) : (
-                <span className="size-9 shrink-0" aria-hidden />
+                <span className="max-md:hidden" />
               ))}
-          </div>
+          </TableRow>
         );
       })}
-    </RowList>
+    </section>
   );
 }

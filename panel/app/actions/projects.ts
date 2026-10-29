@@ -3,11 +3,12 @@
 import { redirect } from "next/navigation";
 import { AgentError } from "@layer/protocol";
 import { agent } from "@/lib/agent";
-import { activeDeployment, cancelDeployment, deploymentPath, deployProject, getDeployment, rollbackTo } from "@/lib/deploy";
+import { activeDeployment, cancelDeployment, deploymentPath, deployProject, getDeployment, rollbackTo, type Deployment } from "@/lib/deploy";
 import { parseRepoUrl } from "@/lib/github-repo";
 import { importRepo } from "@/lib/import";
-import { parseSettings } from "@/lib/project-settings";
+import { parseEnvVars, parseSettings } from "@/lib/project-settings";
 import { deleteProject, getProject, getProjectBySlug, setProjectEnv, updateProjectSettings } from "@/lib/projects";
+import { restartWithNewEnv } from "@/lib/services";
 import { requireUser } from "@/lib/session";
 
 export interface ImportState {
@@ -46,7 +47,7 @@ export async function saveSettings(_prev: SettingsState, form: FormData): Promis
   if (!parsed.ok) return { errors: parsed.errors };
   const { env, ...settings } = parsed.value;
   updateProjectSettings(project.id, settings);
-  setProjectEnv(project.id, env);
+  if (env) setProjectEnv(project.id, env);
   if (form.get("intent") !== "deploy") return { saved: true };
   let deploymentId: number;
   try {
@@ -55,6 +56,31 @@ export async function saveSettings(_prev: SettingsState, form: FormData): Promis
     return { errors: { form: err instanceof Error ? err.message : "Couldn't start the deployment." } };
   }
   redirect(deploymentPath(project.slug, deploymentId));
+}
+
+export interface EnvState {
+  error?: string;
+  saved?: string;
+}
+
+/** Saves the env vars; "apply" in the submit button's value loads them right away. */
+export async function saveEnvAction(_prev: EnvState, form: FormData): Promise<EnvState> {
+  await requireUser();
+  const project = getProjectBySlug(field(form, "slug"));
+  if (!project) redirect("/");
+  const parsed = parseEnvVars(form.get("env"));
+  if (!parsed.ok) return { error: parsed.error };
+  setProjectEnv(project.id, parsed.env);
+  if (form.get("intent") !== "apply") return { saved: "Saved. The next deploy uses them." };
+  let d: Deployment | null;
+  try {
+    // A static site reads them at build time; an app gets them on a restart of its live build.
+    d = project.runtime.kind === "static" ? await deployProject(project, "manual") : restartWithNewEnv(project);
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "Couldn't start the deployment." };
+  }
+  if (!d) return { saved: activeDeployment(project.id) ? "Saved. A deploy is running: redeploy after it to load them." : "Saved. The first deploy uses them." };
+  redirect(deploymentPath(project.slug, d.id));
 }
 
 /** Deletes the project and its app on the server (data/ is archived unless asked otherwise). */

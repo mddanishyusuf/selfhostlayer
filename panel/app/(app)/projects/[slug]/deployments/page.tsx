@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { redeploy } from "@/app/actions/projects";
 import { DeploymentRows } from "@/components/deployment-rows";
 import { SubmitButton } from "@/components/form";
-import { PageBody, PageHeader } from "@/components/page";
+import { PageHeader } from "@/components/page";
 import { listDeployments, liveDeployment } from "@/lib/deploy";
 import { getProjectBySlug } from "@/lib/projects";
 import { requireUser } from "@/lib/session";
@@ -18,8 +18,9 @@ export default async function ProjectDeploymentsPage({ params }: { params: Promi
   return (
     <>
       <PageHeader
-        title="Deployments"
-        subtitle={project.slug}
+        title={project.slug}
+        crumb="Deployments"
+        meta="Roll back instantly: old builds stay on disk"
         actions={
           <form action={redeploy}>
             <input type="hidden" name="slug" value={project.slug} />
@@ -29,10 +30,7 @@ export default async function ProjectDeploymentsPage({ params }: { params: Promi
           </form>
         }
       />
-      <PageBody>
-        <p className="text-[13px] text-muted">Roll back to any earlier ready deployment instantly: its build is still on disk.</p>
-        <DeploymentRows slug={project.slug} deployments={listDeployments(project.id, 100)} liveIds={live ? [live.id] : []} rollbacks />
-      </PageBody>
+      <DeploymentRows slug={project.slug} deployments={listDeployments(project.id, 100)} liveIds={live ? [live.id] : []} rollbacks />
     </>
   );
 }

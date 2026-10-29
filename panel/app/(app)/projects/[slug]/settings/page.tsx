@@ -1,10 +1,9 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { DeleteProject, SettingsForm } from "@/components/settings";
+import { Notice, PageHeader } from "@/components/page";
 import { frameworkLabel } from "@/lib/detect";
 import { listDeployments } from "@/lib/deploy";
 import { getProjectBySlug, projectEnv } from "@/lib/projects";
-import { PageBody, PageHeader } from "@/components/page";
 import { requireUser } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
@@ -23,23 +22,22 @@ export default async function SettingsPage({ params, searchParams }: { params: P
   return (
     <>
       <PageHeader
-        title={isNew ? `Configure ${project.slug}` : "Settings"}
+        title={isNew ? `Configure ${project.slug}` : project.slug}
+        crumb={isNew ? undefined : "Settings"}
         back={isNew ? "/" : undefined}
-        subtitle={
-          <>
-            <Link href={`/projects/${project.slug}`} className="underline-offset-4 hover:underline">
-            {project.repoOwner}/{project.repoName}
-          </Link>
-          {project.rootDir && ` · ${project.rootDir}`} · will be live at <span className="text-foreground">{project.domains[0]}</span>
-          </>
-        }
+        meta={`${frameworkLabel(project.framework)} detected`}
       />
-      <PageBody>
+      {isNew && (
+        <Notice lead="Almost live" tone="lav">
+          Check what we detected, add the env vars it needs, then deploy. It will be live at <b className="font-medium text-foreground">{project.domains[0]}</b>.
+        </Notice>
+      )}
       <SettingsForm
         isNew={isNew}
         framework={frameworkLabel(project.framework)}
         d={{
           slug: project.slug,
+          repo: `${project.repoOwner}/${project.repoName}${project.rootDir ? ` · ${project.rootDir}` : ""}`,
           branch: project.branch,
           installCommand: project.installCommand ?? "",
           buildCommand: project.buildCommand ?? "",
@@ -56,7 +54,6 @@ export default async function SettingsPage({ params, searchParams }: { params: P
         }}
       />
       {!isNew && <DeleteProject slug={project.slug} />}
-      </PageBody>
     </>
   );
 }

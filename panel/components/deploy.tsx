@@ -13,10 +13,10 @@ export function ImportButton({ repo, installationId }: { repo: string; installat
     <form action={action} className="grid justify-items-end gap-1">
       <input type="hidden" name="repo" value={repo} />
       <input type="hidden" name="installationId" value={installationId} />
-      <SubmitButton pending="Importing…" className="h-8 w-auto px-3 text-[13px]">
+      <SubmitButton pending="Importing…" size="sm" className="w-auto">
         Import
       </SubmitButton>
-      {state.error && <p className="max-w-[260px] text-right text-[12px] text-err">{state.error}</p>}
+      {state.error && <p className="max-w-[260px] text-right text-[12px] text-rose">{state.error}</p>}
     </form>
   );
 }
@@ -38,22 +38,27 @@ export function PublicRepoForm() {
         </Field>
       </div>
       <FormError message={state.error} />
-      <SubmitButton pending="Importing…">Import and deploy</SubmitButton>
+      <div>
+        <SubmitButton pending="Importing…" className="w-auto">
+          Import and deploy
+        </SubmitButton>
+      </div>
     </form>
   );
 }
 
 // --- log viewer ---------------------------------------------------------------
 
+// The log area is always dark (also in the light theme), so these are fixed colors.
 const ANSI_CLASS: Record<string, string> = {
-  "1": "font-semibold", "2": "opacity-60",
-  "31": "text-[#ff6369]", "32": "text-[#3fb950]", "33": "text-[#f5a524]", "34": "text-[#52a8ff]",
-  "35": "text-[#c084fc]", "36": "text-[#5eead4]", "90": "opacity-60", "91": "text-[#ff6369]", "92": "text-[#3fb950]", "93": "text-[#f5a524]",
-  "94": "text-[#52a8ff]", "95": "text-[#c084fc]", "96": "text-[#5eead4]",
+  "1": "font-semibold text-white", "2": "opacity-60",
+  "31": "text-[#f2777a]", "32": "text-[#7ccfc2]", "33": "text-[#f2b35b]", "34": "text-[#6c9ef0]",
+  "35": "text-[#b4a6f5]", "36": "text-[#7ccfc2]", "90": "opacity-60", "91": "text-[#f2777a]", "92": "text-[#7ccfc2]", "93": "text-[#f2b35b]",
+  "94": "text-[#6c9ef0]", "95": "text-[#b4a6f5]", "96": "text-[#7ccfc2]",
 };
 
 /** Text with ANSI color codes → styled segments. Other escape sequences are dropped; \r keeps the last redraw. */
-function toSegments(text: string): { text: string; cls: string }[] {
+export function toSegments(text: string): { text: string; cls: string }[] {
   const clean = text
     .split("\n")
     .map((line) => line.split("\r").filter((part, i, all) => part !== "" || i === all.length - 1).at(-1) ?? "")
@@ -75,50 +80,35 @@ function toSegments(text: string): { text: string; cls: string }[] {
   return segments;
 }
 
-export function LogViewer({ deploymentId, initialStatus }: { deploymentId: number; initialStatus: string }) {
-  const [log, setLog] = useState("");
+const stripAnsi = (s: string) => s.replace(/\x1b\[[0-9;?]*[A-Za-z]/g, "");
+
+/** The dark log area with a bar for following, copying and downloading. */
+export function LogPane({ text, live, label, fileName, minHeight = "calc(100dvh - 300px)", toolbar }: { text: string; live: boolean; label: string; fileName: string; minHeight?: string; toolbar?: React.ReactNode }) {
   const [follow, setFollow] = useState(true);
   const box = useRef<HTMLDivElement>(null);
-  const router = useRouter();
-  const lastStatus = useRef(initialStatus);
-
-  useEffect(() => {
-    const source = new EventSource(`/api/deployments/${deploymentId}/events`);
-    source.addEventListener("log", (e) => setLog((prev) => prev + JSON.parse((e as MessageEvent).data)));
-    source.addEventListener("status", (e) => {
-      const d = JSON.parse((e as MessageEvent).data) as { status: string } | null;
-      if (d && d.status !== lastStatus.current) {
-        lastStatus.current = d.status;
-        router.refresh();
-      }
-    });
-    source.onerror = () => source.close();
-    return () => source.close();
-  }, [deploymentId, router]);
-
   useEffect(() => {
     if (follow && box.current) box.current.scrollTop = box.current.scrollHeight;
-  }, [log, follow]);
-
-  const segments = useMemo(() => toSegments(log), [log]);
+  }, [text, follow]);
+  const segments = useMemo(() => toSegments(text), [text]);
+  const btn = "h-[26px] rounded-md px-2.5 text-[12px] font-medium text-muted transition-colors duration-150 hover:bg-hover hover:text-foreground";
   return (
-    <div className="overflow-hidden rounded-2xl border border-border bg-[#0a0a0a] text-[#ededed]">
-      <div className="flex items-center justify-between border-b border-white/10 px-4 py-2 text-[12px] text-white/60">
-        <span>Build log</span>
-        <div className="flex items-center gap-1">
+    <div>
+      <div className="flex items-center gap-3 border-b border-border px-4 py-2.5 sm:px-7">
+        <span className="inline-flex items-center gap-2 text-[13px] text-muted">
+          <span className={cx("size-2 rounded-full", live ? "bg-teal [animation:pulse-ring_1.6s_infinite]" : "bg-dim")} />
+          {label}
+        </span>
+        <div className="ml-auto flex items-center gap-1">
+          {toolbar}
           {!follow && (
-            <button type="button" onClick={() => setFollow(true)} className="rounded px-2 py-1 transition-colors duration-150 hover:bg-white/10 hover:text-white">
+            <button type="button" onClick={() => setFollow(true)} className={btn}>
               Follow
             </button>
           )}
-          <button type="button" onClick={() => navigator.clipboard.writeText(log.replace(/\x1b\[[0-9;?]*[A-Za-z]/g, ""))} className="rounded px-2 py-1 transition-colors duration-150 hover:bg-white/10 hover:text-white">
+          <button type="button" onClick={() => navigator.clipboard.writeText(stripAnsi(text))} className={btn}>
             Copy
           </button>
-          <a
-            href={`data:text/plain;charset=utf-8,${encodeURIComponent(log.replace(/\x1b\[[0-9;?]*[A-Za-z]/g, ""))}`}
-            download={`deployment-${deploymentId}.log`}
-            className="rounded px-2 py-1 transition-colors duration-150 hover:bg-white/10 hover:text-white"
-          >
+          <a href={`data:text/plain;charset=utf-8,${encodeURIComponent(stripAnsi(text))}`} download={fileName} className={cx(btn, "inline-flex items-center")}>
             Download
           </a>
         </div>
@@ -129,12 +119,64 @@ export function LogViewer({ deploymentId, initialStatus }: { deploymentId: numbe
           const el = e.currentTarget;
           setFollow(el.scrollHeight - el.scrollTop - el.clientHeight < 40);
         }}
-        className="h-[480px] overflow-auto px-4 py-3 font-mono text-[12.5px] leading-relaxed whitespace-pre-wrap break-words"
+        style={{ height: minHeight }}
+        className="overflow-auto whitespace-pre-wrap break-words bg-code px-4 pb-6 pt-3.5 font-mono text-[12.5px] leading-[1.75] text-[#e9e5df] sm:px-7"
         role="log"
         aria-live="polite"
       >
         {segments.length === 0 ? <span className="opacity-50">Waiting for output…</span> : segments.map((s, i) => <span key={i} className={cx(s.cls)}>{s.text}</span>)}
       </div>
     </div>
+  );
+}
+
+export function LogViewer({ deploymentId, initialStatus }: { deploymentId: number; initialStatus: string }) {
+  const [log, setLog] = useState("");
+  const router = useRouter();
+  const lastStatus = useRef(initialStatus);
+  const [live, setLive] = useState(!["ready", "failed", "cancelled"].includes(initialStatus));
+
+  useEffect(() => {
+    const source = new EventSource(`/api/deployments/${deploymentId}/events`);
+    source.addEventListener("log", (e) => setLog((prev) => prev + JSON.parse((e as MessageEvent).data)));
+    source.addEventListener("status", (e) => {
+      const d = JSON.parse((e as MessageEvent).data) as { status: string } | null;
+      if (d && d.status !== lastStatus.current) {
+        lastStatus.current = d.status;
+        setLive(!["ready", "failed", "cancelled"].includes(d.status));
+        router.refresh();
+      }
+    });
+    source.onerror = () => source.close();
+    return () => source.close();
+  }, [deploymentId, router]);
+
+  return <LogPane text={log} live={live} label={live ? "Streaming" : "Build log"} fileName={`deployment-${deploymentId}.log`} />;
+}
+
+/** The app's journal, live: the last lines, then new ones as they come. */
+export function AppLogs({ slug }: { slug: string }) {
+  const [log, setLog] = useState("");
+  const [live, setLive] = useState(true);
+  const [filter, setFilter] = useState("");
+  useEffect(() => {
+    const source = new EventSource(`/api/projects/${slug}/logs`);
+    source.addEventListener("log", (e) => setLog((prev) => (prev + JSON.parse((e as MessageEvent).data)).slice(-400_000)));
+    source.addEventListener("end", () => setLive(false));
+    source.onerror = () => {
+      setLive(false);
+      source.close();
+    };
+    return () => source.close();
+  }, [slug]);
+  const shown = filter.trim() ? log.split("\n").filter((l) => l.toLowerCase().includes(filter.trim().toLowerCase())).join("\n") : log;
+  return (
+    <LogPane
+      text={shown}
+      live={live}
+      label={live ? "Live" : "Stopped (reload to reconnect)"}
+      fileName={`${slug}.log`}
+      toolbar={<input value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Filter…" aria-label="Filter lines" className="mr-2 h-[30px] w-[220px] rounded-lg border border-border-strong bg-transparent px-2.5 text-[13px] outline-none placeholder:text-dim focus:border-lavender max-sm:w-[130px]" />}
+    />
   );
 }

@@ -5,6 +5,7 @@ import { useActionState, useEffect, useState, useTransition } from "react";
 import { useFormStatus } from "react-dom";
 import { restoreBackupAction, saveDestinationAction, testDestinationAction, type DestinationState, type RestoreState } from "@/app/actions/backups";
 import { SubmitButton } from "./form";
+import { Modal } from "./modal";
 import { Button, Field, FormError, Input, cx } from "./ui";
 
 export interface ProviderInfo {
@@ -33,7 +34,7 @@ export function DestinationForm({ providers, saved }: { providers: ProviderInfo[
   return (
     <form action={action} className="grid gap-4">
       <input type="hidden" name="provider" value={provider} />
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-5" role="radiogroup" aria-label="Storage provider">
+      <div className="inline-flex flex-wrap gap-0.5 justify-self-start rounded-[20px] border border-border-strong p-[3px]" role="radiogroup" aria-label="Storage provider">
         {providers.map((p) => (
           <button
             key={p.id}
@@ -44,7 +45,7 @@ export function DestinationForm({ providers, saved }: { providers: ProviderInfo[
               setProvider(p.id);
               if (p.region || provider === "r2") setRegion(p.region);
             }}
-            className={cx("rounded-md border px-3 py-2 text-[13px] font-medium transition-colors duration-150", provider === p.id ? "border-foreground" : "border-border text-muted hover:bg-hover")}
+            className={cx("h-7 rounded-full px-3.5 text-[13px] font-medium transition-colors duration-150", provider === p.id ? "bg-selected text-foreground" : "text-muted hover:text-foreground")}
           >
             {p.label}
           </button>
@@ -115,38 +116,52 @@ export function RestoreButton({ id, slug }: { id: number; slug: string }) {
   const [open, setOpen] = useState(false);
   const [typed, setTyped] = useState("");
   const [state, action] = useActionState(restoreBackupAction, {} as RestoreState);
-  if (state.ok) return <p className="basis-full text-[13px] text-ok">{state.ok}</p>;
-  if (!open) {
-    return (
-      <Button type="button" variant="ghost" className="h-8 px-3 text-[13px]" onClick={() => setOpen(true)}>
-        Restore
-      </Button>
-    );
-  }
   return (
-    <form action={action} className="grid basis-full gap-3 rounded-md border border-border p-3">
-      <input type="hidden" name="id" value={id} />
-      <p className="text-[13px] text-muted">
-        The app stops, its data folder is replaced by this backup, and it starts again. The current data is kept beside it (data.before-restore-…) until the next restore.
-      </p>
-      <Field label={`Type ${slug} to confirm`} htmlFor={`confirm-${id}`}>
-        <Input id={`confirm-${id}`} name="confirm" value={typed} onChange={(e) => setTyped(e.target.value)} autoComplete="off" spellCheck={false} />
-      </Field>
-      <FormError message={state.error} />
-      <div className="flex justify-end gap-2">
-        <Button type="button" variant="ghost" className="h-8 px-3 text-[13px]" onClick={() => setOpen(false)}>
-          Cancel
+    <>
+      {state.ok ? (
+        <span className="text-[13px] text-teal">Restored</span>
+      ) : (
+        <Button type="button" variant="secondary" size="sm" onClick={() => setOpen(true)}>
+          Restore
         </Button>
-        <RestoreSubmit disabled={typed !== slug} />
-      </div>
-    </form>
+      )}
+      <Modal open={open} onClose={() => setOpen(false)} title={`Restore ${slug}`} description="From this backup">
+        {state.ok ? (
+          <div className="grid gap-4 px-6 py-5">
+            <p className="text-[14px] text-teal">{state.ok}</p>
+            <div className="flex justify-end">
+              <Button type="button" variant="secondary" onClick={() => setOpen(false)}>
+                Close
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <form action={action} className="grid gap-4 px-6 py-5">
+            <input type="hidden" name="id" value={id} />
+            <p className="text-[13.5px] text-muted">
+              The app stops, its data folder is replaced by this backup, and it starts again. The current data is kept beside it (data.before-restore-…) until the next restore.
+            </p>
+            <Field label={`Type ${slug} to confirm`} htmlFor={`confirm-${id}`}>
+              <Input id={`confirm-${id}`} name="confirm" value={typed} onChange={(e) => setTyped(e.target.value)} autoComplete="off" spellCheck={false} autoFocus />
+            </Field>
+            <FormError message={state.error} />
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="secondary" onClick={() => setOpen(false)}>
+                Cancel
+              </Button>
+              <RestoreSubmit disabled={typed !== slug} />
+            </div>
+          </form>
+        )}
+      </Modal>
+    </>
   );
 }
 
 function RestoreSubmit({ disabled }: { disabled: boolean }) {
   const { pending } = useFormStatus();
   return (
-    <Button type="submit" disabled={disabled || pending} className="h-8 px-3 text-[13px]">
+    <Button type="submit" disabled={disabled || pending}>
       {pending ? "Restoring…" : "Restore this backup"}
     </Button>
   );

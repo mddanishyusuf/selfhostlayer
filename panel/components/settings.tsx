@@ -1,14 +1,18 @@
 "use client";
 
-import { Eye, EyeOff, Plus, Trash2 } from "lucide-react";
+import { Add01Icon, Delete02Icon, ViewIcon, ViewOffSlashIcon } from "@hugeicons/core-free-icons";
 import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
-import { removeProject, saveSettings, type SettingsState } from "@/app/actions/projects";
+import { removeProject, saveEnvAction, saveSettings, type EnvState, type SettingsState } from "@/app/actions/projects";
 import { parseDotEnv } from "@/lib/project-settings";
-import { Button, Card, Field, FormError, Input, Label, cx } from "./ui";
+import { Icon } from "./icon";
+import { Modal } from "./modal";
+import { SettingsRow } from "./page";
+import { Button, Field, FormError, Input, cx } from "./ui";
 
 export interface SettingsDefaults {
   slug: string;
+  repo: string;
   branch: string;
   installCommand: string;
   buildCommand: string;
@@ -24,21 +28,10 @@ export interface SettingsDefaults {
   env: [string, string][];
 }
 
-function Section({ title, description, children }: { title: string; description?: string; children: React.ReactNode }) {
-  return (
-    <Card className="grid gap-5 p-6">
-      <div className="grid gap-1">
-        <h2 className="text-[17px] font-bold tracking-tight">{title}</h2>
-        {description && <p className="text-[13px] text-muted">{description}</p>}
-      </div>
-      {children}
-    </Card>
-  );
-}
+const Err = ({ msg }: { msg?: string }) => (msg ? <p className="text-[13px] text-rose">{msg}</p> : null);
 
-const Err = ({ msg }: { msg?: string }) => (msg ? <p className="text-[13px] text-err">{msg}</p> : null);
-
-function EnvEditor({ initial, error }: { initial: [string, string][]; error?: string }) {
+/** Name/value rows. Posts them as one JSON field named "env". */
+export function EnvEditor({ initial, error }: { initial: [string, string][]; error?: string }) {
   const [rows, setRows] = useState<{ key: string; value: string }[]>(initial.length ? initial.map(([key, value]) => ({ key, value })) : [{ key: "", value: "" }]);
   const [reveal, setReveal] = useState(false);
   const [paste, setPaste] = useState("");
@@ -52,32 +45,48 @@ function EnvEditor({ initial, error }: { initial: [string, string][]; error?: st
       <input type="hidden" name="env" value={JSON.stringify(vars)} />
       <div className="grid gap-2">
         {rows.map((r, i) => (
-          <div key={i} className="grid grid-cols-[1fr_1.4fr_auto] gap-2">
+          <div key={i} className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)_auto] gap-2">
             <Input aria-label="Name" placeholder="NAME" value={r.key} spellCheck={false} autoComplete="off" className="font-mono text-[13px]" onChange={(e) => set(i, { key: e.target.value.toUpperCase().replace(/[^A-Z0-9_]/g, "_") })} />
             <Input aria-label="Value" placeholder="value" value={r.value} type={reveal ? "text" : "password"} spellCheck={false} autoComplete="off" className="font-mono text-[13px]" onChange={(e) => set(i, { value: e.target.value })} />
-            <button type="button" title="Remove" onClick={() => setRows((prev) => (prev.length > 1 ? prev.filter((_, j) => j !== i) : [{ key: "", value: "" }]))} className="grid size-9 place-items-center rounded-md text-muted transition-colors duration-150 hover:bg-hover hover:text-foreground">
-              <Trash2 className="size-4" aria-hidden />
+            <button
+              type="button"
+              title="Remove"
+              onClick={() => setRows((prev) => (prev.length > 1 ? prev.filter((_, j) => j !== i) : [{ key: "", value: "" }]))}
+              className="grid size-[38px] place-items-center rounded-lg text-muted transition-colors duration-150 hover:bg-hover hover:text-foreground"
+            >
+              <Icon icon={Delete02Icon} size={16} />
               <span className="sr-only">Remove</span>
             </button>
           </div>
         ))}
       </div>
       <div className="flex flex-wrap items-center gap-2">
-        <Button type="button" variant="secondary" className="h-8 px-3 text-[13px]" onClick={() => setRows((prev) => [...prev, { key: "", value: "" }])}>
-          <Plus className="size-3.5" aria-hidden /> Add variable
+        <Button type="button" variant="secondary" size="sm" onClick={() => setRows((prev) => [...prev, { key: "", value: "" }])}>
+          <Icon icon={Add01Icon} size={14} /> Add variable
         </Button>
-        <Button type="button" variant="ghost" className="h-8 px-3 text-[13px]" onClick={() => setReveal(!reveal)}>
-          {reveal ? <EyeOff className="size-3.5" aria-hidden /> : <Eye className="size-3.5" aria-hidden />} {reveal ? "Hide values" : "Show values"}
+        <Button type="button" variant="ghost" size="sm" onClick={() => setReveal(!reveal)}>
+          <Icon icon={reveal ? ViewOffSlashIcon : ViewIcon} size={14} /> {reveal ? "Hide values" : "Show values"}
         </Button>
       </div>
-      <details className="rounded-md border border-border">
-        <summary className="cursor-pointer px-3 py-2 text-[13px] text-muted">Paste a .env file</summary>
-        <div className="grid gap-2 border-t border-border p-3">
-          <textarea value={paste} onChange={(e) => setPaste(e.target.value)} rows={4} spellCheck={false} placeholder={"DATABASE_URL=postgres://…\nAPI_KEY=…"} className="w-full rounded-md border border-border bg-background p-2 font-mono text-[12.5px] outline-none focus:border-muted" />
+      <details className="group border-t border-border pt-3">
+        <summary className="cursor-pointer list-none text-[13px] text-muted transition-colors hover:text-foreground">
+          <span className="group-open:hidden">+</span>
+          <span className="hidden group-open:inline">−</span> Paste a .env file
+        </summary>
+        <div className="mt-3 grid gap-2">
+          <textarea
+            value={paste}
+            onChange={(e) => setPaste(e.target.value)}
+            rows={4}
+            spellCheck={false}
+            placeholder={"DATABASE_URL=postgres://…\nAPI_KEY=…"}
+            className="w-full rounded-lg border border-border-strong bg-transparent p-3 font-mono text-[12.5px] outline-none placeholder:text-dim focus:border-lavender"
+          />
           <Button
             type="button"
             variant="secondary"
-            className="h-8 justify-self-start px-3 text-[13px]"
+            size="sm"
+            className="justify-self-start"
             onClick={() => {
               const parsed = parseDotEnv(paste);
               setRows((prev) => {
@@ -92,7 +101,6 @@ function EnvEditor({ initial, error }: { initial: [string, string][]; error?: st
           </Button>
         </div>
       </details>
-      <p className="text-[12px] text-muted">Encrypted in the panel; on the server only the app's own process sees them (also during the build, for NEXT_PUBLIC_* and similar).</p>
       <Err msg={error} />
     </div>
   );
@@ -115,112 +123,201 @@ function SaveButtons({ isNew }: { isNew: boolean }) {
   );
 }
 
+/** Two choices as one pill group (radio inputs, so the form posts the value). */
+function Segmented<T extends string>({ name, value, options, onChange, label }: { name: string; value: T; options: [T, string][]; onChange: (v: T) => void; label: string }) {
+  return (
+    <div className="inline-flex flex-wrap gap-0.5 justify-self-start rounded-[20px] border border-border-strong p-[3px]" role="radiogroup" aria-label={label}>
+      {options.map(([v, text]) => (
+        <label key={v} className={cx("flex h-7 cursor-pointer items-center rounded-full px-3.5 text-[13px] font-medium transition-colors duration-150", value === v ? "bg-selected text-foreground" : "text-muted hover:text-foreground")}>
+          <input type="radio" name={name} value={v} checked={value === v} onChange={() => onChange(v)} className="sr-only" />
+          {text}
+        </label>
+      ))}
+    </div>
+  );
+}
+
 export function SettingsForm({ d, isNew, framework }: { d: SettingsDefaults; isNew: boolean; framework: string }) {
   const [state, action] = useActionState(saveSettings, {} as SettingsState);
   const [runtime, setRuntime] = useState(d.runtime);
   const e = state.errors ?? {};
   return (
-    <form action={action} className="grid gap-6">
+    <form action={action}>
       <input type="hidden" name="slug" value={d.slug} />
-      <Section title="Build" description={`Detected ${framework} with ${d.packageManager}. Change anything that's wrong.`}>
+      <SettingsRow title="Source" description="Pushes to the branch deploy automatically.">
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Branch" htmlFor="branch" hint="Pushes to this branch deploy automatically.">
+          <Field label="Repository" htmlFor="repository">
+            <Input id="repository" value={d.repo} disabled className="opacity-70" />
+          </Field>
+          <Field label="Branch" htmlFor="branch">
             <Input id="branch" name="branch" defaultValue={d.branch} spellCheck={false} />
             <Err msg={e.branch} />
           </Field>
-          <Field label="Node version" htmlFor="nodeVersion" hint="Exact version; installed on the server if needed.">
-            <Input id="nodeVersion" name="nodeVersion" defaultValue={d.nodeVersion} spellCheck={false} />
-            <Err msg={e.nodeVersion} />
-          </Field>
-          <Field label="Install command" htmlFor="installCommand" hint={`Empty: ${d.packageManager} with the lockfile.`}>
+        </div>
+      </SettingsRow>
+
+      <SettingsRow title="Build" description={`Detected ${framework} with ${d.packageManager}. Empty fields use what was detected.`}>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Install command" htmlFor="installCommand" hint={`Empty: ${d.packageManager} with the lockfile`}>
             <Input id="installCommand" name="installCommand" defaultValue={d.installCommand} placeholder="(automatic)" spellCheck={false} className="font-mono text-[13px]" />
             <Err msg={e.installCommand} />
           </Field>
-          <Field label="Build command" htmlFor="buildCommand" hint="Empty: no build step.">
+          <Field label="Build command" htmlFor="buildCommand" hint="Empty: no build step">
             <Input id="buildCommand" name="buildCommand" defaultValue={d.buildCommand} placeholder="(none)" spellCheck={false} className="font-mono text-[13px]" />
             <Err msg={e.buildCommand} />
           </Field>
         </div>
-      </Section>
+        <Field label="Node version" htmlFor="nodeVersion" hint="An exact version, installed on the server if needed">
+          <Input id="nodeVersion" name="nodeVersion" defaultValue={d.nodeVersion} spellCheck={false} className="max-w-[160px] font-mono text-[13px]" />
+          <Err msg={e.nodeVersion} />
+        </Field>
+      </SettingsRow>
 
-      <Section title="Run" description="A Node server runs as its own sandboxed user; static files are served by Caddy with no process.">
-        <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="How it runs">
-          {(["node", "static"] as const).map((kind) => (
-            <label key={kind} className={cx("flex cursor-pointer items-center gap-2 rounded-md border px-3 py-2.5 text-[13px] transition-colors duration-150", runtime === kind ? "border-foreground" : "border-border hover:bg-hover")}>
-              <input type="radio" name="runtime" value={kind} checked={runtime === kind} onChange={() => setRuntime(kind)} className="accent-current" />
-              <span className="font-medium">{kind === "node" ? "Node.js server" : "Static files"}</span>
-            </label>
-          ))}
-        </div>
+      <SettingsRow title="Run" description="A Node server runs as its own Linux user in a systemd sandbox. Static files are served by Caddy with no process.">
+        <Segmented
+          name="runtime"
+          label="How it runs"
+          value={runtime}
+          onChange={setRuntime}
+          options={[
+            ["node", "Node.js server"],
+            ["static", "Static files"],
+          ]}
+        />
         {runtime === "node" ? (
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Start command" htmlFor="startCommand" hint="Begins with node, npm or npx. PORT and HOST are set for you.">
-              <Input id="startCommand" name="startCommand" defaultValue={d.startCommand} spellCheck={false} className="font-mono text-[13px]" />
-              <Err msg={e.startCommand} />
-            </Field>
-            <Field label="Health check path" htmlFor="healthPath" hint="Must answer before traffic switches.">
+            <div className="sm:col-span-2">
+              <Field label="Start command" htmlFor="startCommand" hint="Begins with node, npm or npx. PORT and HOST are set for you">
+                <Input id="startCommand" name="startCommand" defaultValue={d.startCommand} spellCheck={false} className="font-mono text-[13px]" />
+                <Err msg={e.startCommand} />
+              </Field>
+            </div>
+            <Field label="Health check path" htmlFor="healthPath" hint="Must answer before traffic switches">
               <Input id="healthPath" name="healthPath" defaultValue={d.healthPath} spellCheck={false} className="font-mono text-[13px]" />
               <Err msg={e.healthPath} />
             </Field>
-            <Field label="Writable folders" htmlFor="writablePaths" hint="Inside the project, comma-separated. data/ is always writable.">
+            <Field label="Writable folders" htmlFor="writablePaths" hint="Inside the project, comma-separated. data/ is always writable">
               <Input id="writablePaths" name="writablePaths" defaultValue={d.writablePaths} placeholder="(none)" spellCheck={false} className="font-mono text-[13px]" />
               <Err msg={e.writablePaths} />
-            </Field>
-            <Field label="Memory limit (MB)" htmlFor="memoryMb" hint="The app is restarted if it goes over.">
-              <Input id="memoryMb" name="memoryMb" type="number" min={128} max={16384} defaultValue={d.memoryMb} />
-              <Err msg={e.memoryMb} />
             </Field>
           </div>
         ) : (
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Output folder" htmlFor="outputDir" hint="What the build produces, e.g. dist.">
+            <Field label="Output folder" htmlFor="outputDir" hint="What the build produces, e.g. dist">
               <Input id="outputDir" name="outputDir" defaultValue={d.outputDir} spellCheck={false} className="font-mono text-[13px]" />
               <Err msg={e.outputDir} />
             </Field>
-            <div className="grid content-start gap-1.5">
-              <Label htmlFor="spa">Single-page app</Label>
-              <label className="flex items-center gap-2 text-[13px] text-muted">
-                <input id="spa" name="spa" type="checkbox" defaultChecked={d.spa} /> Serve index.html for unknown paths
-              </label>
-            </div>
-            <input type="hidden" name="memoryMb" value={d.memoryMb} />
+            <label className="flex items-center gap-2.5 self-center text-[13.5px] sm:mt-5">
+              <input id="spa" name="spa" type="checkbox" defaultChecked={d.spa} className="size-4 accent-lavender" /> Single-page app: serve index.html for unknown paths
+            </label>
           </div>
         )}
-      </Section>
+      </SettingsRow>
 
-      <Section title="Environment variables">
-        <EnvEditor initial={d.env} error={e.env} />
-      </Section>
+      {runtime === "node" ? (
+        <SettingsRow title="Resources" description="The app restarts if it goes over the memory limit, so one app can't freeze the server.">
+          <Field label="Memory limit (MB)" htmlFor="memoryMb" hint="128 to 16384">
+            <Input id="memoryMb" name="memoryMb" type="number" min={128} max={16384} defaultValue={d.memoryMb} className="max-w-[160px] tabular-nums" />
+            <Err msg={e.memoryMb} />
+          </Field>
+        </SettingsRow>
+      ) : (
+        <input type="hidden" name="memoryMb" value={d.memoryMb} />
+      )}
 
-      <FormError message={e.form} />
-      {state.saved && <p className="text-right text-[13px] text-ok">Saved. The next deploy uses these settings.</p>}
-      <SaveButtons isNew={isNew} />
+      {isNew && (
+        <SettingsRow title="Environment variables" description="Encrypted in the panel. On the server only the app's own process sees them, also during the build (for NEXT_PUBLIC_* and similar).">
+          <EnvEditor initial={d.env} error={e.env} />
+        </SettingsRow>
+      )}
+
+      <div className="grid gap-3 border-b border-border px-4 py-5 sm:px-7">
+        <FormError message={e.form} />
+        {state.saved && <p className="text-right text-[13px] text-teal">Saved. The next deploy uses these settings.</p>}
+        <SaveButtons isNew={isNew} />
+      </div>
     </form>
+  );
+}
+
+function ApplyButtons({ isStatic, live }: { isStatic: boolean; live: boolean }) {
+  const { pending, data } = useFormStatus();
+  const intent = data?.get("intent");
+  return (
+    <div className="flex flex-wrap justify-end gap-2">
+      <Button type="submit" name="intent" value="save" variant={live ? "secondary" : "primary"} disabled={pending}>
+        {pending && intent === "save" ? "Saving…" : "Save"}
+      </Button>
+      {live && (
+        <Button type="submit" name="intent" value="apply" disabled={pending}>
+          {pending && intent === "apply" ? "Starting…" : isStatic ? "Save and redeploy" : "Save and restart"}
+        </Button>
+      )}
+    </div>
+  );
+}
+
+/** The Environment page's form: the editor and its save buttons. */
+export function EnvForm({ slug, initial, isStatic, live }: { slug: string; initial: [string, string][]; isStatic: boolean; live: boolean }) {
+  const [state, action] = useActionState(saveEnvAction, {} as EnvState);
+  return (
+    <form action={action}>
+      <input type="hidden" name="slug" value={slug} />
+      <SettingsRow
+        title="Your variables"
+        description={
+          isStatic
+            ? "A static site reads them at build time, so saving and redeploying rebuilds it."
+            : "Save and restart loads them without a rebuild and without downtime. Variables read at build time (NEXT_PUBLIC_*) need a redeploy."
+        }
+      >
+        <EnvEditor initial={initial} error={state.error} />
+        {state.saved && <p className="text-[13px] text-teal">{state.saved}</p>}
+        <ApplyButtons isStatic={isStatic} live={live} />
+      </SettingsRow>
+    </form>
+  );
+}
+
+function DeleteSubmit({ disabled, slug }: { disabled: boolean; slug: string }) {
+  const { pending } = useFormStatus();
+  return (
+    <Button type="submit" variant="danger" disabled={disabled || pending}>
+      {pending ? "Deleting…" : `Delete ${slug}`}
+    </Button>
   );
 }
 
 export function DeleteProject({ slug }: { slug: string }) {
   const [state, action] = useActionState(removeProject, {} as SettingsState);
+  const [open, setOpen] = useState(false);
   const [typed, setTyped] = useState("");
   return (
-    <Card className="grid gap-4 border-err/40 p-6">
-      <div className="grid gap-1">
-        <h2 className="text-[17px] font-bold tracking-tight">Delete project</h2>
-        <p className="text-[13px] text-muted">Stops the app and removes its user, files, unit and Caddy site from the server. Its data/ folder is archived on the server unless you tick the box.</p>
-      </div>
-      <form action={action} className="grid gap-3">
-        <input type="hidden" name="slug" value={slug} />
-        <Field label={`Type ${slug} to confirm`} htmlFor="confirm">
-          <Input id="confirm" name="confirm" value={typed} onChange={(e) => setTyped(e.target.value)} autoComplete="off" spellCheck={false} />
-        </Field>
-        <label className="flex items-center gap-2 text-[13px] text-muted">
-          <input name="deleteData" type="checkbox" /> Also delete data/ (no archive)
-        </label>
-        <FormError message={state.errors?.delete} />
-        <Button type="submit" disabled={typed !== slug} className="justify-self-end bg-err text-white hover:opacity-90">
-          Delete {slug}
+    <SettingsRow title="Delete project" description="Stops the app and removes its user, files, unit and Caddy site from the server. Its data/ folder is archived on the server unless you say otherwise.">
+      <div>
+        <Button type="button" variant="secondary" size="sm" className="border-rose/60 text-rose hover:bg-rose/10" onClick={() => setOpen(true)} data-testid="delete-project">
+          Delete {slug}…
         </Button>
-      </form>
-    </Card>
+      </div>
+      <Modal open={open} onClose={() => setOpen(false)} title={`Delete ${slug}`} description="This can't be undone">
+        <form action={action} className="grid gap-4 px-6 py-5">
+          <input type="hidden" name="slug" value={slug} />
+          <p className="text-[13.5px] text-muted">The app stops and its user, files, systemd unit and Caddy site are removed. Domains stop answering. Backups in your bucket are kept.</p>
+          <Field label={`Type ${slug} to confirm`} htmlFor="confirm">
+            <Input id="confirm" name="confirm" value={typed} onChange={(e) => setTyped(e.target.value)} autoComplete="off" spellCheck={false} autoFocus />
+          </Field>
+          <label className="flex items-center gap-2.5 text-[13.5px] text-muted">
+            <input name="deleteData" type="checkbox" className="size-4 accent-rose" /> Also delete data/ (no archive)
+          </label>
+          <FormError message={state.errors?.delete} />
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="secondary" onClick={() => setOpen(false)}>
+              Cancel
+            </Button>
+            <DeleteSubmit disabled={typed !== slug} slug={slug} />
+          </div>
+        </form>
+      </Modal>
+    </SettingsRow>
   );
 }

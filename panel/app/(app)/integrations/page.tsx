@@ -1,45 +1,54 @@
-import { CalendarClock, ChartColumn, Clock3, Link2, Mail, MessageSquareText, NotebookPen } from "lucide-react";
-import { PageBody, PageHeader, Section } from "@/components/page";
+import { Activity01Icon, Analytics01Icon, Calendar03Icon, Clock01Icon, Link01Icon, Mail01Icon, Message01Icon, PencilEdit01Icon } from "@hugeicons/core-free-icons";
+import { Icon } from "@/components/icon";
+import { Notice, PageHeader, TableHead, TableRow, TileIcon } from "@/components/page";
+import { Pill } from "@/components/ui";
 import { requireUser } from "@/lib/session";
 
 export const metadata = { title: "Integrations" };
 
 const APPS = [
-  { icon: ChartColumn, name: "Analytics", by: "Piqo", what: "Cookie-free web analytics for every project you deploy." },
-  { icon: Mail, name: "Email marketing", by: "maillayer", what: "Newsletters and campaigns, sent through your own SMTP or SES." },
-  { icon: CalendarClock, name: "Post scheduler", by: "postscheduler", what: "Schedule posts to X, LinkedIn and more." },
-  { icon: NotebookPen, name: "Blog", by: "blogcms", what: "A fast blog with an editor, on your own domain." },
-  { icon: Link2, name: "Link shortener", by: "Piqo links", what: "Short links with click stats on your domain." },
-  { icon: Clock3, name: "Waitlist", by: "Self Host Layer", what: "Collect sign-ups before launch, export any time." },
-  { icon: MessageSquareText, name: "Feedback board", by: "Self Host Layer", what: "Let users suggest and vote on features." },
-];
+  { icon: Analytics01Icon, tone: "lav", name: "Analytics", by: "Piqo", what: "Cookie-free web analytics for every project you deploy." },
+  { icon: Mail01Icon, tone: "coral", name: "Email marketing", by: "maillayer", what: "Newsletters and campaigns through your own SMTP or SES." },
+  { icon: Calendar03Icon, tone: "blue", name: "Post scheduler", by: "postscheduler", what: "Schedule posts to X, LinkedIn and Threads." },
+  { icon: PencilEdit01Icon, tone: "teal", name: "Blog", by: "blogcms", what: "A fast blog with an editor, on your own domain." },
+  { icon: Link01Icon, tone: "lav", name: "Link shortener", by: "Piqo links", what: "Short links with click stats on your domain." },
+  { icon: Activity01Icon, tone: "teal", name: "Status page", by: "Self Host Layer", what: "A public uptime page fed by your apps' health checks." },
+  { icon: Clock01Icon, tone: "gold", name: "Waitlist", by: "Self Host Layer", what: "Collect sign-ups before launch and export them any time." },
+  { icon: Message01Icon, tone: "coral", name: "Feedback board", by: "Self Host Layer", what: "Let users suggest and vote on features." },
+] as const;
 
 export default async function IntegrationsPage() {
   await requireUser();
+  const columns = "44px minmax(220px,1fr) 150px 130px";
   return (
     <>
-      <PageHeader title="Integrations" subtitle="Tools every product needs, installed on this server in one click" />
-      <PageBody>
-        <Section title="Coming soon" description="Each one runs like your own apps: sandboxed, backed up, on its own subdomain.">
-          <div className="grid gap-3 sm:grid-cols-2">
-            {APPS.map(({ icon: Icon, name, by, what }) => (
-              <div key={name} className="grid gap-3 rounded-2xl border border-border p-4">
-                <div className="flex items-center gap-3">
-                  <span className="grid size-10 place-items-center rounded-xl bg-subtle">
-                    <Icon className="size-5" aria-hidden />
-                  </span>
-                  <div className="grid min-w-0">
-                    <p className="text-[15px] font-bold">{name}</p>
-                    <p className="text-[13px] text-muted">{by}</p>
-                  </div>
-                  <span className="ml-auto rounded-full border border-border-strong px-2.5 py-0.5 text-[12px] font-bold text-muted">Soon</span>
-                </div>
-                <p className="text-[14px] text-muted">{what}</p>
-              </div>
-            ))}
-          </div>
-        </Section>
-      </PageBody>
+      <PageHeader title="Integrations" meta="Tools every product needs, one click" />
+      <Notice lead="Soon" tone="lav">
+        Each one will install like your own apps: sandboxed, backed up, on its own subdomain.
+      </Notice>
+      <section className="border-b border-border">
+        <TableHead columns={columns}>
+          <span />
+          <span>App</span>
+          <span>By</span>
+          <span />
+        </TableHead>
+        {APPS.map((a) => (
+          <TableRow key={a.name} columns={columns}>
+            <TileIcon tone={a.tone}>
+              <Icon icon={a.icon} size={20} />
+            </TileIcon>
+            <div className="grid min-w-0 flex-1 gap-px">
+              <span className="font-medium">{a.name}</span>
+              <span className="text-[12.5px] text-muted">{a.what}</span>
+            </div>
+            <span className="text-muted max-md:hidden">{a.by}</span>
+            <span className="justify-self-end max-md:ml-auto">
+              <Pill outline>Coming soon</Pill>
+            </span>
+          </TableRow>
+        ))}
+      </section>
     </>
   );
 }

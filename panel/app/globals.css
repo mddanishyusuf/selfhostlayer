@@ -1,62 +1,111 @@
 @import "tailwindcss";
 
-/* Design tokens. Neutral grays, one accent, status colors only for status.
-   Light and dark follow the system setting. */
+/* Design tokens: a warm near-black (or warm paper) with one set of accent
+   colors. The theme comes from <html data-theme="dark|light|system">, set
+   on the server from the layer-theme cookie, so pages never flash. */
 @theme inline {
-  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-albert-sans), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, monospace;
   --color-background: var(--background);
+  --color-sidebar: var(--sidebar);
   --color-foreground: var(--foreground);
   --color-muted: var(--muted);
-  --color-subtle: var(--subtle);
+  --color-dim: var(--dim);
+  --color-subtle: var(--hover);
   --color-hover: var(--hover);
+  --color-selected: var(--selected);
+  --color-pill: var(--pill);
+  --color-track: var(--track);
   --color-border: var(--border);
   --color-border-strong: var(--border-strong);
-  --color-accent: var(--accent);
+  --color-accent: var(--lavender);
   --color-inverse: var(--inverse);
   --color-inverse-fg: var(--inverse-fg);
-  --color-ok: var(--ok);
-  --color-warn: var(--warn);
-  --color-err: var(--err);
-  --color-err-subtle: var(--err-subtle);
+  --color-ok: var(--teal);
+  --color-warn: var(--gold);
+  --color-err: var(--rose);
+  --color-err-subtle: color-mix(in srgb, var(--rose) 12%, transparent);
+  --color-lavender: var(--lavender);
+  --color-coral: var(--coral);
+  --color-teal: var(--teal);
+  --color-blue: var(--blue);
+  --color-gold: var(--gold);
+  --color-rose: var(--rose);
+  --color-code: var(--code);
 }
 
-:root {
+:root,
+:root[data-theme="light"] {
   color-scheme: light;
-  --background: #ffffff;
-  --foreground: #0f1419;
-  --muted: #536471;
-  --subtle: #f7f9f9;
-  --hover: #eff3f4;
-  --border: #eff3f4;
-  --border-strong: #cfd9de;
-  --accent: #1d9bf0;
-  --inverse: #0f1419;
-  --inverse-fg: #ffffff;
-  --ok: #00ba7c;
-  --warn: #ffad1f;
-  --err: #f4212e;
-  --err-subtle: #fdeced;
+  --background: #faf8f5;
+  --sidebar: #f4f1ec;
+  --foreground: #1c1a19;
+  --muted: #6f6964;
+  --dim: #9a948e;
+  --border: #e7e2dc;
+  --border-strong: #d4ccc4;
+  --hover: #f1ede7;
+  --selected: #e9e3dc;
+  --pill: #ddd6ce;
+  --track: #e6e0d9;
+  --gold: #b7791f;
+  --lavender: #7a66e0;
+  --coral: #d4683a;
+  --teal: #2a9a88;
+  --blue: #3b72d6;
+  --rose: #d9483b;
+  --inverse: #1c1a19;
+  --inverse-fg: #faf8f5;
+  --code: #1c1a19;
 }
 
-/* "Lights out": true black, like X. */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --background: #1c1a19;
+  --sidebar: #191716;
+  --foreground: #ece8e3;
+  --muted: #9a948e;
+  --dim: #6f6964;
+  --border: #2e2a28;
+  --border-strong: #403b38;
+  --hover: #242120;
+  --selected: #35312f;
+  --pill: #4a4543;
+  --track: #3a3533;
+  --gold: #f2b35b;
+  --lavender: #b4a6f5;
+  --coral: #f0976b;
+  --teal: #7ccfc2;
+  --blue: #6c9ef0;
+  --rose: #f2777a;
+  --inverse: #ece8e3;
+  --inverse-fg: #1c1a19;
+  --code: #141211;
+}
+
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root[data-theme="system"] {
     color-scheme: dark;
-    --background: #000000;
-    --foreground: #e7e9ea;
-    --muted: #71767b;
-    --subtle: #16181c;
-    --hover: #181919;
-    --border: #2f3336;
-    --border-strong: #536471;
-    --accent: #1d9bf0;
-    --inverse: #eff3f4;
-    --inverse-fg: #0f1419;
-    --ok: #00ba7c;
-    --warn: #ffd400;
-    --err: #f4212e;
-    --err-subtle: #2c0e10;
+    --background: #1c1a19;
+    --sidebar: #191716;
+    --foreground: #ece8e3;
+    --muted: #9a948e;
+    --dim: #6f6964;
+    --border: #2e2a28;
+    --border-strong: #403b38;
+    --hover: #242120;
+    --selected: #35312f;
+    --pill: #4a4543;
+    --track: #3a3533;
+    --gold: #f2b35b;
+    --lavender: #b4a6f5;
+    --coral: #f0976b;
+    --teal: #7ccfc2;
+    --blue: #6c9ef0;
+    --rose: #f2777a;
+    --inverse: #ece8e3;
+    --inverse-fg: #1c1a19;
+    --code: #141211;
   }
 }
 
@@ -74,9 +123,47 @@ body {
 }
 
 ::selection {
-  background: color-mix(in srgb, var(--accent) 25%, transparent);
+  background: color-mix(in srgb, var(--lavender) 35%, transparent);
 }
 
 @keyframes shimmer {
   to { background-position: -200% 0; }
+}
+
+/* A soft ring that grows and fades: live and building states. */
+@keyframes pulse-ring {
+  to { box-shadow: 0 0 0 7px transparent; }
+}
+
+@keyframes ping {
+  75%, 100% { transform: scale(2.4); opacity: 0; }
+}
+
+/* A highlight sweeping along a row's top edge while it builds. */
+@keyframes sweep {
+  from { background-position: -50% 0; }
+  to { background-position: 150% 0; }
+}
+
+.sweep-top::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -1px;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--gold), transparent);
+  background-size: 40% 100%;
+  background-repeat: no-repeat;
+  animation: sweep 1.8s linear infinite;
+}
+
+/* Native select styled as a pill with a caret. */
+.select-pill {
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%), linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+  background-position: calc(100% - 15px) 50%, calc(100% - 11px) 50%;
+  background-size: 4px 4px;
+  background-repeat: no-repeat;
 }

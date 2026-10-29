@@ -4,7 +4,7 @@ import { useActionState, useEffect, useRef, useState } from "react";
 import { saveCronAction, type CronState } from "@/app/actions/crons";
 import { describeCron } from "@/lib/cron";
 import { SubmitButton } from "./form";
-import { Field, FormError, Input } from "./ui";
+import { Field, FormError, Input, cx } from "./ui";
 
 const PRESETS = [
   ["*/5 * * * *", "Every 5 minutes"],
@@ -28,30 +28,40 @@ export function CronForm({ slug, nodeVersion }: { slug: string; nodeVersion: str
       <div className="grid gap-4 sm:grid-cols-[1fr_1.4fr]">
         <Field label="Name" htmlFor="name" hint="Lowercase, e.g. sync-orders">
           <Input id="name" name="name" placeholder="sync-orders" autoComplete="off" spellCheck={false} />
-          {e.name && <p className="text-[13px] text-err">{e.name}</p>}
+          {e.name && <p className="text-[13px] text-rose">{e.name}</p>}
         </Field>
         <Field label="Schedule" htmlFor="schedule" hint={`${describeSafe(schedule)} · server time (UTC)`}>
           <Input id="schedule" name="schedule" value={schedule} onChange={(ev) => setSchedule(ev.target.value)} spellCheck={false} className="font-mono text-[13px]" />
-          {e.schedule && <p className="text-[13px] text-err">{e.schedule}</p>}
+          {e.schedule && <p className="text-[13px] text-rose">{e.schedule}</p>}
         </Field>
       </div>
       <div className="flex flex-wrap gap-1.5">
         {PRESETS.map(([value, label]) => (
-          <button key={value} type="button" onClick={() => setSchedule(value)} className="rounded-md border border-border px-2.5 py-1 text-[12px] text-muted transition-colors duration-150 hover:bg-hover hover:text-foreground">
+          <button
+            key={value}
+            type="button"
+            onClick={() => setSchedule(value)}
+            className={cx(
+              "h-7 rounded-full border px-3 text-[12.5px] font-medium transition-colors duration-150",
+              schedule === value ? "border-border-strong bg-selected text-foreground" : "border-border text-muted hover:bg-hover hover:text-foreground",
+            )}
+          >
             {label}
           </button>
         ))}
       </div>
       <Field label="Command" htmlFor="command" hint={`Runs in the live release as the app's user, with its env vars, on Node ${nodeVersion}.`}>
         <Input id="command" name="command" placeholder="node scripts/sync.js" spellCheck={false} className="font-mono text-[13px]" />
-        {e.command && <p className="text-[13px] text-err">{e.command}</p>}
+        {e.command && <p className="text-[13px] text-rose">{e.command}</p>}
       </Field>
       <input type="hidden" name="timeoutSec" value="3600" />
       <FormError message={e.form} />
-      {state.saved && <p className="text-[13px] text-ok">Saved {state.saved}. Its timer is running on the server.</p>}
-      <SubmitButton pending="Saving…" className="w-auto justify-self-end px-4">
-        Save cron job
-      </SubmitButton>
+      {state.saved && <p className="text-[13px] text-teal">Saved {state.saved}. Its timer is running on the server.</p>}
+      <div>
+        <SubmitButton pending="Saving…" className="w-auto">
+          Save job
+        </SubmitButton>
+      </div>
     </form>
   );
 }

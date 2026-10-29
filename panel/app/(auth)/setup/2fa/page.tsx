@@ -23,11 +23,11 @@ export default async function Setup2faPage() {
       <div className="mb-6 grid gap-4">
         {/* Black-on-white in both themes, so every phone camera reads it. */}
         <div className="mx-auto size-44 rounded-lg border border-border bg-white p-2 [&>svg]:size-full" dangerouslySetInnerHTML={{ __html: svg }} />
-        <div className="flex min-w-0 items-center justify-between gap-2 rounded-md border border-border bg-subtle py-1 pl-3 pr-1">
+        <div className="flex h-[38px] min-w-0 items-center justify-between gap-2 rounded-lg border border-border-strong pl-3 pr-1.5">
           <code className="min-w-0 truncate font-mono text-[12px] tracking-wide">{grouped}</code>
           <CopyButton text={secret} />
         </div>
-        <p className="text-center text-[12px] text-muted">Can't scan? Enter the key above in your app by hand.</p>
+        <p className="text-center text-[12.5px] text-dim">Can't scan? Enter the key above in your app by hand.</p>
       </div>
       <Setup2faForm />
     </>

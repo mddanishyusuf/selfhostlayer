@@ -4,10 +4,10 @@ import { backUpProjectAction } from "@/app/actions/backups";
 import { BackupList } from "@/components/backup-list";
 import { RefreshWhile } from "@/components/backups";
 import { SubmitButton } from "@/components/form";
+import { Notice, PageHeader } from "@/components/page";
 import { listBackups } from "@/lib/backup/runner";
 import { getBackupSettings } from "@/lib/backup/settings";
 import { getProjectBySlug } from "@/lib/projects";
-import { PageBody, PageHeader } from "@/components/page";
 import { requireUser } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
@@ -20,14 +20,14 @@ export default async function ProjectBackupsPage({ params }: { params: Promise<{
   const settings = getBackupSettings();
   const ready = !!settings?.keyConfirmed;
   const backups = listBackups({ slug: project.slug });
-  const running = backups.some((b) => b.status === "running");
 
   return (
     <>
-      <RefreshWhile active={running} />
+      <RefreshWhile active={backups.some((b) => b.status === "running")} />
       <PageHeader
-        title="Backups"
-        subtitle={project.slug}
+        title={project.slug}
+        crumb="Backups"
+        meta={ready ? `Daily at ${String(settings!.scheduleHour).padStart(2, "0")}:00 · keep ${settings!.keep}` : undefined}
         actions={
           ready && (
             <form action={backUpProjectAction}>
@@ -39,22 +39,22 @@ export default async function ProjectBackupsPage({ params }: { params: Promise<{
           )
         }
       />
-      <PageBody>
-        <p className="text-[13px] text-muted">
-          Everything in <code className="font-mono">DATA_DIR</code> ({`/srv/apps/${project.slug}/data`}): SQLite databases copied safely and checked, uploads, Redis data, and a dump of the app&apos;s Postgres.
-          {ready && ` Daily at ${String(settings!.scheduleHour).padStart(2, "0")}:00, keeping the last ${settings!.keep}.`}
-        </p>
-      {!ready && (
-        <p className="rounded-md border border-border px-5 py-4 text-[13px]">
+      {ready ? (
+        <Notice lead="Included" tone="lav">
+          everything in <code className="font-mono text-[13px]">/srv/apps/{project.slug}/data</code> (DATA_DIR): SQLite copied safely and checked, uploads, Redis data, and a dump of its Postgres.
+        </Notice>
+      ) : (
+        <Notice lead="Off">
           Backups aren&apos;t set up yet.{" "}
-          <Link href="/settings/backups" className="font-medium underline underline-offset-4">
+          <Link href="/settings/backups" className="text-lavender hover:underline">
             Connect a storage bucket
           </Link>{" "}
           to turn them on for every app.
-        </p>
+        </Notice>
       )}
-      <BackupList backups={backups} restorable empty={ready ? "No backups yet. The first one runs at the scheduled time, or press Back up now." : "No backups yet."} />
-      </PageBody>
+      <section className="border-b border-border">
+        <BackupList backups={backups} restorable empty={ready ? "No backups yet. The first one runs at the scheduled time, or press Back up now." : "No backups yet."} />
+      </section>
     </>
   );
 }

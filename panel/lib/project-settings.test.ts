@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseDotEnv, parseSettings, parseStartCommand } from "./project-settings";
+import { parseDotEnv, parseEnvVars, parseSettings, parseStartCommand } from "./project-settings";
 
 const form = (fields: Record<string, string>) => {
   const f = new FormData();
@@ -40,6 +40,20 @@ describe("parseSettings", () => {
   it("refuses multi-line env values and paths outside the project", () => {
     expect(parseSettings(form({ ...node, env: '{"A":"x\\ny"}' }))).toMatchObject({ ok: false, errors: { env: expect.stringContaining("single line") } });
     expect(parseSettings(form({ ...node, runtime: "static", outputDir: "../../etc" }))).toMatchObject({ ok: false, errors: { outputDir: expect.any(String) } });
+  });
+
+  it("leaves env out when the form has no env editor, so saving keeps the variables", () => {
+    const { env: _env, ...withoutEnv } = node;
+    const r = parseSettings(form(withoutEnv));
+    expect(r.ok && "env" in r.value).toBe(false);
+  });
+});
+
+describe("parseEnvVars", () => {
+  it("reads the editor's JSON and checks names", () => {
+    expect(parseEnvVars('{"API_KEY":"x"}')).toEqual({ ok: true, env: { API_KEY: "x" } });
+    expect(parseEnvVars('{"api-key":"x"}')).toMatchObject({ ok: false, error: expect.stringContaining("isn't a valid name") });
+    expect(parseEnvVars("[1]")).toMatchObject({ ok: false });
   });
 });
 

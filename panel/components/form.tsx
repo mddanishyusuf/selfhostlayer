@@ -9,17 +9,19 @@ export function SubmitButton({
   pending: pendingLabel,
   className,
   variant,
+  size,
 }: {
   children: React.ReactNode;
   pending: string;
   className?: string;
-  variant?: "primary" | "secondary";
+  variant?: "primary" | "secondary" | "ghost" | "danger";
+  size?: "sm" | "md";
 }) {
   const { pending } = useFormStatus();
   return (
     // Full width unless the caller sets a width (w-auto, w-32, …): both classes
     // at once would leave the winner to CSS order.
-    <Button type="submit" variant={variant} disabled={pending} className={cx(/(^|\s)w-/.test(className ?? "") ? "" : "w-full", className)}>
+    <Button type="submit" variant={variant} size={size} disabled={pending} className={cx(/(^|\s)w-/.test(className ?? "") ? "" : "w-full", className)}>
       {pending ? pendingLabel : children}
     </Button>
   );
@@ -87,7 +89,7 @@ export function CopyButton({ text, label = "Copy" }: { text: string; label?: str
         setCopied(true);
         setTimeout(() => setCopied(false), 1500);
       }}
-      className="rounded px-2 py-1 text-[12px] font-medium text-muted transition-colors duration-150 hover:bg-hover hover:text-foreground"
+      className="h-[26px] rounded-md px-2.5 text-[12px] font-medium text-muted transition-colors duration-150 hover:bg-hover hover:text-foreground"
     >
       {copied ? "Copied" : label}
     </button>

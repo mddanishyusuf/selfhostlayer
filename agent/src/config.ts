@@ -25,6 +25,8 @@ export interface Paths {
   restoreDir: string;
   /** Files in restoreDir must belong to this user (the panel's). null skips the check (tests). */
   panelUser: string | null;
+  /** ufw's config and rule files (firewall.status reads them). */
+  ufwDir: string;
   /** Where systemd keeps Persistent= timer stamps (stamp-<unit>.timer). */
   timerStampDir: string;
   /** Node with node:sqlite, for jobs the agent runs as app users. */
@@ -55,6 +57,7 @@ export const DEFAULT_PATHS: Paths = {
   panelUser: "layer",
   runtimeNode: "/opt/layer/runtime/bin/node",
   timerStampDir: "/var/lib/systemd/timers",
+  ufwDir: "/etc/ufw",
   appsGroup: "layer-apps",
   nodeDistBase: "https://nodejs.org/dist",
   portRange: { min: 4000, max: 4999 },

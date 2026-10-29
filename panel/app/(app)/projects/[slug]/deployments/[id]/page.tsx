@@ -1,12 +1,14 @@
+import { Undo02Icon } from "@hugeicons/core-free-icons";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { cancel } from "@/app/actions/projects";
+import { cancel, rollback } from "@/app/actions/projects";
 import { LogViewer } from "@/components/deploy";
 import { SubmitButton } from "@/components/form";
+import { Icon } from "@/components/icon";
+import { Notice, PageHeader } from "@/components/page";
 import { DeployStatusBadge, duration, timeAgo } from "@/components/status";
-import { PageBody, PageHeader } from "@/components/page";
-import { Card } from "@/components/ui";
-import { FINISHED, getDeployment } from "@/lib/deploy";
+import { StatusDot, cx } from "@/components/ui";
+import { FINISHED, getDeployment, liveDeployment } from "@/lib/deploy";
 import { getProject } from "@/lib/projects";
 import { requireUser } from "@/lib/session";
 
@@ -23,18 +25,18 @@ export default async function DeploymentPage({ params }: { params: Promise<{ slu
   const project = getProject(d.projectId);
   if (!project || project.slug !== slug) notFound();
   const done = FINISHED.includes(d.status);
+  const live = liveDeployment(project.id);
+  const total = d.steps.reduce((n, s) => n + (s.ms ?? 0), 0);
 
   return (
     <>
       <PageHeader
         back={`/projects/${project.slug}/deployments`}
-        title={d.commitMessage || `Commit ${d.sha.slice(0, 7)}`}
-        subtitle={
+        title={project.slug}
+        crumb={`Deployment #${d.id}`}
+        meta={
           <>
-            <Link href={`/projects/${project.slug}`} className="font-bold text-foreground underline-offset-4 hover:underline">
-              {project.slug}
-            </Link>{" "}
-            · #{d.id} · <code className="font-mono">{d.sha.slice(0, 7)}</code> · {d.trigger}
+            <code className="font-mono">{d.sha.slice(0, 7)}</code> · {d.trigger}
             {d.commitAuthor && ` · ${d.commitAuthor}`} · {timeAgo(d.createdAt)}
           </>
         }
@@ -44,35 +46,59 @@ export default async function DeploymentPage({ params }: { params: Promise<{ slu
             {!done && (
               <form action={cancel}>
                 <input type="hidden" name="deploymentId" value={d.id} />
-                <SubmitButton pending="Cancelling…" variant="secondary" className="h-8 w-auto px-3 text-[13px]">
+                <SubmitButton pending="Cancelling…" variant="secondary" className="w-auto">
                   Cancel
+                </SubmitButton>
+              </form>
+            )}
+            {d.status === "ready" && live?.id !== d.id && (
+              <form action={rollback}>
+                <input type="hidden" name="deploymentId" value={d.id} />
+                <SubmitButton pending="Starting…" variant="secondary" className="w-auto">
+                  <Icon icon={Undo02Icon} size={14} /> Roll back to this
                 </SubmitButton>
               </form>
             )}
           </>
         }
       />
-      <PageBody className="gap-6">
-
-      {d.error && (
-        <Card className="border-err/40 p-4 text-[13px] text-err">
-          {d.error} <span className="text-muted">The live version is unchanged.</span>
-        </Card>
+      {d.error ? (
+        <Notice lead="Failed" tone="err">
+          {d.error}. The live version is unchanged.
+        </Notice>
+      ) : (
+        <Notice lead={done ? (d.status === "ready" ? (live?.id === d.id ? "Live" : "Ready") : "Cancelled") : "Building"} tone={done ? (d.status === "ready" ? "ok" : "lav") : "gold"}>
+          {d.commitMessage || `Commit ${d.sha.slice(0, 7)}`}
+          {live?.id === d.id && (
+            <>
+              {" "}
+              · serving{" "}
+              <Link href={`/projects/${project.slug}`} className="text-lavender hover:underline">
+                {project.slug}
+              </Link>
+            </>
+          )}
+        </Notice>
       )}
-
       {d.steps.length > 0 && (
-        <ol className="flex flex-wrap gap-2">
-          {d.steps.map((s, i) => (
-            <li key={i} className="inline-flex items-center gap-2 rounded-full border border-border px-3 py-1.5 text-[13px]">
-              <span className="font-medium">{STEP_LABEL[s.name]}</span>
-              <span className="text-muted tabular-nums">{s.ms === null && done ? "-" : duration(s.ms)}</span>
-            </li>
-          ))}
-        </ol>
+        <div className="grid grid-cols-2 border-b border-border lg:grid-cols-5">
+          {d.steps.map((s, i) => {
+            const running = !done && s.ms === null && (i === 0 || d.steps[i - 1]!.ms !== null);
+            return (
+              <div key={i} className="grid gap-1.5 border-b border-r border-border px-4 py-3.5 even:border-r-0 sm:px-7 lg:border-b-0 lg:even:border-r lg:last:border-r-0">
+                <span className="flex items-center gap-2 text-[13px] text-muted">
+                  <StatusDot status={s.ms !== null ? "ok" : running ? "warn" : "idle"} pulse={running} /> {STEP_LABEL[s.name]}
+                </span>
+                <span className="text-[17px] font-semibold tabular-nums">{s.ms === null ? (running ? "…" : "—") : duration(s.ms)}</span>
+                <div className="h-1.5 overflow-hidden rounded bg-track">
+                  <div className={cx("h-full rounded", s.name === "build" ? "bg-lavender" : "bg-foreground")} style={{ width: `${total && s.ms ? Math.max(2, (s.ms / total) * 100) : 0}%` }} />
+                </div>
+              </div>
+            );
+          })}
+        </div>
       )}
-
       <LogViewer deploymentId={d.id} initialStatus={d.status} />
-      </PageBody>
     </>
   );
 }

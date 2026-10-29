@@ -24,6 +24,7 @@ const base: NextConfig = {
 // `next dev` gets its own folder: release builds (`next build`) rewrite .next,
 // and a dev server sharing it ends up with a stale cache and makes the browser
 // reload in a loop ("HMR hash mismatch").
+// LAYER_DEV_DIST lets a second dev server (scripts/preview.ts) run next to it.
 export default function config(phase: string): NextConfig {
-  return { ...base, distDir: phase === PHASE_DEVELOPMENT_SERVER ? ".next-dev" : ".next" };
+  return { ...base, distDir: phase === PHASE_DEVELOPMENT_SERVER ? (process.env.LAYER_DEV_DIST ?? ".next-dev") : ".next" };
 }

@@ -1,9 +1,10 @@
-import { FolderGit2 } from "lucide-react";
+import { GithubIcon } from "@hugeicons/core-free-icons";
 import Link from "next/link";
 import { PublicRepoForm } from "@/components/deploy";
 import { RepoSearch } from "@/components/github-connect";
-import { PageBody, PageHeader } from "@/components/page";
-import { Card, FormError } from "@/components/ui";
+import { Icon } from "@/components/icon";
+import { Empty, PageHeader, PillLink, SettingsRow } from "@/components/page";
+import { FormError } from "@/components/ui";
 import { GITHUB_WEB, listInstallationRepos } from "@/lib/github";
 import { getApp, listInstallations } from "@/lib/github-store";
 import { requireUser } from "@/lib/session";
@@ -18,22 +19,17 @@ export default async function NewProjectPage({ searchParams }: { searchParams: P
   if (!app) {
     return (
       <>
-        <PageHeader title="New project" back="/" />
-        <PageBody>
-          <p className="text-[13px] text-muted">Connect GitHub for your private repositories and deploy on push, or deploy any public repository now.</p>
-        <Card className="flex flex-wrap items-center justify-between gap-4 p-5">
-          <div className="grid gap-0.5">
-            <p className="font-medium">Your repositories</p>
-            <p className="text-[13px] text-muted">Creates a private GitHub App owned by you.</p>
+        <PageHeader title="New project" back="/" meta="Deploy a repository on this server" />
+        <SettingsRow title="Your repositories" description="Creates a private GitHub App owned by you: private repositories, deploys on every push, commit statuses.">
+          <div>
+            <PillLink href="/github/connect" primary>
+              <Icon icon={GithubIcon} size={16} /> Connect GitHub
+            </PillLink>
           </div>
-          <Link href="/github/connect" className="inline-flex h-9 items-center rounded-full bg-inverse px-4 text-sm font-bold text-inverse-fg transition-opacity duration-150 hover:opacity-90">
-            Connect GitHub
-          </Link>
-        </Card>
-        <Card className="p-5">
+        </SettingsRow>
+        <SettingsRow title="Public repository" description="Any public repository by URL. For a monorepo, give the folder to deploy.">
           <PublicRepoForm />
-        </Card>
-        </PageBody>
+        </SettingsRow>
       </>
     );
   }
@@ -48,45 +44,60 @@ export default async function NewProjectPage({ searchParams }: { searchParams: P
     loadError = "Couldn't load repositories from GitHub. Check that the app is still installed, then reload.";
   }
   repos.sort((a, b) => (b.pushed_at ?? "").localeCompare(a.pushed_at ?? ""));
+  const message = error === "installation" ? "GitHub didn't confirm that installation. Try installing the app again." : loadError;
 
   return (
     <>
       <PageHeader
         title="New project"
-        subtitle="Pick a repository to deploy on this server"
         back="/"
+        meta="Pick a repository to deploy on this server"
         actions={
-          <a href={installUrl} className="hidden text-[13px] text-accent hover:underline sm:inline">
+          <a href={installUrl} className="text-[13px] text-lavender hover:underline">
             Adjust GitHub access
           </a>
         }
       />
-      <PageBody>
-      <FormError message={error === "installation" ? "GitHub didn't confirm that installation. Try installing the app again." : loadError} />
+      {message && (
+        <div className="border-b border-border px-4 py-4 sm:px-7">
+          <FormError message={message} />
+        </div>
+      )}
       {installs.length === 0 ? (
-        <Card className="grid place-items-center gap-4 border-dashed px-6 py-14 text-center">
-          <FolderGit2 className="size-6 text-muted" aria-hidden />
-          <div className="grid gap-1">
-            <p className="font-medium">Install the app on your repositories</p>
-            <p className="text-muted">The GitHub App exists, but it can't see any repositories yet.</p>
-          </div>
-          <a href={installUrl} className="inline-flex h-9 items-center rounded-full bg-inverse px-4 text-sm font-bold text-inverse-fg transition-opacity duration-150 hover:opacity-90">
-            Install on GitHub
-          </a>
-        </Card>
+        <section className="border-b border-border">
+          <Empty
+            action={
+              <PillLink href={installUrl} external primary>
+                Install on GitHub
+              </PillLink>
+            }
+          >
+            <p className="text-[15px] font-semibold text-foreground">Install the app on your repositories</p>
+            <p>The GitHub App exists, but it can&apos;t see any repositories yet.</p>
+          </Empty>
+        </section>
       ) : (
         <RepoSearch repos={repos.map((r) => ({ fullName: r.full_name, private: r.private, pushedAt: r.pushed_at, branch: r.default_branch, installationId: r.installationId }))} />
       )}
-      <details className="rounded-2xl border border-border">
-        <summary className="cursor-pointer px-5 py-3.5 text-[13px] font-medium">Deploy a public repository or a monorepo folder</summary>
-        <div className="border-t border-border p-5">
-          <PublicRepoForm />
+      <details className="group border-b border-border">
+        <summary className="flex h-[52px] cursor-pointer list-none items-center gap-2 px-4 text-[14px] font-medium text-muted transition-colors hover:bg-hover hover:text-foreground sm:px-7">
+          <span className="w-3 text-dim group-open:hidden">+</span>
+          <span className="hidden w-3 text-dim group-open:inline">−</span>
+          Deploy a public repository or a monorepo folder
+        </summary>
+        <div className="px-4 pb-6 pt-2 sm:px-7">
+          <div className="max-w-[680px]">
+            <PublicRepoForm />
+          </div>
         </div>
       </details>
-      <p className="text-[12px] text-muted">
-        Connected through <Link href="/github/connect" className="underline-offset-4 hover:underline">{app.name}</Link>.
+      <p className="px-4 py-4 text-[12.5px] text-dim sm:px-7">
+        Connected through{" "}
+        <Link href="/github/connect" className="text-muted hover:text-foreground hover:underline">
+          {app.name}
+        </Link>
+        .
       </p>
-      </PageBody>
     </>
   );
 }

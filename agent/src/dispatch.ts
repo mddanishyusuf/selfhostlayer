@@ -3,6 +3,7 @@ import { appActions } from "./actions/app.ts";
 import { buildActions } from "./actions/build.ts";
 import { backupActions } from "./actions/backup.ts";
 import { cronActions } from "./actions/cron.ts";
+import { firewallActions } from "./actions/firewall.ts";
 import { serviceActions } from "./actions/service.ts";
 import { envActions } from "./actions/env.ts";
 import { logsActions } from "./actions/logs.ts";
@@ -33,6 +34,7 @@ export const ACTION_TABLE: ActionTable = {
   ...cronActions,
   ...backupActions,
   ...serviceActions,
+  ...firewallActions,
 };
 
 export const MAX_LINE_BYTES = 1024 * 1024;

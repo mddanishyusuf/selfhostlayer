@@ -1,29 +1,32 @@
 "use client";
 
+import { Add01Icon } from "@hugeicons/core-free-icons";
 import { useActionState, useState } from "react";
+import { useFormStatus } from "react-dom";
 import { addPostgresAction, addRedisAction, removePostgresAction, removeRedisAction, type ServiceState } from "@/app/actions/services";
 import { CopyButton, SubmitButton } from "./form";
-import { Button, Field, FormError, Input } from "./ui";
+import { Icon } from "./icon";
+import { Modal } from "./modal";
+import { Button, Field, FormError, Input, Select } from "./ui";
 
 export function AddRedisForm({ slug, installed }: { slug: string; installed: boolean }) {
   const [state, action] = useActionState(addRedisAction, {} as ServiceState);
-  if (state.ok) return <p className="text-[13px] text-ok">{state.ok}</p>;
+  if (state.ok) return <p className="text-[13px] text-teal">{state.ok}</p>;
   return (
-    <form action={action} className="flex flex-wrap items-end gap-3">
+    <form action={action} className="grid gap-3">
       <input type="hidden" name="slug" value={slug} />
-      <label className="grid gap-1.5 text-[13px] font-medium">
-        Memory
-        <select name="memoryMb" defaultValue="64" className="h-9 rounded-md border border-border bg-background px-2 text-sm tabular-nums">
+      <div className="flex flex-wrap items-center gap-2">
+        <Select name="memoryMb" defaultValue="64" aria-label="Memory" className="w-[120px] tabular-nums">
           {[32, 64, 128, 256, 512].map((mb) => (
             <option key={mb} value={mb}>
               {mb} MB
             </option>
           ))}
-        </select>
-      </label>
-      <SubmitButton pending={installed ? "Starting Redis…" : "Installing Redis…"} className="w-auto">
-        Add Redis
-      </SubmitButton>
+        </Select>
+        <SubmitButton pending={installed ? "Starting Redis…" : "Installing Redis…"} className="w-auto">
+          <Icon icon={Add01Icon} size={15} strokeWidth={2} /> Add Redis
+        </SubmitButton>
+      </div>
       <FormError message={state.error} />
     </form>
   );
@@ -34,12 +37,12 @@ export function SecretUrl({ url }: { url: string }) {
   const [shown, setShown] = useState(false);
   const masked = url.replace(/:\/\/([^:]*):([^@]+)@/, (_m, user) => `://${user}:••••••••@`);
   return (
-    <div className="flex items-center justify-between gap-2 rounded-md border border-border bg-subtle px-3 py-2">
-      <code className="min-w-0 truncate font-mono text-[12px]" data-testid="secret-url">
+    <div className="flex h-[38px] min-w-0 items-center justify-between gap-2 rounded-lg border border-border-strong pl-3 pr-1.5">
+      <code className="min-w-0 truncate font-mono text-[12.5px]" data-testid="secret-url">
         {shown ? url : masked}
       </code>
-      <span className="flex shrink-0 items-center">
-        <button type="button" onClick={() => setShown((s) => !s)} className="rounded px-2 py-1 text-[12px] font-medium text-muted transition-colors duration-150 hover:bg-hover hover:text-foreground">
+      <span className="flex shrink-0 items-center gap-1">
+        <button type="button" onClick={() => setShown((s) => !s)} className="h-[26px] rounded-md px-2 text-[12px] font-medium text-muted transition-colors duration-150 hover:bg-hover hover:text-foreground">
           {shown ? "Hide" : "Reveal"}
         </button>
         <CopyButton text={url} />
@@ -50,13 +53,15 @@ export function SecretUrl({ url }: { url: string }) {
 
 export function AddPostgresForm({ slug, installed }: { slug: string; installed: boolean }) {
   const [state, action] = useActionState(addPostgresAction, {} as ServiceState);
-  if (state.ok) return <p className="text-[13px] text-ok">{state.ok}</p>;
+  if (state.ok) return <p className="text-[13px] text-teal">{state.ok}</p>;
   return (
-    <form action={action} className="flex flex-wrap items-center gap-3">
+    <form action={action} className="grid gap-3">
       <input type="hidden" name="slug" value={slug} />
-      <SubmitButton pending={installed ? "Creating the database…" : "Installing PostgreSQL…"} className="w-auto">
-        Add Postgres
-      </SubmitButton>
+      <div>
+        <SubmitButton pending={installed ? "Creating the database…" : "Installing PostgreSQL…"} className="w-auto">
+          <Icon icon={Add01Icon} size={15} strokeWidth={2} /> Add Postgres
+        </SubmitButton>
+      </div>
       <FormError message={state.error} />
     </form>
   );
@@ -80,38 +85,45 @@ export function RemovePostgresForm({ slug }: { slug: string }) {
   return <RemoveServiceForm slug={slug} kind="postgres" />;
 }
 
+function RemoveSubmit({ disabled, label }: { disabled: boolean; label: string }) {
+  const { pending } = useFormStatus();
+  return (
+    <Button type="submit" variant="danger" disabled={disabled || pending}>
+      {pending ? "Removing…" : `Remove ${label}`}
+    </Button>
+  );
+}
+
 function RemoveServiceForm({ slug, kind }: { slug: string; kind: keyof typeof REMOVE }) {
   const r = REMOVE[kind];
   const [open, setOpen] = useState(false);
   const [typed, setTyped] = useState("");
   const [state, action] = useActionState(r.action, {} as ServiceState);
   if (state.ok) return <p className="text-[13px] text-muted">{state.ok}</p>;
-  if (!open) {
-    return (
-      <Button type="button" variant="ghost" className="h-8 px-3 text-[13px]" onClick={() => setOpen(true)}>
-        Remove {r.label}
-      </Button>
-    );
-  }
   return (
-    <form action={action} className="grid gap-3 rounded-md border border-border p-3">
-      <input type="hidden" name="slug" value={slug} />
-      <p className="text-[13px] text-muted">{r.what}</p>
-      <label className="flex items-center gap-2 text-[13px]">
-        <input type="checkbox" name="deleteData" className="size-4 accent-foreground" /> {r.data}
-      </label>
-      <Field label={`Type ${slug} to confirm`} htmlFor={`confirm-${kind}`}>
-        <Input id={`confirm-${kind}`} name="confirm" value={typed} onChange={(e) => setTyped(e.target.value)} autoComplete="off" spellCheck={false} />
-      </Field>
-      <FormError message={state.error} />
-      <div className="flex justify-end gap-2">
-        <Button type="button" variant="ghost" className="h-8 px-3 text-[13px]" onClick={() => setOpen(false)}>
-          Cancel
-        </Button>
-        <Button type="submit" disabled={typed !== slug} className="h-8 bg-err px-3 text-[13px] text-white">
-          Remove
-        </Button>
-      </div>
-    </form>
+    <div>
+      <Button type="button" variant="ghost" size="sm" className="-ml-3" onClick={() => setOpen(true)}>
+        Remove {r.label}…
+      </Button>
+      <Modal open={open} onClose={() => setOpen(false)} title={`Remove ${r.label}`} description={slug}>
+        <form action={action} className="grid gap-4 px-6 py-5">
+          <input type="hidden" name="slug" value={slug} />
+          <p className="text-[13.5px] text-muted">{r.what}</p>
+          <label className="flex items-center gap-2.5 text-[13.5px] text-muted">
+            <input type="checkbox" name="deleteData" className="size-4 accent-rose" /> {r.data}
+          </label>
+          <Field label={`Type ${slug} to confirm`} htmlFor={`confirm-${kind}`}>
+            <Input id={`confirm-${kind}`} name="confirm" value={typed} onChange={(e) => setTyped(e.target.value)} autoComplete="off" spellCheck={false} autoFocus />
+          </Field>
+          <FormError message={state.error} />
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="secondary" onClick={() => setOpen(false)}>
+              Cancel
+            </Button>
+            <RemoveSubmit disabled={typed !== slug} label={r.label} />
+          </div>
+        </form>
+      </Modal>
+    </div>
   );
 }

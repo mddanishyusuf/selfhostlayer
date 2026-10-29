@@ -37,6 +37,7 @@ export const ACTIONS = [
   "redis.remove",
   "postgres.add",
   "postgres.remove",
+  "firewall.status",
   "proxy.set",
   "static.publish",
   "logs.tail",

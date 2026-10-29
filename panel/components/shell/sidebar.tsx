@@ -1,225 +1,283 @@
 "use client";
 
 import {
-  ArrowLeft,
-  ArrowUpRight,
-  Bell,
-  Blocks,
-  ChartColumn,
-  Clock,
-  Database,
-  DatabaseBackup,
-  Globe,
-  LayoutGrid,
-  LogOut,
-  Menu,
-  Plus,
-  Rocket,
-  Settings,
-  Shield,
-  SquareTerminal,
-  X,
-  type LucideIcon,
-} from "lucide-react";
+  Analytics01Icon,
+  ArrowLeft01Icon,
+  ArrowUpRight01Icon,
+  Clock01Icon,
+  CommandLineIcon,
+  ComputerIcon,
+  DashboardSquare01Icon,
+  Database01Icon,
+  DatabaseRestoreIcon,
+  FolderLibraryIcon,
+  Globe02Icon,
+  Key01Icon,
+  Layers01Icon,
+  Logout01Icon,
+  Menu01Icon,
+  Moon02Icon,
+  Notification01Icon,
+  PuzzleIcon,
+  Rocket01Icon,
+  Search01Icon,
+  Settings01Icon,
+  Shield01Icon,
+  Sun03Icon,
+  UnfoldMoreIcon,
+} from "@hugeicons/core-free-icons";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { logout } from "@/app/actions/auth";
-import { Logo, StatusDot, cx } from "../ui";
+import { THEME_COOKIE, type Theme } from "@/lib/theme";
+import { Icon, type IconSvgElement } from "../icon";
+import { StatusDot, cx } from "../ui";
+import { openPalette } from "./palette";
+import { openServerModal } from "./server-modal";
 
 export interface SidebarProject {
   slug: string;
   repo: string;
+  branch: string;
   status: "ok" | "warn" | "err" | "idle";
   isStatic: boolean;
   url: string | null;
 }
 
+export interface SidebarProps {
+  projects: SidebarProject[];
+  domainCount: number;
+  deploying: boolean;
+  openIncidents: number;
+  email: string;
+  server: { name: string; spec: string; host: string };
+  theme: Theme;
+}
+
 interface Item {
   href: string;
   label: string;
-  icon: LucideIcon;
-  /** Active on this exact path only (otherwise also on sub-paths). */
+  icon: IconSvgElement;
   exact?: boolean;
+  count?: number;
   dot?: boolean;
   external?: boolean;
 }
 
-function globalItems(openIncidents: number): Item[][] {
+function globalNav(p: SidebarProps): Item[][] {
   return [
     [
-      { href: "/", label: "Projects", icon: LayoutGrid, exact: true },
-      { href: "/deployments", label: "Deployments", icon: Rocket },
-      { href: "/analytics", label: "Analytics", icon: ChartColumn },
-      { href: "/firewall", label: "Firewall", icon: Shield },
-      { href: "/domains", label: "Domains", icon: Globe },
-      { href: "/integrations", label: "Integrations", icon: Blocks },
-      { href: "/databases", label: "Databases", icon: Database },
+      { href: "/", label: "Projects", icon: FolderLibraryIcon, exact: true, count: p.projects.length },
+      { href: "/deployments", label: "Deployments", icon: Rocket01Icon, dot: p.deploying },
+      { href: "/analytics", label: "Analytics", icon: Analytics01Icon },
+      { href: "/firewall", label: "Firewall", icon: Shield01Icon },
+      { href: "/domains", label: "Domains", icon: Globe02Icon, count: p.domainCount },
+      { href: "/integrations", label: "Integrations", icon: PuzzleIcon },
+      { href: "/databases", label: "Databases", icon: Database01Icon },
     ],
     [
-      { href: "/settings/backups", label: "Backups", icon: DatabaseBackup },
-      { href: "/settings/alerts", label: "Alerts", icon: Bell, dot: openIncidents > 0 },
+      { href: "/settings/backups", label: "Backups", icon: DatabaseRestoreIcon },
+      { href: "/settings/alerts", label: "Alerts", icon: Notification01Icon, dot: p.openIncidents > 0 },
+      { href: "/settings", label: "Settings", icon: Settings01Icon, exact: true },
     ],
   ];
 }
 
-function projectItems(p: SidebarProject): Item[][] {
+function projectNav(p: SidebarProject): Item[][] {
   const base = `/projects/${p.slug}`;
   return [
     [
-      { href: base, label: "Overview", icon: LayoutGrid, exact: true },
-      { href: `${base}/deployments`, label: "Deployments", icon: Rocket },
-      { href: `${base}/domains`, label: "Domains", icon: Globe },
+      { href: base, label: "Overview", icon: DashboardSquare01Icon, exact: true },
+      { href: `${base}/deployments`, label: "Deployments", icon: Rocket01Icon },
+      ...(p.isStatic ? [] : [{ href: `${base}/logs`, label: "Logs", icon: CommandLineIcon }]),
+      { href: `${base}/domains`, label: "Domains", icon: Globe02Icon },
       ...(p.isStatic
         ? []
         : [
-            { href: `${base}/databases`, label: "Databases", icon: Database },
-            { href: `${base}/backups`, label: "Backups", icon: DatabaseBackup },
+            { href: `${base}/databases`, label: "Databases", icon: Database01Icon },
+            { href: `${base}/backups`, label: "Backups", icon: DatabaseRestoreIcon },
+            { href: `${base}/crons`, label: "Cron jobs", icon: Clock01Icon },
           ]),
-      { href: `${base}/crons`, label: "Cron jobs", icon: Clock },
-      { href: `${base}/settings`, label: "Settings", icon: Settings },
+      { href: `${base}/env`, label: "Environment", icon: Key01Icon },
+      { href: `${base}/settings`, label: "Settings", icon: Settings01Icon },
     ],
-    p.url ? [{ href: p.url, label: "Visit site", icon: ArrowUpRight, external: true }] : [],
+    p.url ? [{ href: p.url, label: "Visit site", icon: ArrowUpRight01Icon, external: true }] : [],
   ];
 }
 
-function NavItem({ item, active, onNavigate }: { item: Item; active: boolean; onNavigate?: () => void }) {
-  const Icon = item.icon;
-  const inner = (
-    <span
-      className={cx(
-        "inline-flex items-center gap-4 rounded-full py-2.5 pl-3 pr-3 text-[16px] transition-colors duration-150 group-hover:bg-hover md:max-lg:pr-3 lg:pr-5",
-        active ? "font-bold" : "font-normal",
-      )}
-    >
-      <span className="relative">
-        <Icon className="size-[22px]" strokeWidth={active ? 2.6 : 1.9} aria-hidden />
-        {item.dot && <span className="absolute -right-0.5 -top-0.5 size-2 rounded-full bg-accent ring-2 ring-background" aria-label="open incidents" />}
-      </span>
-      <span className="md:max-lg:sr-only">{item.label}</span>
-    </span>
-  );
-  const props = { title: item.label, className: "group flex outline-none focus-visible:[&>span]:ring-2 focus-visible:[&>span]:ring-accent/50 md:max-lg:justify-center", onClick: onNavigate };
-  return item.external ? (
-    <a href={item.href} target="_blank" rel="noreferrer" {...props}>
-      {inner}
-    </a>
-  ) : (
-    <Link href={item.href} aria-current={active ? "page" : undefined} {...props}>
-      {inner}
-    </Link>
-  );
-}
-
-function isActive(item: Item, pathname: string): boolean {
+function active(item: Item, pathname: string): boolean {
   if (item.external) return false;
   if (item.exact) return pathname === item.href;
   return pathname === item.href || pathname.startsWith(`${item.href}/`);
 }
 
-function Nav({ projects, openIncidents, email, server, onNavigate }: SidebarProps & { onNavigate?: () => void }) {
+function ThemeSwitch({ initial }: { initial: Theme }) {
+  const [theme, setTheme] = useState(initial);
+  const pick = (t: Theme) => {
+    setTheme(t);
+    document.documentElement.dataset.theme = t;
+    document.cookie = `${THEME_COOKIE}=${t}; path=/; max-age=31536000; samesite=lax`;
+  };
+  const options: [Theme, IconSvgElement, string][] = [
+    ["dark", Moon02Icon, "Dark"],
+    ["light", Sun03Icon, "Light"],
+    ["system", ComputerIcon, "System"],
+  ];
+  return (
+    <div className="flex gap-0.5 rounded-lg border border-border p-0.5" role="radiogroup" aria-label="Theme">
+      {options.map(([t, icon, label]) => (
+        <button
+          key={t}
+          type="button"
+          role="radio"
+          aria-checked={theme === t}
+          title={label}
+          onClick={() => pick(t)}
+          className={cx("grid h-6 w-[26px] place-items-center rounded-md transition-colors", theme === t ? "bg-selected text-foreground" : "text-dim hover:text-foreground")}
+        >
+          <Icon icon={icon} size={14} />
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function Nav(props: SidebarProps & { onNavigate?: () => void }) {
   const pathname = usePathname();
   const slug = /^\/projects\/([^/]+)/.exec(pathname)?.[1];
-  const project = projects.find((p) => p.slug === slug);
-  const groups = project ? projectItems(project) : globalItems(openIncidents);
+  const project = props.projects.find((p) => p.slug === slug);
+  const groups = project ? projectNav(project) : globalNav(props);
 
   return (
-    <div className="flex h-full flex-col gap-1 px-2 py-2 lg:px-3">
-      <Link href="/" onClick={onNavigate} aria-label="Self Host Layer" className="mb-1 inline-flex w-fit rounded-full p-2.5 transition-colors duration-150 hover:bg-hover md:max-lg:self-center">
-        <Logo withName={false} />
-      </Link>
+    <div className="flex h-full flex-col bg-sidebar">
+      <div className="flex h-[60px] shrink-0 items-center gap-2.5 border-b border-border px-4">
+        <Link href="/" onClick={props.onNavigate} aria-label="Projects" className="grid size-[30px] shrink-0 place-items-center rounded-lg bg-foreground text-background">
+          <Icon icon={Layers01Icon} size={17} strokeWidth={2} />
+        </Link>
+        <button type="button" onClick={openServerModal} title="Server status" className="grid min-w-0 flex-1 text-left leading-tight">
+          <b className="truncate text-sm font-semibold">{props.server.name}</b>
+          <span className="truncate text-[12px] text-muted">{props.server.spec}</span>
+        </button>
+        <span className="grid size-8 place-items-center text-dim" title="One server (multi-server comes later)">
+          <Icon icon={UnfoldMoreIcon} size={16} />
+        </span>
+      </div>
+
+      <button
+        type="button"
+        onClick={() => {
+          props.onNavigate?.();
+          openPalette();
+        }}
+        className="mx-3 mb-1 mt-3 flex h-9 items-center gap-2.5 rounded-lg border border-border px-2.5 text-left text-dim transition-colors hover:border-border-strong hover:text-muted"
+      >
+        <Icon icon={Search01Icon} size={16} />
+        <span>Search</span>
+        <kbd className="ml-auto rounded-[5px] border border-border px-1.5 font-mono text-[11px] text-dim">⌘K</kbd>
+      </button>
 
       {project && (
-        <div className="mb-2 grid gap-2 md:max-lg:justify-items-center">
-          <Link href="/" onClick={onNavigate} title="All projects" className="inline-flex w-fit items-center gap-2 rounded-full px-3 py-1.5 text-[13px] text-muted transition-colors duration-150 hover:bg-hover hover:text-foreground">
-            <ArrowLeft className="size-4" aria-hidden /> <span className="md:max-lg:sr-only">All projects</span>
+        <>
+          <Link href="/" onClick={props.onNavigate} className="mt-1.5 flex h-10 items-center gap-2 border-y border-border px-5 text-[13px] text-muted transition-colors hover:bg-hover hover:text-foreground">
+            <Icon icon={ArrowLeft01Icon} size={15} /> All projects
           </Link>
-          <div className="grid gap-0.5 px-3 md:max-lg:hidden">
-            <p className="flex items-center gap-2 truncate text-[17px] font-bold">
-              <StatusDot status={project.status} /> {project.slug}
-            </p>
-            <p className="truncate text-[13px] text-muted">{project.repo}</p>
+          <div className="grid gap-1 border-b border-border px-5 py-4">
+            <b className="flex items-center gap-2 text-base font-bold">
+              <StatusDot status={project.status} pulse={project.status === "warn"} /> {project.slug}
+            </b>
+            <span className="truncate text-[12.5px] text-muted">
+              {project.repo} · {project.branch}
+            </span>
           </div>
-        </div>
+        </>
       )}
 
-      <nav className="grid gap-0.5" aria-label={project ? `${project.slug} navigation` : "Main navigation"}>
-        {groups.map((group, i) => (
-          <div key={i} className={cx("grid gap-0.5", i > 0 && group.length > 0 && "mt-2 border-t border-border pt-2")}>
-            {group.map((item) => (
-              <NavItem key={item.href} item={item} active={isActive(item, pathname)} onNavigate={onNavigate} />
-            ))}
-          </div>
-        ))}
+      <nav className="flex-1 overflow-auto pb-3 pt-1.5" aria-label={project ? `${project.slug} navigation` : "Main navigation"}>
+        {groups.map((group, gi) =>
+          group.length === 0 ? null : (
+            <div key={gi}>
+              {gi > 0 && (project ? <div className="my-2 h-px bg-border" /> : <p className="px-5 pb-1.5 pt-[18px] text-[12px] font-medium text-dim">Server</p>)}
+              {group.map((item) => {
+                const on = active(item, pathname);
+                const cls = cx(
+                  "relative flex h-[38px] items-center gap-3 px-5 text-sm transition-colors duration-150",
+                  on ? "bg-selected font-semibold text-foreground before:absolute before:inset-y-0 before:left-0 before:w-[3px] before:bg-foreground" : "text-muted hover:bg-hover hover:text-foreground",
+                );
+                const inner = (
+                  <>
+                    <Icon icon={item.icon} size={18} />
+                    {item.label}
+                    {item.count !== undefined && <span className="ml-auto text-[12px] tabular-nums text-dim">{item.count}</span>}
+                    {item.dot && <span className="ml-auto size-[7px] rounded-full bg-gold" aria-label="needs attention" />}
+                  </>
+                );
+                return item.external ? (
+                  <a key={item.href} href={item.href} target="_blank" rel="noreferrer" className={cls}>
+                    {inner}
+                  </a>
+                ) : (
+                  <Link key={item.href} href={item.href} onClick={props.onNavigate} aria-current={on ? "page" : undefined} className={cls}>
+                    {inner}
+                  </Link>
+                );
+              })}
+            </div>
+          ),
+        )}
       </nav>
 
-      {!project && (
-        <Link
-          href="/new"
-          onClick={onNavigate}
-          className="mt-4 inline-flex h-[50px] items-center justify-center gap-2 rounded-full bg-inverse text-[16px] font-bold text-inverse-fg transition-opacity duration-150 hover:opacity-90 md:max-lg:size-[50px] md:max-lg:self-center lg:w-full"
-          title="New project"
-        >
-          <Plus className="size-5 lg:hidden" aria-hidden />
-          <span className="md:max-lg:sr-only">New project</span>
-        </Link>
-      )}
-
-      <div className="mt-auto flex items-center gap-3 rounded-full p-2 md:max-lg:justify-center">
-        <span className="grid size-10 shrink-0 place-items-center rounded-full bg-subtle text-[15px] font-bold uppercase" aria-hidden>
-          {email.slice(0, 1)}
-        </span>
-        <div className="grid min-w-0 flex-1 md:max-lg:hidden">
-          <p className="truncate text-[14px] font-bold">{email}</p>
-          <p className="flex items-center gap-1.5 truncate text-[13px] text-muted">
-            <SquareTerminal className="size-3.5 shrink-0" aria-hidden /> {server}
-          </p>
+      <div className="shrink-0 border-t border-border">
+        <div className="flex items-center gap-2.5 px-4 py-2.5">
+          <span className="flex-1 text-[12.5px] text-dim">Theme</span>
+          <ThemeSwitch initial={props.theme} />
         </div>
-        <form action={logout} className="md:max-lg:hidden">
-          <button type="submit" title="Sign out" className="grid size-9 place-items-center rounded-full text-muted transition-colors duration-150 hover:bg-hover hover:text-foreground">
-            <LogOut className="size-[18px]" aria-hidden />
-            <span className="sr-only">Sign out</span>
-          </button>
-        </form>
+        <div className="flex items-center gap-2.5 border-t border-border px-4 py-3">
+          <span className="grid size-8 shrink-0 place-items-center rounded-full bg-selected text-[13px] font-bold uppercase" aria-hidden>
+            {props.email.slice(0, 1)}
+          </span>
+          <div className="grid min-w-0 flex-1 leading-tight">
+            <b className="truncate text-[13px] font-semibold">{props.email}</b>
+            <span className="truncate text-[12px] text-dim">{props.server.host}</span>
+          </div>
+          <form action={logout}>
+            <button type="submit" title="Sign out" className="grid size-8 place-items-center rounded-lg text-muted transition-colors hover:bg-hover hover:text-foreground">
+              <Icon icon={Logout01Icon} size={16} />
+              <span className="sr-only">Sign out</span>
+            </button>
+          </form>
+        </div>
       </div>
     </div>
   );
 }
 
-export interface SidebarProps {
-  projects: SidebarProject[];
-  openIncidents: number;
-  email: string;
-  server: string;
-}
-
-/** Left column on md and up; on phones a top bar with a drawer. */
+/** Fixed to the left edge on desktop; a top bar with a drawer on phones. */
 export function Sidebar(props: SidebarProps) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
   useEffect(() => setOpen(false), [pathname]);
   return (
     <>
-      <aside className="sticky top-0 hidden h-dvh shrink-0 md:block md:w-[88px] lg:w-[275px]">
+      <aside className="sticky top-0 hidden h-dvh w-[252px] shrink-0 border-r border-border md:block">
         <Nav {...props} />
       </aside>
 
-      <div className="fixed inset-x-0 top-0 z-20 flex h-14 items-center justify-between border-b border-border bg-background/85 px-2 backdrop-blur-md md:hidden">
-        <button type="button" onClick={() => setOpen(true)} aria-label="Open menu" className="grid size-10 place-items-center rounded-full hover:bg-hover">
-          <Menu className="size-5" aria-hidden />
+      <div className="fixed inset-x-0 top-0 z-20 flex h-14 items-center justify-between border-b border-border bg-background px-2.5 md:hidden">
+        <button type="button" onClick={() => setOpen(true)} aria-label="Open menu" className="grid size-10 place-items-center rounded-lg hover:bg-hover">
+          <Icon icon={Menu01Icon} size={20} />
         </button>
-        <Link href="/" aria-label="Self Host Layer">
-          <Logo withName={false} />
+        <Link href="/" aria-label="Projects" className="grid size-[30px] place-items-center rounded-lg bg-foreground text-background">
+          <Icon icon={Layers01Icon} size={17} strokeWidth={2} />
         </Link>
-        <span className="size-10" aria-hidden />
+        <button type="button" onClick={openPalette} aria-label="Search" className="grid size-10 place-items-center rounded-lg hover:bg-hover">
+          <Icon icon={Search01Icon} size={20} />
+        </button>
       </div>
       {open && (
-        <div className="fixed inset-0 z-30 md:hidden" role="dialog" aria-modal="true" aria-label="Menu">
+        <div className="fixed inset-0 z-40 md:hidden" role="dialog" aria-modal="true" aria-label="Menu">
           <button type="button" aria-label="Close menu" className="absolute inset-0 bg-black/40" onClick={() => setOpen(false)} />
-          <div className="absolute inset-y-0 left-0 w-[280px] border-r border-border bg-background shadow-xl">
-            <button type="button" onClick={() => setOpen(false)} aria-label="Close menu" className="absolute right-2 top-3 grid size-9 place-items-center rounded-full hover:bg-hover">
-              <X className="size-5" aria-hidden />
-            </button>
+          <div className="absolute inset-y-0 left-0 w-[280px] border-r border-border shadow-xl">
             <Nav {...props} onNavigate={() => setOpen(false)} />
           </div>
         </div>

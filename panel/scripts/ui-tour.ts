@@ -127,6 +127,8 @@ await setViewport(1280, 820);
 console.log("Setup");
 await go("/");
 await waitForPath("/setup");
+// The panel is dark unless told otherwise; follow the emulated color scheme so screenshots come in both.
+await evaluate(`document.cookie = "layer-theme=system; path=/; max-age=31536000", true`);
 await screenshot("setup");
 await fill("#token", "wrong-token");
 await click("button[type=submit]");
@@ -148,8 +150,12 @@ await waitForPath("/setup/recovery");
 await screenshot("recovery-codes");
 await click("button[type=submit]");
 await waitForPath("/");
-await waitFor(`document.body.innerText.includes("Server") && !document.querySelector('[role=meter]') === false`, "dashboard data");
+await waitFor(`!!document.querySelector('button[title="Server status"]')`, "dashboard data");
 await screenshot("dashboard");
+await click('button[title="Server status"]');
+await waitFor(`document.querySelectorAll('[role=dialog] [role=meter]').length === 3`, "server stats (CPU, memory, disk)");
+await screenshot("server-modal");
+await click('[role=dialog] button[aria-label="Close"]');
 await setViewport(1280, 820, true);
 await screenshot("dashboard-dark");
 await setViewport(390, 844);
@@ -180,7 +186,7 @@ console.log("  ✓ signed in again; /login redirects to the dashboard");
 if (process.env.TOUR_GITHUB === "1") {
   console.log("GitHub");
   await setViewport(1280, 820);
-  await go("/new");
+  await go("/github/connect");
   await waitForPath("/github/connect");
   await screenshot("github-connect");
   // The form that posts to GitHub (not the sign-out form in the top bar).
@@ -313,7 +319,7 @@ if (process.env.TOUR_DEPLOY === "1") {
   await fill("#command", "node -e console.log(process.env.GREETING)");
   await click("form:has(#command) button[type=submit]");
   await waitFor(`document.body.innerText.includes("Saved greet")`, "cron saved", 60_000);
-  await waitFor(`document.body.innerText.includes("Next:")`, "next run shown", 30_000);
+  await waitFor(`!!document.querySelector('[data-testid="next-run"]')`, "next run shown", 30_000);
   console.log("  ✓ saved a cron job; its timer is scheduled on the server");
   await screenshot("crons");
   await click('button[title="Run now"]');
@@ -372,8 +378,8 @@ if (process.env.TOUR_DEPLOY === "1") {
     console.log("  ✓ a failed cron run raised an alert");
     await go("/settings/alerts");
     await waitForPath("/settings/alerts");
-    if (!(await evaluate(`!!document.querySelector('a[href="/settings/alerts"] span.bg-err')`))) throw new Error("the bell doesn't show an open incident");
-    console.log("  ✓ the bell shows the open incident");
+    if (!(await evaluate(`!!document.querySelector('a[href="/settings/alerts"] [aria-label="needs attention"]')`))) throw new Error("the sidebar doesn't flag the open incident");
+    console.log("  ✓ the sidebar's Alerts item flags the open incident");
     await screenshot("alerts-open");
     await go("/projects/next/crons");
     await waitForPath("/projects/next/crons");
@@ -532,10 +538,10 @@ if (process.env.TOUR_DEPLOY === "1") {
     await fill('input[name="host"]', tourDomain);
     await click('form:has(input[name="host"]) button[type=submit]');
     await waitFor(`document.body.innerText.includes("www.${tourDomain}")`, "domain rows", 60_000);
-    // Both are live once DNS checks out: no Verify button left, a certificate status instead.
-    await waitFor(`!document.querySelector('form:has(input[name="domainId"]) button[type=submit]')?.innerText.includes("Verify")`, "domains to go live", 60_000);
+    // Both are live once DNS checks out: no DNS record to add, a certificate status instead.
+    await waitFor(`document.querySelectorAll('[data-host$=${JSON.stringify(tourDomain)}][data-status="active"]').length === 2`, "domains to go live", 60_000);
     const text = String(await evaluate("document.body.innerText"));
-    if (!/Issuing certificate|expires in|local CA/.test(text)) throw new Error(`no certificate status shown:\n${text.slice(0, 600)}`);
+    if (!/Issuing a certificate|renews in|local CA/.test(text)) throw new Error(`no certificate status shown:\n${text.slice(0, 600)}`);
     console.log(`  ✓ ${tourDomain} and www.${tourDomain} verified through public DNS and live`);
     await screenshot("domains-live");
 
@@ -545,11 +551,7 @@ if (process.env.TOUR_DEPLOY === "1") {
     console.log("  ✓ a domain pointing elsewhere stays pending, with the explanation and the record to create");
     await screenshot("domains-pending");
     for (const host of ["github.com", "www.github.com"]) {
-      await evaluate(`(() => {
-        const row = [...document.querySelectorAll("a")].find((a) => a.textContent === ${JSON.stringify(host)})?.closest("div.grid");
-        row?.querySelector('button[type=submit]:not([class*="bg-inverse"])')?.click();
-        return true;
-      })()`);
+      await evaluate(`document.querySelector('[data-host=${JSON.stringify(host)}] button[title^="Remove"]')?.click(), true`);
       await sleep(1500);
     }
     await go("/projects/next/domains");
@@ -574,8 +576,9 @@ if (process.env.TOUR_DEPLOY === "1") {
       await go(path);
       await waitForPath(path);
       await waitFor(`document.querySelector("main header h1")?.innerText === ${JSON.stringify(label)}`, `${label} page`);
+      // The item's first line is its label; a count or a dot may follow.
       const current = String(await evaluate(`document.querySelector('aside nav [aria-current="page"]')?.innerText ?? ""`));
-      if (current.trim() !== label) throw new Error(`on ${path} the sidebar highlights "${current}", not ${label}`);
+      if (current.trim().split("\n")[0]!.trim() !== label) throw new Error(`on ${path} the sidebar highlights "${current}", not ${label}`);
       await screenshot(shot);
     }
     const global = await navText();
@@ -612,6 +615,8 @@ if (process.env.TOUR_DEPLOY === "1") {
   await go("/projects/vite/settings");
   await waitForPath("/projects/vite/settings");
   await screenshot("settings-vite");
+  await click('[data-testid="delete-project"]');
+  await waitFor(`!!document.querySelector("#confirm")`, "the delete confirmation");
   // React-controlled input: set the value through the native setter so React sees it.
   await evaluate(`(() => { const el = document.querySelector("#confirm"); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(el, "vite"); el.dispatchEvent(new Event("input", { bubbles: true })); return true; })()`);
   await click('form:has(#confirm) button[type=submit]');

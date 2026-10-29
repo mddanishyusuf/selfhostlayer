@@ -1,9 +1,11 @@
 "use client";
 
-import { FolderGit2, GitBranch } from "lucide-react";
+import { GitBranchIcon, GithubIcon, Search01Icon } from "@hugeicons/core-free-icons";
 import { useState } from "react";
 import { ImportButton } from "./deploy";
-import { Button, Field, Input } from "./ui";
+import { Icon } from "./icon";
+import { Dot, ListRow, RowIcon } from "./page";
+import { Button, Field, Input, Pill } from "./ui";
 
 /**
  * Posts the app manifest to GitHub from the browser (GitHub's manifest flow
@@ -18,9 +20,11 @@ export function GithubConnectForm({ manifest, state, githubWeb }: { manifest: st
       <Field label="Organization (optional)" htmlFor="org" hint="Leave empty to create the app on your personal account.">
         <Input id="org" value={org} onChange={(e) => setOrg(e.target.value)} placeholder="acme-inc" autoComplete="off" spellCheck={false} />
       </Field>
-      <Button type="submit" className="w-full">
-        <GitBranch className="size-4" aria-hidden /> Create GitHub App
-      </Button>
+      <div>
+        <Button type="submit">
+          <Icon icon={GithubIcon} size={16} /> Create GitHub App
+        </Button>
+      </div>
     </form>
   );
 }
@@ -29,25 +33,48 @@ export function RepoSearch({ repos }: { repos: { fullName: string; private: bool
   const [query, setQuery] = useState("");
   const shown = repos.filter((r) => r.fullName.toLowerCase().includes(query.trim().toLowerCase()));
   return (
-    <div className="grid gap-3">
-      <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={`Search ${repos.length} repositories`} aria-label="Search repositories" autoFocus />
-      <div className="divide-y divide-border overflow-hidden rounded-2xl border border-border">
-        {shown.length === 0 && <p className="px-5 py-8 text-center text-muted">No repositories match “{query}”.</p>}
-        {shown.slice(0, 100).map((r) => (
-          <div key={r.fullName} className="flex items-center gap-3 px-5 py-3.5 transition-colors duration-150 hover:bg-subtle">
-            <FolderGit2 className="size-4 shrink-0 text-muted" aria-hidden />
-            <div className="grid min-w-0 flex-1">
-              <p className="truncate font-medium">{r.fullName}</p>
-              <p className="text-[12px] text-muted">
-                {r.private ? "Private" : "Public"} · {r.branch}
-                {r.pushedAt ? ` · pushed ${timeAgo(r.pushedAt)}` : ""}
-              </p>
-            </div>
-            <ImportButton repo={r.fullName} installationId={r.installationId} />
-          </div>
-        ))}
+    <section className="border-b border-border">
+      <div className="flex h-[52px] items-center gap-2.5 border-b border-border px-4 sm:px-7">
+        <Icon icon={Search01Icon} size={16} className="text-dim" />
+        <input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder={`Search ${repos.length} repositories`}
+          aria-label="Search repositories"
+          autoFocus
+          className="h-full min-w-0 flex-1 bg-transparent text-[14.5px] outline-none placeholder:text-dim"
+        />
       </div>
-    </div>
+      {shown.length === 0 && <p className="px-4 py-10 text-center text-muted sm:px-7">No repositories match “{query}”.</p>}
+      {shown.slice(0, 100).map((r) => (
+        <ListRow
+          key={r.fullName}
+          className="hover:bg-hover"
+          lead={
+            <RowIcon>
+              <Icon icon={GitBranchIcon} size={16} />
+            </RowIcon>
+          }
+          title={
+            <>
+              <span className="truncate">{r.fullName}</span>
+              {r.private && <Pill outline>Private</Pill>}
+            </>
+          }
+          sub={
+            <>
+              {r.branch}
+              {r.pushedAt && (
+                <>
+                  <Dot /> pushed {timeAgo(r.pushedAt)}
+                </>
+              )}
+            </>
+          }
+          side={<ImportButton repo={r.fullName} installationId={r.installationId} />}
+        />
+      ))}
+    </section>
   );
 }
 

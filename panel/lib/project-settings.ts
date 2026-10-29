@@ -9,7 +9,8 @@ export interface SettingsInput {
   runtime: Runtime;
   nodeVersion: string;
   memoryMb: number;
-  env: Record<string, string>;
+  /** Absent when the form has no env editor (settings after the first deploy): keep what's saved. */
+  env?: Record<string, string>;
 }
 
 export type SettingsResult = { ok: true; value: SettingsInput } | { ok: false; errors: Record<string, string> };
@@ -93,20 +94,31 @@ export function parseSettings(form: FormData): SettingsResult {
   const memoryMb = Number(text(form, "memoryMb"));
   if (!Number.isInteger(memoryMb) || memoryMb < 128 || memoryMb > 16384) errors.memoryMb = "Use a whole number from 128 to 16384.";
 
-  let env: Record<string, string> = {};
+  let env: Record<string, string> | undefined;
+  if (form.has("env")) {
+    const parsed = parseEnvVars(form.get("env"));
+    if (parsed.ok) env = parsed.env;
+    else errors.env = parsed.error;
+  }
+
+  if (Object.keys(errors).length > 0) return { ok: false, errors };
+  return { ok: true, value: { branch, installCommand, buildCommand, runtime, nodeVersion, memoryMb, ...(env ? { env } : {}) } };
+}
+
+/** The env editor's hidden JSON field: {"NAME": "value"}. */
+export function parseEnvVars(raw: FormDataEntryValue | null): { ok: true; env: Record<string, string> } | { ok: false; error: string } {
+  let env: Record<string, string>;
   try {
-    const parsed = JSON.parse(String(form.get("env") ?? "{}")) as unknown;
+    const parsed = JSON.parse(String(raw ?? "{}")) as unknown;
     if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) throw new Error();
     env = parsed as Record<string, string>;
   } catch {
-    errors.env = "The environment variables couldn't be read. Reload and try again.";
+    return { ok: false, error: "The environment variables couldn't be read. Reload and try again." };
   }
   const badKey = Object.keys(env).find((k) => !ENV_KEY.test(k));
-  if (badKey !== undefined) errors.env = `"${badKey}" isn't a valid name: use A-Z, 0-9 and _, not starting with a digit.`;
+  if (badKey !== undefined) return { ok: false, error: `"${badKey}" isn't a valid name: use A-Z, 0-9 and _, not starting with a digit.` };
   const badValue = Object.entries(env).find(([, v]) => typeof v !== "string" || CONTROL.test(v) || v.length > 32768);
-  if (badValue) errors.env = `${badValue[0]}: values must be a single line (paste multi-line secrets base64-encoded).`;
-  if (Object.keys(env).length > 500) errors.env = "At most 500 variables.";
-
-  if (Object.keys(errors).length > 0) return { ok: false, errors };
-  return { ok: true, value: { branch, installCommand, buildCommand, runtime, nodeVersion, memoryMb, env } };
+  if (badValue) return { ok: false, error: `${badValue[0]}: values must be a single line (paste multi-line secrets base64-encoded).` };
+  if (Object.keys(env).length > 500) return { ok: false, error: "At most 500 variables." };
+  return { ok: true, env };
 }

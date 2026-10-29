@@ -1,6 +1,6 @@
 import { RestoreButton } from "./backups";
-import { duration, timeAgo } from "./status";
-import { Card, StatusDot } from "./ui";
+import { Empty, TableHead } from "./page";
+import { StatusText, duration, timeAgo } from "./status";
 import type { Backup } from "@/lib/backup/runner";
 
 export function formatBytes(n: number | null): string {
@@ -16,34 +16,51 @@ export function formatBytes(n: number | null): string {
   return `${v.toFixed(v < 10 ? 1 : 0)} ${units[i]}`;
 }
 
-const DOT = { running: "warn", ok: "ok", failed: "err" } as const;
-const LABEL = { running: "Backing up…", ok: "Backed up", failed: "Failed" } as const;
+const STATUS = { running: ["warn", "Backing up…"], ok: ["ok", "Backed up"], failed: ["err", "Failed"] } as const;
 
+function contents(b: Backup): string {
+  const dbs = b.contents?.sqlite ?? [];
+  return [dbs.length ? `${dbs.length} SQLite database${dbs.length === 1 ? "" : "s"} checked` : null, b.contents?.postgres ? "Postgres dump" : null, b.kind === "panel" ? "Panel database and key" : null, b.trigger === "schedule" ? "scheduled" : "manual"]
+    .filter(Boolean)
+    .join(" · ");
+}
+
+/** Backups as rows. The column labels sit outside the list, so the list's first child is the newest backup. */
 export function BackupList({ backups, showApp = false, restorable = false, empty }: { backups: Backup[]; showApp?: boolean; restorable?: boolean; empty: string }) {
+  const columns = `120px ${showApp ? "130px " : ""}minmax(180px,1fr) 90px 90px ${restorable ? "90px" : ""}`;
   return (
-    <Card className="divide-y divide-border overflow-hidden" data-testid="backup-list">
-      {backups.length === 0 && <p className="px-5 py-6 text-muted">{empty}</p>}
-      {backups.map((b) => {
-        const dbs = b.contents?.sqlite ?? [];
-        return (
-          <div key={b.id} className="flex flex-wrap items-center gap-x-4 gap-y-1 px-5 py-3" data-status={b.status}>
-            <span className="inline-flex w-32 items-center gap-2 text-[13px] font-medium">
-              <StatusDot status={DOT[b.status]} /> {LABEL[b.status]}
+    <>
+      <TableHead columns={columns}>
+        <span>Status</span>
+        {showApp && <span>App</span>}
+        <span>Contents</span>
+        <span className="text-right">Size</span>
+        <span className="text-right">Age</span>
+        {restorable && <span />}
+      </TableHead>
+      <div data-testid="backup-list">
+        {backups.length === 0 && <Empty>{empty}</Empty>}
+        {backups.map((b) => (
+          <div
+            key={b.id}
+            data-status={b.status}
+            style={{ gridTemplateColumns: columns }}
+            className="flex min-h-[56px] flex-wrap items-center gap-x-3.5 gap-y-1 border-b border-border px-4 py-2.5 text-[14.5px] last:border-b-0 md:grid md:gap-x-5 md:px-7"
+          >
+            <span>
+              <StatusText status={STATUS[b.status][0]} label={STATUS[b.status][1]} pulse={b.status === "running"} />
             </span>
-            {showApp && <span className="w-28 truncate font-mono text-[13px]">{b.kind === "panel" ? "panel" : b.slug}</span>}
-            <span className="min-w-0 flex-1 truncate text-[13px] text-muted">
-              {b.status === "failed"
-                ? b.error
-                : [formatBytes(b.bytes), dbs.length ? `${dbs.length} SQLite database${dbs.length === 1 ? "" : "s"} checked` : null, b.contents?.postgres ? "Postgres dump" : null, b.trigger === "schedule" ? "scheduled" : "manual"].filter(Boolean).join(" · ")}
-            </span>
-            <span className="text-[12px] tabular-nums text-muted" title={new Date(b.startedAt).toISOString()}>
+            {showApp && <span className="truncate font-medium">{b.kind === "panel" ? "panel" : b.slug}</span>}
+            <span className={b.status === "failed" ? "min-w-0 flex-1 truncate text-rose" : "min-w-0 flex-1 truncate text-muted"}>{b.status === "failed" ? b.error : contents(b)}</span>
+            <span className="text-right tabular-nums max-md:hidden">{formatBytes(b.bytes)}</span>
+            <span className="text-right tabular-nums text-muted max-md:ml-auto" title={new Date(b.startedAt).toISOString()}>
               {timeAgo(Math.floor(b.startedAt / 1000))}
-              {b.finishedAt && ` · ${duration(b.finishedAt - b.startedAt)}`}
+              {b.finishedAt && <span className="text-dim max-lg:hidden"> · {duration(b.finishedAt - b.startedAt)}</span>}
             </span>
-            {restorable && b.status === "ok" && b.kind === "app" && <RestoreButton id={b.id} slug={b.slug} />}
+            {restorable && <span className="justify-self-end">{b.status === "ok" && b.kind === "app" && <RestoreButton id={b.id} slug={b.slug} />}</span>}
           </div>
-        );
-      })}
-    </Card>
+        ))}
+      </div>
+    </>
   );
 }
