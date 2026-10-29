@@ -59,4 +59,20 @@
 - **`project_crons`** keeps jobs as written; every deploy rewrites them (`syncCrons`), so they follow the project's Node version, folder and memory limit.
 - **Bug the screenshot caught:** durations showed "-0.0s". For `Type=oneshot` systemd logs "Starting…" first and "Finished" only after the job exits, and the parser took "Finished" as the start. Runs now start at the earliest of the two (test with the real journal order).
 
+## Day 5–6 result (2026-10-29)
+**Done when "alerts fire once and recover": passed** in the VM through the browser tour (webhook channel saved and its signed test arrives; a failed cron run sends exactly one "Cron job failed" message, the bell shows it, the next successful run sends exactly one recovery). Deployed to the VPS: monitor running, no incidents, the user's app untouched.
+
+- **Incidents** (`alert_incidents`, one open row per key): `deploy:<id>`, `crash:<slug>`, `disk`, `cert:<host>`, `cron:<slug>:<name>`. One message when opened, one when resolved, nothing in between. Delivery errors are kept on the incident, not thrown.
+- **Rules** (`lib/alerts/rules.ts`, pure and tested): disk alerts at 80% and recovers below 75%; crash = systemd gave up or 3+ restarts since the last check; certificates = expired, unreachable, under 14 days, or issuing for over 15 minutes (a local CA is ignored); cron = the last run failed.
+- **Monitor** runs inside the panel (`instrumentation.ts`): every 60s, certificates every 10 minutes. State lives on `globalThis` because Next loads modules twice.
+- **Channels:** Telegram (bot token + chat ID), Discord (webhook, mentions disabled), webhook (JSON, `X-Layer-Signature: sha256=<HMAC>` when a secret is set, https only). Encrypted at rest. Saving a channel sends a test to it.
+- **UI:** Settings → Alerts (open incidents, channels with Send test, recently resolved) and a bell in the top bar with a red dot when anything is open.
+- **Bugs found on the way:**
+  - "Run now" failures never alerted: a manual start doesn't update the timer's `LastTriggerUSec`. `cron.list` now reports the service's `ExecMainStartTimestamp`.
+  - After a server action redirects, Next fetches the target page from `http://localhost:3000`, but the panel listens on a unix socket. On a real box that request would carry the admin's cookies to any app on port 3000. `server.mjs` now pins that origin to `layer-panel.invalid` and serves it over the panel socket.
+  - The secondary buttons (Send test, Cancel deploy) had invisible labels: `SubmitButton` takes a `variant` now.
+- **Test helper:** `installer/test/alert-receiver.sh` (VM only) runs a webhook receiver at `https://hook.internal` and makes the panel trust Caddy's local CA; `--remove` undoes it.
+
+**Needs from the user (optional):** a Telegram bot or Discord webhook. Add it under Settings → Alerts on the VPS panel and press Send test.
+
 **Needs from the user (optional):** a domain or subdomain that can point at the VPS (37.27.25.45).
