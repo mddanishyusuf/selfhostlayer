@@ -39,9 +39,9 @@ async function CertLine({ host, free }: { host: string; free: boolean }) {
   return <span className={cert.reason === "expired" || cert.reason === "unreachable" ? "text-rose" : cert.reason === "issuing" ? "text-gold" : undefined}>{text}</span>;
 }
 
-export function DomainRow({ d, freeHost, serverIp, indent }: { d: ProjectDomain; freeHost: string; serverIp: string; indent?: boolean }) {
+export function DomainRow({ d, serverIp, indent }: { d: ProjectDomain; serverIp: string; indent?: boolean }) {
   const pending = d.status === "pending";
-  const record = pending ? suggestedRecord(d.host, serverIp, freeHost) : null;
+  const record = pending ? suggestedRecord(d.host, serverIp) : null;
   const sub = pending ? (
     <>
       <span className="text-gold">Waiting for DNS</span>

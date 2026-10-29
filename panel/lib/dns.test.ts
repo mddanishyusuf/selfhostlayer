@@ -47,10 +47,13 @@ describe("isCloudflareIp", () => {
 });
 
 describe("suggestedRecord", () => {
-  it("asks for A on apex domains and CNAME on subdomains", () => {
-    expect(suggestedRecord("piqo.app", IP, "piqo.37-27-25-45.sslip.io")).toEqual({ type: "A", name: "@", value: IP });
-    expect(suggestedRecord("shop.example.co.uk", IP, "x.sslip.io")).toEqual({ type: "CNAME", name: "shop", value: "x.sslip.io" });
-    expect(suggestedRecord("example.co.uk", IP, "x")).toMatchObject({ type: "A" });
-    expect(suggestedRecord("app.piqo.app", IP, "piqo.37-27-25-45.sslip.io")).toEqual({ type: "CNAME", name: "app", value: "piqo.37-27-25-45.sslip.io" });
+  it("always asks for an A record to this server, named relative to the bought domain", () => {
+    expect(suggestedRecord("piqo.app", IP)).toEqual({ type: "A", name: "@", value: IP });
+    expect(suggestedRecord("www.reducepngsize.com", IP)).toEqual({ type: "A", name: "www", value: IP });
+    // Three short labels used to pass for example.co.uk.
+    expect(suggestedRecord("www.abc.com", IP)).toEqual({ type: "A", name: "www", value: IP });
+    expect(suggestedRecord("example.co.uk", IP)).toEqual({ type: "A", name: "@", value: IP });
+    expect(suggestedRecord("shop.example.co.uk", IP)).toEqual({ type: "A", name: "shop", value: IP });
+    expect(suggestedRecord("app.staging.piqo.app", IP)).toEqual({ type: "A", name: "app.staging", value: IP });
   });
 });

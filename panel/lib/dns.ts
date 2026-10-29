@@ -100,10 +100,18 @@ export async function checkDomain(host: string, serverIp: string): Promise<{ ver
   return { verdict, message: explainDns(verdict, host, serverIp), answers };
 }
 
-/** The record to tell the user to create: apex domains need A; subdomains can CNAME to the free host. */
-export function suggestedRecord(host: string, serverIp: string, freeHost: string): { type: "A" | "CNAME"; name: string; value: string } {
+// Second-level labels under country domains that are sold as a whole (example.co.uk, example.com.au).
+const COUNTRY_SECOND_LEVEL = new Set(["co", "com", "net", "org", "ac", "gov", "edu", "ltd", "plc", "ne", "or"]);
+
+/**
+ * The record to tell the user to create: an A record straight to this
+ * server, named relative to the domain they bought (@ for the domain itself,
+ * www for www.example.com). Never a CNAME to the free sslip.io address: that
+ * would make their domain depend on a service they don't control, and on
+ * networks that block it.
+ */
+export function suggestedRecord(host: string, serverIp: string): { type: "A"; name: string; value: string } {
   const labels = host.split(".");
-  // Rough apex test (example.com, example.co.uk): two labels, or three with a short second-level label.
-  const apex = labels.length === 2 || (labels.length === 3 && labels[1]!.length <= 3 && labels[2]!.length <= 3);
-  return apex ? { type: "A", name: "@", value: serverIp } : { type: "CNAME", name: labels[0]!, value: freeHost };
+  const bought = labels.length >= 3 && labels.at(-1)!.length === 2 && COUNTRY_SECOND_LEVEL.has(labels.at(-2)!) ? 3 : 2;
+  return { type: "A", name: labels.slice(0, -bought).join(".") || "@", value: serverIp };
 }

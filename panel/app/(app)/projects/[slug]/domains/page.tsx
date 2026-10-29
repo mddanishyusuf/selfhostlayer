@@ -19,7 +19,6 @@ export default async function DomainsPage({ params }: { params: Promise<{ slug: 
   if (!project) notFound();
   const domains = listDomains(project.id);
   const box = boxConfig();
-  const freeHost = domains.find((d) => d.role === "free")?.host ?? project.domains[0]!;
   const pending = domains.filter((d) => d.status === "pending");
 
   return (
@@ -31,7 +30,7 @@ export default async function DomainsPage({ params }: { params: Promise<{ slug: 
       </SettingsRow>
       <section className="border-b border-border" data-testid="domain-list">
         {domains.map((d) => (
-          <DomainRow key={d.id} d={d} freeHost={freeHost} serverIp={box.publicIp} />
+          <DomainRow key={d.id} d={d} serverIp={box.publicIp} />
         ))}
       </section>
       <SettingsRow title="How it works">
