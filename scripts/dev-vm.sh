@@ -83,10 +83,11 @@ release() {
 e2e() {
   exists || up
   multipass transfer "$root/installer/test/agent-e2e.sh" "$root/installer/test/bluegreen-e2e.sh" \
-    "$root/installer/test/build-e2e.sh" "$vm:/home/ubuntu/"
+    "$root/installer/test/build-e2e.sh" "$root/installer/test/cron-e2e.sh" "$vm:/home/ubuntu/"
   multipass exec "$vm" -- sudo bash /home/ubuntu/agent-e2e.sh
   multipass exec "$vm" -- sudo bash /home/ubuntu/bluegreen-e2e.sh
   multipass exec "$vm" -- sudo bash /home/ubuntu/build-e2e.sh
+  multipass exec "$vm" -- sudo bash /home/ubuntu/cron-e2e.sh
 }
 
 # Drives Chrome on this machine through the VM's panel (setup → 2FA → sign in).

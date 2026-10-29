@@ -76,10 +76,21 @@ SuccessExitStatus=143
 SyslogIdentifier=${user}-%i
 UMask=0077
 
-# Resources
-MemoryHigh=${Math.floor(memoryMax * 0.8)}M
-MemoryMax=${memoryMax}M
-CPUQuota=${cpuQuota}%
+${sandboxLines(memoryMax, cpuQuota, readWritePaths)}
+[Install]
+WantedBy=multi-user.target
+`;
+}
+
+/**
+ * Resource limits and the sandbox, shared by app units and cron services:
+ * a cron job gets exactly the same lockdown as the app it belongs to.
+ */
+export function sandboxLines(memoryMaxMb: number, cpuQuotaPercent: number, readWritePaths: string[]): string {
+  return `# Resources
+MemoryHigh=${Math.floor(memoryMaxMb * 0.8)}M
+MemoryMax=${memoryMaxMb}M
+CPUQuota=${cpuQuotaPercent}%
 TasksMax=256
 LimitNOFILE=65536
 
@@ -108,13 +119,10 @@ SystemCallFilter=@system-service
 SystemCallFilter=~@privileged @resources
 SystemCallErrorNumber=EPERM
 SystemCallArchitectures=native
-
-[Install]
-WantedBy=multi-user.target
 `;
 }
 
-function renderExecStart(exec: string[], nodeVersion: string): string {
+export function renderExecStart(exec: string[], nodeVersion: string): string {
   if (!Array.isArray(exec) || exec.length === 0 || exec.length > 64) {
     throw new ValidationError("exec", "must be a non-empty argv array");
   }

@@ -15,10 +15,17 @@ PACKAGES=(
 apt_get() {
   # Fresh cloud boxes often run apt in cloud-init or unattended-upgrades right
   # after boot. Wait for the lock instead of failing.
-  run env DEBIAN_FRONTEND=noninteractive apt-get -q -y \
+  log "+ apt-get $*"
+  if ! env DEBIAN_FRONTEND=noninteractive apt-get -q -y \
     -o DPkg::Lock::Timeout=300 \
     -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold \
-    "$@"
+    "$@" >>"$LAYER_LOG" 2>&1; then
+    # A clock that's far off makes apt reject repository indexes as "not valid yet".
+    if tail -n 30 "$LAYER_LOG" | grep -q "not valid yet\|is not valid until"; then
+      die "apt rejected the package indexes because this server's clock is wrong ($(date -u +%FT%TZ)). Check: timedatectl status, then re-run the installer."
+    fi
+    die "command failed: apt-get $* (see $LAYER_LOG)"
+  fi
 }
 
 install_packages() {

@@ -1,5 +1,6 @@
-import { existsSync, readFileSync, rmSync } from "node:fs";
-import { join } from "node:path";
+import { randomBytes } from "node:crypto";
+import { existsSync, readFileSync, readlinkSync, renameSync, rmSync, symlinkSync } from "node:fs";
+import { basename, join } from "node:path";
 import { assertColor, assertSlug, ValidationError } from "@layer/protocol";
 import type { ActionTable, Context, Params } from "../context.ts";
 import { ActionError } from "../errors.ts";
@@ -52,7 +53,42 @@ async function proxySet(params: Params, ctx: Context) {
     await ctx.exec(BIN.systemctl, ["reload", "caddy"], { allowFail: true, timeoutMs: 120_000 });
     throw new ActionError("invalid_config", "Caddy refused the new config, so the previous one was kept (see journalctl -u caddy)");
   }
+  pointCurrent(app.appDir, params.static === true ? staticSha(ctx, slug) : liveSha(app.appDir, String(params.color)));
   return { slug, domains, ...target };
+}
+
+/** The sha a color points at (blue → releases/<sha>). */
+function liveSha(appDir: string, color: string): string | null {
+  try {
+    return basename(readlinkSync(join(appDir, color)));
+  } catch {
+    return null;
+  }
+}
+
+/** The sha of the published static release (/srv/static/<slug>/current → <sha>-<time>). */
+function staticSha(ctx: Context, slug: string): string | null {
+  try {
+    return readlinkSync(join(childOf(ctx.paths.staticRoot, slug), "current")).split("-")[0] ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * /srv/apps/<slug>/current → releases/<sha> of whatever is live. Cron jobs run
+ * from here. A new symlink renamed over the old one: never follows anything.
+ */
+function pointCurrent(appDir: string, sha: string | null): void {
+  if (!sha || !/^[0-9a-f]{40}$/.test(sha)) return;
+  const tmp = join(appDir, `.current-${randomBytes(4).toString("hex")}`);
+  symlinkSync(join("releases", sha), tmp);
+  try {
+    renameSync(tmp, join(appDir, "current"));
+  } catch (err) {
+    rmSync(tmp, { force: true });
+    throw err;
+  }
 }
 
 export const proxyActions: ActionTable = {

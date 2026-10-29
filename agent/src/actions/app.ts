@@ -9,6 +9,7 @@ import { allocatePortPair } from "../ports.ts";
 import { parseColorEnvPort, renderColorEnv, renderEnvFile } from "../templates/env-file.ts";
 import { unitName } from "../templates/app-unit.ts";
 import { parseLiveMarker } from "../templates/caddy-site.ts";
+import { cronNames, removeCronUnits } from "./cron.ts";
 
 export function appLayout(ctx: Context, slug: string) {
   const appDir = childOf(ctx.paths.appsRoot, slug);
@@ -98,6 +99,7 @@ async function appDelete(params: Params, ctx: Context) {
     await ctx.exec(BIN.systemctl, ["stop", unit], { allowFail: true });
     await ctx.exec(BIN.systemctl, ["disable", unit], { allowFail: true });
   }
+  for (const name of cronNames(ctx, slug)) await removeCronUnits(ctx, slug, name);
   const unitFile = join(ctx.paths.systemdDir, unitName(slug));
   if (existsSync(unitFile)) {
     rmSync(unitFile);

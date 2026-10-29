@@ -42,4 +42,13 @@
 - **Browser tour** (`TOUR_DOMAIN=…`): add a domain + www → both verified and live; add `github.com` → stays pending with "points at …, not this server" and the record; remove it. Passes in the VM.
 - **Bug found by the screenshots:** `SubmitButton` always added `w-full`, which beat a caller's `w-auto` and squashed the input next to inline buttons. It now applies `w-full` only when no width is given.
 
+## Day 3 result (2026-10-29)
+**Done when "a job runs on schedule and on demand, as the app user, with env, history visible": passed** in the VM (`installer/test/cron-e2e.sh`, also in CI).
+
+- **Units:** `app-<slug>-cron-<name>.timer` (OnCalendar, `Persistent=true` so a run missed while the server was down happens after boot) + `.service` (oneshot, `TimeoutStartSec`). The service runs as the app user with the app's env file, pinned Node and **the same sandbox lines as the app unit** (now one shared `sandboxLines()`), from `/srv/apps/<slug>/current`, which `proxy.set` now points at whatever release is live.
+- **Actions:** `cron.write` (schedule checked by `systemd-analyze calendar`, which also gives the next run), `cron.delete`, `cron.run` (non-blocking), `cron.list` (schedule, next run, last result), `cron.history` (runs from the journal). `app.delete` removes an app's cron units.
+- **Schedules:** the panel converts cron expressions (`*/15 * * * *`, ranges, lists, steps, names, `@daily`…) to OnCalendar (`panel/lib/cron.ts`, 26 tests); all 14 converted forms are accepted by real `systemd-analyze`. Setting both day-of-month and day-of-week is refused (cron ORs them, systemd ANDs).
+- **Finding:** a job that exits quickly can lose its `_SYSTEMD_INVOCATION_ID` in the journal, so history groups runs by systemd's own start/end messages and places unmarked output lines by time.
+- **Installer:** apt failing on "not valid yet" (a wrong server clock, e.g. a VM resumed after the host slept) now says so and points at `timedatectl`.
+
 **Needs from the user (optional):** a domain or subdomain that can point at the VPS (37.27.25.45).
