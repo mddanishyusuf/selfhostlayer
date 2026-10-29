@@ -5,7 +5,7 @@ import { assertColor, assertSlug, ValidationError } from "@layer/protocol";
 import type { ActionTable, Context, Params } from "../context.ts";
 import { ActionError } from "../errors.ts";
 import { BIN } from "../exec.ts";
-import { childOf, ensureDir, writeFileAtomic } from "../fsutil.ts";
+import { childOf, ensureDir, removeManaged, writeFileAtomic } from "../fsutil.ts";
 import { assertDomains, assertRedirects, renderCaddySite, renderStaticSite } from "../templates/caddy-site.ts";
 import { parseColorEnvPort } from "../templates/env-file.ts";
 import { appLayout } from "./app.ts";
@@ -48,7 +48,7 @@ async function proxySet(params: Params, ctx: Context) {
 
   const reload = await ctx.exec(BIN.systemctl, ["reload", "caddy"], { allowFail: true, timeoutMs: 120_000 });
   if (reload.code !== 0) {
-    if (previous === null) rmSync(site, { force: true });
+    if (previous === null) removeManaged(site);
     else writeFileAtomic(site, previous, 0o644);
     await ctx.exec(BIN.systemctl, ["reload", "caddy"], { allowFail: true, timeoutMs: 120_000 });
     throw new ActionError("invalid_config", "Caddy refused the new config, so the previous one was kept (see journalctl -u caddy)");

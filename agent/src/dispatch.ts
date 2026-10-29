@@ -9,6 +9,8 @@ import { envActions } from "./actions/env.ts";
 import { logsActions } from "./actions/logs.ts";
 import { panelActions } from "./actions/panel.ts";
 import { proxyActions } from "./actions/proxy.ts";
+import { repairActions } from "./actions/repair.ts";
+import { updateActions } from "./actions/update.ts";
 import { releaseActions } from "./actions/release.ts";
 import { unitActions } from "./actions/unit.ts";
 import { nodeActions } from "./actions/node.ts";
@@ -37,6 +39,8 @@ export const ACTION_TABLE: ActionTable = {
   ...serviceActions,
   ...firewallActions,
   ...panelActions,
+  ...repairActions,
+  ...updateActions,
 };
 
 export const MAX_LINE_BYTES = 1024 * 1024;

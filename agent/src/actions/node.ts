@@ -27,7 +27,7 @@ async function fetchOk(url: string): Promise<Response> {
 }
 
 /** Streams url to path, returning its sha256. Aborts past MAX_TARBALL_BYTES. */
-async function download(url: string, path: string): Promise<string> {
+export async function download(url: string, path: string): Promise<string> {
   const res = await fetchOk(url);
   const hash = createHash("sha256");
   let bytes = 0;

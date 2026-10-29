@@ -3,7 +3,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DEFAULT_PATHS, type Paths } from "../src/config.ts";
 import type { Context } from "../src/context.ts";
+import { ownsPath } from "../src/actions/repair.ts";
 import { BIN, type Exec, type ExecResult } from "../src/exec.ts";
+import { manageFiles } from "../src/fsutil.ts";
 import type { Spawn } from "../src/sandbox.ts";
 
 export interface FakeSpawn {
@@ -94,6 +96,8 @@ export function testEnv(): TestEnv {
     staticRoot: join(root, "srv", "static"),
     staticGroup: null,
     archiveRoot: join(root, "var", "lib", "layer-agent", "archive"),
+    managedDir: join(root, "var", "lib", "layer-agent", "managed"),
+    updatesDir: join(root, "var", "lib", "layer-agent", "updates"),
     stagingDir: join(root, "var", "lib", "layer-staging"),
     restoreDir: join(root, "var", "lib", "layer", "restore"),
     panelUser: null,
@@ -106,12 +110,16 @@ export function testEnv(): TestEnv {
   };
   const fake = fakeExec();
   const spawner = fakeSpawn();
+  manageFiles({ dir: paths.managedDir, owns: ownsPath(paths) });
   return {
     root,
     paths,
     ctx: { paths, exec: fake.exec, spawn: spawner.spawn },
     fake,
     spawner,
-    cleanup: () => rmSync(root, { recursive: true, force: true }),
+    cleanup: () => {
+      manageFiles(null);
+      rmSync(root, { recursive: true, force: true });
+    },
   };
 }

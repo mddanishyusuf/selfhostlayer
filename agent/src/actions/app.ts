@@ -4,7 +4,7 @@ import { assertSlug, ValidationError, type Color } from "@layer/protocol";
 import type { ActionTable, Context, Params } from "../context.ts";
 import { ActionError } from "../errors.ts";
 import { BIN } from "../exec.ts";
-import { childOf, ensureDir, lookupUser, writeFileAtomic } from "../fsutil.ts";
+import { childOf, ensureDir, forgetManagedUnder, lookupUser, removeManaged, writeFileAtomic } from "../fsutil.ts";
 import { allocatePortPair } from "../ports.ts";
 import { parseColorEnvPort, renderColorEnv, renderEnvFile } from "../templates/env-file.ts";
 import { unitName } from "../templates/app-unit.ts";
@@ -106,12 +106,12 @@ async function appDelete(params: Params, ctx: Context) {
   await removePostgres(ctx, slug, keepData);
   const unitFile = join(ctx.paths.systemdDir, unitName(slug));
   if (existsSync(unitFile)) {
-    rmSync(unitFile);
+    removeManaged(unitFile);
     await ctx.exec(BIN.systemctl, ["daemon-reload"]);
   }
   const site = childOf(ctx.paths.caddySitesDir, `${slug}.caddy`);
   if (existsSync(site)) {
-    rmSync(site);
+    removeManaged(site);
     await ctx.exec(BIN.systemctl, ["reload", "caddy"], { allowFail: true });
   }
 
@@ -135,6 +135,7 @@ async function appDelete(params: Params, ctx: Context) {
   }
   rmSync(app.appDir, { recursive: true, force: true });
   rmSync(app.etcDir, { recursive: true, force: true });
+  forgetManagedUnder(app.etcDir);
   rmSync(childOf(ctx.paths.staticRoot, slug), { recursive: true, force: true });
 
   return { slug, deleted: true, archivedData };

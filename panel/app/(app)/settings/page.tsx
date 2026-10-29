@@ -2,6 +2,7 @@ import { CheckmarkCircle02Icon, GithubIcon } from "@hugeicons/core-free-icons";
 import { dropAddressAction } from "@/app/actions/address";
 import { AccessForm } from "@/components/access";
 import { MoveAppsForm, MovePanelForm } from "@/components/address";
+import { RepairButton, UpdatePanel } from "@/components/maintenance";
 import { Icon } from "@/components/icon";
 import { KeyValues, PageHeader, PillLink, SettingsRow } from "@/components/page";
 import { Button, Pill } from "@/components/ui";
@@ -89,7 +90,7 @@ export default async function ServerSettingsPage() {
           ]}
         />
       </SettingsRow>
-      <SettingsRow title="Version" description="Updating the panel never restarts your apps.">
+      <SettingsRow title="Version" description="Updating the panel never restarts your apps. On the server, layer update does the same.">
         <KeyValues
           inset
           items={[
@@ -98,6 +99,10 @@ export default async function ServerSettingsPage() {
             ["Server", info ? `${info.os.name} · ${info.arch} · Node ${info.nodeVersions.join(", ")}` : "—"],
           ]}
         />
+        <UpdatePanel current={box.version} />
+      </SettingsRow>
+      <SettingsRow title="Repair" description="Puts back unit files, Caddy sites and env files someone edited or deleted by hand, and restarts what they feed. layer repair on the server does the same.">
+        <RepairButton />
       </SettingsRow>
       <SettingsRow title="Remove the panel" description="Your apps keep running: they're plain systemd units and Caddy sites. Only the panel goes.">
         <p className="text-[13.5px] text-muted">

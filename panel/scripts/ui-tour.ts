@@ -790,6 +790,25 @@ if (process.env.TOUR_ACCESS === "1") {
   console.log("  ✓ open to anyone again");
 }
 
+// TOUR_UPDATE=1: a feed (installer/test/release-feed.sh) offers a newer
+// version; update from Settings and follow it through the panel's restart.
+if (process.env.TOUR_UPDATE === "1") {
+  console.log("Update");
+  await go("/settings");
+  await waitForPath("/settings");
+  await evaluate(`[...document.querySelectorAll('[data-testid="updates"] button')].find((b) => b.textContent === "Check for updates").click(), true`);
+  await waitFor(`/is available|latest version|role="alert"/.test(document.querySelector('[data-testid="updates"]').innerHTML)`, "the update check", 30_000);
+  const offer = String(await evaluate(`document.querySelector('[data-testid="updates"]').innerText`));
+  const target = /(\S+) is available/.exec(offer)?.[1];
+  if (!target) throw new Error(`no update offered: ${offer}`);
+  await evaluate(`[...document.querySelectorAll('[data-testid="updates"] button')].find((b) => b.textContent === ${JSON.stringify(`Update to ${target}`)}).click(), true`);
+  await waitFor(`!!document.querySelector('[data-testid="update-progress"]')`, "the update to start", 60_000);
+  await screenshot("update-running");
+  // The page reloads itself once the new version answers.
+  await waitFor(`!document.querySelector('[data-testid="update-progress"]') && !!document.querySelector('[data-testid="updates"]') && document.body.innerText.includes(${JSON.stringify(target)})`, `the panel on ${target}`, 600_000);
+  console.log(`  ✓ updated to ${target} from Settings; the page followed the panel's restart`);
+}
+
 console.log("Guards");
 await send("Network.enable");
 await send("Network.clearBrowserCookies");

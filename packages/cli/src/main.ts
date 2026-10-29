@@ -1,6 +1,6 @@
 // `layer`: the command-line view of the box, for when you SSH in. Every
 // command goes through the agent, so it sees exactly what the panel sees.
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { chmodSync, chownSync, constants, copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, statSync } from "node:fs";
 import { join } from "node:path";
@@ -25,6 +25,8 @@ const HELP = `${bold("layer")}: Self Host Layer on this server
   layer import <app> <file>        replace the app's data/ with a .tar.gz from another server
                                    (SQLite checked first; the replaced data is kept)
   layer access [reset]             who may open the panel; reset lets everyone reach the sign-in again
+  layer update [version]           update the panel, agent and CLI from the release feed (apps keep running)
+  layer repair                     put back generated files edited or deleted by hand (units, Caddy sites, env)
   layer call <action> [json]       send a raw agent action (debugging)
 
 Raw commands behind these: journalctl -u 'app-<app>@*', systemctl status 'app-<app>@*',
@@ -155,6 +157,32 @@ async function access(sub: string | undefined) {
   console.log(dim("  Locked out? `layer access reset` lets everyone reach the sign-in page again."));
 }
 
+async function repair() {
+  const r = await callAgent<{ checked: number; restored: string[]; restarted: string[] }>("system.repair");
+  if (!r.restored.length) return console.log(`${green("✓")} Nothing to repair: all ${r.checked} generated files are as the agent wrote them.`);
+  console.log(`${green("✓")} Put back ${r.restored.length} file${r.restored.length === 1 ? "" : "s"} edited or deleted by hand:`);
+  for (const path of r.restored) console.log(`  ${path}`);
+  if (r.restarted.length) console.log(dim(`  Restarted ${r.restarted.join(", ")}`));
+}
+
+async function update(version: string | undefined) {
+  const check = await callAgent<{ current: string; latest: { version: string; notes: string | null } | null; available: boolean; running: boolean }>("update.check");
+  if (!version && !check.available) return console.log(`${green("✓")} ${check.current} is the latest version.`);
+  const since = Math.floor(Date.now() / 1000);
+  const started = await callAgent<{ from: string; to: string; unit: string }>("update.start", { version: version ?? "latest" }, { onChunk: (c) => process.stdout.write(dim(c)) });
+  console.log(`Updating ${started.from} → ${bold(started.to)}. Your apps keep running.`);
+  // The installer runs in its own unit (it restarts the agent): follow its output until it ends.
+  const follow = spawn("journalctl", ["-u", started.unit, "-f", "-o", "cat", "--no-pager", `--since=@${since}`], { stdio: ["ignore", "inherit", "inherit"] });
+  const show = (prop: string) => execFileSync("systemctl", ["show", started.unit, "-p", prop, "--value"], { encoding: "utf8" }).trim();
+  await new Promise((r) => setTimeout(r, 1500));
+  while (["active", "activating"].includes(show("ActiveState"))) await new Promise((r) => setTimeout(r, 1000));
+  await new Promise((r) => setTimeout(r, 500));
+  follow.kill();
+  const now = (JSON.parse(readFileSync("/etc/layer/config.json", "utf8")) as { version: string }).version;
+  if (show("Result") !== "success" || now !== started.to) throw new Error(`the update didn't finish (${show("Result")}); see journalctl -u ${started.unit}`);
+  console.log(`${green("✓")} Updated to ${now}.`);
+}
+
 async function main() {
   const { positionals, values } = parseArgs({
     allowPositionals: true,
@@ -178,6 +206,8 @@ async function main() {
     case "score": return score(need("app"), values.color ?? "blue");
     case "info": return info();
     case "access": return access(arg);
+    case "repair": return repair();
+    case "update": return update(arg);
     case "import": {
       if (!arg || !extra) throw new Error("usage: layer import <app> <file.tar.gz>");
       return importData(arg, extra);

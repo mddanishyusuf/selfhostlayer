@@ -13,7 +13,7 @@ import { assertInt, assertSlug, ValidationError } from "@layer/protocol";
 import type { ActionTable, Context, Params } from "../context.ts";
 import { ActionError } from "../errors.ts";
 import { BIN } from "../exec.ts";
-import { ensureDir, lookupUser, writeFileAtomic } from "../fsutil.ts";
+import { ensureDir, lookupUser, removeManaged, writeFileAtomic } from "../fsutil.ts";
 import { isPortFree } from "../ports.ts";
 import { SYSTEMD_RUN } from "../sandbox.ts";
 import { renderEnvFile } from "../templates/env-file.ts";
@@ -182,10 +182,10 @@ export async function removeRedis(ctx: Context, slug: string, keepData = true): 
   const state = existsSync(app.etcDir) ? readServices(ctx, slug) : {};
   if (!existsSync(unitFile) && !state.redis) return false;
   await ctx.exec(BIN.systemctl, ["disable", "--now", redisUnit(slug)], { allowFail: true });
-  rmSync(unitFile, { force: true });
+  removeManaged(unitFile);
   await ctx.exec(BIN.systemctl, ["daemon-reload"]);
   await ctx.exec(BIN.systemctl, ["reset-failed", redisUnit(slug)], { allowFail: true });
-  rmSync(join(app.etcDir, "redis.conf"), { force: true });
+  removeManaged(join(app.etcDir, "redis.conf"));
   if (existsSync(app.etcDir)) {
     const { redis: _removed, ...rest } = state;
     writeServices(ctx, slug, rest);

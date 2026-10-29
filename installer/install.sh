@@ -25,6 +25,7 @@ Usage: install.sh [options]
   --domain <name>         Serve the panel on this domain instead of <ip>.sslip.io
   --internal-tls          Use Caddy's local CA instead of Let's Encrypt (test boxes)
   --apps-domain <name>    Free app URLs under this domain (default <ip-with-dashes>.sslip.io)
+  --updates-url <url>     Release feed for one-click updates (default https://get.selfhostlayer.com/releases.json)
   --email <address>       Contact email for TLS certificates
   --from-tarball <path>   Install the panel from a local release tarball (development)
   --no-harden-ssh         Leave SSH settings alone
@@ -34,7 +35,7 @@ EOF
 }
 
 parse_args() {
-  LAYER_DOMAIN="" LAYER_EMAIL="" LAYER_TARBALL="" LAYER_HARDEN_SSH=1 LAYER_YES=0 LAYER_INTERNAL_TLS=0 LAYER_APPS_DOMAIN=""
+  LAYER_DOMAIN="" LAYER_EMAIL="" LAYER_TARBALL="" LAYER_HARDEN_SSH=1 LAYER_YES=0 LAYER_INTERNAL_TLS=0 LAYER_APPS_DOMAIN="" LAYER_UPDATES_URL=""
   while (($# > 0)); do
     case "$1" in
       --domain) LAYER_DOMAIN="${2:?--domain needs a value}"; shift 2 ;;
@@ -43,6 +44,7 @@ parse_args() {
       --no-harden-ssh) LAYER_HARDEN_SSH=0; shift ;;
       --internal-tls) LAYER_INTERNAL_TLS=1; shift ;;
       --apps-domain) LAYER_APPS_DOMAIN="${2:?--apps-domain needs a value}"; shift 2 ;;
+      --updates-url) LAYER_UPDATES_URL="${2:?--updates-url needs a value}"; shift 2 ;;
       --yes) LAYER_YES=1; shift ;;
       -h | --help) usage; exit 0 ;;
       *) usage >&2; die "unknown option: $1" ;;
@@ -57,7 +59,10 @@ parse_args() {
   if [[ -n "$LAYER_APPS_DOMAIN" && ! "$LAYER_APPS_DOMAIN" =~ ^[a-z0-9]([a-z0-9.-]{0,251}[a-z0-9])?$ ]]; then
     die "--apps-domain must be a lowercase domain like apps.example.com"
   fi
-  export LAYER_DOMAIN LAYER_EMAIL LAYER_TARBALL LAYER_HARDEN_SSH LAYER_YES LAYER_INTERNAL_TLS LAYER_APPS_DOMAIN
+  if [[ -n "$LAYER_UPDATES_URL" && ! "$LAYER_UPDATES_URL" =~ ^(https://|http://127\.0\.0\.1[:/])[^[:space:]]+$ ]]; then
+    die "--updates-url must be an https URL"
+  fi
+  export LAYER_DOMAIN LAYER_EMAIL LAYER_TARBALL LAYER_HARDEN_SSH LAYER_YES LAYER_INTERNAL_TLS LAYER_APPS_DOMAIN LAYER_UPDATES_URL
 }
 
 on_error() {

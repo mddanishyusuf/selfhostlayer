@@ -7,7 +7,7 @@ import { assertDomain } from "@layer/protocol";
 import type { ActionTable, Context, Params } from "../context.ts";
 import { ActionError } from "../errors.ts";
 import { BIN } from "../exec.ts";
-import { childOf, ensureDir, lookupGid, writeFileAtomic } from "../fsutil.ts";
+import { childOf, ensureDir, lookupGid, removeManaged, writeFileAtomic } from "../fsutil.ts";
 import { assertHosts, assertRanges, renderPanelSite } from "../templates/caddy-panel.ts";
 
 export interface BoxFile {
@@ -23,9 +23,11 @@ export interface BoxFile {
   internalTls?: boolean;
   /** IPs or ranges the panel answers; empty or missing: anyone. */
   panelAllow?: string[];
+  /** The release feed for update.*, set by the installer (the panel can't change it). */
+  updatesUrl?: string;
 }
 
-function readBox(ctx: Context): BoxFile {
+export function readBox(ctx: Context): BoxFile {
   if (!existsSync(ctx.paths.boxConfig)) throw new ActionError("not_found", `${ctx.paths.boxConfig} is missing (re-run the installer)`);
   return JSON.parse(readFileSync(ctx.paths.boxConfig, "utf8")) as BoxFile;
 }
@@ -65,7 +67,7 @@ async function publish(ctx: Context, next: BoxFile, current: BoxFile): Promise<v
   if (changed) await writeBox(ctx, next);
   const reload = await ctx.exec(BIN.systemctl, ["reload", "caddy"], { allowFail: true, timeoutMs: 120_000 });
   if (reload.code !== 0) {
-    if (previous === null) rmSync(site, { force: true });
+    if (previous === null) removeManaged(site);
     else writeFileAtomic(site, previous, 0o644);
     if (changed) await writeBox(ctx, current);
     await ctx.exec(BIN.systemctl, ["reload", "caddy"], { allowFail: true, timeoutMs: 120_000 });

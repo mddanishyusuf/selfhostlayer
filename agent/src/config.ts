@@ -21,6 +21,10 @@ export interface Paths {
   staticGroup: string | null;
   /** Where app.delete moves data/ when keepData is set. */
   archiveRoot: string;
+  /** Copies of every generated file, for `layer repair`. */
+  managedDir: string;
+  /** Releases downloaded for panel.update. */
+  updatesDir: string;
   /** Backup snapshots waiting for the panel to upload them (root:<socketGroup> 750). */
   stagingDir: string;
   /** Where the panel puts downloaded backups for backup.restore. */
@@ -55,6 +59,8 @@ export const DEFAULT_PATHS: Paths = {
   staticRoot: "/srv/static",
   staticGroup: "caddy",
   archiveRoot: "/var/lib/layer-agent/archive",
+  managedDir: "/var/lib/layer-agent/managed",
+  updatesDir: "/var/lib/layer-agent/updates",
   stagingDir: "/var/lib/layer-staging",
   restoreDir: "/var/lib/layer/restore",
   panelUser: "layer",

@@ -85,3 +85,17 @@
   - GitHub's webhook still gets through: it's signed, and blocking it would stop deploys on push.
 - **Settings → Access:** anyone, only these addresses (yours filled in), or Tailscale only (`100.64.0.0/10`, `fd7a:115c:a1e0::/48`). A list that leaves out the address you're using is refused (`lib/ip.ts` matches IPv4/IPv6 ranges).
 - **`layer access`** shows the list, and **`layer access reset`** lets everyone reach the sign-in page again. That's the way back over SSH.
+
+## Day 4 result (2026-10-29)
+**Done when "update from one build to the next from the UI; repair fixes a hand-edited unit and Caddy file": passed.** In the VM tour, Settings → Check for updates offers a newer build from a test feed, and Update to it runs the installer. The page follows the panel's restart and comes back on the new version. `installer/test/update-e2e.sh` covers `layer update` and a refused bad checksum; `installer/test/repair-e2e.sh` covers repair.
+
+- **Updates** (`update.check`, `update.start`, `update.status`):
+  - The feed URL is `updatesUrl` in `/etc/layer/config.json`, set by the installer (`--updates-url`, default `https://get.selfhostlayer.com/releases.json`). So the panel only picks a version, never where it comes from.
+  - The agent downloads the release and its installer, checks both sha256s from the feed (https only, except `127.0.0.1` for tests), then runs `install.sh --from-tarball … --yes --no-harden-ssh` in its own transient unit, `layer-update.service`. It has to be its own unit, because the installer restarts the agent and the panel.
+  - The installer now keeps the box's settings without flags (panel address, apps domain, local CA, feed), so an update changes nothing else.
+  - **Panel:** Settings → Version → Check for updates → Update to …, with the installer's last lines while it runs. **CLI:** `layer update [version]` follows the installer's output until it ends.
+- **Repair** (`system.repair`, `layer repair`, Settings → Repair):
+  - Every file the agent generates (app units, cron and Redis units, Caddy sites, env files) is recorded as it's written (`/var/lib/layer-agent/managed`). Deleting one forgets it. On first start, files from older versions are adopted as they are.
+  - Repair puts back what was edited or deleted, reloads systemd or Caddy as needed, and restarts only the running units those files feed.
+  - Installer-owned files (`layer-panel.service`, `config.json`) are left to a re-run of the installer, which also writes them.
+- **Found on the way:** port 4998 was already the alert receiver's in the test VM, so the test feed serves on 4996.

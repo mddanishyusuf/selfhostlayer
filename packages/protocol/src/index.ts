@@ -7,6 +7,7 @@ export * from "./client.ts";
  */
 export const ACTIONS = [
   "system.info",
+  "system.repair",
   "node.install",
   "tool.install",
   "app.list",
@@ -47,6 +48,9 @@ export const ACTIONS = [
   "static.publish",
   "logs.tail",
   "security.score",
+  "update.check",
+  "update.start",
+  "update.status",
 ] as const;
 
 export type ActionName = (typeof ACTIONS)[number];

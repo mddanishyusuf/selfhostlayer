@@ -3,7 +3,8 @@ import { Audit } from "./audit.ts";
 import { AGENT_VERSION, DEFAULT_PATHS } from "./config.ts";
 import { createDispatcher } from "./dispatch.ts";
 import { realExec } from "./exec.ts";
-import { lookupGid } from "./fsutil.ts";
+import { filesOnDisk, ownsPath } from "./actions/repair.ts";
+import { adoptManaged, lookupGid, manageFiles } from "./fsutil.ts";
 import { realSpawn } from "./sandbox.ts";
 import { listen } from "./server.ts";
 
@@ -23,6 +24,12 @@ async function main(): Promise<void> {
       process.exit(1);
     }
   }
+
+  // Generated files are recorded as they're written, for `layer repair`; ones
+  // from before this version are recorded as they are now.
+  manageFiles({ dir: paths.managedDir, owns: ownsPath(paths) });
+  const adopted = adoptManaged(filesOnDisk(paths));
+  if (adopted) console.log(`recorded ${adopted} existing generated file(s) for layer repair`);
 
   const server = await listen(paths.socket, createDispatcher(ctx, new Audit(paths.auditLog)), { gid });
   console.log(`layer-agent ${AGENT_VERSION} listening on ${paths.socket}`);
