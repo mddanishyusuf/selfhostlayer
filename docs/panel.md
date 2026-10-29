@@ -77,7 +77,9 @@ Add your own domain:
 2. It checks public DNS through Cloudflare's and Google's resolvers, not the server's own, until the domain points at this server. If something's off, it says what to change: a record pointing elsewhere, Cloudflare's proxy turned on, or an IPv6 record that points somewhere else.
 3. Then it adds the domain to the app's Caddy site, and Caddy gets a Let's Encrypt certificate. The page shows the certificate's status.
 
-Adding a domain can also add `www.` in front of it, redirecting to it. The free `<app>.<apps domain>` address always keeps working.
+Adding a domain can also add `www.` in front of it, redirecting to it.
+
+The free `<app>.<apps domain>` address keeps working next to your domains. Once one of your own domains is live, its remove button turns it off, and **Add it back** restores it. A project's last live domain can't be removed, so the app always answers somewhere.
 
 ```sh
 cat /etc/caddy/sites/<app>.caddy

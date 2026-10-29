@@ -39,7 +39,7 @@ async function CertLine({ host, free }: { host: string; free: boolean }) {
   return <span className={cert.reason === "expired" || cert.reason === "unreachable" ? "text-rose" : cert.reason === "issuing" ? "text-gold" : undefined}>{text}</span>;
 }
 
-export function DomainRow({ d, serverIp, indent }: { d: ProjectDomain; serverIp: string; indent?: boolean }) {
+export function DomainRow({ d, serverIp, removable, indent }: { d: ProjectDomain; serverIp: string; removable: boolean; indent?: boolean }) {
   const pending = d.status === "pending";
   const record = pending ? suggestedRecord(d.host, serverIp) : null;
   const sub = pending ? (
@@ -80,10 +80,10 @@ export function DomainRow({ d, serverIp, indent }: { d: ProjectDomain; serverIp:
           <a href={`https://${d.host}`} target="_blank" rel="noreferrer" title={`Open ${d.host}`} className="grid size-8 place-items-center rounded-lg text-muted transition-colors hover:bg-hover hover:text-foreground">
             <Icon icon={ArrowUpRight01Icon} size={16} />
           </a>
-          {d.role !== "free" && (
+          {removable && (
             <form action={removeDomainAction}>
               <input type="hidden" name="domainId" value={d.id} />
-              <button type="submit" title={`Remove ${d.host}`} className="grid size-8 place-items-center rounded-lg text-muted transition-colors hover:bg-hover hover:text-foreground">
+              <button type="submit" title={d.role === "free" ? `Remove the free address: the app stops answering on ${d.host}` : `Remove ${d.host}`} className="grid size-8 place-items-center rounded-lg text-muted transition-colors hover:bg-hover hover:text-foreground">
                 <Icon icon={Delete02Icon} size={15} />
                 <span className="sr-only">Remove {d.host}</span>
               </button>

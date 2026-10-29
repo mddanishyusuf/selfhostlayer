@@ -99,6 +99,7 @@ const FAKE: Partial<Record<ActionName, unknown>> = {
     apps: { piqo: { cpuNs: 5_000_000_000, memoryMb: 212 } },
   },
   "metrics.disk": { apps: { piqo: 310 } },
+  "proxy.set": {},
   "requests.tail": {
     slug: "piqo",
     requests: [

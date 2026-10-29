@@ -59,7 +59,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const items: PaletteItem[] = [
     ...PAGES,
     ...listProjects().flatMap((p) => [
-      { label: p.slug, href: `/projects/${p.slug}`, hint: p.domains[0] ?? "Project" },
+      { label: p.slug, href: `/projects/${p.slug}`, hint: servingConfig(p.id).domains.find((h) => h !== p.domains[0]) ?? servingConfig(p.id).domains[0] ?? "Project" },
       { label: `${p.slug}: deployments`, href: `/projects/${p.slug}/deployments`, hint: "Project" },
       { label: `${p.slug}: environment`, href: `/projects/${p.slug}/env`, hint: "Project" },
     ]),

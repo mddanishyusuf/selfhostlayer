@@ -1,10 +1,10 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { boxConfig } from "@/lib/box";
+import { boxConfig, freeHost } from "@/lib/box";
 import { checkDomain } from "@/lib/dns";
-import { addDomain, applyDomains, getDomain, hostTaken, normalizeHost, removeDomain, setDomainStatus } from "@/lib/domains";
-import { getProject, getProjectBySlug } from "@/lib/projects";
+import { addDomain, applyDomains, canRemove, getDomain, hostTaken, listDomains, normalizeHost, removeDomain, setDomainStatus } from "@/lib/domains";
+import { getProject, getProjectBySlug, setFreeHost } from "@/lib/projects";
 import { requireUser } from "@/lib/session";
 
 export interface DomainState {
@@ -72,10 +72,28 @@ export async function verifyDomainAction(form: FormData): Promise<void> {
 export async function removeDomainAction(form: FormData): Promise<void> {
   await requireUser();
   const domain = getDomain(Number(field(form, "domainId")));
-  if (!domain || domain.role === "free") return;
+  // The free address can go once another domain is live; the last one a project answers on can't.
+  if (!domain || !canRemove(domain)) return;
   removeDomain(domain.id);
   const project = getProject(domain.projectId);
   if (!project) return;
+  await applyDomains(project);
+  revalidatePath(`/projects/${project.slug}/domains`);
+}
+
+/** Puts the project's free address (<app>.<apps domain>) back after it was removed. */
+export async function restoreFreeDomainAction(form: FormData): Promise<void> {
+  await requireUser();
+  const project = getProjectBySlug(field(form, "slug"));
+  if (!project) return;
+  const domains = listDomains(project.id);
+  if (domains.some((d) => d.role === "free")) return;
+  const host = freeHost(project.slug);
+  // A redirect left on that name by moving the apps domain gives way.
+  const clash = domains.find((d) => d.host === host);
+  if (clash) removeDomain(clash.id);
+  addDomain(project.id, host, "free", null, "active");
+  setFreeHost(project.id, host);
   await applyDomains(project);
   revalidatePath(`/projects/${project.slug}/domains`);
 }

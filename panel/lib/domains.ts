@@ -73,6 +73,15 @@ export function removeDomain(id: number): void {
   db().prepare("DELETE FROM project_domains WHERE id = ? OR (project_id = ? AND redirect_to = ?)").run(id, d.projectId, d.host);
 }
 
+/** The domains a project answers on itself: active, and not redirects. */
+export const servingDomains = (projectId: number): ProjectDomain[] => listDomains(projectId).filter((d) => d.status === "active" && d.role !== "redirect");
+
+/** Whether a domain can go: any, except the last one the project answers on (it would stop being reachable). */
+export function canRemove(d: ProjectDomain): boolean {
+  const serving = servingDomains(d.projectId);
+  return !(serving.length === 1 && serving[0]!.id === d.id);
+}
+
 /** What Caddy should serve: active free and primary hosts, plus active redirects to them. */
 export function servingConfig(projectId: number): { domains: string[]; redirects: { from: string; to: string }[] } {
   const active = listDomains(projectId).filter((d) => d.status === "active");
