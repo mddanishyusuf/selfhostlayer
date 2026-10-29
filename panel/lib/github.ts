@@ -160,18 +160,12 @@ export interface Repo {
   html_url: string;
 }
 
-/** Every repo an installation can see (paged by 100). */
+/** Every repo an installation can see: the first page of 100 says how many, the rest load in parallel. */
 export async function listInstallationRepos(app: GithubAppCredentials, installationId: number, fetchImpl?: Fetch): Promise<Repo[]> {
   const { token } = await installationToken(app, installationId, { permissions: { metadata: "read" } }, fetchImpl);
-  const repos: Repo[] = [];
-  for (let page = 1; page <= 50; page++) {
-    const res = await github<{ total_count: number; repositories: Repo[] }>(
-      `/installation/repositories?per_page=100&page=${page}`,
-      { token },
-      fetchImpl,
-    );
-    repos.push(...res.repositories);
-    if (repos.length >= res.total_count || res.repositories.length === 0) break;
-  }
-  return repos;
+  const page = (n: number) => github<{ total_count: number; repositories: Repo[] }>(`/installation/repositories?per_page=100&page=${n}`, { token }, fetchImpl);
+  const first = await page(1);
+  const pages = Math.min(50, Math.ceil(first.total_count / 100));
+  const rest = await Promise.all(Array.from({ length: Math.max(0, pages - 1) }, (_, i) => page(i + 2)));
+  return [first, ...rest].flatMap((r) => r.repositories);
 }

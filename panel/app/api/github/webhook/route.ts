@@ -1,5 +1,6 @@
 import { verifyWebhookSignature, type Installation } from "@/lib/github";
 import { createDeployment } from "@/lib/deploy";
+import { forgetRepos } from "@/lib/github-repos";
 import { getApp, recordDelivery, removeInstallation, upsertInstallation } from "@/lib/github-store";
 import { projectsForPush } from "@/lib/projects";
 
@@ -41,6 +42,11 @@ export async function POST(request: Request) {
         if (payload.action === "deleted") removeInstallation(payload.installation.id);
         else upsertInstallation(payload.installation);
       }
+      forgetRepos();
+      break;
+    case "installation_repositories":
+      // Repositories added to or removed from an installation: the New project list changes.
+      forgetRepos();
       break;
     case "push": {
       // Deploy every project that tracks this repo and branch (auto-deploy on).

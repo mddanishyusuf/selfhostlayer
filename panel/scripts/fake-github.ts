@@ -44,6 +44,17 @@ const installation = { id: FAKE.installationId, account: { login: "mddanishyusuf
 const repos = [
   { id: 1, name: "selfhostlayer-examples", full_name: "mddanishyusuf/selfhostlayer-examples", owner: { login: "mddanishyusuf" }, private: false, default_branch: "main", pushed_at: new Date(Date.now() - 3600_000).toISOString(), html_url: "https://github.com/mddanishyusuf/selfhostlayer-examples" },
   { id: 2, name: "piqo", full_name: "mddanishyusuf/piqo", owner: { login: "mddanishyusuf" }, private: true, default_branch: "main", pushed_at: new Date(Date.now() - 86400_000 * 3).toISOString(), html_url: "https://github.com/mddanishyusuf/piqo" },
+  // FAKE_REPOS=<n> adds n more, for paging through a long list.
+  ...Array.from({ length: Number(process.env.FAKE_REPOS ?? 0) }, (_, i) => ({
+    id: 100 + i,
+    name: `project-${i + 1}`,
+    full_name: `mddanishyusuf/project-${i + 1}`,
+    owner: { login: "mddanishyusuf" },
+    private: i % 3 === 0,
+    default_branch: "main",
+    pushed_at: new Date(Date.now() - 86400_000 * (i + 4)).toISOString(),
+    html_url: `https://github.com/mddanishyusuf/project-${i + 1}`,
+  })),
 ];
 
 createServer(async (req, res) => {
@@ -84,7 +95,10 @@ createServer(async (req, res) => {
   }
   if (req.method === "GET" && path === "/installation/repositories") {
     if (req.headers.authorization !== `Bearer ${FAKE.token}`) return json(res, 401, { message: "Bad credentials" });
-    return json(res, 200, { total_count: repos.length, repositories: repos });
+    // Paged like GitHub: per_page (at most 100) and page.
+    const perPage = Math.min(100, Number(url.searchParams.get("per_page") ?? 30));
+    const page = Number(url.searchParams.get("page") ?? 1);
+    return json(res, 200, { total_count: repos.length, repositories: repos.slice((page - 1) * perPage, page * perPage) });
   }
   json(res, 404, { message: `fake-github: no route for ${req.method} ${path}` });
 }).listen(port, () => console.log(`fake GitHub on http://localhost:${port}`));

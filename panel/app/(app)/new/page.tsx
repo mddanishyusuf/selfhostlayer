@@ -1,11 +1,11 @@
 import { GithubIcon } from "@hugeicons/core-free-icons";
 import Link from "next/link";
 import { PublicRepoForm } from "@/components/deploy";
-import { RepoSearch } from "@/components/github-connect";
+import { RepoPicker } from "@/components/github-connect";
 import { Icon } from "@/components/icon";
 import { Empty, PageHeader, PillLink, SettingsRow } from "@/components/page";
 import { FormError } from "@/components/ui";
-import { GITHUB_WEB, listInstallationRepos } from "@/lib/github";
+import { GITHUB_WEB } from "@/lib/github";
 import { getApp, listInstallations } from "@/lib/github-store";
 import { requireUser } from "@/lib/session";
 
@@ -36,15 +36,8 @@ export default async function NewProjectPage({ searchParams }: { searchParams: P
   const installs = listInstallations().filter((i) => !i.suspended);
   const installUrl = `${GITHUB_WEB}/apps/${app.slug}/installations/new`;
 
-  let repos: (Awaited<ReturnType<typeof listInstallationRepos>>[number] & { installationId: number })[] = [];
-  let loadError: string | null = null;
-  try {
-    repos = (await Promise.all(installs.map(async (i) => (await listInstallationRepos(app.credentials, i.id)).map((r) => ({ ...r, installationId: i.id }))))).flat();
-  } catch {
-    loadError = "Couldn't load repositories from GitHub. Check that the app is still installed, then reload.";
-  }
-  repos.sort((a, b) => (b.pushed_at ?? "").localeCompare(a.pushed_at ?? ""));
-  const message = error === "installation" ? "GitHub didn't confirm that installation. Try installing the app again." : loadError;
+  // The list itself loads in the page (RepoPicker), so it shows at once.
+  const message = error === "installation" ? "GitHub didn't confirm that installation. Try installing the app again." : null;
 
   return (
     <>
@@ -77,7 +70,7 @@ export default async function NewProjectPage({ searchParams }: { searchParams: P
           </Empty>
         </section>
       ) : (
-        <RepoSearch repos={repos.map((r) => ({ fullName: r.full_name, private: r.private, pushedAt: r.pushed_at, branch: r.default_branch, installationId: r.installationId }))} />
+        <RepoPicker />
       )}
       <details className="group border-b border-border">
         <summary className="flex h-[52px] cursor-pointer list-none items-center gap-2 px-4 text-[14px] font-medium text-muted transition-colors hover:bg-hover hover:text-foreground sm:px-7">

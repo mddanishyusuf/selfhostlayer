@@ -9,6 +9,8 @@ import { agent, type SystemInfo } from "@/lib/agent";
 import { frameworkLabel } from "@/lib/detect";
 import { FINISHED, listDeployments, liveDeployment } from "@/lib/deploy";
 import { servingConfig } from "@/lib/domains";
+import { allRepos } from "@/lib/github-repos";
+import { getApp } from "@/lib/github-store";
 import { listProjects } from "@/lib/projects";
 
 export const dynamic = "force-dynamic";
@@ -29,6 +31,8 @@ const FW_DOT: Record<string, string> = {
 
 export default async function ProjectsPage({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
   const { q } = await searchParams;
+  // Warm the New project list in the background, so it opens without waiting on GitHub.
+  if (getApp()) void allRepos().catch(() => {});
   const all = listProjects();
   const term = q?.trim().toLowerCase();
   const projects = term ? all.filter((p) => `${p.slug} ${p.domains.join(" ")} ${p.repoName}`.toLowerCase().includes(term)) : all;

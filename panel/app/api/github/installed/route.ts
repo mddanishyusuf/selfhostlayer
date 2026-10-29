@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { getInstallation } from "@/lib/github";
+import { forgetRepos } from "@/lib/github-repos";
 import { getApp, upsertInstallation } from "@/lib/github-store";
 import { requireUser } from "@/lib/session";
 
@@ -18,6 +19,7 @@ export async function GET(request: Request) {
   if (!Number.isSafeInteger(id) || id <= 0) redirect("/new?error=installation");
   try {
     upsertInstallation(await getInstallation(app.credentials, id));
+    forgetRepos();
   } catch {
     redirect("/new?error=installation");
   }
