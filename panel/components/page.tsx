@@ -83,10 +83,16 @@ export function SettingsRow({ title, description, children, id }: { title: React
   );
 }
 
-/** Label/value lines. inset: inside a SettingsRow (no side padding). */
-export function KeyValues({ items, inset }: { items: [ReactNode, ReactNode][]; inset?: boolean }) {
+/** Label/value lines. inset: inside a SettingsRow (no side padding). flush: no line above (something else draws it). */
+export function KeyValues({ items, inset, flush }: { items: [ReactNode, ReactNode][]; inset?: boolean; flush?: boolean }) {
   return (
-    <div className={cx("grid", inset ? "grid-cols-[130px_minmax(0,1fr)] border-b border-border" : "grid-cols-[110px_minmax(0,1fr)] border-t border-border sm:grid-cols-[160px_minmax(0,1fr)]")}>
+    <div
+      className={cx(
+        "grid content-start",
+        inset ? "grid-cols-[130px_minmax(0,1fr)] border-b border-border" : "grid-cols-[110px_minmax(0,1fr)] sm:grid-cols-[160px_minmax(0,1fr)]",
+        !inset && !flush && "border-t border-border",
+      )}
+    >
       {items.map(([k, v], i) => {
         const last = i === items.length - 1;
         const cell = cx("min-w-0 text-sm", !last && "border-b border-border", inset ? "py-[11px]" : "px-4 py-[13px] sm:px-7");
@@ -113,7 +119,7 @@ export interface Stat {
 /** A strip of numbers separated by vertical lines. */
 export function Stats({ items }: { items: Stat[] }) {
   return (
-    <div className={cx("grid grid-cols-2 border-b border-border", items.length >= 5 ? "lg:grid-cols-5" : items.length === 3 ? "lg:grid-cols-3" : "lg:grid-cols-4")}>
+    <div className={cx("grid grid-cols-2 border-b border-border", items.length >= 5 ? "lg:grid-cols-5" : items.length === 3 ? "lg:grid-cols-3" : items.length === 2 ? "lg:grid-cols-2" : "lg:grid-cols-4")}>
       {items.map((s, i) => (
         <div key={i} className="grid min-w-0 gap-1 border-b border-r border-border px-4 py-4 even:border-r-0 sm:px-7 lg:border-b-0 lg:py-[18px] lg:even:border-r lg:last:border-r-0">
           <span className="text-[13px] text-dim">{s.label}</span>
@@ -279,7 +285,7 @@ export function ComingSoon({ icon, title, children }: { icon: ReactNode; title: 
       <span className="grid size-12 place-items-center rounded-full bg-hover text-muted">{icon}</span>
       <p className="text-[17px] font-semibold">{title}</p>
       <div className="max-w-[460px] text-[14px] text-muted">{children}</div>
-      <span className="rounded-full border border-border-strong px-3 py-1 text-[12px] font-semibold text-muted">Coming soon</span>
+      <span className="rounded-md border border-border-strong px-2.5 py-1 text-[12px] font-semibold text-muted">Coming soon</span>
     </div>
   );
 }

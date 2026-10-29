@@ -6,6 +6,7 @@ import { agent } from "@/lib/agent";
 import { activeDeployment, cancelDeployment, deploymentPath, deployProject, getDeployment, rollbackTo, type Deployment } from "@/lib/deploy";
 import { parseRepoUrl } from "@/lib/github-repo";
 import { importRepo } from "@/lib/import";
+import { removePreview } from "@/lib/preview";
 import { parseEnvVars, parseSettings } from "@/lib/project-settings";
 import { deleteProject, getProject, getProjectBySlug, setProjectEnv, updateProjectSettings } from "@/lib/projects";
 import { restartWithNewEnv } from "@/lib/services";
@@ -98,6 +99,7 @@ export async function removeProject(_prev: SettingsState, form: FormData): Promi
     }
   }
   deleteProject(project.id);
+  removePreview(project.slug);
   redirect("/");
 }
 

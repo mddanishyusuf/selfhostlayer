@@ -34,7 +34,7 @@ export function DestinationForm({ providers, saved }: { providers: ProviderInfo[
   return (
     <form action={action} className="grid gap-4">
       <input type="hidden" name="provider" value={provider} />
-      <div className="inline-flex flex-wrap gap-0.5 justify-self-start rounded-[20px] border border-border-strong p-[3px]" role="radiogroup" aria-label="Storage provider">
+      <div className="inline-flex flex-wrap gap-0.5 justify-self-start rounded-lg border border-border-strong p-[3px]" role="radiogroup" aria-label="Storage provider">
         {providers.map((p) => (
           <button
             key={p.id}
@@ -45,7 +45,7 @@ export function DestinationForm({ providers, saved }: { providers: ProviderInfo[
               setProvider(p.id);
               if (p.region || provider === "r2") setRegion(p.region);
             }}
-            className={cx("h-7 rounded-full px-3.5 text-[13px] font-medium transition-colors duration-150", provider === p.id ? "bg-selected text-foreground" : "text-muted hover:text-foreground")}
+            className={cx("h-7 rounded-md px-3 text-[13px] font-medium transition-colors duration-150", provider === p.id ? "bg-selected text-foreground" : "text-muted hover:text-foreground")}
           >
             {p.label}
           </button>

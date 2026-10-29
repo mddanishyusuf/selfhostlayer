@@ -24,7 +24,7 @@ export function Button({
   return (
     <button
       className={cx(
-        "inline-flex select-none items-center justify-center gap-1.5 whitespace-nowrap rounded-full font-semibold transition-[background-color,opacity] duration-150 ease-out disabled:pointer-events-none disabled:opacity-50",
+        "inline-flex select-none items-center justify-center gap-1.5 whitespace-nowrap rounded-md font-semibold transition-[background-color,opacity] duration-150 ease-out disabled:pointer-events-none disabled:opacity-50",
         size === "sm" ? "h-7 px-3 text-[12.5px]" : "h-[34px] px-3.5 text-[13px]",
         focus,
         VARIANTS[variant],
@@ -37,7 +37,7 @@ export function Button({
 
 export const buttonClass = (variant: keyof typeof VARIANTS = "primary", size: "sm" | "md" = "md") =>
   cx(
-    "inline-flex select-none items-center justify-center gap-1.5 whitespace-nowrap rounded-full font-semibold transition-[background-color,opacity] duration-150 ease-out",
+    "inline-flex select-none items-center justify-center gap-1.5 whitespace-nowrap rounded-md font-semibold transition-[background-color,opacity] duration-150 ease-out",
     size === "sm" ? "h-7 px-3 text-[12.5px]" : "h-[34px] px-3.5 text-[13px]",
     focus,
     VARIANTS[variant],
@@ -47,7 +47,7 @@ export function Input({ className, ...props }: ComponentProps<"input">) {
   return (
     <input
       className={cx(
-        "h-[38px] w-full rounded-lg border border-border-strong bg-transparent px-3 text-sm transition-[border-color,box-shadow] duration-150 placeholder:text-dim focus:border-lavender focus:shadow-[0_0_0_3px_color-mix(in_srgb,var(--lavender)_22%,transparent)]",
+        "h-[38px] w-full rounded-md border border-border-strong bg-transparent px-3 text-sm transition-[border-color,box-shadow] duration-150 placeholder:text-dim focus:border-lavender focus:shadow-[0_0_0_3px_color-mix(in_srgb,var(--lavender)_22%,transparent)]",
         "outline-none aria-invalid:border-rose",
         className,
       )}
@@ -59,7 +59,7 @@ export function Input({ className, ...props }: ComponentProps<"input">) {
 export function Select({ className, ...props }: ComponentProps<"select">) {
   return (
     <select
-      className={cx("select-pill h-[38px] w-full rounded-lg border border-border-strong bg-transparent pl-3 pr-8 text-sm outline-none focus:border-lavender", className)}
+      className={cx("select-pill h-[38px] w-full rounded-md border border-border-strong bg-transparent pl-3 pr-8 text-sm outline-none focus:border-lavender", className)}
       {...props}
     />
   );
@@ -71,7 +71,7 @@ export function Label({ className, ...props }: ComponentProps<"label">) {
 
 export function Field({ label, htmlFor, hint, children }: { label: string; htmlFor: string; hint?: ReactNode; children: ReactNode }) {
   return (
-    <div className="grid gap-1.5">
+    <div className="grid content-start gap-1.5">
       <Label htmlFor={htmlFor}>{label}</Label>
       {children}
       {hint && <p className="text-[12.5px] text-dim">{hint}</p>}
@@ -120,7 +120,7 @@ export function Pill({ children, outline, className }: { children: ReactNode; ou
   return (
     <span
       className={cx(
-        "inline-flex h-[22px] items-center whitespace-nowrap rounded-full px-2.5 text-[12px] font-medium",
+        "inline-flex h-[22px] items-center whitespace-nowrap rounded-md px-2 text-[12px] font-medium",
         outline ? "border border-border-strong text-muted" : "bg-pill text-foreground",
         className,
       )}

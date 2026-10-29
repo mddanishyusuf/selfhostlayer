@@ -80,7 +80,7 @@ export function EnvEditor({ initial, error }: { initial: [string, string][]; err
             rows={4}
             spellCheck={false}
             placeholder={"DATABASE_URL=postgres://…\nAPI_KEY=…"}
-            className="w-full rounded-lg border border-border-strong bg-transparent p-3 font-mono text-[12.5px] outline-none placeholder:text-dim focus:border-lavender"
+            className="w-full rounded-md border border-border-strong bg-transparent p-3 font-mono text-[12.5px] outline-none placeholder:text-dim focus:border-lavender"
           />
           <Button
             type="button"
@@ -126,9 +126,9 @@ function SaveButtons({ isNew }: { isNew: boolean }) {
 /** Two choices as one pill group (radio inputs, so the form posts the value). */
 function Segmented<T extends string>({ name, value, options, onChange, label }: { name: string; value: T; options: [T, string][]; onChange: (v: T) => void; label: string }) {
   return (
-    <div className="inline-flex flex-wrap gap-0.5 justify-self-start rounded-[20px] border border-border-strong p-[3px]" role="radiogroup" aria-label={label}>
+    <div className="inline-flex flex-wrap gap-0.5 justify-self-start rounded-lg border border-border-strong p-[3px]" role="radiogroup" aria-label={label}>
       {options.map(([v, text]) => (
-        <label key={v} className={cx("flex h-7 cursor-pointer items-center rounded-full px-3.5 text-[13px] font-medium transition-colors duration-150", value === v ? "bg-selected text-foreground" : "text-muted hover:text-foreground")}>
+        <label key={v} className={cx("flex h-7 cursor-pointer items-center rounded-md px-3 text-[13px] font-medium transition-colors duration-150", value === v ? "bg-selected text-foreground" : "text-muted hover:text-foreground")}>
           <input type="radio" name={name} value={v} checked={value === v} onChange={() => onChange(v)} className="sr-only" />
           {text}
         </label>

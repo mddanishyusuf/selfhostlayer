@@ -16,7 +16,7 @@ export default async function RecoveryPage() {
   return (
     <>
       <AuthHeader title="Save your recovery codes" description="If you lose your phone, each code signs you in once. This is the only time they're shown." />
-      <div className="mb-4 rounded-lg border border-border-strong p-4">
+      <div className="mb-4 rounded-md border border-border-strong p-4">
         <ul className="grid grid-cols-2 gap-x-6 gap-y-2 font-mono text-[13px] tabular-nums">
           {codes.map((code) => (
             <li key={code}>{code}</li>

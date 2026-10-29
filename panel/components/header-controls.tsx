@@ -4,6 +4,7 @@ import { Search01Icon } from "@hugeicons/core-free-icons";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Icon } from "./icon";
+import { cx } from "./ui";
 import { openServerModal } from "./shell/server-modal";
 
 /** The "● server · CPU · RAM" pill that opens the server modal. */
@@ -13,7 +14,7 @@ export function ServerButton({ children }: { children: ReactNode }) {
       type="button"
       onClick={openServerModal}
       title="Server status"
-      className="inline-flex h-[34px] items-center gap-2 whitespace-nowrap rounded-full border border-border-strong px-3.5 text-[13px] text-muted transition-colors duration-150 hover:bg-hover hover:text-foreground"
+      className="inline-flex h-[34px] items-center gap-2 whitespace-nowrap rounded-md border border-border-strong px-3 text-[13px] text-muted transition-colors duration-150 hover:bg-hover hover:text-foreground"
     >
       {children}
     </button>
@@ -21,7 +22,7 @@ export function ServerButton({ children }: { children: ReactNode }) {
 }
 
 /** A search box that keeps its text in the URL (?q=), so the server filters. */
-export function FilterBox({ placeholder, param = "q" }: { placeholder: string; param?: string }) {
+export function FilterBox({ placeholder, param = "q", className }: { placeholder: string; param?: string; className?: string }) {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
@@ -29,7 +30,12 @@ export function FilterBox({ placeholder, param = "q" }: { placeholder: string; p
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
   useEffect(() => () => clearTimeout(timer.current), []);
   return (
-    <label className="hidden h-[34px] w-[220px] items-center gap-2 rounded-full border border-border-strong px-3 text-dim lg:flex">
+    <label
+      className={cx(
+        "flex h-[34px] min-w-0 items-center gap-2 rounded-md border border-border-strong px-3 text-dim transition-[border-color,box-shadow] duration-150 focus-within:border-lavender focus-within:shadow-[0_0_0_3px_color-mix(in_srgb,var(--lavender)_22%,transparent)]",
+        className,
+      )}
+    >
       <Icon icon={Search01Icon} size={15} />
       <input
         value={value}

@@ -37,7 +37,7 @@ export function SecretUrl({ url }: { url: string }) {
   const [shown, setShown] = useState(false);
   const masked = url.replace(/:\/\/([^:]*):([^@]+)@/, (_m, user) => `://${user}:••••••••@`);
   return (
-    <div className="flex h-[38px] min-w-0 items-center justify-between gap-2 rounded-lg border border-border-strong pl-3 pr-1.5">
+    <div className="flex h-[38px] min-w-0 items-center justify-between gap-2 rounded-md border border-border-strong pl-3 pr-1.5">
       <code className="min-w-0 truncate font-mono text-[12.5px]" data-testid="secret-url">
         {shown ? url : masked}
       </code>

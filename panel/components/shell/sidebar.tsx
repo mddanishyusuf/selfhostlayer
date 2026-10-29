@@ -170,7 +170,7 @@ function Nav(props: SidebarProps & { onNavigate?: () => void }) {
           props.onNavigate?.();
           openPalette();
         }}
-        className="mx-3 mb-1 mt-3 flex h-9 items-center gap-2.5 rounded-lg border border-border px-2.5 text-left text-dim transition-colors hover:border-border-strong hover:text-muted"
+        className="mx-3 mb-1 mt-3 flex h-9 items-center gap-2.5 rounded-md border border-border px-2.5 text-left text-dim transition-colors hover:border-border-strong hover:text-muted"
       >
         <Icon icon={Search01Icon} size={16} />
         <span>Search</span>
