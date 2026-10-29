@@ -167,8 +167,8 @@ async function prune(settings: BackupSettings, kind: Backup["kind"], slug: strin
 
 function requireSettings(): BackupSettings {
   const settings = getBackupSettings();
-  if (!settings) throw new Error("Connect a storage bucket first (Backups in the top bar).");
-  if (!settings.keyConfirmed) throw new Error("Save the recovery key first (Backups in the top bar).");
+  if (!settings) throw new Error("Connect a storage bucket first (Server → Backups).");
+  if (!settings.keyConfirmed) throw new Error("Save the recovery key first (Server → Backups).");
   return settings;
 }
 

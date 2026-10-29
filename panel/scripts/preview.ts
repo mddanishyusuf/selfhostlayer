@@ -47,7 +47,7 @@ function seedMetrics() {
 
 function seed() {
   if (!db.prepare("SELECT 1 FROM users").get()) {
-    db.prepare("INSERT INTO users (email, password_hash, totp_secret_enc, created_at) VALUES (?, 'x', 'x', ?)").run("danish@mvpstack.com", now);
+    db.prepare("INSERT INTO users (email, password_hash, totp_secret_enc, created_at) VALUES (?, 'x', 'x', ?)").run("you@example.com", now);
   }
   if (db.prepare("SELECT 1 FROM projects").get()) return;
   const node = (exec: string[], writable: string[] = []) => JSON.stringify({ kind: "node", exec, writablePaths: writable, healthPath: "/" });
@@ -65,9 +65,9 @@ function seed() {
     ids[slug] = Number(
       db
         .prepare("INSERT INTO projects (slug, repo_owner, repo_name, branch, framework, package_manager, node_version, runtime, domains, created_at) VALUES (?, 'mddanishyusuf', ?, 'main', ?, ?, ?, ?, ?, ?)")
-        .run(slug, repo, fw, pm, nodeV, runtime, JSON.stringify([`${slug}.37-27-25-45.sslip.io`]), now - 86400 * 20).lastInsertRowid,
+        .run(slug, repo, fw, pm, nodeV, runtime, JSON.stringify([`${slug}.203-0-113-7.sslip.io`]), now - 86400 * 20).lastInsertRowid,
     );
-    db.prepare("INSERT INTO project_domains (project_id, host, role, status, created_at, verified_at) VALUES (?, ?, 'free', 'active', ?, ?)").run(ids[slug], `${slug}.37-27-25-45.sslip.io`, now - 86400 * 20, now - 86400 * 20);
+    db.prepare("INSERT INTO project_domains (project_id, host, role, status, created_at, verified_at) VALUES (?, ?, 'free', 'active', ?, ?)").run(ids[slug], `${slug}.203-0-113-7.sslip.io`, now - 86400 * 20, now - 86400 * 20);
   }
   const steps = JSON.stringify([{ name: "fetch", ms: 700 }, { name: "install", ms: 17200 }, { name: "build", ms: 39400 }, { name: "start", ms: 900 }, { name: "switch", ms: 2100 }]);
   const deploys: [string, string, string, string, string, number, string | null][] = [
@@ -169,6 +169,8 @@ for (const spec of paths) {
     await send("Runtime.evaluate", { expression: `document.querySelector(${JSON.stringify(o.slice(6))})?.click()` });
     await sleep(900);
   }
+  // The dev server's own badge isn't part of the panel.
+  await send("Runtime.evaluate", { expression: `document.querySelector("nextjs-portal")?.remove()` });
   const { data } = await send("Page.captureScreenshot", { format: "png" });
   const name = spec.replace(/^\//, "").replace(/@click:.*/, "@click").replace(/[^a-z0-9@-]+/gi, "_") || "home";
   writeFileSync(join(outDir, `${name}.png`), Buffer.from(data, "base64"));

@@ -147,3 +147,24 @@
   - Backups say "MySQL dump".
 - **Found on the way, older than MySQL:** systemd replaces `${...}` in a sandboxed job's command line with an environment variable of that name, even inside a shell script. Unknown names become empty, so `${login%%:*}` in the restore script came out empty. Only expansions with a `:` survived (`${DATABASE_URL:-}`, which is why Postgres restores worked). Every `$` in a job's command is now escaped (`$$`), so jobs run exactly the text the agent gives them. Unit files already escaped it.
 - **And a live-update gap:** a deployment page could miss the end of its build and show "Building" forever. The tour hit it once: after a refresh partway through the build, the page stopped showing what the stream delivered, though the server sent all of it. The page now reconnects when its stream drops or goes quiet (the server pings every 15 seconds). Each connection starts with the whole log, so the page always catches up.
+
+## Day 8 result (2026-10-29)
+**Done when "CI fails above 200MB; every panel page has a docs section": done.**
+
+- **The idle budget in CI** (`installer/test/idle-budget.sh`):
+  - It adds up the PSS of every process in the `layer-panel`, `layer-agent` and `caddy` units. PSS is each process's share of the memory it maps; page cache isn't counted.
+  - It measures after the panel has served its sign-in page, so it's a panel someone has opened, not one that never served anything.
+  - CI runs it right after the install and fails above 200MB.
+  - On the 2 vCPU VM: panel 58MB + agent 20MB + Caddy 52MB = **131MB**. Week 1 measured 172MB.
+- **Docs** in `docs/`, written for people installing Self Host Layer on their own server:
+  - [Install](docs/install.md): requirements, flags, what the installer changes step by step, what's where on the box, updating, repairing, removing.
+  - [The panel, page by page](docs/panel.md): every page, with the commands underneath its buttons.
+  - [The `layer` command](docs/cli.md): every command, with the raw commands underneath.
+  - [Security model](docs/security.md): how apps are fenced in, the panel and agent, backups, and the honest limits.
+  - [Moving an app from pm2](docs/moving-from-pm2.md), from Day 1.
+  - The README now points to `docs/`. Every claim was checked against the code, which caught a few things below.
+- **Found on the way:**
+  - The installer accepts `--email` but never uses it. It's left out of the docs. Let's Encrypt no longer sends expiry emails, so it can probably just go.
+  - Two backup errors still said "Backups in the top bar", from before the redesign. They now say Server → Backups.
+  - The panel keeps an encrypted copy of the backup recovery key, so scheduled backups can run. The docs say so rather than "only you hold it".
+  - The preview seed used a real email and server address. It now uses example values, and preview screenshots hide the dev server's badge.

@@ -59,6 +59,8 @@ jobs:
       - name: install on a fresh runner
         run: sudo bash dist/install.sh --from-tarball dist/layer-ci.tar.gz $INSTALL_FLAGS
       - run: sudo bash installer/test/verify.sh
+      - name: idle budget (panel + agent + Caddy at most 200MB)
+        run: sudo bash installer/test/idle-budget.sh 200
       - name: re-run is safe (idempotent), and prints a fresh setup token
         run: |
           sudo bash dist/install.sh --from-tarball dist/layer-ci.tar.gz $INSTALL_FLAGS | tee install.out
