@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { createWriteStream, existsSync, mkdtempSync, renameSync, rmSync } from "node:fs";
+import { createWriteStream, existsSync, lstatSync, mkdtempSync, readFileSync, renameSync, rmSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Readable, Transform } from "node:stream";
@@ -43,11 +43,49 @@ export async function download(url: string, path: string): Promise<string> {
   return hash.digest("hex");
 }
 
+/**
+ * Node 25 and later don't ship corepack, which builds use to run yarn and
+ * pnpm. It's added the way Node 24 lays it out (lib/node_modules/corepack and
+ * a bin/corepack link), from a pinned npm tarball checked against its
+ * integrity hash. Returns whether it was added.
+ */
+export async function ensureCorepack(ctx: Context, dir: string): Promise<boolean> {
+  const link = join(dir, "bin", "corepack");
+  const target = join(dir, "lib", "node_modules", "corepack");
+  if (existsSync(link)) return false;
+  const { url, integrity } = ctx.paths.corepack;
+  const tmp = mkdtempSync(join(tmpdir(), "layer-corepack-"));
+  const partial = `${target}.partial`;
+  try {
+    const file = join(tmp, "corepack.tgz");
+    await download(url, file);
+    if (`sha512-${createHash("sha512").update(readFileSync(file)).digest("base64")}` !== integrity) {
+      throw new ActionError("checksum_mismatch", `${url} doesn't match its pinned integrity hash`);
+    }
+    rmSync(partial, { recursive: true, force: true });
+    ensureDir(partial, 0o755);
+    await ctx.exec(BIN.tar, ["-xzf", file, "-C", partial, "--strip-components=1", "--no-same-owner"], { timeoutMs: 60_000 });
+    // npm tarballs list only files, so tar makes their folders under the
+    // agent's umask (077): every app user must be able to read and run them.
+    await ctx.exec(BIN.chmod, ["-R", "u=rwX,go=rX", partial]);
+    rmSync(target, { recursive: true, force: true });
+    renameSync(partial, target);
+    // A link left from a broken install points nowhere: replace it.
+    if (lstatSync(link, { throwIfNoEntry: false })) rmSync(link);
+    symlinkSync("../lib/node_modules/corepack/dist/corepack.js", link);
+  } finally {
+    rmSync(tmp, { recursive: true, force: true });
+    rmSync(partial, { recursive: true, force: true });
+  }
+  return true;
+}
+
 async function nodeInstall(params: Params, ctx: Context) {
   const version = assertNodeVersion(params.version, "version");
   const dest = join(ctx.paths.nodeRoot, version);
   if (existsSync(join(dest, "bin", "node"))) {
-    return { version, path: dest, installed: false };
+    // Runtimes installed before corepack was added for Node 25+ get it now.
+    return { version, path: dest, installed: false, corepack: await ensureCorepack(ctx, dest) };
   }
 
   const tarball = `node-v${version}-linux-${nodeArch()}.tar.xz`;
@@ -77,6 +115,7 @@ async function nodeInstall(params: Params, ctx: Context) {
       timeoutMs: 5 * 60_000,
     });
     await ctx.exec(BIN.chmod, ["-R", "go-w", partial]);
+    await ensureCorepack(ctx, partial);
     renameSync(partial, dest);
   } finally {
     rmSync(tmp, { recursive: true, force: true });

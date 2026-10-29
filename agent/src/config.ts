@@ -42,6 +42,8 @@ export interface Paths {
   /** Supplementary group for every app user. */
   appsGroup: string;
   nodeDistBase: string;
+  /** corepack for Node versions that don't ship it (25 and later): a pinned npm tarball and its integrity hash. */
+  corepack: { url: string; integrity: string };
   portRange: { min: number; max: number };
   /** Builds refuse to start below this fraction of free disk on appsRoot. */
   minFreeDisk: number;
@@ -72,6 +74,10 @@ export const DEFAULT_PATHS: Paths = {
   ufwDir: "/etc/ufw",
   appsGroup: "layer-apps",
   nodeDistBase: "https://nodejs.org/dist",
+  corepack: {
+    url: "https://registry.npmjs.org/corepack/-/corepack-0.36.0.tgz",
+    integrity: "sha512-SiiJsBhZqdBiPHTEl6OT3sASrRrKIcYTQMsVGXx6EE/gM8WFMwYjeIX8Tt8RiU4Iv2J6LbT8KpGfCOsBpRWB/w==",
+  },
   portRange: { min: 4000, max: 4999 },
   minFreeDisk: 0.15,
 };

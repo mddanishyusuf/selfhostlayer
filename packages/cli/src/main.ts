@@ -215,7 +215,8 @@ async function main() {
     case "call": {
       const action = need("action");
       if (!isActionName(action)) throw new Error(`unknown action: ${action}`);
-      return console.log(JSON.stringify(await callAgent(action, extra ? JSON.parse(extra) : {}), null, 2));
+      // A job's output (a build's log, say) streams to stderr; the result goes to stdout.
+      return console.log(JSON.stringify(await callAgent(action, extra ? JSON.parse(extra) : {}, { onChunk: (c) => process.stderr.write(c) }), null, 2));
     }
     case undefined:
     case "help": return console.log(HELP);
