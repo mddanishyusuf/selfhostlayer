@@ -43,6 +43,9 @@ export function isCloudflareIp(ip: string): boolean {
 export function evaluateDns(results: DnsAnswers[], serverIp: string): DnsVerdict {
   const key = (r: DnsAnswers) => [...r.a].sort().join(",") + "|" + [...r.aaaa].sort().join(",");
   if (results.length === 0) return { status: "none" };
+  // Cloudflare hands different resolvers different proxy addresses: when all
+  // of them answer with Cloudflare's, that's the proxy, not a change spreading.
+  if (results.every((r) => r.a.length > 0 && r.a.every(isCloudflareIp))) return { status: "cloudflare", found: [...new Set(results.flatMap((r) => r.a))] };
   if (new Set(results.map(key)).size > 1) return { status: "resolvers_disagree" };
   const { a, aaaa } = results[0]!;
   if (a.length === 0 && aaaa.length === 0) return { status: "none" };

@@ -73,3 +73,16 @@ describe("isRootDomain", () => {
     for (const sub of ["docs.superdevpro.com", "www.example.com", "shop.example.co.uk", "a.b.piqo.app"]) expect(isRootDomain(sub), sub).toBe(false);
   });
 });
+
+describe("evaluateDns behind Cloudflare's proxy", () => {
+  it("sees the proxy even when each resolver got different Cloudflare addresses", () => {
+    // What docs.superdevpro.com looked like from a server in Germany.
+    const cloudflareDns = ans(["188.114.96.9", "188.114.97.9"], ["2a06:98c1:3120::9", "2a06:98c1:3121::9"]);
+    const googleDns = ans(["188.114.96.3", "188.114.97.3"], ["2a06:98c1:3120::3", "2a06:98c1:3121::3"]);
+    expect(evaluateDns([cloudflareDns, googleDns], IP)).toEqual({ status: "cloudflare", found: ["188.114.96.9", "188.114.97.9", "188.114.96.3", "188.114.97.3"] });
+  });
+
+  it("still waits while one resolver has the proxy and the other the old address", () => {
+    expect(evaluateDns([ans(["188.114.96.9"]), ans(["203.0.113.9"])], IP)).toEqual({ status: "resolvers_disagree" });
+  });
+});
