@@ -200,7 +200,12 @@ describe("build.run", () => {
     // Project settings arrive only as env vars; the script itself is constant.
     expect(BUILD_SCRIPT).toContain('exec bash -c "$LAYER_BUILD_CMD"');
     expect(BUILD_SCRIPT).toContain("npm ci");
-    expect(BUILD_SCRIPT).toContain("falling back to npm install");
+    // An out-of-date lockfile falls back to an install that isn't frozen, for every package manager.
+    expect(BUILD_SCRIPT).toContain('stale package-lock.json "npm install"');
+    expect(BUILD_SCRIPT).toContain('try "lockfile needs to be updated" yarn install --frozen-lockfile');
+    expect(BUILD_SCRIPT).toContain("exec yarn install --non-interactive");
+    expect(BUILD_SCRIPT).toContain("exec yarn install --no-immutable");
+    expect(BUILD_SCRIPT).toContain("exec pnpm install --no-frozen-lockfile");
   });
 });
 

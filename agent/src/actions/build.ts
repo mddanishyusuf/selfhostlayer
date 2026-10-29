@@ -167,9 +167,10 @@ async function sourceFetch(params: Params, ctx: Context, io: CallIO) {
 /**
  * The script each build step runs, as the app user. Constant: project settings
  * reach it only through env vars. It creates yarn/pnpm shims (corepack), picks
- * the install command from the package manager, and falls back from `npm ci`
- * to `npm install` when the lockfile is out of sync (npm 11 can write lockfiles
- * that its own `npm ci` rejects).
+ * the install command from the package manager, and when a frozen install fails
+ * only because the lockfile is out of date with package.json, installs without
+ * freezing it, as Vercel does (npm 11 can even write lockfiles its own `npm ci`
+ * rejects).
  */
 export const BUILD_SCRIPT = `set -euo pipefail
 mkdir -p "$LAYER_CACHE/bin" "$HOME"
@@ -177,27 +178,52 @@ for pm in yarn pnpm; do
   printf '#!/bin/sh\\nexec corepack %s "$@"\\n' "$pm" > "$LAYER_CACHE/bin/$pm"
   chmod 755 "$LAYER_CACHE/bin/$pm"
 done
+# try <pattern> <command...>: prints and runs a frozen install, keeping its
+# output. Returns 0 when it worked, 2 when it failed only because the lockfile
+# is out of date with package.json (the pattern), 1 for anything else.
+try() {
+  local pattern="$1"
+  shift
+  echo "$ $*"
+  if "$@" 2>&1 | tee /tmp/layer-install.log; then return 0; fi
+  if grep -qE "$pattern" /tmp/layer-install.log; then return 2; fi
+  return 1
+}
+# Like Vercel, an out-of-date lockfile doesn't stop the build: it installs
+# without freezing, so the lockfile changes only inside this build.
+stale() {
+  echo "layer: $1 is out of sync with package.json, falling back to $2."
+  echo "layer: to fix it, install locally and commit the updated $1."
+}
 case "$1" in
   install)
     if [ -n "\${LAYER_INSTALL_CMD:-}" ]; then echo "$ $LAYER_INSTALL_CMD"; exec bash -c "$LAYER_INSTALL_CMD"; fi
+    rc=0
     case "$LAYER_PM" in
       npm)
         if [ -f package-lock.json ] || [ -f npm-shrinkwrap.json ]; then
-          echo "$ npm ci"
-          if npm ci 2>&1 | tee /tmp/layer-npm-ci.log; then exit 0; fi
-          if grep -q "in sync" /tmp/layer-npm-ci.log; then
-            echo "layer: package-lock.json is out of sync with package.json, falling back to npm install."
-            echo "layer: to fix it, run npm install locally and commit the updated package-lock.json."
-            echo "$ npm install"; exec npm install
-          fi
-          exit 1
+          try "in sync" npm ci || rc=$?
+          [ "$rc" = 2 ] || exit "$rc"
+          stale package-lock.json "npm install"; echo "$ npm install"; exec npm install
         fi
         echo "$ npm install"; exec npm install ;;
       yarn)
-        if [ -f .yarnrc.yml ]; then echo "$ yarn install --immutable"; exec yarn install --immutable; fi
-        echo "$ yarn install --frozen-lockfile"; exec yarn install --frozen-lockfile --non-interactive ;;
-      pnpm) echo "$ pnpm install --frozen-lockfile"; exec pnpm install --frozen-lockfile ;;
-      bun) echo "$ bun install --frozen-lockfile"; exec bun install --frozen-lockfile ;;
+        if [ -f .yarnrc.yml ]; then
+          try "YN0028" yarn install --immutable || rc=$?
+          [ "$rc" = 2 ] || exit "$rc"
+          stale yarn.lock "yarn install --no-immutable"; echo "$ yarn install --no-immutable"; exec yarn install --no-immutable
+        fi
+        try "lockfile needs to be updated" yarn install --frozen-lockfile --non-interactive || rc=$?
+        [ "$rc" = 2 ] || exit "$rc"
+        stale yarn.lock "yarn install"; echo "$ yarn install"; exec yarn install --non-interactive ;;
+      pnpm)
+        try "ERR_PNPM_OUTDATED_LOCKFILE" pnpm install --frozen-lockfile || rc=$?
+        [ "$rc" = 2 ] || exit "$rc"
+        stale pnpm-lock.yaml "pnpm install --no-frozen-lockfile"; echo "$ pnpm install --no-frozen-lockfile"; exec pnpm install --no-frozen-lockfile ;;
+      bun)
+        try "lockfile had changes" bun install --frozen-lockfile || rc=$?
+        [ "$rc" = 2 ] || exit "$rc"
+        stale bun.lock "bun install"; echo "$ bun install"; exec bun install ;;
     esac ;;
   build) echo "$ $LAYER_BUILD_CMD"; exec bash -c "$LAYER_BUILD_CMD" ;;
 esac
