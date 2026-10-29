@@ -19,6 +19,14 @@ export interface Paths {
   staticGroup: string | null;
   /** Where app.delete moves data/ when keepData is set. */
   archiveRoot: string;
+  /** Backup snapshots waiting for the panel to upload them (root:<socketGroup> 750). */
+  stagingDir: string;
+  /** Where the panel puts downloaded backups for backup.restore. */
+  restoreDir: string;
+  /** Files in restoreDir must belong to this user (the panel's). null skips the check (tests). */
+  panelUser: string | null;
+  /** Node with node:sqlite, for jobs the agent runs as app users. */
+  runtimeNode: string;
   /** Supplementary group for every app user. */
   appsGroup: string;
   nodeDistBase: string;
@@ -40,6 +48,10 @@ export const DEFAULT_PATHS: Paths = {
   staticRoot: "/srv/static",
   staticGroup: "caddy",
   archiveRoot: "/var/lib/layer-agent/archive",
+  stagingDir: "/var/lib/layer-staging",
+  restoreDir: "/var/lib/layer/restore",
+  panelUser: "layer",
+  runtimeNode: "/opt/layer/runtime/bin/node",
   appsGroup: "layer-apps",
   nodeDistBase: "https://nodejs.org/dist",
   portRange: { min: 4000, max: 4999 },

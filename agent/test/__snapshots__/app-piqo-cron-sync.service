@@ -8,6 +8,8 @@ Type=oneshot
 User=app-piqo
 Group=app-piqo
 WorkingDirectory=/srv/apps/piqo/current/apps/web
+Environment=DATA_DIR=/srv/apps/piqo/data
+EnvironmentFile=-/etc/layer/apps/piqo/services.env
 EnvironmentFile=/etc/layer/apps/piqo/app.env
 Environment=PATH=/opt/layer/node/24.13.1/bin:/usr/bin:/bin
 Environment=NODE_ENV=production

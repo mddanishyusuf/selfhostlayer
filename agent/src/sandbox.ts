@@ -92,6 +92,8 @@ export interface SpawnResult {
 export interface SpawnOptions {
   onData: (chunk: string) => void;
   stdin?: Readable;
+  /** A file descriptor for the job's stdout (binary output, e.g. an archive); onData then only gets stderr. */
+  stdout?: number;
 }
 
 /** Runs a program (argv, no shell), streaming stdout and stderr together. */
@@ -99,8 +101,8 @@ export type Spawn = (file: string, args: string[], opts: SpawnOptions) => Promis
 
 export const realSpawn: Spawn = (file, args, opts) =>
   new Promise((resolve, reject) => {
-    const child = spawn(file, args, { env: SAFE_ENV, stdio: [opts.stdin ? "pipe" : "ignore", "pipe", "pipe"] });
-    child.stdout!.setEncoding("utf8").on("data", opts.onData);
+    const child = spawn(file, args, { env: SAFE_ENV, stdio: [opts.stdin ? "pipe" : "ignore", opts.stdout ?? "pipe", "pipe"] });
+    child.stdout?.setEncoding("utf8").on("data", opts.onData);
     child.stderr!.setEncoding("utf8").on("data", opts.onData);
     if (opts.stdin) {
       // The job may exit before reading everything (e.g. a bad archive); that

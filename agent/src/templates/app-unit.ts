@@ -65,6 +65,10 @@ Type=simple
 User=${user}
 Group=${user}
 WorkingDirectory=${workDir}
+Environment=DATA_DIR=${appDir}/data
+# Credentials for the app's Redis/Postgres (made by the agent), then the
+# user's env vars (which win), then the color's PORT.
+EnvironmentFile=-${APP_ETC_ROOT}/${slug}/services.env
 EnvironmentFile=${APP_ETC_ROOT}/${slug}/app.env
 EnvironmentFile=${APP_ETC_ROOT}/${slug}/%i.env
 Environment=PATH=${nodeBin}:/usr/bin:/bin

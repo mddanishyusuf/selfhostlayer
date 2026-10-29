@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync, writeSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DEFAULT_PATHS, type Paths } from "../src/config.ts";
@@ -13,7 +13,7 @@ export interface FakeSpawn {
   respond?: (
     file: string,
     args: string[],
-  ) => { code: number; output?: string } | undefined | Promise<{ code: number; output?: string } | undefined>;
+  ) => { code: number; output?: string; stdout?: string } | undefined | Promise<{ code: number; output?: string; stdout?: string } | undefined>;
 }
 
 export function fakeSpawn(): FakeSpawn {
@@ -22,6 +22,7 @@ export function fakeSpawn(): FakeSpawn {
     fake.calls.push([file, ...args]);
     const r = (await fake.respond?.(file, args)) ?? { code: 0 };
     if (r.output) opts.onData(r.output);
+    if (r.stdout !== undefined && opts.stdout !== undefined) writeSync(opts.stdout, r.stdout);
     opts.stdin?.resume();
     return { code: r.code };
   };
@@ -92,6 +93,9 @@ export function testEnv(): TestEnv {
     staticRoot: join(root, "srv", "static"),
     staticGroup: null,
     archiveRoot: join(root, "var", "lib", "layer-agent", "archive"),
+    stagingDir: join(root, "var", "lib", "layer-staging"),
+    restoreDir: join(root, "var", "lib", "layer", "restore"),
+    panelUser: null,
     // High range, so the real isPortFree check doesn't collide with dev servers.
     portRange: { min: 46000, max: 46099 },
     // Tests must not depend on how full the developer's disk is.

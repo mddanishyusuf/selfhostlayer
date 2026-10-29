@@ -12,6 +12,10 @@ Type=simple
 User=app-piqo
 Group=app-piqo
 WorkingDirectory=/srv/apps/piqo/%i
+Environment=DATA_DIR=/srv/apps/piqo/data
+# Credentials for the app's Redis/Postgres (made by the agent), then the
+# user's env vars (which win), then the color's PORT.
+EnvironmentFile=-/etc/layer/apps/piqo/services.env
 EnvironmentFile=/etc/layer/apps/piqo/app.env
 EnvironmentFile=/etc/layer/apps/piqo/%i.env
 Environment=PATH=/opt/layer/node/24.11.0/bin:/usr/bin:/bin

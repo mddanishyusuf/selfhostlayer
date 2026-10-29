@@ -67,7 +67,7 @@ function isRealDir(path: string): boolean {
   }
 }
 
-function diskGuard(ctx: Context): void {
+export function diskGuard(ctx: Context): void {
   const fs = statfsSync(ctx.paths.appsRoot);
   const free = fs.bavail / fs.blocks;
   const min = ctx.paths.minFreeDisk;

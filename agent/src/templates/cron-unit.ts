@@ -54,6 +54,8 @@ Type=oneshot
 User=${user}
 Group=${user}
 WorkingDirectory=${workDir}
+Environment=DATA_DIR=${appDir}/data
+EnvironmentFile=-${APP_ETC_ROOT}/${slug}/services.env
 EnvironmentFile=${APP_ETC_ROOT}/${slug}/app.env
 Environment=PATH=${NODE_ROOT}/${nodeVersion}/bin:/usr/bin:/bin
 Environment=NODE_ENV=production
