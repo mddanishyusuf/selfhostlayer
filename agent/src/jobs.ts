@@ -117,6 +117,121 @@ function findDatabases(dir, rel, out) {
 `;
 
 /**
+ * Import: `node -e IMPORT_JOB <appDir> <stamp> <gzip|tar>` with an archive of
+ * a data folder from somewhere else (another server, made by hand) on stdin.
+ * It unpacks into data.importing-<stamp> and drops macOS litter (._*,
+ * .DS_Store, __MACOSX). An archive holding a single folder counts as that
+ * folder. Every SQLite file (found by its header) must open, replay its WAL
+ * and pass PRAGMA integrity_check; stale -shm files go. The agent swaps the
+ * result in with the app stopped, or deletes it when this fails. The last
+ * stderr line is `LAYER-IMPORT {"root","sqlite":[{path,bytes}],"files","bytes"}`.
+ */
+export const IMPORT_JOB = String.raw`
+const fs = require("node:fs");
+const path = require("node:path");
+const { spawn } = require("node:child_process");
+const { DatabaseSync } = require("node:sqlite");
+
+const [app, stamp, format] = process.argv.slice(1);
+const work = path.join(app, "data.importing-" + stamp);
+const HEADER = Buffer.from("SQLite format 3\0");
+const LITTER = (name) => name === "__MACOSX" || name === ".DS_Store" || name.startsWith("._");
+
+function fail(code, message) {
+  console.error("layer: " + message);
+  process.exit(code);
+}
+
+function isSqlite(file) {
+  const fd = fs.openSync(file, fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW);
+  try {
+    const head = Buffer.alloc(16);
+    return fs.readSync(fd, head, 0, 16, 0) === 16 && head.equals(HEADER);
+  } finally {
+    fs.closeSync(fd);
+  }
+}
+
+/**
+ * Every regular file under dir (relative paths). Litter is deleted on the way;
+ * with own, modes become the app's alone (files rw, folders rwx), whatever
+ * they were on the old server.
+ */
+function files(dir, own = false, rel = "", out = []) {
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const full = path.join(dir, entry.name);
+    if (LITTER(entry.name)) {
+      fs.rmSync(full, { recursive: true, force: true });
+      continue;
+    }
+    const name = rel ? rel + "/" + entry.name : entry.name;
+    if (entry.isDirectory()) {
+      if (own) fs.chmodSync(full, 0o700);
+      files(full, own, name, out);
+    } else if (entry.isFile()) {
+      if (own) fs.chmodSync(full, (fs.statSync(full).mode & 0o700) | 0o600);
+      out.push(name);
+    }
+  }
+  return out;
+}
+
+try {
+  fs.mkdirSync(work, { mode: 0o700 });
+} catch (err) {
+  fail(2, "can't make " + work + ": " + err.message);
+}
+const tar = spawn(
+  "/usr/bin/tar",
+  ["--extract", ...(format === "gzip" ? ["--gzip"] : []), "--file=-", "--no-same-owner", "--no-same-permissions", "--directory=" + work],
+  { stdio: ["inherit", "inherit", "inherit"] },
+);
+tar.on("close", (code) => {
+  if (code !== 0) fail(4, "the archive could not be unpacked (tar exited " + code + "); data/ is unchanged");
+  try {
+    files(work, true);
+    const top = fs.readdirSync(work, { withFileTypes: true });
+    const root = top.length === 1 && top[0].isDirectory() ? top[0].name : "";
+    const base = root ? path.join(work, root) : work;
+    if (fs.existsSync(path.join(base, ".layer-postgres.dump"))) {
+      fs.rmSync(path.join(base, ".layer-postgres.dump"));
+      console.log("Skipped .layer-postgres.dump: Postgres data comes back through a backup restore.");
+    }
+
+    const sqlite = [];
+    for (const rel of files(base).filter((f) => !/-(shm|wal|journal)$/.test(f))) {
+      const file = path.join(base, rel);
+      if (!isSqlite(file)) continue;
+      // A -shm from another machine is only an index; SQLite rebuilds it from the -wal.
+      fs.rmSync(file + "-shm", { force: true });
+      let result;
+      try {
+        const db = new DatabaseSync(file);
+        try {
+          result = db.prepare("PRAGMA integrity_check").all().map((row) => Object.values(row)[0]).join("; ");
+          if (result === "ok") db.exec("PRAGMA wal_checkpoint(TRUNCATE)");
+        } finally {
+          db.close();
+        }
+      } catch (err) {
+        result = err && err.message ? err.message : String(err);
+      }
+      if (result !== "ok") fail(3, rel + " failed SQLite's integrity check (" + String(result).slice(0, 300) + "); data/ is unchanged");
+      sqlite.push({ path: rel, bytes: fs.statSync(file).size });
+      console.log("Checked " + rel + ": ok");
+    }
+
+    const all = files(base);
+    if (all.length === 0) fail(5, "the archive has no files; data/ is unchanged");
+    const bytes = all.reduce((n, f) => n + fs.statSync(path.join(base, f)).size, 0);
+    console.error("LAYER-IMPORT " + JSON.stringify({ root, sqlite, files: all.length, bytes }));
+  } catch (err) {
+    fail(2, "import failed: " + (err && err.message ? err.message : err));
+  }
+});
+`;
+
+/**
  * Restore: `sh -c RESTORE_JOB layer-restore <appDir> <stamp>` with the tar.gz
  * on stdin. Unpacks next to data/ first, so a broken archive changes nothing;
  * then swaps folders and keeps the old one as data.before-restore-<stamp>

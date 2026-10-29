@@ -2,9 +2,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { backUpProjectAction } from "@/app/actions/backups";
 import { BackupList } from "@/components/backup-list";
-import { RefreshWhile } from "@/components/backups";
+import { ImportData, RefreshWhile } from "@/components/backups";
 import { SubmitButton } from "@/components/form";
-import { Notice, PageHeader } from "@/components/page";
+import { Notice, PageHeader, SettingsRow } from "@/components/page";
 import { listBackups } from "@/lib/backup/runner";
 import { getBackupSettings } from "@/lib/backup/settings";
 import { getProjectBySlug } from "@/lib/projects";
@@ -55,6 +55,16 @@ export default async function ProjectBackupsPage({ params }: { params: Promise<{
       <section className="border-b border-border">
         <BackupList backups={backups} restorable empty={ready ? "No backups yet. The first one runs at the scheduled time, or press Back up now." : "No backups yet."} />
       </section>
+      <SettingsRow
+        title="Import data"
+        description={
+          <>
+            Moving from another server? Upload a <code className="font-mono text-[12px]">.tar.gz</code> of the app&apos;s data folder. On the server, <code className="font-mono text-[12px]">layer import {project.slug} file.tar.gz</code> does the same.
+          </>
+        }
+      >
+        <ImportData slug={project.slug} />
+      </SettingsRow>
     </>
   );
 }

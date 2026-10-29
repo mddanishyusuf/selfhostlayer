@@ -5,10 +5,12 @@
 //   node panel/scripts/ui-tour.ts <base-url> <setup-token> <out-dir>
 //
 // Needs Google Chrome. Uses the DevTools protocol over Node's built-in WebSocket.
-import { spawn } from "node:child_process";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { execFileSync, spawn } from "node:child_process";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createHmac, randomUUID } from "node:crypto";
+import { DatabaseSync } from "node:sqlite";
 import { currentCounter, totpAt } from "../lib/totp.ts";
 
 const [baseArg, tokenArg, outArg] = process.argv.slice(2);
@@ -27,6 +29,10 @@ const chrome = spawn(
     "--disable-gpu",
     "--hide-scrollbars",
     "--ignore-certificate-errors",
+    // Without these, macOS can throttle a Chrome nobody looks at until a screenshot never comes back.
+    "--disable-background-timer-throttling",
+    "--disable-backgrounding-occluded-windows",
+    "--disable-renderer-backgrounding",
     `--remote-debugging-port=${port}`,
     `--user-data-dir=${join(outDir, ".chrome")}`,
     // e.g. "--host-resolver-rules=MAP *.internal 192.168.252.9" to reach apps in a VM.
@@ -58,10 +64,18 @@ ws.addEventListener("message", (e) => {
   if (msg.id && pending.has(msg.id)) pending.get(msg.id)!(msg);
   if (msg.method === "Page.frameNavigated" && !msg.params.frame.parentId) topNavigations++;
 });
+/** One DevTools call. A minute without an answer fails the tour instead of hanging it. */
 async function send(method: string, params: Record<string, unknown> = {}): Promise<any> {
   const id = ++nextId;
   ws.send(JSON.stringify({ id, method, params }));
-  const msg = await new Promise<any>((r) => pending.set(id, r));
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const msg = await Promise.race([
+    new Promise<any>((r) => pending.set(id, r)),
+    new Promise<never>((_, reject) => (timer = setTimeout(() => reject(new Error(`Chrome didn't answer ${method} within 60s`)), 60_000))),
+  ]).finally(() => {
+    clearTimeout(timer);
+    pending.delete(id);
+  });
   if (msg.error) throw new Error(`${method}: ${msg.error.message}`);
   return msg.result;
 }
@@ -527,6 +541,49 @@ if (process.env.TOUR_DEPLOY === "1") {
       if (!row.includes("Postgres dump")) throw new Error(`the backup has no Postgres dump: ${row}`);
       console.log("  ✓ the next backup includes a pg_dump of the app's database");
     }
+  }
+
+  // Moving an app from another server: a data/ archive uploaded in the panel replaces the app's data.
+  console.log("Import data");
+  {
+    const dir = mkdtempSync(join(tmpdir(), "layer-tour-import-"));
+    mkdirSync(join(dir, "data"));
+    const db = new DatabaseSync(join(dir, "data", "visits.db"));
+    db.exec("CREATE TABLE visits (id INTEGER PRIMARY KEY, at TEXT NOT NULL)");
+    const insert = db.prepare("INSERT INTO visits (at) VALUES (?)");
+    for (let i = 0; i < 42; i++) insert.run(new Date().toISOString());
+    db.close();
+    const archive = join(dir, "next-data.tar.gz");
+    execFileSync("tar", ["-czf", archive, "-C", dir, "data"], { env: { ...process.env, COPYFILE_DISABLE: "1" } });
+    await go("/projects/next/backups");
+    await waitForPath("/projects/next/backups");
+    const { root } = await send("DOM.getDocument", { depth: 0 });
+    const { nodeId } = await send("DOM.querySelector", { nodeId: root.nodeId, selector: '[data-testid="import-data"] input[type=file]' });
+    await send("DOM.setFileInputFiles", { nodeId, files: [archive] });
+    const importButton = `[...document.querySelectorAll('[data-testid="import-data"] button')].find((b) => b.textContent === "Import…")`;
+    await waitFor(`!${importButton}?.disabled`, "the import button");
+    await evaluate(`${importButton}.click(), true`);
+    await waitFor(`!!document.querySelector("#import-confirm")`, "the import confirmation");
+    await setValue("#import-confirm", "next");
+    await evaluate(`[...document.querySelectorAll("[role=dialog] button")].find((b) => b.textContent === "Import").click(), true`);
+    await waitFor(`/Imported|Nothing changed|failed/.test(document.querySelector("[role=dialog]")?.innerText ?? "")`, "the import", 120_000);
+    const dialog = String(await evaluate(`document.querySelector("[role=dialog]").innerText`));
+    if (!dialog.includes("Imported")) throw new Error(`the import failed: ${dialog}`);
+    await screenshot("import-data");
+    let count = -1;
+    for (let i = 0; i < 20 && count !== 42; i++) {
+      await go(`https://next.${appsDomain}/api/visits`);
+      await sleep(500);
+      try {
+        count = Number(JSON.parse(String(await evaluate("document.body.innerText"))).visits ?? -1);
+      } catch {
+        count = -1; // not JSON yet: the app is restarting
+      }
+      if (count !== 42) await sleep(1000);
+    }
+    if (count !== 42) throw new Error(`after the import the app counts ${count} visits, expected 42`);
+    console.log("  ✓ import: a data/ archive uploaded in the panel replaced the app's data (42 visits), with the app restarted on it");
+    rmSync(dir, { recursive: true, force: true });
   }
 
   // TOUR_DOMAIN: a host whose public DNS points at the box (e.g. shop.<ip-with-dashes>.sslip.io).

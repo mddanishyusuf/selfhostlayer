@@ -31,6 +31,7 @@ export const ACTIONS = [
   "backup.snapshot",
   "backup.restore",
   "backup.discard",
+  "data.import",
   "service.install",
   "service.status",
   "redis.add",

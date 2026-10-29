@@ -43,3 +43,22 @@
 - **Platform:** server-to-server migration assistant, per-app outbound network rules, MongoDB, AppArmor/Landlock.
 - **Panel:** firewall rule editing and unban, alert on/off switches, Databases' Manage opening a page like Domains, real screenshots as an option.
 - **Pro (paid):** multi-server, teams, preview deploys.
+
+## Day 1 result (2026-10-29)
+**Done when "a `data/` archive with SQLite is imported and served; a corrupt database is refused and nothing changes": passed.** `installer/test/import-e2e.sh` (28 checks) passes in the VM, repeatedly. The browser tour uploads an archive in the panel, and the example app then counts the 42 imported visits (61 tour checks in all).
+
+- **`data.import`** (agent) only reads a file the panel user owns in `/var/lib/layer/restore`, with the same checks as restore, and tells gzip from plain tar by the first bytes.
+- **`IMPORT_JOB`** runs as the app user, offline, in its sandbox, while the app keeps running:
+  - it unpacks into `data.importing-<id>` and drops macOS litter (`._*`, `.DS_Store`, `__MACOSX`);
+  - it makes every file the app's alone (600, folders 700);
+  - an archive holding a single folder counts as that folder;
+  - every SQLite file (found by its header) must open, replay its `-wal` and pass `integrity_check` (a stale `-shm` is deleted first); the WAL is then folded in.
+- **The swap:** only after the checks pass does the agent stop the app and its Redis, swap the folders, and start Redis, then the app. The replaced data is kept as `data.before-restore-<id>` (only the latest).
+- **Refused, with nothing changed:** damaged databases, files that aren't archives, empty archives, and members reaching outside the folder (`../`). Nothing is written outside the import folder.
+- **Panel:** Backups → Import data streams the upload to disk (up to 20GB) after checking free space and the request's Origin. You confirm by typing the app's name, then see upload progress and the result.
+- **CLI:** `layer import <app> <file>` on the box copies the file into the panel's restore folder and calls the same action.
+- **Guide:** [docs/moving-from-pm2.md](docs/moving-from-pm2.md).
+- **Bugs found on the way:**
+  - The kept folder's name had one-second resolution. Two restores or imports in the same second collided, and the failed swap left a half-imported folder behind. Each run now gets a unique suffix, and the work folder is always removed.
+  - Restore (Week 4) never restarted the app's Redis. Redis kept writing into the folder that was moved aside and never loaded the restored `dump.rdb`. Restore and import now stop Redis after the app, make sure `data/redis` exists, and start Redis before the app.
+  - The browser tour could hang forever when headless Chrome stopped answering a screenshot (macOS throttles background apps). Every DevTools call now fails after 60 seconds, and Chrome runs with background throttling off.

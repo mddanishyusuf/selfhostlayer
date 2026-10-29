@@ -93,6 +93,14 @@ const FAKE: Partial<Record<ActionName, unknown>> = {
       },
     ],
   },
+  "data.import": {
+    slug: "piqo",
+    previous: "data.before-restore-20261030090000-1a2b3c",
+    sqlite: [{ path: "piqo.db", bytes: 210_000_000 }],
+    files: 1204,
+    bytes: 262_144_000,
+    restarted: ["app-piqo@blue.service"],
+  },
   "cron.history": {
     slug: "piqo",
     name: "aggregate-stats",

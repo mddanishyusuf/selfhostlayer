@@ -166,3 +166,135 @@ function RestoreSubmit({ disabled }: { disabled: boolean }) {
     </Button>
   );
 }
+
+const fileSize = (bytes: number) => (bytes < 1024 ** 2 ? `${Math.max(1, Math.round(bytes / 1024))} KB` : bytes < 1024 ** 3 ? `${(bytes / 1024 ** 2).toFixed(1)} MB` : `${(bytes / 1024 ** 3).toFixed(2)} GB`);
+
+interface ImportResponse {
+  ok?: boolean;
+  error?: string;
+  sqlite?: { path: string }[];
+  files?: number;
+  bytes?: number;
+  restarted?: string[];
+  previous?: string;
+}
+
+/**
+ * A data/ archive from another server: pick it, type the app name, and it
+ * uploads with progress. The agent checks it before anything is replaced.
+ */
+export function ImportData({ slug }: { slug: string }) {
+  const router = useRouter();
+  const [file, setFile] = useState<File | null>(null);
+  const [open, setOpen] = useState(false);
+  const [typed, setTyped] = useState("");
+  const [phase, setPhase] = useState<"confirm" | "uploading" | "importing" | "done" | "error">("confirm");
+  const [progress, setProgress] = useState(0);
+  const [message, setMessage] = useState("");
+  const busy = phase === "uploading" || phase === "importing";
+
+  const start = () => {
+    if (!file) return;
+    setPhase("uploading");
+    setProgress(0);
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", `/api/projects/${slug}/import?confirm=${encodeURIComponent(typed)}`);
+    xhr.setRequestHeader("Content-Type", "application/octet-stream");
+    xhr.upload.onprogress = (e) => e.lengthComputable && setProgress(e.loaded / e.total);
+    xhr.upload.onload = () => setPhase("importing");
+    xhr.onload = () => {
+      let body: ImportResponse = {};
+      try {
+        body = JSON.parse(xhr.responseText) as ImportResponse;
+      } catch {
+        // not JSON: a proxy error page
+      }
+      if (xhr.status === 200 && body.ok) {
+        const dbs = body.sqlite?.length ?? 0;
+        setMessage(
+          `Imported ${body.files} file${body.files === 1 ? "" : "s"} (${fileSize(body.bytes ?? 0)})${dbs ? `, ${dbs} SQLite database${dbs === 1 ? "" : "s"} checked` : ""}.` +
+            (body.restarted?.length ? ` ${slug} restarted on the new data.` : "") +
+            ` The replaced data is kept in ${body.previous} until the next import or restore.`,
+        );
+        setPhase("done");
+        router.refresh();
+      } else {
+        setMessage(body.error ?? `The import failed (HTTP ${xhr.status}). Nothing changed.`);
+        setPhase("error");
+      }
+    };
+    xhr.onerror = () => {
+      setMessage("The upload was interrupted. Nothing changed.");
+      setPhase("error");
+    };
+    xhr.send(file);
+  };
+
+  const close = () => {
+    if (busy) return;
+    setOpen(false);
+    if (phase === "done") setFile(null);
+    setPhase("confirm");
+    setTyped("");
+  };
+
+  return (
+    <div className="grid gap-3" data-testid="import-data">
+      <div className="flex flex-wrap items-center gap-2">
+        <label className="inline-flex h-[34px] min-w-0 max-w-full cursor-pointer items-center gap-2 rounded-md border border-dashed border-border-strong px-3 text-[13px] text-muted transition-colors duration-150 hover:border-lavender hover:text-foreground">
+          <input
+            type="file"
+            name="archive"
+            accept=".tar.gz,.tgz,.tar,application/gzip,application/x-tar"
+            className="sr-only"
+            onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+          />
+          <span className="truncate">{file ? `${file.name} · ${fileSize(file.size)}` : "Choose a .tar.gz…"}</span>
+        </label>
+        <Button type="button" variant="secondary" disabled={!file} onClick={() => setOpen(true)}>
+          Import…
+        </Button>
+      </div>
+      <Modal open={open} onClose={close} title={`Import data into ${slug}`} description={file ? `${file.name} · ${fileSize(file.size)}` : undefined}>
+        <div className="grid gap-4 px-6 py-5">
+          {phase === "done" ? (
+            <p className="text-[14px] text-teal">{message}</p>
+          ) : busy ? (
+            <div className="grid gap-2" aria-live="polite">
+              <div className="h-1.5 overflow-hidden rounded bg-track">
+                <div className="h-full rounded bg-lavender transition-[width] duration-150" style={{ width: `${Math.round((phase === "importing" ? 1 : progress) * 100)}%` }} />
+              </div>
+              <p className="text-[13.5px] text-muted">{phase === "uploading" ? `Uploading… ${Math.round(progress * 100)}%` : "Checking the databases and importing…"}</p>
+            </div>
+          ) : (
+            <>
+              <p className="text-[13.5px] text-muted">
+                The app&apos;s data folder is replaced by this archive. SQLite databases are checked first; if anything is wrong, nothing changes. The current data is kept beside it until the next import or restore.
+              </p>
+              <Field label={`Type ${slug} to confirm`} htmlFor="import-confirm">
+                <Input id="import-confirm" value={typed} onChange={(e) => setTyped(e.target.value)} autoComplete="off" spellCheck={false} autoFocus />
+              </Field>
+              {phase === "error" && <FormError message={message} />}
+            </>
+          )}
+          <div className="flex justify-end gap-2">
+            {phase === "done" ? (
+              <Button type="button" variant="secondary" onClick={close}>
+                Close
+              </Button>
+            ) : (
+              <>
+                <Button type="button" variant="secondary" onClick={close} disabled={busy}>
+                  Cancel
+                </Button>
+                <Button type="button" onClick={start} disabled={busy || typed !== slug}>
+                  {busy ? "Importing…" : phase === "error" ? "Try again" : "Import"}
+                </Button>
+              </>
+            )}
+          </div>
+        </div>
+      </Modal>
+    </div>
+  );
+}

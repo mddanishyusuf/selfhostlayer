@@ -1,7 +1,11 @@
 // `layer`: the command-line view of the box, for when you SSH in. Every
 // command goes through the agent, so it sees exactly what the panel sees.
+import { execFileSync } from "node:child_process";
+import { randomBytes } from "node:crypto";
+import { chmodSync, chownSync, constants, copyFileSync, existsSync, mkdirSync, rmSync, statSync } from "node:fs";
+import { join } from "node:path";
 import { parseArgs } from "node:util";
-import { AgentError, callAgent, isActionName } from "@layer/protocol";
+import { AgentError, assertSlug, callAgent, isActionName } from "@layer/protocol";
 
 const tty = process.stdout.isTTY;
 const paint = (code: number) => (s: string) => (tty ? `\x1b[${code}m${s}\x1b[0m` : s);
@@ -18,6 +22,8 @@ const HELP = `${bold("layer")}: Self Host Layer on this server
   layer logs <app> [-f] [-n 100] [--color blue|green]
   layer score <app> [--color blue|green]   systemd sandbox score (0 = safest)
   layer info                       server summary
+  layer import <app> <file>        replace the app's data/ with a .tar.gz from another server
+                                   (SQLite checked first; the replaced data is kept)
   layer call <action> [json]       send a raw agent action (debugging)
 
 Raw commands behind these: journalctl -u 'app-<app>@*', systemctl status 'app-<app>@*',
@@ -100,6 +106,41 @@ async function info() {
   ]));
 }
 
+// The agent only imports files the panel user owns in its restore folder
+// (paths.restoreDir and paths.panelUser in the agent's config).
+const RESTORE_DIR = "/var/lib/layer/restore";
+const PANEL_USER = "layer";
+
+const size = (bytes: number) => (bytes < 1024 ** 2 ? `${Math.round(bytes / 1024)} KB` : bytes < 1024 ** 3 ? `${(bytes / 1024 ** 2).toFixed(1)} MB` : `${(bytes / 1024 ** 3).toFixed(2)} GB`);
+
+async function importData(slug: string, source: string) {
+  assertSlug(slug);
+  if (!existsSync(source) || !statSync(source).isFile()) throw new Error(`no such file: ${source}`);
+  if (process.getuid?.() !== 0) throw new Error("run it as root (sudo layer import …): the archive is handed to the agent as the panel's file");
+  const id = (flag: string) => Number(execFileSync("id", [flag, PANEL_USER], { encoding: "utf8" }).trim());
+  const [uid, gid] = [id("-u"), id("-g")];
+  mkdirSync(RESTORE_DIR, { recursive: true, mode: 0o700 });
+  chownSync(RESTORE_DIR, uid, gid);
+  const name = `${slug}-${new Date().toISOString().replace(/[-:T]/g, "").slice(0, 14)}-${randomBytes(4).toString("hex")}.tar.gz`;
+  const copy = join(RESTORE_DIR, name);
+  copyFileSync(source, copy, constants.COPYFILE_EXCL);
+  try {
+    chownSync(copy, uid, gid);
+    chmodSync(copy, 0o600);
+    console.log(dim(`Importing ${source} into ${slug}…`));
+    const r = await callAgent<{ previous: string; sqlite: { path: string }[]; files: number; bytes: number; restarted: string[] }>(
+      "data.import",
+      { slug, file: name },
+      { onChunk: (c) => process.stdout.write(dim(c)) },
+    );
+    const checked = r.sqlite.length ? `, ${r.sqlite.length} SQLite database${r.sqlite.length === 1 ? "" : "s"} checked` : "";
+    console.log(`${green("✓")} Imported ${r.files} file${r.files === 1 ? "" : "s"} (${size(r.bytes)})${checked}.${r.restarted.length ? " The app restarted on the new data." : ""}`);
+    console.log(dim(`  The replaced data is kept in /srv/apps/${slug}/${r.previous} until the next import or restore.`));
+  } finally {
+    rmSync(copy, { force: true });
+  }
+}
+
 async function main() {
   const { positionals, values } = parseArgs({
     allowPositionals: true,
@@ -122,6 +163,10 @@ async function main() {
     case "logs": return logs(need("app"), { follow: values.follow, lines: Number(values.lines), color: values.color });
     case "score": return score(need("app"), values.color ?? "blue");
     case "info": return info();
+    case "import": {
+      if (!arg || !extra) throw new Error("usage: layer import <app> <file.tar.gz>");
+      return importData(arg, extra);
+    }
     case "call": {
       const action = need("action");
       if (!isActionName(action)) throw new Error(`unknown action: ${action}`);
