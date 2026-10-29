@@ -19,3 +19,6 @@ export function clearState(key: string): void {
 
 /** The address the panel moves to once its DNS record points here and its certificate is issued. */
 export const PANEL_MOVE = "panel-move";
+
+/** How many deployments may build at the same time (Settings → Builds). */
+export const BUILD_SLOTS = "build-slots";

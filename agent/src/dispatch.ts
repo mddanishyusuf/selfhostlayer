@@ -22,7 +22,7 @@ import { toolActions } from "./actions/tool.ts";
 import type { Audit } from "./audit.ts";
 import { NO_IO, type ActionTable, type CallIO, type Context } from "./context.ts";
 import { ActionError } from "./errors.ts";
-import { Lock } from "./lock.ts";
+import { KeyedLock, Lock } from "./lock.ts";
 
 export const ACTION_TABLE: ActionTable = {
   ...systemActions,
@@ -60,7 +60,7 @@ export interface Dispatcher {
 }
 
 export function createDispatcher(ctx: Context, audit: Audit, table: ActionTable = ACTION_TABLE): Dispatcher {
-  const locks = { global: new Lock(), build: new Lock() };
+  const locks = { global: new Lock(), build: new KeyedLock() };
 
   async function handleLine(line: string, makeIO: (id: string) => CallIO = () => NO_IO): Promise<Response> {
     let req: unknown;
@@ -93,7 +93,7 @@ export function createDispatcher(ctx: Context, audit: Audit, table: ActionTable 
     try {
       const io = makeIO(id);
       const run = () => def.run(p, ctx, io);
-      const result = await (def.mutates ? locks[def.lock ?? "global"].run(run) : run());
+      const result = await (!def.mutates ? run() : def.lock === "build" ? locks.build.run(String(p.slug ?? ""), run) : locks.global.run(run));
       response = { id, ok: true, result };
     } catch (err) {
       if (err instanceof ValidationError) {

@@ -14,10 +14,12 @@ import { db, now } from "./db";
 import { installationToken } from "./github";
 import { raise, resolve } from "./alerts/engine";
 import { boxConfig } from "./box";
+import { BuildQueue } from "./build-queue";
 import { checkCertificate } from "./cert";
 import { syncCrons } from "./crons";
 import { servingConfig } from "./domains";
 import { getApp } from "./github-store";
+import { BUILD_SLOTS, readState } from "./panel-state";
 import { latestCommit } from "./github-repo";
 import { getProject, projectEnv, type Project } from "./projects";
 
@@ -116,16 +118,13 @@ function update(id: number, fields: Partial<Pick<Row, "status" | "color" | "erro
 // globalThis: the worker started by an action must reach the /events route.
 interface DeployState {
   events: EventEmitter;
-  queue: number[];
-  running: number | null;
+  builds?: BuildQueue;
   cancelRequested: Set<number>;
   recovered: boolean;
 }
 const g = globalThis as unknown as { layerDeploy?: DeployState };
 const state: DeployState = (g.layerDeploy ??= {
   events: new EventEmitter().setMaxListeners(200),
-  queue: [],
-  running: null,
   cancelRequested: new Set(),
   recovered: false,
 });
@@ -152,15 +151,31 @@ const heading = (text: string) => `\n\x1b[1m▸ ${text}\x1b[0m\n`;
 
 // --- queue -------------------------------------------------------------------
 
-const queue = state.queue;
 const cancelRequested = state.cancelRequested;
+
+/** How many deployments may build at once (Settings → Builds): 1 to 4, one by default. */
+export function buildSlots(): number {
+  const n = Number(readState(BUILD_SLOTS));
+  return Number.isInteger(n) && n >= 1 && n <= 4 ? n : 1;
+}
+
+const builds = (state.builds ??= new BuildQueue((id) => run(id), (id) => getDeployment(id)?.projectId, buildSlots));
+
+/** How many queued deployments start before this one, or null when it isn't waiting. */
+export const queuePosition = (id: number) => builds.position(id);
 
 /** After a panel restart, unfinished deployments can't resume: fail running ones, requeue waiting ones. */
 function recover(): void {
   if (state.recovered) return;
   state.recovered = true;
   db().prepare("UPDATE deployments SET status = 'failed', error = 'The panel restarted during this deployment.', finished_at = ? WHERE status NOT IN ('queued','ready','failed','cancelled')").run(now());
-  for (const r of db().prepare("SELECT id FROM deployments WHERE status = 'queued' ORDER BY id").all() as { id: number }[]) queue.push(r.id);
+  for (const r of db().prepare("SELECT id FROM deployments WHERE status = 'queued' ORDER BY id").all() as { id: number }[]) builds.add(r.id);
+}
+
+/** At startup, and when Settings → Builds changes: picks up waiting deployments. */
+export function resumeDeployments(): void {
+  recover();
+  builds.pump();
 }
 
 export function createDeployment(project: Project, trigger: Deployment["trigger"], commit: { sha: string; message: string; author: string }): Deployment {
@@ -169,8 +184,7 @@ export function createDeployment(project: Project, trigger: Deployment["trigger"
     .prepare("INSERT INTO deployments (project_id, sha, commit_message, commit_author, trigger, status, created_at) VALUES (?, ?, ?, ?, ?, 'queued', ?)")
     .run(project.id, commit.sha, commit.message, commit.author, trigger, now());
   const id = Number(result.lastInsertRowid);
-  queue.push(id);
-  void pump();
+  builds.add(id);
   return getDeployment(id)!;
 }
 
@@ -200,28 +214,12 @@ export async function cancelDeployment(id: number): Promise<void> {
   const d = getDeployment(id);
   if (!d || FINISHED.includes(d.status)) return;
   cancelRequested.add(id);
-  const i = queue.indexOf(id);
-  if (i >= 0) {
-    queue.splice(i, 1);
+  if (builds.remove(id)) {
     finish(id, "cancelled", null);
     return;
   }
   const project = getProject(d.projectId);
   if (project) await agent("build.cancel", { slug: project.slug }).catch(() => {});
-}
-
-async function pump(): Promise<void> {
-  if (state.running !== null) return;
-  while (queue.length > 0) {
-    const id = queue.shift()!;
-    state.running = id;
-    try {
-      await run(id);
-    } catch (err) {
-      console.error(`deployment ${id} crashed:`, err);
-    }
-    state.running = null;
-  }
 }
 
 function finish(id: number, status: DeployStatus, error: string | null, color?: Deployment["color"]): void {

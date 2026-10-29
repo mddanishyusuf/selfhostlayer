@@ -7,6 +7,7 @@ import { boxConfig } from "../box";
 import { checkCertificate } from "../cert";
 import { listCrons, liveCrons } from "../crons";
 import { db, now } from "../db";
+import { resumeDeployments } from "../deploy";
 import { listDomains } from "../domains";
 import { backupProjects, markInterrupted, overdueSlugs, scheduledTick } from "../backup/runner";
 import { listProjects } from "../projects";
@@ -142,6 +143,8 @@ export function startMonitor(): void {
   } catch {
     // no box config (dev): keep the default name
   }
+  // Deployments still waiting when the panel stopped start again.
+  resumeDeployments();
   setTimeout(() => void tick(), 15_000);
   setInterval(() => void tick(), TICK_MS).unref();
   console.log("layer-panel monitor started");

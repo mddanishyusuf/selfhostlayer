@@ -8,7 +8,7 @@ import { Icon } from "@/components/icon";
 import { Notice, PageHeader } from "@/components/page";
 import { DeployStatusBadge, duration, timeAgo } from "@/components/status";
 import { StatusDot, cx } from "@/components/ui";
-import { FINISHED, getDeployment, liveDeployment } from "@/lib/deploy";
+import { buildSlots, FINISHED, getDeployment, listDeployments, liveDeployment, queuePosition } from "@/lib/deploy";
 import { getProject } from "@/lib/projects";
 import { requireUser } from "@/lib/session";
 
@@ -65,6 +65,13 @@ export default async function DeploymentPage({ params }: { params: Promise<{ slu
       {d.error ? (
         <Notice lead="Failed" tone="err">
           {d.error}. The live version is unchanged.
+        </Notice>
+      ) : d.status === "queued" ? (
+        <Notice lead="Queued" tone="lav">
+          {listDeployments(project.id, 20).some((x) => x.id !== d.id && !FINISHED.includes(x.status) && x.status !== "queued")
+            ? `Waiting for ${project.slug}'s current deployment to finish.`
+            : `Waiting for a free build slot (${buildSlots() === 1 ? "one build at a time" : `${buildSlots()} at a time`}, Settings → Builds)${queuePosition(d.id) ? `, ${queuePosition(d.id)} ahead` : ""}.`}{" "}
+          It starts on its own.
         </Notice>
       ) : (
         <Notice lead={done ? (d.status === "ready" ? (live?.id === d.id ? "Live" : "Ready") : "Cancelled") : "Building"} tone={done ? (d.status === "ready" ? "ok" : "lav") : "gold"}>

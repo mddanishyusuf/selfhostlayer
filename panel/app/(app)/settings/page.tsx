@@ -2,6 +2,7 @@ import { CheckmarkCircle02Icon, GithubIcon } from "@hugeicons/core-free-icons";
 import { dropAddressAction } from "@/app/actions/address";
 import { signOutOthersAction } from "@/app/actions/account";
 import { AccessForm } from "@/components/access";
+import { BuildSlotsForm } from "@/components/builds";
 import { ChangePasswordForm, RecoveryCodesForm } from "@/components/account";
 import { MoveAppsForm, MovePanelForm } from "@/components/address";
 import { RepairButton, UpdatePanel } from "@/components/maintenance";
@@ -10,6 +11,7 @@ import { KeyValues, PageHeader, PillLink, SettingsRow } from "@/components/page"
 import { Button, Pill } from "@/components/ui";
 import { agent, type SystemInfo } from "@/lib/agent";
 import { boxConfig } from "@/lib/box";
+import { buildSlots } from "@/lib/deploy";
 import { GITHUB_WEB } from "@/lib/github";
 import { getApp, listInstallations } from "@/lib/github-store";
 import { db } from "@/lib/db";
@@ -87,6 +89,12 @@ export default async function ServerSettingsPage() {
             </PillLink>
           </div>
         )}
+      </SettingsRow>
+      <SettingsRow
+        title="Builds"
+        description={`How many projects can build at the same time. Others wait in line and start as soon as one finishes. A build can use twice its app's memory limit (at least 1 GB)${info ? `, and this server has ${(info.memoryMb.total / 1024).toFixed(1)} GB of memory${info.swapMb.total ? ` and ${(info.swapMb.total / 1024).toFixed(1)} GB of swap` : ""}` : ""}: on small servers, one at a time is safest.`}
+      >
+        <BuildSlotsForm current={buildSlots()} />
       </SettingsRow>
       <SettingsRow title="Account" description="Signing in always takes your password and a code from your authenticator app.">
         <KeyValues

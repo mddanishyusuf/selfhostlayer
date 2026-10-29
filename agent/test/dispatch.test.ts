@@ -158,12 +158,19 @@ describe("locking", () => {
     expect(order).toEqual(["start build big", "start fast", "end fast", "end build big"]);
   });
 
-  it("runs builds one at a time", async () => {
+  it("runs one app's builds one at a time, and different apps' side by side", async () => {
     await Promise.all([
       call({ id: "1", action: "release.point", params: { slug: "one" } }),
-      call({ id: "2", action: "release.point", params: { slug: "two" } }),
+      call({ id: "2", action: "release.point", params: { slug: "one" } }),
     ]);
-    expect(order).toEqual(["start build one", "end build one", "start build two", "end build two"]);
+    expect(order).toEqual(["start build one", "end build one", "start build one", "end build one"]);
+    order.length = 0;
+    await Promise.all([
+      call({ id: "3", action: "release.point", params: { slug: "one" } }),
+      call({ id: "4", action: "release.point", params: { slug: "two" } }),
+    ]);
+    // How many apps build at once is the panel's call (Settings → Builds).
+    expect(order).toEqual(["start build one", "start build two", "end build one", "end build two"]);
   });
 
   it("keeps going after a failed mutating action", async () => {

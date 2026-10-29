@@ -45,7 +45,7 @@ Every deployment of the project, newest first, with its commit, what started it 
 What one deploy does, step by step:
 
 1. **Fetch:** downloads the commit's tarball from GitHub into `/srv/apps/<app>/releases/<sha>/`. The server never holds git credentials.
-2. **Build:** runs the install and build commands as `app-<app>` in a sandbox (`systemd-run` with the same restrictions as the app, plus network access for the package registry). The output streams to the page. Only one build runs at a time, and builds stop if the disk is under 15% free.
+2. **Build:** runs the install and build commands as `app-<app>` in a sandbox (`systemd-run` with the same restrictions as the app, plus network access for the package registry). The output streams to the page. One build runs at a time by default; Settings → Builds allows up to 4, never two of the same project. The rest wait in line and start on their own, and a waiting deployment's page says what it's waiting for. Builds stop if the disk is under 15% free.
 3. **Start:** writes the app's unit and env file, then starts the new build on the idle color (blue or green) and waits for its health check.
 4. **Switch:** points the app's Caddy site at the new color, waits for requests in flight, then stops the old color. Visitors never see a gap.
 
@@ -212,6 +212,7 @@ tail -f /var/log/layer/audit.jsonl
 - **Panel address:** move the panel to a domain you own. Point the name at the server first. The panel checks public DNS, waits until the certificate is issued, then switches; the old address redirects to the new one.
 - **Apps domain:** the base of every app's free address. Your own domain needs one wildcard record (`*.apps.example.com`). The old addresses keep redirecting.
 - **Access:** who can reach the panel at all: anyone (password plus 2FA), only some addresses (yours is filled in), or Tailscale only. Blocked requests stop at Caddy. GitHub's webhook always gets through. A list that would lock you out is refused, and `layer access reset` on the server undoes any list.
+- **Builds:** how many projects can build at the same time (1 to 4). A build can use twice its app's memory limit, so on small servers one at a time is safest.
 - **GitHub:** the GitHub App this server created under your account. Its private key never leaves the server. Install it on more repositories from here.
 - **Account:**
   - Change your password; that signs out every other session.
