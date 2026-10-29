@@ -51,17 +51,20 @@ export default async function DatabasesOverviewPage() {
   const all = listProjects();
   const apps = all.filter((p) => p.runtime.kind !== "static");
   const statuses = (await Promise.all(apps.map((p) => serviceStatus(p.slug).catch(() => null)))).filter((s): s is ServiceStatus => s !== null);
-  const installed = statuses[0]?.installed ?? (await agent<{ installed: ServiceStatus["installed"] }>("service.status").then((r) => r.installed).catch(() => ({ redis: false, postgres: false })));
+  const installed = statuses[0]?.installed ?? (await agent<{ installed: ServiceStatus["installed"] }>("service.status").then((r) => r.installed).catch(() => ({ redis: false, postgres: false, mysql: false })));
   const indexOf = (slug: string) => all.findIndex((p) => p.slug === slug);
   const pg = statuses.filter((s) => s.postgres);
+  const my = statuses.filter((s) => s.mysql);
   const redis = statuses.filter((s) => s.redis);
   // SQLite files as the last successful backup found them.
   const sqlite = apps
     .map((p) => ({ p, files: listBackups({ slug: p.slug, limit: 5 }).find((b) => b.status === "ok")?.contents?.sqlite ?? [] }))
     .filter((x) => x.files.length > 0);
-  const down = [...pg.filter((s) => !s.postgres!.answering), ...redis.filter((s) => !s.redis!.answering)];
-  const total = pg.length + redis.length + sqlite.reduce((n, x) => n + x.files.length, 0);
-  const without = (key: "postgres" | "redis") => statuses.filter((s) => !s[key]).map((s) => s.slug);
+  const down = [...pg.filter((s) => !s.postgres!.answering), ...my.filter((s) => !s.mysql!.answering), ...redis.filter((s) => !s.redis!.answering)];
+  const total = pg.length + my.length + redis.length + sqlite.reduce((n, x) => n + x.files.length, 0);
+  const withoutRedis = statuses.filter((s) => !s.redis).map((s) => s.slug);
+  // An app gets one SQL database: those with Postgres can't add MySQL, and the other way round.
+  const withoutSql = statuses.filter((s) => !s.postgres && !s.mysql).map((s) => s.slug);
   const addLinks = (engine: string, slugs: string[]) =>
     slugs.length ? (
       <span className="flex flex-wrap items-center gap-1.5">
@@ -74,6 +77,7 @@ export default async function DatabasesOverviewPage() {
       </span>
     ) : undefined;
   const pgMb = pg.reduce((n, s) => n + (s.postgres!.sizeMb ?? 0), 0);
+  const myMb = my.reduce((n, s) => n + (s.mysql!.sizeMb ?? 0), 0);
   const redisUsed = redis.reduce((n, s) => n + (s.redis!.memoryUsedMb ?? 0), 0);
   const redisCap = redis.reduce((n, s) => n + s.redis!.memoryMb, 0);
 
@@ -100,7 +104,20 @@ export default async function DatabasesOverviewPage() {
         {pg.map((s) => (
           <Instance key={s.slug} slug={s.slug} index={indexOf(s.slug)} name={s.postgres!.database} ok={s.postgres!.answering} url={s.postgres!.url} detail={<>{s.postgres!.sizeMb !== null ? `${s.postgres!.sizeMb} MB` : "size unknown"}<Dot />a pg_dump in every backup</>} />
         ))}
-        <Footer add={addLinks("Postgres", without("postgres"))} note="One server · a role and database per app · 127.0.0.1 only" />
+        <Footer add={addLinks("Postgres", withoutSql)} note="One server · a role and database per app · 127.0.0.1 only" />
+      </Collapsible>
+
+      <Collapsible
+        testId="engine-mysql"
+        lead={<TileIcon tone="teal"><Icon icon={Database01Icon} size={20} /></TileIcon>}
+        title={<>MySQL {installed.mysql ? <Pill outline>Installed</Pill> : <Pill outline>Not installed</Pill>}</>}
+        sub={installed.mysql ? <>{my.length} database{my.length === 1 ? "" : "s"}<Dot />{myMb.toFixed(1)} MB<Dot />MariaDB</> : "MariaDB, installed the first time you add it to a project"}
+        side={installed.mysql ? <span className="max-sm:hidden"><StatusText status="ok" label="Running" /></span> : undefined}
+      >
+        {my.map((s) => (
+          <Instance key={s.slug} slug={s.slug} index={indexOf(s.slug)} name={s.mysql!.database} ok={s.mysql!.answering} url={s.mysql!.url} detail={<>{s.mysql!.sizeMb !== null ? `${s.mysql!.sizeMb} MB` : "size unknown"}<Dot />a dump in every backup</>} />
+        ))}
+        <Footer add={addLinks("MySQL", withoutSql)} note="One server · a user and database per app · 127.0.0.1 only" />
       </Collapsible>
 
       <Collapsible
@@ -113,7 +130,7 @@ export default async function DatabasesOverviewPage() {
         {redis.map((s) => (
           <Instance key={s.slug} slug={s.slug} index={indexOf(s.slug)} name={`port ${s.redis!.port}`} ok={s.redis!.answering} url={s.redis!.url} detail={<>{s.redis!.memoryUsedMb ?? "?"} MB of {s.redis!.memoryMb} MB<Dot />noeviction</>} />
         ))}
-        <Footer add={addLinks("Redis", without("redis"))} note="One small Redis per app · its own password and memory cap" />
+        <Footer add={addLinks("Redis", withoutRedis)} note="One small Redis per app · its own password and memory cap" />
       </Collapsible>
 
       <Collapsible
@@ -129,10 +146,7 @@ export default async function DatabasesOverviewPage() {
       </Collapsible>
 
       <Section title="More engines" description="Installed the first time an app asks for one.">
-        {[
-          ["MongoDB", "Document data. Not in Ubuntu's packages; it needs MongoDB's own repository.", "teal"],
-          ["MySQL / MariaDB", "For apps that need it, like Ghost.", "dim"],
-        ].map(([name, what, tone]) => (
+        {[["MongoDB", "Document data. Not in Ubuntu's packages; it needs MongoDB's own repository.", "dim"]].map(([name, what, tone]) => (
           <div key={name} className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-3.5 border-t border-border px-4 py-3.5 sm:px-7">
             <TileIcon tone={tone as "teal" | "dim"}>
               <Icon icon={Database01Icon} size={20} />

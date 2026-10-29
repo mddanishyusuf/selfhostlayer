@@ -543,6 +543,53 @@ if (process.env.TOUR_DEPLOY === "1") {
     }
   }
 
+  // TOUR_MYSQL=1: an app gets one SQL database, so Postgres goes first (with the
+  // type-to-confirm dialog), then MySQL comes in; the next backup has its dump.
+  if (process.env.TOUR_MYSQL === "1") {
+    console.log("MySQL");
+    const setTyped = (selector: string, value: string) =>
+      evaluate(`(() => { const el = document.querySelector(${JSON.stringify(selector)}); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(el, ${JSON.stringify(value)}); el.dispatchEvent(new Event("input", { bubbles: true })); return true; })()`);
+    const restartOf = async (what: string) => {
+      const notice = String(await evaluate(`document.querySelector('[data-testid="notice"]')?.innerText ?? ""`));
+      const deployment = /deployment #(\d+)/.exec(notice)?.[1];
+      if (!deployment) throw new Error(`${what} without a restart: ${notice}`);
+      await go(`/deployments/${deployment}`);
+      await waitForDeploy(`the restart after ${what}`);
+      return deployment;
+    };
+    await go("/projects/next/databases");
+    await waitForPath("/projects/next/databases");
+    if (process.env.TOUR_POSTGRES === "1") {
+      const card = String(await evaluate(`document.querySelector('[data-testid="mysql-card"]').innerText`));
+      if (!card.includes("next uses Postgres")) throw new Error(`MySQL is offered next to Postgres: ${card}`);
+      await evaluate(`[...document.querySelectorAll('[data-testid="postgres-card"] button')].find((b) => b.textContent === "Remove Postgres…").click(), true`);
+      await waitFor(`!!document.querySelector("#confirm-postgres")`, "the remove dialog");
+      await setTyped("#confirm-postgres", "next");
+      await waitFor(`!document.querySelector('[role=dialog] button[type=submit]').disabled`, "the remove button to unlock");
+      await click("[role=dialog] button[type=submit]");
+      await waitFor(`/Postgres removed/.test(document.querySelector('[data-testid="notice"]')?.innerText ?? "")`, "Postgres to be removed", 120_000);
+      console.log(`  ✓ removed Postgres after typing the app's name; a final dump stays on the server (#${await restartOf("removing Postgres")})`);
+      await go("/projects/next/databases");
+      await waitForPath("/projects/next/databases");
+    }
+    await click('[data-testid="mysql-card"] form button[type=submit]');
+    await waitFor(`!!document.querySelector('[data-testid="notice"]') || /role="alert"/.test(document.querySelector('[data-testid="mysql-card"]').innerHTML)`, "MySQL to be added (installs MariaDB the first time)", 600_000);
+    const url = String(await evaluate(`[...document.querySelectorAll('[data-testid="secret-url"]')].map((e) => e.innerText).find((t) => t.startsWith("mysql:")) ?? ""`));
+    if (!/^mysql:\/\/app_next:••••••••@127\.0\.0\.1:3306\/app_next$/.test(url)) throw new Error(`DATABASE_URL isn't shown masked: ${url || await evaluate(`document.querySelector('[data-testid="mysql-card"]').innerText`)}`);
+    await screenshot("databases-mysql");
+    console.log(`  ✓ MariaDB installed, database app_next created, DATABASE_URL shown masked (#${await restartOf("adding MySQL")})`);
+    if (process.env.TOUR_BACKUPS === "1") {
+      await go("/projects/next/backups");
+      await waitForPath("/projects/next/backups");
+      const before = Number(await evaluate(`document.querySelectorAll('[data-testid="backup-list"] [data-status]').length`));
+      await click('form:has(input[name="slug"]) button[type=submit]');
+      await waitFor(`document.querySelectorAll('[data-testid="backup-list"] [data-status]').length > ${before} && !document.querySelector('[data-testid="backup-list"] [data-status="running"]')`, "the backup with MySQL", 180_000);
+      const row = String(await evaluate(`document.querySelector('[data-testid="backup-list"] > div')?.innerText ?? ""`));
+      if (!row.includes("MySQL dump")) throw new Error(`the backup has no MySQL dump: ${row}`);
+      console.log("  ✓ the next backup includes a dump of the app's MySQL database");
+    }
+  }
+
   // Moving an app from another server: a data/ archive uploaded in the panel replaces the app's data.
   console.log("Import data");
   {

@@ -1,8 +1,8 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { appActions } from "../src/actions/app.ts";
-import { serviceActions, serviceEnv } from "../src/actions/service.ts";
+import { grantPattern, renderMariadbConf, serviceActions, serviceEnv } from "../src/actions/service.ts";
 import { NO_IO } from "../src/context.ts";
 import { renderRedisConf, renderRedisUnit } from "../src/templates/redis.ts";
 import { testEnv, type TestEnv } from "./helpers.ts";
@@ -34,6 +34,41 @@ describe("Redis templates", () => {
       REDIS_URL: "redis://default:pw@127.0.0.1:6400",
       DATABASE_URL: "postgresql://app_piqo:x@127.0.0.1:5432/app_piqo",
     });
+  });
+});
+
+describe("MySQL (MariaDB)", () => {
+  it("hands apps a mysql:// DATABASE_URL", () => {
+    expect(serviceEnv({ mysql: { database: "app_piqo", user: "app_piqo", password: "x" } })).toEqual({ DATABASE_URL: "mysql://app_piqo:x@127.0.0.1:3306/app_piqo" });
+  });
+
+  it("is tuned for a small box and listens on 127.0.0.1 only", () => {
+    expect(renderMariadbConf(1024)).toContain("innodb_buffer_pool_size = 64M\n");
+    expect(renderMariadbConf(256)).toContain("innodb_buffer_pool_size = 32M\n");
+    expect(renderMariadbConf(65536)).toContain("innodb_buffer_pool_size = 512M\n");
+    expect(renderMariadbConf(2048)).toContain("bind-address = 127.0.0.1\n");
+  });
+
+  it("escapes _ in grants, where it would match any character", () => {
+    expect(grantPattern("app_my_app")).toBe("app\\_my\\_app");
+  });
+});
+
+describe("one SQL database per app", () => {
+  let env: TestEnv;
+  beforeEach(async () => {
+    env = testEnv();
+    await appActions["app.create"]!.run({ slug: "piqo" }, env.ctx, NO_IO);
+  });
+  afterEach(() => env.cleanup());
+  const has = (state: object) => writeFileSync(join(env.paths.appEtcRoot, "piqo", "services.json"), JSON.stringify(state));
+  const login = { database: "app_piqo", user: "app_piqo", password: "x" };
+
+  it("refuses MySQL next to Postgres, and Postgres next to MySQL: both use DATABASE_URL", async () => {
+    has({ postgres: login });
+    await expect(serviceActions["mysql.add"]!.run({ slug: "piqo" }, env.ctx, NO_IO)).rejects.toThrow(/already has Postgres/);
+    has({ mysql: login });
+    await expect(serviceActions["postgres.add"]!.run({ slug: "piqo" }, env.ctx, NO_IO)).rejects.toThrow(/already has MySQL/);
   });
 });
 

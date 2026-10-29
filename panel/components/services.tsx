@@ -3,7 +3,8 @@
 import { Add01Icon } from "@hugeicons/core-free-icons";
 import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
-import { addPostgresAction, addRedisAction, removePostgresAction, removeRedisAction, type ServiceState } from "@/app/actions/services";
+import { addMysqlAction, addPostgresAction, addRedisAction, removeMysqlAction, removePostgresAction, removeRedisAction, type ServiceState } from "@/app/actions/services";
+import type { SqlKind } from "@/lib/services";
 import { CopyButton, SubmitButton } from "./form";
 import { Icon } from "./icon";
 import { Modal } from "./modal";
@@ -51,15 +52,21 @@ export function SecretUrl({ url }: { url: string }) {
   );
 }
 
-export function AddPostgresForm({ slug, installed }: { slug: string; installed: boolean }) {
-  const [state, action] = useActionState(addPostgresAction, {} as ServiceState);
+const ADD_SQL = {
+  postgres: { action: addPostgresAction, label: "Postgres", installing: "Installing PostgreSQL…" },
+  mysql: { action: addMysqlAction, label: "MySQL", installing: "Installing MariaDB…" },
+} as const;
+
+export function AddSqlForm({ slug, kind, installed }: { slug: string; kind: SqlKind; installed: boolean }) {
+  const a = ADD_SQL[kind];
+  const [state, action] = useActionState(a.action, {} as ServiceState);
   if (state.ok) return <p className="text-[13px] text-teal">{state.ok}</p>;
   return (
     <form action={action} className="grid gap-3">
       <input type="hidden" name="slug" value={slug} />
       <div>
-        <SubmitButton pending={installed ? "Creating the database…" : "Installing PostgreSQL…"} className="w-auto">
-          <Icon icon={Add01Icon} size={15} strokeWidth={2} /> Add Postgres
+        <SubmitButton pending={installed ? "Creating the database…" : a.installing} className="w-auto">
+          <Icon icon={Add01Icon} size={15} strokeWidth={2} /> Add {a.label}
         </SubmitButton>
       </div>
       <FormError message={state.error} />
@@ -75,14 +82,20 @@ const REMOVE = {
     what: "Drops this app's database and role and removes DATABASE_URL. The app restarts without it.",
     data: "Don't keep a final dump on the server",
   },
+  mysql: {
+    action: removeMysqlAction,
+    label: "MySQL",
+    what: "Drops this app's database and user and removes DATABASE_URL. The app restarts without it.",
+    data: "Don't keep a final dump on the server",
+  },
 } as const;
 
 export function RemoveRedisForm({ slug }: { slug: string }) {
   return <RemoveServiceForm slug={slug} kind="redis" />;
 }
 
-export function RemovePostgresForm({ slug }: { slug: string }) {
-  return <RemoveServiceForm slug={slug} kind="postgres" />;
+export function RemoveSqlForm({ slug, kind }: { slug: string; kind: SqlKind }) {
+  return <RemoveServiceForm slug={slug} kind={kind} />;
 }
 
 function RemoveSubmit({ disabled, label }: { disabled: boolean; label: string }) {

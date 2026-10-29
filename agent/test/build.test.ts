@@ -71,6 +71,12 @@ describe("sandboxArgs", () => {
     expect(offline).toContain("--property=RestrictAddressFamilies=AF_UNIX");
     expect(args).not.toContain("--property=IPAddressDeny=any");
   });
+
+  it("passes the command on as written, with every $ escaped from systemd", () => {
+    const script = 'x=a@b; echo "${x%%@*}" "${DATABASE_URL:-}" $HOME $$';
+    const run = sandboxArgs({ unit: "u", user: "app-x", cwd: "/", readWrite: ["/x"], env: {}, memoryMb: 256, timeoutSec: 60, network: false, command: ["/bin/sh", "-c", script] });
+    expect(run.slice(run.indexOf("--") + 1)).toEqual(["/bin/sh", "-c", 'x=a@b; echo "$${x%%@*}" "$${DATABASE_URL:-}" $$HOME $$$$']);
+  });
 });
 
 describe("source URLs", () => {

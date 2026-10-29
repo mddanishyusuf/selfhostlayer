@@ -61,7 +61,8 @@ async function backupSnapshot(params: Params, ctx: Context, io: CallIO) {
   const dir = await stagingDir(ctx);
   removeStale(dir);
 
-  const hasPostgres = readServices(ctx, slug).postgres !== undefined;
+  const services = readServices(ctx, slug);
+  const hasDatabase = Boolean(services.postgres ?? services.mysql);
   const name = `${slug}-${stamp()}-${randomBytes(4).toString("hex")}.tar.gz`;
   const file = join(dir, name);
   const fd = openSync(file, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW, 0o640);
@@ -83,11 +84,11 @@ async function backupSnapshot(params: Params, ctx: Context, io: CallIO) {
         // Writable only so SQLite can open WAL databases (it touches -shm).
         readWrite: [app.data],
         env: { PATH: "/usr/bin:/bin" },
-        // DATABASE_URL, for pg_dump with the app's own role.
+        // DATABASE_URL, to dump Postgres or MySQL with the app's own login.
         envFiles: [join(app.etcDir, "services.env")],
         memoryMb: 512,
         timeoutSec: 3600,
-        network: hasPostgres ? "localhost" : false,
+        network: hasDatabase ? "localhost" : false,
         command: [ctx.paths.runtimeNode, "--no-warnings", "-e", SNAPSHOT_JOB, app.data],
       }),
       {
@@ -107,8 +108,8 @@ async function backupSnapshot(params: Params, ctx: Context, io: CallIO) {
     throw new ActionError("snapshot_failed", reason ?? `the snapshot job exited ${code}`);
   }
   const manifest = /^LAYER-SNAPSHOT (.+)$/m.exec(output);
-  const parsed = manifest ? (JSON.parse(manifest[1]!) as { sqlite: { path: string; bytes: number }[]; postgres?: { bytes: number } | null }) : null;
-  return { slug, file: name, path: file, bytes: statSync(file).size, sqlite: parsed?.sqlite ?? [], postgres: parsed?.postgres ?? null };
+  const parsed = manifest ? (JSON.parse(manifest[1]!) as { sqlite: { path: string; bytes: number }[]; postgres?: { bytes: number } | null; mysql?: { bytes: number } | null }) : null;
+  return { slug, file: name, path: file, bytes: statSync(file).size, sqlite: parsed?.sqlite ?? [], postgres: parsed?.postgres ?? null, mysql: parsed?.mysql ?? null };
 }
 
 /**
@@ -163,6 +164,7 @@ async function backupRestore(params: Params, ctx: Context, io: CallIO) {
   const name = assertStagedName(params.file, "file");
   const { app, user } = await requireAppUser(ctx, slug);
   const fd = await openPanelFile(ctx, name);
+  const services = readServices(ctx, slug);
 
   const units = await activeUnits(ctx, slug);
   for (const unit of units) await ctx.exec(BIN.systemctl, ["stop", unit]);
@@ -182,7 +184,7 @@ async function backupRestore(params: Params, ctx: Context, io: CallIO) {
         envFiles: [join(app.etcDir, "services.env")],
         memoryMb: 512,
         timeoutSec: 3600,
-        network: readServices(ctx, slug).postgres ? "localhost" : false,
+        network: services.postgres || services.mysql ? "localhost" : false,
         command: ["/bin/sh", "-c", RESTORE_JOB, "layer-restore", app.appDir, when],
       }),
       { onData: io.emit, stdin: createReadStream("", { fd }) },
@@ -191,7 +193,7 @@ async function backupRestore(params: Params, ctx: Context, io: CallIO) {
     // Whatever happened, the app runs again (on the restored data, or the old).
     await startAgain(ctx, slug, units);
   }
-  if (code === 2) throw new ActionError("restore_failed", `the files of ${name} were restored, but loading its Postgres dump failed (see the output above)`);
+  if (code === 2) throw new ActionError("restore_failed", `the files of ${name} were restored, but loading its database dump failed (see the output above)`);
   if (code !== 0) throw new ActionError("restore_failed", `restoring ${name} failed (exit ${code}); data/ is unchanged`);
   return { slug, restored: name, previous: `data.before-restore-${when}`, restarted: units };
 }

@@ -5,6 +5,13 @@ import { SAFE_ENV } from "./exec.ts";
 
 export const SYSTEMD_RUN = "/usr/bin/systemd-run";
 
+/**
+ * A command argument as systemd should pass it on. systemd replaces ${...} in
+ * a command with the variable of that name, even inside a script (so
+ * ${x%%@*} became empty); $$ is a literal $. % isn't expanded for transient units.
+ */
+export const systemdLiteral = (arg: string) => arg.replaceAll("$", "$$$$");
+
 export interface SandboxOptions {
   /** Transient unit name, e.g. layer-build-piqo. */
   unit: string;
@@ -83,7 +90,7 @@ export function sandboxArgs(o: SandboxOptions): string[] {
     ...props.map((p) => `--property=${p}`),
     ...Object.entries(o.env).map(([k, v]) => `--setenv=${k}=${v}`),
     "--",
-    ...o.command,
+    ...o.command.map(systemdLiteral),
   ];
 }
 

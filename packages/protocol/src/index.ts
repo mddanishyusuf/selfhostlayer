@@ -39,6 +39,8 @@ export const ACTIONS = [
   "redis.remove",
   "postgres.add",
   "postgres.remove",
+  "mysql.add",
+  "mysql.remove",
   "firewall.status",
   "panel.site",
   "panel.address",

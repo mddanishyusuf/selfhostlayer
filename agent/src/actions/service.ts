@@ -2,6 +2,8 @@
 // - Redis: one small redis-server per app (its own port, password and memory
 //   cap, data in the app's data/redis), as the app's user in its sandbox.
 // - Postgres: one shared server, a role and database per app.
+// - MySQL (MariaDB): the same, a user and database per app. An app gets one
+//   SQL database, Postgres or MySQL, since both hand it DATABASE_URL.
 // The agent makes the passwords and writes them to services.env (root 600),
 // which the app's units load before the user's app.env.
 import { randomBytes } from "node:crypto";
@@ -26,6 +28,7 @@ const REDIS_BINARIES = ["/usr/bin/redis-server", "/usr/bin/valkey-server"];
 export interface ServicesState {
   redis?: { port: number; password: string; memoryMb: number };
   postgres?: { database: string; user: string; password: string };
+  mysql?: { database: string; user: string; password: string };
 }
 
 const servicesFile = (ctx: Context, slug: string) => join(appLayout(ctx, slug).etcDir, "services.json");
@@ -42,6 +45,10 @@ export function serviceEnv(state: ServicesState): Record<string, string> {
   if (state.postgres) {
     const p = state.postgres;
     env.DATABASE_URL = `postgresql://${p.user}:${p.password}@127.0.0.1:5432/${p.database}`;
+  }
+  if (state.mysql) {
+    const m = state.mysql;
+    env.DATABASE_URL = `mysql://${m.user}:${m.password}@127.0.0.1:3306/${m.database}`;
   }
   return env;
 }
@@ -71,7 +78,8 @@ function apt(ctx: Context, args: string[], unit: string) {
 async function serviceInstall(params: Params, ctx: Context) {
   const name = params.name;
   if (name === "postgres") return installPostgres(ctx);
-  if (name !== "redis") throw new ValidationError("name", 'must be "redis" or "postgres"');
+  if (name === "mysql") return installMysql(ctx);
+  if (name !== "redis") throw new ValidationError("name", 'must be "redis", "postgres" or "mysql"');
   if (redisBinary()) return { name, installed: true, binary: redisBinary(), already: true };
   await apt(ctx, ["update", "-q"], "layer-apt-update");
   // Some releases ship Valkey (the Redis fork) instead of Redis; both work the same here.
@@ -204,17 +212,27 @@ async function redisRemove(params: Params, ctx: Context) {
 
 async function serviceStatus(params: Params, ctx: Context) {
   // Without an app: just which engines are installed on the server.
-  if (params.slug === undefined) return { installed: { redis: redisBinary() !== null, postgres: postgresCluster() !== null } };
+  const installed = { redis: redisBinary() !== null, postgres: postgresCluster() !== null, mysql: mysqlInstalled() };
+  if (params.slug === undefined) return { installed };
   const slug = assertSlug(params.slug);
   const app = appLayout(ctx, slug);
   if (!existsSync(app.etcDir)) throw new ActionError("not_found", `app ${slug} doesn't exist`);
   const state = readServices(ctx, slug);
   const env = serviceEnv(state);
-  const out: Record<string, unknown> = { slug, installed: { redis: redisBinary() !== null, postgres: postgresCluster() !== null } };
+  const out: Record<string, unknown> = { slug, installed };
   if (state.postgres && postgresCluster()) {
     const size = await psql(ctx, `SELECT pg_database_size('${state.postgres.database}')`, { allowFail: true });
     out.postgres = {
       database: state.postgres.database,
+      url: env.DATABASE_URL,
+      sizeMb: size.code === 0 ? Math.round((Number(size.stdout.trim()) / 1048576) * 10) / 10 : null,
+      answering: size.code === 0,
+    };
+  }
+  if (state.mysql && installed.mysql) {
+    const size = await mysql(ctx, `SELECT COALESCE(SUM(data_length + index_length), 0) FROM information_schema.tables WHERE table_schema = '${state.mysql.database}'`, { allowFail: true });
+    out.mysql = {
+      database: state.mysql.database,
       url: env.DATABASE_URL,
       sizeMb: size.code === 0 ? Math.round((Number(size.stdout.trim()) / 1048576) * 10) / 10 : null,
       answering: size.code === 0,
@@ -300,8 +318,9 @@ async function postgresAdd(params: Params, ctx: Context) {
   const slug = assertSlug(params.slug);
   const app = appLayout(ctx, slug);
   if (!existsSync(app.etcDir)) throw new ActionError("not_found", `app ${slug} doesn't exist`);
-  if (!postgresCluster()) throw new ActionError("not_installed", "Postgres isn't installed yet (service.install postgres)");
   const state = readServices(ctx, slug);
+  if (state.mysql) throw new ActionError("conflict", `${slug} already has MySQL: an app gets one SQL database, since both use DATABASE_URL`);
+  if (!postgresCluster()) throw new ActionError("not_installed", "Postgres isn't installed yet (service.install postgres)");
   const name = pgName(slug);
   const pg = state.postgres ?? { database: name, user: name, password: randomBytes(24).toString("hex") };
   // Names are app_[a-z0-9_]+ and the password is hex: nothing here needs escaping.
@@ -324,24 +343,8 @@ export async function removePostgres(ctx: Context, slug: string, keepData = true
   const state = existsSync(app.etcDir) ? readServices(ctx, slug) : {};
   const pg = state.postgres;
   if (!pg || !postgresCluster()) return null;
-  let archived: string | null = null;
-  if (keepData) {
-    ensureDir(ctx.paths.archiveRoot, 0o700);
-    archived = join(ctx.paths.archiveRoot, `${slug}-${new Date().toISOString().replace(/[:.]/g, "-")}.pgdump`);
-    // pg_dump runs as postgres and writes to stdout: a file only root can read.
-    const fd = openSync(archived, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL, 0o600);
-    let errors = "";
-    let code: number;
-    try {
-      ({ code } = await ctx.spawn(BIN.runuser, ["-u", "postgres", "--", BIN.pgDump, "--format=custom", pg.database], { stdout: fd, onData: (c) => (errors += c) }));
-    } finally {
-      closeSync(fd);
-    }
-    if (code !== 0) {
-      rmSync(archived, { force: true });
-      throw new ActionError("dump_failed", `couldn't dump ${pg.database} before removing it: ${errors.trim().slice(0, 300)}`);
-    }
-  }
+  // pg_dump runs as postgres and writes to stdout.
+  const archived = keepData ? await archiveDump(ctx, slug, "pgdump", BIN.runuser, ["-u", "postgres", "--", BIN.pgDump, "--format=custom", pg.database], pg.database) : null;
   await psql(ctx, `DROP DATABASE IF EXISTS ${pg.database} WITH (FORCE)`);
   await psql(ctx, `DROP ROLE IF EXISTS ${pg.user}`);
   if (existsSync(app.etcDir)) {
@@ -349,6 +352,25 @@ export async function removePostgres(ctx: Context, slug: string, keepData = true
     writeServices(ctx, slug, rest);
   }
   return { archived };
+}
+
+/** Runs a dump command into a new file in the archive, one only root can read. Returns its path. */
+async function archiveDump(ctx: Context, slug: string, ext: string, file: string, args: string[], what: string): Promise<string> {
+  ensureDir(ctx.paths.archiveRoot, 0o700);
+  const archived = join(ctx.paths.archiveRoot, `${slug}-${new Date().toISOString().replace(/[:.]/g, "-")}.${ext}`);
+  const fd = openSync(archived, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL, 0o600);
+  let errors = "";
+  let code: number;
+  try {
+    ({ code } = await ctx.spawn(file, args, { stdout: fd, onData: (c) => (errors += c) }));
+  } finally {
+    closeSync(fd);
+  }
+  if (code !== 0) {
+    rmSync(archived, { force: true });
+    throw new ActionError("dump_failed", `couldn't dump ${what} before removing it: ${errors.trim().slice(0, 300)}`);
+  }
+  return archived;
 }
 
 async function postgresRemove(params: Params, ctx: Context) {
@@ -360,6 +382,120 @@ async function postgresRemove(params: Params, ctx: Context) {
   return { slug, removed: true, archived: result.archived };
 }
 
+// ---------------------------------------------------------------- MySQL (MariaDB)
+
+const MARIADB_SERVER = "/usr/sbin/mariadbd";
+const MARIADB_CONF = "/etc/mysql/mariadb.conf.d/90-layer.cnf";
+
+export function mysqlInstalled(): boolean {
+  return existsSync(MARIADB_SERVER) && existsSync(BIN.mariadb);
+}
+
+/** Settings for a small box, like Postgres's: modest memory, localhost only. */
+export function renderMariadbConf(totalMb: number): string {
+  return `# Generated by layer-agent: MariaDB tuned for a small server.
+[mysqld]
+bind-address = 127.0.0.1
+skip-name-resolve
+max_connections = 50
+innodb_buffer_pool_size = ${Math.min(512, Math.max(32, Math.floor(totalMb / 16)))}M
+key_buffer_size = 8M
+performance_schema = OFF
+character-set-server = utf8mb4
+collation-server = utf8mb4_unicode_ci
+`;
+}
+
+/** Runs SQL as root over the local socket (MariaDB's unix_socket login). Returns rows as text. */
+async function mysql(ctx: Context, sql: string, opts: { allowFail?: boolean } = {}) {
+  return ctx.exec(BIN.mariadb, ["--batch", "--skip-column-names", "--execute", sql], { allowFail: opts.allowFail, timeoutMs: 120_000 });
+}
+
+async function waitForMysql(ctx: Context): Promise<void> {
+  for (let i = 0; i < 60; i++) {
+    if ((await mysql(ctx, "SELECT 1", { allowFail: true })).code === 0) return;
+    await new Promise((r) => setTimeout(r, 250));
+  }
+  throw new ActionError("start_failed", "MariaDB didn't come up");
+}
+
+async function installMysql(ctx: Context) {
+  const already = mysqlInstalled();
+  if (!already) {
+    await apt(ctx, ["update", "-q"], "layer-apt-update");
+    const r = await apt(ctx, ["install", "-y", "-q", "--no-install-recommends", "mariadb-server"], "layer-apt-install");
+    if (r.code !== 0 || !mysqlInstalled()) throw new ActionError("install_failed", `couldn't install mariadb-server with apt: ${(r.stderr || r.stdout).trim().split("\n").slice(-3).join(" ")}`);
+  }
+  writeFileAtomic(MARIADB_CONF, renderMariadbConf(Math.round(totalmem() / 1048576)), 0o644);
+  await ctx.exec(BIN.systemctl, ["enable", "mariadb"], { allowFail: true });
+  await ctx.exec(BIN.systemctl, ["restart", "mariadb"]);
+  await waitForMysql(ctx);
+  // Older packages came with anonymous logins and a test database anyone could use.
+  await mysql(ctx, "DROP USER IF EXISTS ''@'localhost'; DROP USER IF EXISTS ''@'%'; DROP DATABASE IF EXISTS test");
+  const version = (await mysql(ctx, "SELECT VERSION()")).stdout.trim();
+  return { name: "mysql", installed: true, version, already };
+}
+
+/**
+ * The database name as a GRANT pattern. In grants, _ matches any character:
+ * unescaped, app_my_app would also cover the database of an app called myxapp.
+ */
+export const grantPattern = (database: string) => database.replaceAll("_", "\\_");
+
+async function mysqlAdd(params: Params, ctx: Context) {
+  const slug = assertSlug(params.slug);
+  const app = appLayout(ctx, slug);
+  if (!existsSync(app.etcDir)) throw new ActionError("not_found", `app ${slug} doesn't exist`);
+  const state = readServices(ctx, slug);
+  if (state.postgres) throw new ActionError("conflict", `${slug} already has Postgres: an app gets one SQL database, since both use DATABASE_URL`);
+  if (!mysqlInstalled()) throw new ActionError("not_installed", "MySQL isn't installed yet (service.install mysql)");
+  const name = pgName(slug);
+  const my = state.mysql ?? { database: name, user: name, password: randomBytes(24).toString("hex") };
+  // Names are app_[a-z0-9_]+ and the password is hex: nothing here needs escaping
+  // beyond the grant's pattern. The user can only log in over TCP from 127.0.0.1.
+  await mysql(
+    ctx,
+    [
+      `CREATE DATABASE IF NOT EXISTS ${my.database} CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`,
+      `CREATE USER IF NOT EXISTS '${my.user}'@'127.0.0.1' IDENTIFIED BY '${my.password}'`,
+      `ALTER USER '${my.user}'@'127.0.0.1' IDENTIFIED BY '${my.password}' WITH MAX_USER_CONNECTIONS 20`,
+      `GRANT ALL PRIVILEGES ON \`${grantPattern(my.database)}\`.* TO '${my.user}'@'127.0.0.1'`,
+    ].join("; "),
+  );
+  writeServices(ctx, slug, { ...state, mysql: my });
+  // Prove the credentials the app gets work, over TCP like the app connects.
+  const check = await ctx.exec(BIN.mariadb, ["--protocol=TCP", "--host=127.0.0.1", "--port=3306", `--user=${my.user}`, "--batch", "--skip-column-names", "--execute", "SELECT CURRENT_USER()", my.database], {
+    allowFail: true,
+    env: { MYSQL_PWD: my.password },
+  });
+  if (check.code !== 0 || check.stdout.trim() !== `${my.user}@127.0.0.1`) throw new ActionError("start_failed", `the new credentials don't work: ${check.stderr.trim()}`);
+  return { slug, database: my.database, env: ["DATABASE_URL"] };
+}
+
+/** Drops the app's database and user. With keepData, a dump goes to the archive first. */
+export async function removeMysql(ctx: Context, slug: string, keepData = true): Promise<{ archived: string | null } | null> {
+  const app = appLayout(ctx, slug);
+  const state = existsSync(app.etcDir) ? readServices(ctx, slug) : {};
+  const my = state.mysql;
+  if (!my || !mysqlInstalled()) return null;
+  const archived = keepData ? await archiveDump(ctx, slug, "sql", BIN.mariadbDump, ["--single-transaction", "--quick", "--routines", "--events", my.database], my.database) : null;
+  await mysql(ctx, `DROP DATABASE IF EXISTS ${my.database}; DROP USER IF EXISTS '${my.user}'@'127.0.0.1'`);
+  if (existsSync(app.etcDir)) {
+    const { mysql: _removed, ...rest } = state;
+    writeServices(ctx, slug, rest);
+  }
+  return { archived };
+}
+
+async function mysqlRemove(params: Params, ctx: Context) {
+  const slug = assertSlug(params.slug);
+  const keepData = params.keepData ?? true;
+  if (typeof keepData !== "boolean") throw new ValidationError("keepData", "must be true or false");
+  const result = await removeMysql(ctx, slug, keepData);
+  if (!result) throw new ActionError("not_found", `${slug} has no MySQL`);
+  return { slug, removed: true, archived: result.archived };
+}
+
 export const serviceActions: ActionTable = {
   "service.install": { mutates: true, run: serviceInstall },
   "service.status": { mutates: false, run: serviceStatus },
@@ -367,4 +503,6 @@ export const serviceActions: ActionTable = {
   "redis.remove": { mutates: true, run: redisRemove },
   "postgres.add": { mutates: true, run: postgresAdd },
   "postgres.remove": { mutates: true, run: postgresRemove },
+  "mysql.add": { mutates: true, run: mysqlAdd },
+  "mysql.remove": { mutates: true, run: mysqlRemove },
 };

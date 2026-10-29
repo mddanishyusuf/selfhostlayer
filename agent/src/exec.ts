@@ -17,6 +17,8 @@ export const BIN = {
   runuser: "/usr/sbin/runuser",
   psql: "/usr/bin/psql",
   pgDump: "/usr/bin/pg_dump",
+  mariadb: "/usr/bin/mariadb",
+  mariadbDump: "/usr/bin/mariadb-dump",
   fail2banClient: "/usr/bin/fail2ban-client",
 } as const;
 
@@ -30,6 +32,8 @@ export interface ExecOptions {
   timeoutMs?: number;
   /** Return non-zero exits instead of throwing. */
   allowFail?: boolean;
+  /** Extra environment, for a password that mustn't show in the process list. */
+  env?: Record<string, string>;
 }
 
 /** Runs one program with an argv array. Never through a shell. */
@@ -55,7 +59,7 @@ export const realExec: Exec = (file, args, opts = {}) => {
     execFile(
       file,
       args,
-      { shell: false, env: SAFE_ENV, timeout: opts.timeoutMs ?? 60_000, maxBuffer: 16 * 1024 * 1024 },
+      { shell: false, env: opts.env ? { ...SAFE_ENV, ...opts.env } : SAFE_ENV, timeout: opts.timeoutMs ?? 60_000, maxBuffer: 16 * 1024 * 1024 },
       (err, stdout, stderr) => {
         const code = err ? (typeof err.code === "number" ? err.code : 1) : 0;
         const result = { code, stdout: String(stdout), stderr: String(stderr) };

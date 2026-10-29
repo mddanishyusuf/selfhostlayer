@@ -2,11 +2,11 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { formatBytes } from "@/components/backup-list";
 import { Dot, KeyValues, Notice, PageHeader, SettingsRow } from "@/components/page";
-import { AddPostgresForm, AddRedisForm, RemovePostgresForm, RemoveRedisForm, SecretUrl } from "@/components/services";
+import { AddRedisForm, AddSqlForm, RemoveRedisForm, RemoveSqlForm, SecretUrl } from "@/components/services";
 import { StatusText } from "@/components/status";
 import { listBackups } from "@/lib/backup/runner";
 import { getProjectBySlug } from "@/lib/projects";
-import { serviceStatus } from "@/lib/services";
+import { serviceStatus, type ServiceStatus, type SqlKind } from "@/lib/services";
 import { requireUser } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
@@ -18,7 +18,15 @@ const NOTICES: Record<string, { lead: string; tone: "ok" | "lav"; text: string }
   "postgres-added": { lead: "Added", tone: "ok", text: "Postgres is ready." },
   "postgres-removed": { lead: "Removed", tone: "lav", text: "Postgres removed, and its data deleted." },
   "postgres-removed-kept": { lead: "Removed", tone: "lav", text: "Postgres removed. A final dump is kept on the server in /var/lib/layer-agent/archive." },
+  "mysql-added": { lead: "Added", tone: "ok", text: "MySQL is ready." },
+  "mysql-removed": { lead: "Removed", tone: "lav", text: "MySQL removed, and its data deleted." },
+  "mysql-removed-kept": { lead: "Removed", tone: "lav", text: "MySQL removed. A final dump is kept on the server in /var/lib/layer-agent/archive." },
 };
+
+const SQL = {
+  postgres: { title: "PostgreSQL", label: "Postgres", description: "A database and role only this app can use, on the server's PostgreSQL. Every backup includes a pg_dump." },
+  mysql: { title: "MySQL", label: "MySQL", description: "A database and user only this app can use, on the server's MariaDB, the MySQL that comes with Ubuntu and Debian. Every backup includes a dump." },
+} as const;
 
 const Unreachable = () => <p className="text-[13px] text-rose">Couldn&apos;t ask the agent about this app&apos;s services.</p>;
 
@@ -31,7 +39,6 @@ export default async function DatabasesPage({ params, searchParams }: { params: 
   const lastBackup = listBackups({ slug: project.slug, limit: 10 }).find((b) => b.status === "ok");
   const sqlite = lastBackup?.contents?.sqlite ?? [];
   const redis = status?.redis;
-  const postgres = status?.postgres;
   const n = notice ? NOTICES[notice] : undefined;
 
   return (
@@ -55,39 +62,8 @@ export default async function DatabasesPage({ params, searchParams }: { params: 
         </Notice>
       )}
 
-      <SettingsRow title="PostgreSQL" description="A database and role only this app can use, on the server's PostgreSQL. Every backup includes a pg_dump.">
-        <div className="grid gap-4" data-testid="postgres-card">
-          {!status && <Unreachable />}
-          {status && !postgres && (
-            <>
-              <p className="text-[13.5px] text-muted">
-                Installed the first time and tuned for small boxes. The app gets <code className="font-mono text-[12.5px]">DATABASE_URL</code>.
-              </p>
-              <AddPostgresForm slug={project.slug} installed={status.installed.postgres} />
-            </>
-          )}
-          {postgres && (
-            <>
-              <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[13.5px] text-muted">
-                <StatusText status={postgres.answering ? "ok" : "err"} label={postgres.answering ? "Running" : "Not answering"} />
-                <Dot />
-                <code className="font-mono text-[12.5px]">{postgres.database}</code>
-                {postgres.sizeMb !== null && (
-                  <>
-                    <Dot />
-                    <span className="tabular-nums">{postgres.sizeMb} MB</span>
-                  </>
-                )}
-              </div>
-              <div className="grid gap-1.5">
-                <p className="text-[13px] font-medium">DATABASE_URL</p>
-                <SecretUrl url={postgres.url} />
-              </div>
-              <RemovePostgresForm slug={project.slug} />
-            </>
-          )}
-        </div>
-      </SettingsRow>
+      <SqlRow kind="postgres" slug={project.slug} status={status} />
+      <SqlRow kind="mysql" slug={project.slug} status={status} />
 
       <SettingsRow title="Redis" description="Its own small Redis on 127.0.0.1, with a password and a memory cap. Its data lives in data/redis, so it's in the backups.">
         <div className="grid gap-4" data-testid="redis-card">
@@ -147,5 +123,51 @@ export default async function DatabasesPage({ params, searchParams }: { params: 
         />
       </SettingsRow>
     </>
+  );
+}
+
+/** Postgres or MySQL: add it, or see it and remove it. An app with one can't add the other. */
+function SqlRow({ kind, slug, status }: { kind: SqlKind; slug: string; status: ServiceStatus | null }) {
+  const db = status?.[kind];
+  const other = kind === "postgres" ? "mysql" : "postgres";
+  return (
+    <SettingsRow title={SQL[kind].title} description={SQL[kind].description}>
+      <div className="grid gap-4" data-testid={`${kind}-card`}>
+        {!status && <Unreachable />}
+        {status && !db && status[other] && (
+          <p className="text-[13.5px] text-muted">
+            {slug} uses {SQL[other].label}. An app gets one SQL database, since both give it <code className="font-mono text-[12.5px]">DATABASE_URL</code>.
+          </p>
+        )}
+        {status && !db && !status[other] && (
+          <>
+            <p className="text-[13.5px] text-muted">
+              Installed the first time and tuned for small boxes. The app gets <code className="font-mono text-[12.5px]">DATABASE_URL</code>.
+            </p>
+            <AddSqlForm slug={slug} kind={kind} installed={status.installed[kind]} />
+          </>
+        )}
+        {db && (
+          <>
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[13.5px] text-muted">
+              <StatusText status={db.answering ? "ok" : "err"} label={db.answering ? "Running" : "Not answering"} />
+              <Dot />
+              <code className="font-mono text-[12.5px]">{db.database}</code>
+              {db.sizeMb !== null && (
+                <>
+                  <Dot />
+                  <span className="tabular-nums">{db.sizeMb} MB</span>
+                </>
+              )}
+            </div>
+            <div className="grid gap-1.5">
+              <p className="text-[13px] font-medium">DATABASE_URL</p>
+              <SecretUrl url={db.url} />
+            </div>
+            <RemoveSqlForm slug={slug} kind={kind} />
+          </>
+        )}
+      </div>
+    </SettingsRow>
   );
 }

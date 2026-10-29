@@ -6,7 +6,7 @@ import { backupActions } from "../src/actions/backup.ts";
 import { NO_IO } from "../src/context.ts";
 import { BIN } from "../src/exec.ts";
 import { IMPORT_JOB, RESTORE_JOB, SNAPSHOT_JOB } from "../src/jobs.ts";
-import { SYSTEMD_RUN } from "../src/sandbox.ts";
+import { SYSTEMD_RUN, systemdLiteral } from "../src/sandbox.ts";
 import { testEnv, type TestEnv } from "./helpers.ts";
 
 let env: TestEnv;
@@ -30,7 +30,7 @@ describe("backup.snapshot", () => {
     expect(run).toContain("--uid=app-piqo");
     expect(run).toContain("--property=IPAddressDeny=any");
     expect(run).toContain(`--property=ReadWritePaths=${join(env.paths.appsRoot, "piqo", "data")}`);
-    expect(run.slice(run.indexOf("--") + 1)).toEqual([env.paths.runtimeNode, "--no-warnings", "-e", SNAPSHOT_JOB, join(env.paths.appsRoot, "piqo", "data")]);
+    expect(run.slice(run.indexOf("--") + 1)).toEqual([env.paths.runtimeNode, "--no-warnings", "-e", systemdLiteral(SNAPSHOT_JOB), join(env.paths.appsRoot, "piqo", "data")]);
   });
 
   it("deletes the partial file and reports the job's reason on failure", async () => {
@@ -64,7 +64,7 @@ describe("backup.restore", () => {
     expect(systemctl).toEqual(["stop app-piqo@blue.service", "start app-piqo@blue.service"]);
     const run = env.spawner.calls.find(([f]) => f === SYSTEMD_RUN)!;
     expect(run).toContain("--uid=app-piqo");
-    expect(run.slice(run.indexOf("--") + 1, run.indexOf("--") + 5)).toEqual(["/bin/sh", "-c", RESTORE_JOB, "layer-restore"]);
+    expect(run.slice(run.indexOf("--") + 1, run.indexOf("--") + 5)).toEqual(["/bin/sh", "-c", systemdLiteral(RESTORE_JOB), "layer-restore"]);
   });
 
   it("starts the app again even when the restore fails", async () => {
@@ -120,7 +120,7 @@ describe("data.import", () => {
     const run = env.spawner.calls.find(([f]) => f === SYSTEMD_RUN)!;
     expect(run).toContain("--uid=app-piqo");
     expect(run).toContain("--property=IPAddressDeny=any");
-    expect(run.slice(run.indexOf("--") + 1, run.indexOf("--") + 5)).toEqual([env.paths.runtimeNode, "--no-warnings", "-e", IMPORT_JOB]);
+    expect(run.slice(run.indexOf("--") + 1, run.indexOf("--") + 5)).toEqual([env.paths.runtimeNode, "--no-warnings", "-e", systemdLiteral(IMPORT_JOB)]);
     expect(run.at(-1)).toBe("gzip");
     // The app runs during the long part; it's only stopped for the swap.
     const order = [...env.fake.calls.filter(([f, a]) => f === BIN.systemctl && (a === "stop" || a === "start")).map((c) => c[1])];

@@ -21,7 +21,8 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
         send("status", getDeployment(id));
         if (FINISHED.includes(status)) close();
       };
-      const keepAlive = setInterval(() => controller.enqueue(encoder.encode(": keep-alive\n\n")), 15_000);
+      // An event, not a comment: the page reconnects when these stop coming.
+      const keepAlive = setInterval(() => send("ping", Date.now()), 15_000);
       const close = () => {
         cleanup();
         try {

@@ -42,6 +42,8 @@ const LABELS: Record<string, string> = {
   "redis.remove": "Removed Redis",
   "postgres.add": "Added Postgres",
   "postgres.remove": "Removed Postgres",
+  "mysql.add": "Added MySQL",
+  "mysql.remove": "Removed MySQL",
   "proxy.set": "Routed its domains",
   "static.publish": "Published static files",
   "panel.site": "Wrote the panel's site",

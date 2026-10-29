@@ -130,25 +130,63 @@ export function LogPane({ text, live, label, fileName, minHeight = "calc(100dvh 
   );
 }
 
+const DONE = ["ready", "failed", "cancelled"];
+
 export function LogViewer({ deploymentId, initialStatus }: { deploymentId: number; initialStatus: string }) {
   const [log, setLog] = useState("");
   const router = useRouter();
   const lastStatus = useRef(initialStatus);
-  const [live, setLive] = useState(!["ready", "failed", "cancelled"].includes(initialStatus));
+  const [live, setLive] = useState(!DONE.includes(initialStatus));
 
+  // Until the deployment finishes, a stream that drops or goes quiet (the
+  // server pings every 15s) is opened again. Each connection starts with the
+  // whole log so far, which replaces what's shown.
   useEffect(() => {
-    const source = new EventSource(`/api/deployments/${deploymentId}/events`);
-    source.addEventListener("log", (e) => setLog((prev) => prev + JSON.parse((e as MessageEvent).data)));
-    source.addEventListener("status", (e) => {
-      const d = JSON.parse((e as MessageEvent).data) as { status: string } | null;
-      if (d && d.status !== lastStatus.current) {
-        lastStatus.current = d.status;
-        setLive(!["ready", "failed", "cancelled"].includes(d.status));
-        router.refresh();
-      }
-    });
-    source.onerror = () => source.close();
-    return () => source.close();
+    let source: EventSource | undefined;
+    let retry: ReturnType<typeof setTimeout> | undefined;
+    let watchdog: ReturnType<typeof setTimeout> | undefined;
+    let finished = false;
+    let failures = 0;
+    const reconnect = () => {
+      source?.close();
+      clearTimeout(watchdog);
+      if (!finished && ++failures <= 10) retry = setTimeout(connect, Math.min(1000 * failures, 5000));
+    };
+    const alive = () => {
+      failures = 0;
+      clearTimeout(watchdog);
+      watchdog = setTimeout(reconnect, 25_000);
+    };
+    const connect = () => {
+      let first = true;
+      source = new EventSource(`/api/deployments/${deploymentId}/events`);
+      source.addEventListener("ping", alive);
+      source.addEventListener("log", (e) => {
+        alive();
+        const text = JSON.parse((e as MessageEvent).data) as string;
+        setLog((prev) => (first ? text : prev + text));
+        first = false;
+      });
+      source.addEventListener("status", (e) => {
+        alive();
+        const d = JSON.parse((e as MessageEvent).data) as { status: string } | null;
+        if (!d) return;
+        finished = DONE.includes(d.status);
+        if (d.status !== lastStatus.current) {
+          lastStatus.current = d.status;
+          setLive(!finished);
+          router.refresh();
+        }
+      });
+      source.onerror = reconnect;
+    };
+    connect();
+    return () => {
+      finished = true;
+      clearTimeout(retry);
+      clearTimeout(watchdog);
+      source?.close();
+    };
   }, [deploymentId, router]);
 
   return <LogPane text={log} live={live} label={live ? "Streaming" : "Build log"} fileName={`deployment-${deploymentId}.log`} />;

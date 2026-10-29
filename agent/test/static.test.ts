@@ -5,7 +5,7 @@ import { appActions } from "../src/actions/app.ts";
 import { proxyActions } from "../src/actions/proxy.ts";
 import { COPY_SCRIPT, staticActions } from "../src/actions/static.ts";
 import { NO_IO } from "../src/context.ts";
-import { SYSTEMD_RUN } from "../src/sandbox.ts";
+import { SYSTEMD_RUN, systemdLiteral } from "../src/sandbox.ts";
 import { parseLiveMarker, renderStaticSite } from "../src/templates/caddy-site.ts";
 import { testEnv, type TestEnv } from "./helpers.ts";
 
@@ -47,7 +47,7 @@ describe("static.publish", () => {
     expect(dest.startsWith(join(siteDir(), `${sha("a")}-`))).toBe(true);
     expect(run).toContain("--property=IPAddressDeny=any");
     expect(run.slice(run.indexOf("--") + 1)).toEqual([
-      "/bin/sh", "-c", COPY_SCRIPT, "layer-publish",
+      "/bin/sh", "-c", systemdLiteral(COPY_SCRIPT), "layer-publish",
       join(env.paths.appsRoot, "site", "releases", sha("a"), "web", "dist"),
       dest,
       "dist",

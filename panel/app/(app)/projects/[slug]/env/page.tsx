@@ -37,6 +37,7 @@ export default async function EnvPage({ params }: { params: Promise<{ slug: stri
         [<code key="p" className="font-mono text-[13px]">PORT, HOST</code>, <span key="pv">127.0.0.1 and the port of the live color (blue or green)</span>],
         ...(status?.redis ? [secretRow("REDIS_URL", status.redis.url, "Redis")] : []),
         ...(status?.postgres ? [secretRow("DATABASE_URL", status.postgres.url, "Postgres")] : []),
+        ...(status?.mysql ? [secretRow("DATABASE_URL", status.mysql.url, "MySQL")] : []),
       ];
 
   return (

@@ -1,14 +1,25 @@
-// Databases next to an app (Redis now, Postgres next), through the agent.
+// Databases next to an app (Redis, Postgres, MySQL), through the agent.
 import { agent } from "./agent";
 import { activeDeployment, liveDeployment, rollbackTo, type Deployment } from "./deploy";
 import type { Project } from "./projects";
 
 export interface ServiceStatus {
   slug: string;
-  installed: { redis: boolean; postgres: boolean };
+  installed: { redis: boolean; postgres: boolean; mysql: boolean };
   redis?: { port: number; memoryMb: number; url: string; active: boolean; memoryUsedMb: number | null; answering: boolean };
-  postgres?: { database: string; url: string; sizeMb: number | null; answering: boolean };
+  postgres?: SqlDatabase;
+  mysql?: SqlDatabase;
 }
+
+export interface SqlDatabase {
+  database: string;
+  url: string;
+  sizeMb: number | null;
+  answering: boolean;
+}
+
+/** An app gets one SQL database, Postgres or MySQL: both hand it DATABASE_URL. */
+export type SqlKind = "postgres" | "mysql";
 
 export const serviceStatus = (slug: string) => agent<ServiceStatus>("service.status", { slug });
 
@@ -36,15 +47,15 @@ export async function removeRedis(project: Project, keepData: boolean): Promise<
   return restartWithNewEnv(project);
 }
 
-export async function addPostgres(project: Project): Promise<Deployment | null> {
+export async function addSqlDatabase(project: Project, kind: SqlKind): Promise<Deployment | null> {
   const status = await serviceStatus(project.slug);
-  // The first database on the box installs PostgreSQL (a minute or two).
-  if (!status.installed.postgres) await agent("service.install", { name: "postgres" });
-  await agent("postgres.add", { slug: project.slug });
+  // The first database of its kind installs the server (PostgreSQL or MariaDB, a minute or two).
+  if (!status.installed[kind]) await agent("service.install", { name: kind });
+  await agent(`${kind}.add` as const, { slug: project.slug });
   return restartWithNewEnv(project);
 }
 
-export async function removePostgres(project: Project, keepData: boolean): Promise<{ archived: string | null; deployment: Deployment | null }> {
-  const { archived } = await agent<{ archived: string | null }>("postgres.remove", { slug: project.slug, keepData });
+export async function removeSqlDatabase(project: Project, kind: SqlKind, keepData: boolean): Promise<{ archived: string | null; deployment: Deployment | null }> {
+  const { archived } = await agent<{ archived: string | null }>(`${kind}.remove` as const, { slug: project.slug, keepData });
   return { archived, deployment: restartWithNewEnv(project) };
 }

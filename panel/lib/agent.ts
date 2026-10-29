@@ -67,7 +67,7 @@ const FAKE: Partial<Record<ActionName, unknown>> = {
   },
   "service.status": {
     slug: "piqo",
-    installed: { redis: true, postgres: true },
+    installed: { redis: true, postgres: true, mysql: false },
     redis: { port: 6400, memoryMb: 64, url: "redis://default:51b0e9c2aa7741f8@127.0.0.1:6400", active: true, memoryUsedMb: 23, answering: true },
     postgres: { database: "app_piqo", url: "postgresql://app_piqo:9f2c41d07be6a1e3@127.0.0.1:5432/app_piqo", sizeMb: 48.2, answering: true },
   },

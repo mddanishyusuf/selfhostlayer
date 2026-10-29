@@ -9,9 +9,9 @@
  * app writes (WAL included), and the copy must pass PRAGMA integrity_check.
  * The archive holds those checked copies in place of the live files and
  * leaves out -wal/-shm/-journal. With DATABASE_URL set (the app has
- * Postgres), a pg_dump made with the app's own role goes in as
- * .layer-postgres.dump. The last stderr line is
- * `LAYER-SNAPSHOT {"sqlite":[{path,bytes}],"postgres":{bytes}|null}`.
+ * Postgres or MySQL), a dump made with the app's own login goes in as
+ * .layer-postgres.dump or .layer-mysql.sql. The last stderr line is
+ * `LAYER-SNAPSHOT {"sqlite":[{path,bytes}],"postgres":{bytes}|null,"mysql":{bytes}|null}`.
  */
 export const SNAPSHOT_JOB = String.raw`
 const fs = require("node:fs");
@@ -72,10 +72,12 @@ function findDatabases(dir, rel, out) {
     report.push({ path: rel, bytes: fs.statSync(dest).size });
   }
 
-  // The app's Postgres database, dumped with its own credentials. It travels
-  // in the archive as .layer-postgres.dump; restore loads it back.
+  // The app's SQL database, dumped with its own login. It travels in the
+  // archive as .layer-postgres.dump or .layer-mysql.sql; restore loads it back.
   let postgres = null;
-  if (process.env.DATABASE_URL) {
+  let mysql = null;
+  const url = process.env.DATABASE_URL || "";
+  if (url.startsWith("postgresql://")) {
     const dump = path.join(snap, ".layer-postgres.dump");
     const r = spawnSync("/usr/bin/pg_dump", ["--format=custom", "--no-owner", "--no-privileges", "--file=" + dump, process.env.DATABASE_URL], { stdio: ["ignore", "ignore", "pipe"], encoding: "utf8" });
     if (r.status !== 0) {
@@ -83,11 +85,25 @@ function findDatabases(dir, rel, out) {
       process.exit(5);
     }
     postgres = { bytes: fs.statSync(dump).size };
+  } else if (url.startsWith("mysql://")) {
+    const u = new URL(url);
+    const dump = path.join(snap, ".layer-mysql.sql");
+    const r = spawnSync(
+      "/usr/bin/mariadb-dump",
+      ["--single-transaction", "--quick", "--routines", "--events", "--protocol=TCP", "--host=" + u.hostname, "--port=" + (u.port || "3306"), "--user=" + decodeURIComponent(u.username), "--result-file=" + dump, decodeURIComponent(u.pathname.slice(1))],
+      // The password in the environment: other users can't read it there, unlike in arguments.
+      { stdio: ["ignore", "ignore", "pipe"], encoding: "utf8", env: { ...process.env, MYSQL_PWD: decodeURIComponent(u.password) } },
+    );
+    if (r.status !== 0) {
+      console.error("layer: mariadb-dump failed: " + String(r.stderr || r.error).trim().split("\n").pop());
+      process.exit(5);
+    }
+    mysql = { bytes: fs.statSync(dump).size };
   }
 
   const excludes = path.join(stage, "excludes");
   const skip = databases.flatMap((rel) => ["", "-wal", "-shm", "-journal"].map((s) => "./" + rel + s));
-  skip.push("./.layer-postgres.dump");
+  skip.push("./.layer-postgres.dump", "./.layer-mysql.sql");
   fs.writeFileSync(excludes, skip.join("\n") + "\n");
   const tar = spawn(
     "/usr/bin/tar",
@@ -108,7 +124,7 @@ function findDatabases(dir, rel, out) {
       console.error("layer: tar exited " + code);
       process.exit(4);
     }
-    console.error("LAYER-SNAPSHOT " + JSON.stringify({ sqlite: report, postgres }));
+    console.error("LAYER-SNAPSHOT " + JSON.stringify({ sqlite: report, postgres, mysql }));
   });
 })().catch((err) => {
   console.error("layer: snapshot failed: " + (err && err.message ? err.message : err));
@@ -193,9 +209,10 @@ tar.on("close", (code) => {
     const top = fs.readdirSync(work, { withFileTypes: true });
     const root = top.length === 1 && top[0].isDirectory() ? top[0].name : "";
     const base = root ? path.join(work, root) : work;
-    if (fs.existsSync(path.join(base, ".layer-postgres.dump"))) {
-      fs.rmSync(path.join(base, ".layer-postgres.dump"));
-      console.log("Skipped .layer-postgres.dump: Postgres data comes back through a backup restore.");
+    for (const [dump, engine] of [[".layer-postgres.dump", "Postgres"], [".layer-mysql.sql", "MySQL"]]) {
+      if (!fs.existsSync(path.join(base, dump))) continue;
+      fs.rmSync(path.join(base, dump));
+      console.log("Skipped " + dump + ": " + engine + " data comes back through a backup restore.");
     }
 
     const sqlite = [];
@@ -248,9 +265,27 @@ export const RESTORE_JOB = [
   // The app's Postgres, from the dump inside the backup (with the app's own role).
   'dump="$app/data/.layer-postgres.dump"',
   'if [ -f "$dump" ]; then',
-  '  if [ -z "${DATABASE_URL:-}" ]; then echo "layer: the backup has a Postgres dump, but the app has no Postgres now; skipped it"; rm -f -- "$dump";',
-  '  elif ! pg_restore --clean --if-exists --no-owner --no-privileges --exit-on-error --single-transaction --dbname="$DATABASE_URL" "$dump"; then rm -f -- "$dump"; echo "layer: files restored, but loading the Postgres dump failed"; exit 2;',
-  '  else rm -f -- "$dump"; echo "layer: Postgres database restored"; fi',
+  '  case "${DATABASE_URL:-}" in',
+  '    postgresql://*)',
+  '      if ! pg_restore --clean --if-exists --no-owner --no-privileges --exit-on-error --single-transaction --dbname="$DATABASE_URL" "$dump"; then rm -f -- "$dump"; echo "layer: files restored, but loading the Postgres dump failed"; exit 2; fi',
+  '      rm -f -- "$dump"; echo "layer: Postgres database restored" ;;',
+  '    *) rm -f -- "$dump"; echo "layer: the backup has a Postgres dump, but the app has no Postgres now; skipped it" ;;',
+  '  esac',
+  'fi',
+  // The app's MySQL, the same way. MySQL can't load a dump in one transaction,
+  // so the database as it was is dumped next to the replaced files first.
+  'dump="$app/data/.layer-mysql.sql"',
+  'if [ -f "$dump" ]; then',
+  '  case "${DATABASE_URL:-}" in',
+  '    mysql://*)',
+  '      rest="${DATABASE_URL#mysql://}"; login="${rest%%@*}"; MYSQL_PWD="${login#*:}"; export MYSQL_PWD',
+  '      set -- --protocol=TCP --host=127.0.0.1 --port=3306 --user="${login%%:*}"',
+  '      before="$app/data.before-restore-$stamp"; mkdir -p -m 700 -- "$before"',
+  '      if ! mariadb-dump "$@" --single-transaction --quick --routines --events --result-file="$before/.layer-mysql.sql" "${rest##*/}"; then rm -f -- "$dump"; echo "layer: files restored, but the MySQL database could not be saved first, so it was left as it was"; exit 2; fi',
+  '      if ! mariadb "$@" --batch "${rest##*/}" <"$dump"; then rm -f -- "$dump"; echo "layer: files restored, but loading the MySQL dump failed; the database as it was is in data.before-restore-$stamp/.layer-mysql.sql"; exit 2; fi',
+  '      rm -f -- "$dump"; echo "layer: MySQL database restored" ;;',
+  '    *) rm -f -- "$dump"; echo "layer: the backup has a MySQL dump, but the app has no MySQL now; skipped it" ;;',
+  '  esac',
   'fi',
   // Keep only the folder this restore replaced.
   'for old in "$app"/data.before-restore-*; do [ "$old" = "$app/data.before-restore-$stamp" ] || rm -rf -- "$old"; done',

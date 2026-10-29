@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getProjectBySlug } from "@/lib/projects";
-import { addPostgres, addRedis, removePostgres, removeRedis } from "@/lib/services";
+import { addRedis, addSqlDatabase, removeRedis, removeSqlDatabase, type SqlKind } from "@/lib/services";
 import { requireUser } from "@/lib/session";
 
 export interface ServiceState {
@@ -49,29 +49,45 @@ export async function removeRedisAction(_prev: ServiceState, form: FormData): Pr
   done(project.slug, "redis-removed", d?.id);
 }
 
-export async function addPostgresAction(_prev: ServiceState, form: FormData): Promise<ServiceState> {
+async function addSql(form: FormData, kind: SqlKind): Promise<ServiceState> {
   await requireUser();
   const project = getProjectBySlug(field(form, "slug"));
   if (!project) return { error: "Project not found." };
   let d;
   try {
-    d = await addPostgres(project);
+    d = await addSqlDatabase(project, kind);
   } catch (err) {
     return { error: (err as Error).message };
   }
-  done(project.slug, "postgres-added", d?.id);
+  done(project.slug, `${kind}-added`, d?.id);
 }
 
-export async function removePostgresAction(_prev: ServiceState, form: FormData): Promise<ServiceState> {
+async function removeSql(form: FormData, kind: SqlKind): Promise<ServiceState> {
   await requireUser();
   const project = getProjectBySlug(field(form, "slug"));
   if (!project) return { error: "Project not found." };
   if (field(form, "confirm") !== project.slug) return { error: `Type ${project.slug} to confirm.` };
   let result;
   try {
-    result = await removePostgres(project, form.get("deleteData") !== "on");
+    result = await removeSqlDatabase(project, kind, form.get("deleteData") !== "on");
   } catch (err) {
     return { error: (err as Error).message };
   }
-  done(project.slug, result.archived ? "postgres-removed-kept" : "postgres-removed", result.deployment?.id);
+  done(project.slug, result.archived ? `${kind}-removed-kept` : `${kind}-removed`, result.deployment?.id);
+}
+
+export async function addPostgresAction(_prev: ServiceState, form: FormData): Promise<ServiceState> {
+  return addSql(form, "postgres");
+}
+
+export async function removePostgresAction(_prev: ServiceState, form: FormData): Promise<ServiceState> {
+  return removeSql(form, "postgres");
+}
+
+export async function addMysqlAction(_prev: ServiceState, form: FormData): Promise<ServiceState> {
+  return addSql(form, "mysql");
+}
+
+export async function removeMysqlAction(_prev: ServiceState, form: FormData): Promise<ServiceState> {
+  return removeSql(form, "mysql");
 }

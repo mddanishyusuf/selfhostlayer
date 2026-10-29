@@ -20,7 +20,7 @@ const STATUS = { running: ["warn", "Backing up…"], ok: ["ok", "Backed up"], fa
 
 function contents(b: Backup): string {
   const dbs = b.contents?.sqlite ?? [];
-  return [dbs.length ? `${dbs.length} SQLite database${dbs.length === 1 ? "" : "s"} checked` : null, b.contents?.postgres ? "Postgres dump" : null, b.kind === "panel" ? "Panel database and key" : null, b.trigger === "schedule" ? "scheduled" : "manual"]
+  return [dbs.length ? `${dbs.length} SQLite database${dbs.length === 1 ? "" : "s"} checked` : null, b.contents?.postgres ? "Postgres dump" : null, b.contents?.mysql ? "MySQL dump" : null, b.kind === "panel" ? "Panel database and key" : null, b.trigger === "schedule" ? "scheduled" : "manual"]
     .filter(Boolean)
     .join(" · ");
 }

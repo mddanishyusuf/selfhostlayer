@@ -126,3 +126,24 @@
 - **Found on the way:**
   - Reading the end of a log could drop a whole first line when the cut fell exactly on a line break. Fixed by reading one byte more.
   - Two samples in one minute (a panel restart) wiped that minute's disk figure. Fixed: the second sample now updates the row and keeps the disk figure.
+
+## Day 7 result (2026-10-29)
+**Done when "an app on MySQL is backed up and restored, like Postgres": passed.** `installer/test/mysql-e2e.sh` (in CI) installs MariaDB and gives four apps their own databases. It checks they can't reach each other's databases, backs one up, changes it and restores it. Then it removes a database and deletes an app. In the VM tour, the example app swaps Postgres for MySQL from its Databases page, and its next backup holds a MySQL dump. The full tour passes (85 checks).
+
+- **MySQL as MariaDB** (`service.install mysql`, `mysql.add`, `mysql.remove`): one shared server, installed the first time an app asks for it. `mariadb-server` from the OS packages, MariaDB 10.11 on Ubuntu 24.04.
+  - Tuned for a small box: 127.0.0.1 only, a buffer pool of 1/16 of RAM (32–512MB), 50 connections, no performance schema. It idles at about 80MB RSS.
+  - The installer's leftovers are removed: anonymous logins and the `test` database.
+- **A user and database per app:** `app_<slug>` with a random password, allowed to log in only over TCP from 127.0.0.1, with at most 20 connections. It has every privilege on its own database and none on the server.
+  - In MySQL grants `_` matches any character, so an unescaped grant for `app_my_db` would also cover the database of an app called `myxdb`. The grant escapes it, and the e2e test checks exactly that case.
+- **One SQL database per app:** Postgres and MySQL both hand the app `DATABASE_URL` (`mysql://…` here, which Prisma, Drizzle, Knex and Sequelize read as is). So an app gets one or the other, and the Databases page says so.
+- **Backups:**
+  - Every snapshot includes a `mariadb-dump` made with the app's own login (`--single-transaction`, routines, triggers and events).
+  - Restore loads it back. MySQL can't load a dump in one transaction like Postgres can, so restore first dumps the database as it was into the folder of replaced data (`data.before-restore-<time>`).
+  - Removing MySQL or deleting the app keeps a final dump in `/var/lib/layer-agent/archive` unless asked not to.
+- **Panel:**
+  - Project → Databases has a MySQL row next to PostgreSQL.
+  - Databases (all projects) lists MySQL as an engine with every app's database.
+  - Environment shows the URL under "Set for you".
+  - Backups say "MySQL dump".
+- **Found on the way, older than MySQL:** systemd replaces `${...}` in a sandboxed job's command line with an environment variable of that name, even inside a shell script. Unknown names become empty, so `${login%%:*}` in the restore script came out empty. Only expansions with a `:` survived (`${DATABASE_URL:-}`, which is why Postgres restores worked). Every `$` in a job's command is now escaped (`$$`), so jobs run exactly the text the agent gives them. Unit files already escaped it.
+- **And a live-update gap:** a deployment page could miss the end of its build and show "Building" forever. The tour hit it once: after a refresh partway through the build, the page stopped showing what the stream delivered, though the server sent all of it. The page now reconnects when its stream drops or goes quiet (the server pings every 15 seconds). Each connection starts with the whole log, so the page always catches up.

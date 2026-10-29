@@ -28,7 +28,7 @@ export interface Backup {
   trigger: "schedule" | "manual";
   objectKey: string | null;
   bytes: number | null;
-  contents: { sqlite?: { path: string; bytes: number }[]; postgres?: { bytes: number } | null } | null;
+  contents: { sqlite?: { path: string; bytes: number }[]; postgres?: { bytes: number } | null; mysql?: { bytes: number } | null } | null;
   error: string | null;
   startedAt: number;
   finishedAt: number | null;
@@ -177,11 +177,11 @@ async function backupApp(project: Project, trigger: Backup["trigger"]): Promise<
   const id = begin("app", project.slug, project.id, trigger);
   let staged: string | null = null;
   try {
-    const snap = await agent<{ file: string; path: string; bytes: number; sqlite: { path: string; bytes: number }[]; postgres: { bytes: number } | null }>("backup.snapshot", { slug: project.slug });
+    const snap = await agent<{ file: string; path: string; bytes: number; sqlite: { path: string; bytes: number }[]; postgres: { bytes: number } | null; mysql: { bytes: number } | null }>("backup.snapshot", { slug: project.slug });
     staged = snap.file;
     const key = `${serverPrefix(settings)}${project.slug}/${stamp(Date.now())}-${id}.tar.gz.enc`;
     const bytes = await encryptAndUpload(settings, key, createReadStream(join(STAGING_DIR, snap.file)));
-    finish(id, { ok: true, objectKey: key, bytes, contents: { sqlite: snap.sqlite, postgres: snap.postgres, archiveBytes: snap.bytes } });
+    finish(id, { ok: true, objectKey: key, bytes, contents: { sqlite: snap.sqlite, postgres: snap.postgres, mysql: snap.mysql, archiveBytes: snap.bytes } });
     await resolve(`backup:${project.slug}`, "The latest backup worked.");
     await prune(settings, "app", project.slug);
   } catch (err) {
