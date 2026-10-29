@@ -389,6 +389,140 @@ if (process.env.TOUR_DEPLOY === "1") {
     console.log("  ✓ the next successful run sent exactly one recovery message");
   }
 
+  // TOUR_BACKUPS=1: needs a fake S3 at http://127.0.0.1:4999 on the box (installer/test/fake-s3.sh).
+  if (process.env.TOUR_BACKUPS === "1") {
+    console.log("Backups");
+    const visits = async (add = false) => {
+      await go(`https://next.${appsDomain}/api/visits${add ? "?add=1" : ""}`);
+      await sleep(300);
+      return Number(JSON.parse(String(await evaluate("document.body.innerText"))).visits);
+    };
+    for (let i = 0; i < 3; i++) await visits(true);
+    if ((await visits()) !== 3) throw new Error("the example app didn't count 3 visits in SQLite");
+    console.log("  ✓ the app stores visits in SQLite under DATA_DIR (3)");
+
+    await go("/settings/backups");
+    await waitForPath("/settings/backups");
+    await evaluate(`[...document.querySelectorAll('button[role=radio]')].find((b) => b.textContent === "Other").click(), true`);
+    await fill("#endpoint", "http://127.0.0.1:4999");
+    await setValue("#region", "us-east-1");
+    await fill("#bucket", "tour-backups");
+    await fill("#prefix", "layer");
+    await fill("#accessKeyId", "test");
+    await fill("#secretAccessKey", "testsecret");
+    await click("form:has(#endpoint) button[type=submit]");
+    await waitFor(`!!document.querySelector('[data-testid="recovery-key"]') || !!document.querySelector('form:has(#endpoint) [role=alert]')`, "storage connected", 60_000);
+    const keyText = String(await evaluate(`document.querySelector('[data-testid="recovery-key"]')?.innerText ?? document.querySelector('form:has(#endpoint) [role=alert]')?.innerText`));
+    if (!/^lbk1-[A-Za-z0-9_-]{43}$/.test(keyText.trim())) throw new Error(`no recovery key after connecting: ${keyText}`);
+    console.log("  ✓ storage connected (test object written, read, listed, deleted); recovery key shown");
+    await screenshot("backups-recovery-key");
+    await click('form:has(input[name="saved"]) input[name="saved"]');
+    await click('form:has(input[name="saved"]) button[type=submit]');
+    await waitFor(`document.body.innerText.includes("Back up everything now")`, "backups turned on", 30_000);
+    console.log("  ✓ recovery key confirmed; backups are on");
+
+    await go("/projects/next/backups");
+    await waitForPath("/projects/next/backups");
+    await click('form:has(input[name="slug"]) button[type=submit]');
+    await waitFor(`!!document.querySelector('[data-testid="backup-list"] [data-status="ok"], [data-testid="backup-list"] [data-status="failed"]')`, "the backup to finish", 180_000);
+    const row = String(await evaluate(`document.querySelector('[data-testid="backup-list"] > div')?.innerText ?? ""`));
+    if (!row.includes("Backed up") || !row.includes("1 SQLite database checked")) throw new Error(`backup didn't succeed: ${row}`);
+    console.log("  ✓ Back up now: snapshot with 1 SQLite database checked, encrypted and uploaded");
+    await screenshot("backups-project");
+
+    for (let i = 0; i < 2; i++) await visits(true);
+    if ((await visits()) !== 5) throw new Error("expected 5 visits before the restore");
+    await go("/projects/next/backups");
+    await waitForPath("/projects/next/backups");
+    await evaluate(`[...document.querySelectorAll('[data-testid="backup-list"] button')].find((b) => b.textContent === "Restore").click(), true`);
+    await waitFor(`!!document.querySelector('input[name="confirm"]')`, "restore confirmation");
+    await setValue('input[name="confirm"]', "next");
+    await waitFor(`!document.querySelector('form:has(input[name="confirm"]) button[type=submit]').disabled`, "the restore button to enable");
+    await click('form:has(input[name="confirm"]) button[type=submit]');
+    await waitFor(`document.body.innerText.includes("Restored.") || !!document.querySelector('form:has(input[name="confirm"]) [role=alert]')`, "the restore", 180_000);
+    const restored = String(await evaluate("document.body.innerText"));
+    if (!restored.includes("Restored.")) throw new Error(`restore failed: ${String(await evaluate(`document.querySelector('form:has(input[name="confirm"]) [role=alert]')?.innerText`))}`);
+    let count = -1;
+    for (let i = 0; i < 20 && count !== 3; i++) {
+      count = await visits().catch(() => -1);
+      if (count !== 3) await sleep(1000);
+    }
+    if (count !== 3) throw new Error(`after the restore the app counts ${count} visits, expected 3`);
+    console.log("  ✓ restore: the app restarted on the backup's data (5 visits → 3)");
+
+    await go("/settings/backups");
+    await waitForPath("/settings/backups");
+    await evaluate(`[...document.querySelectorAll("button")].find((b) => b.textContent === "Back up everything now").click(), true`);
+    await waitFor(`[...document.querySelectorAll('[data-testid="backup-list"] > div')].some((d) => d.innerText.includes("panel") && d.dataset.status !== "running")`, "the panel backup", 180_000);
+    const panelRow = String(await evaluate(`[...document.querySelectorAll('[data-testid="backup-list"] > div')].find((d) => d.innerText.includes("panel")).innerText`));
+    if (!panelRow.includes("Backed up")) throw new Error(`panel backup failed: ${panelRow}`);
+    console.log("  ✓ Back up everything: the panel's own database and key are backed up too");
+    await screenshot("backups-settings");
+  }
+
+  // TOUR_REDIS=1: add a Redis to the next app from the Databases page.
+  if (process.env.TOUR_REDIS === "1") {
+    console.log("Redis");
+    const redisVisits = async (add = false) => {
+      await go(`https://next.${appsDomain}/api/redis${add ? "?add=1" : ""}`);
+      await sleep(300);
+      return JSON.parse(String(await evaluate("document.body.innerText"))) as { visits?: number; error?: string };
+    };
+    if ((await redisVisits()).error !== "no REDIS_URL") throw new Error("the app already has REDIS_URL");
+    await go("/projects/next/databases");
+    await waitForPath("/projects/next/databases");
+    await click('[data-testid="redis-card"] form button[type=submit]');
+    await waitFor(`!!document.querySelector('[data-testid="notice"]') || /role="alert"/.test(document.querySelector('[data-testid="redis-card"]').innerHTML)`, "Redis to be added (installs it the first time)", 300_000);
+    const added = String(await evaluate(`document.querySelector('[data-testid="notice"]')?.innerText ?? document.querySelector('[data-testid="redis-card"]').innerText`));
+    const deployment = /deployment #(\d+)/.exec(added)?.[1];
+    if (!deployment) throw new Error(`Redis wasn't added with a restart: ${added}`);
+    console.log(`  ✓ Redis installed and started for next; restarting it on the same build (#${deployment})`);
+    await go(`/deployments/${deployment}`);
+    await waitForDeploy("the restart with REDIS_URL");
+    let first: { visits?: number; error?: string } = {};
+    for (let i = 0; i < 10 && first.visits === undefined; i++) {
+      first = await redisVisits(true);
+      if (first.visits === undefined) await sleep(1000);
+    }
+    const second = await redisVisits(true);
+    if (first.visits !== 1 || second.visits !== 2) throw new Error(`Redis counter: ${JSON.stringify(first)} then ${JSON.stringify(second)}`);
+    console.log("  ✓ the app counts visits in its own Redis (1, 2)");
+    await go("/projects/next/databases");
+    await waitForPath("/projects/next/databases");
+    const url = String(await evaluate(`document.querySelector('[data-testid="secret-url"]')?.innerText ?? ""`));
+    if (!/^redis:\/\/default:••••••••@127\.0\.0\.1:\d+$/.test(url)) throw new Error(`REDIS_URL isn't shown masked: ${url}`);
+    console.log("  ✓ the Databases page shows it running, with REDIS_URL masked");
+    await screenshot("databases-redis");
+  }
+
+  // TOUR_POSTGRES=1: add Postgres to the next app; the next backup includes a pg_dump.
+  if (process.env.TOUR_POSTGRES === "1") {
+    console.log("Postgres");
+    await go("/projects/next/databases");
+    await waitForPath("/projects/next/databases");
+    await click('[data-testid="postgres-card"] form button[type=submit]');
+    await waitFor(`!!document.querySelector('[data-testid="notice"]') || /role="alert"/.test(document.querySelector('[data-testid="postgres-card"]').innerHTML)`, "Postgres to be added (installs it the first time)", 600_000);
+    const added = String(await evaluate(`document.querySelector('[data-testid="notice"]')?.innerText ?? document.querySelector('[data-testid="postgres-card"]').innerText`));
+    const deployment = /deployment #(\d+)/.exec(added)?.[1];
+    if (!deployment) throw new Error(`Postgres wasn't added with a restart: ${added}`);
+    const url = String(await evaluate(`[...document.querySelectorAll('[data-testid="secret-url"]')].map((e) => e.innerText).find((t) => t.startsWith("postgresql:")) ?? ""`));
+    if (!/^postgresql:\/\/app_next:••••••••@127\.0\.0\.1:5432\/app_next$/.test(url)) throw new Error(`DATABASE_URL isn't shown masked: ${url}`);
+    console.log(`  ✓ Postgres installed, database app_next created, DATABASE_URL shown masked; restarting (#${deployment})`);
+    await screenshot("databases-postgres");
+    await go(`/deployments/${deployment}`);
+    await waitForDeploy("the restart with DATABASE_URL");
+    if (process.env.TOUR_BACKUPS === "1") {
+      await go("/projects/next/backups");
+      await waitForPath("/projects/next/backups");
+      const before = Number(await evaluate(`document.querySelectorAll('[data-testid="backup-list"] [data-status]').length`));
+      await click('form:has(input[name="slug"]) button[type=submit]');
+      await waitFor(`document.querySelectorAll('[data-testid="backup-list"] [data-status]').length > ${before} && !document.querySelector('[data-testid="backup-list"] [data-status="running"]')`, "the backup with Postgres", 180_000);
+      const row = String(await evaluate(`document.querySelector('[data-testid="backup-list"] > div')?.innerText ?? ""`));
+      if (!row.includes("Postgres dump")) throw new Error(`the backup has no Postgres dump: ${row}`);
+      console.log("  ✓ the next backup includes a pg_dump of the app's database");
+    }
+  }
+
   // TOUR_DOMAIN: a host whose public DNS points at the box (e.g. shop.<ip-with-dashes>.sslip.io).
   const tourDomain = process.env.TOUR_DOMAIN;
   if (tourDomain) {

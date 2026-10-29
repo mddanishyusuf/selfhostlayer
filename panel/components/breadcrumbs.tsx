@@ -12,6 +12,8 @@ export function Breadcrumbs() {
     crumbs.push({ label: parts[1], href: parts[2] ? `/projects/${parts[1]}` : undefined });
     if (parts[2] === "settings") crumbs.push({ label: "Settings" });
     if (parts[2] === "domains") crumbs.push({ label: "Domains" });
+    if (parts[2] === "backups") crumbs.push({ label: "Backups" });
+    if (parts[2] === "databases") crumbs.push({ label: "Databases" });
     if (parts[2] === "crons") {
       crumbs.push({ label: "Crons", href: parts[3] ? `/projects/${parts[1]}/crons` : undefined });
       if (parts[3]) crumbs.push({ label: parts[3] });
@@ -22,6 +24,8 @@ export function Breadcrumbs() {
     crumbs.push({ label: "New project" });
   } else if (parts[0] === "settings" && parts[1] === "alerts") {
     crumbs.push({ label: "Alerts" });
+  } else if (parts[0] === "settings" && parts[1] === "backups") {
+    crumbs.push({ label: "Backups" });
   } else if (parts[0] === "github") {
     crumbs.push({ label: "GitHub" });
   }

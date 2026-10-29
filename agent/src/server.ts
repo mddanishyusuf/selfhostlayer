@@ -42,9 +42,15 @@ export function listen(path: string, dispatcher: Dispatcher, access: SocketAcces
 
 function serve(socket: Socket, dispatcher: Dispatcher): void {
   socket.setEncoding("utf8");
-  socket.setTimeout(IDLE_TIMEOUT_MS, () => socket.destroy());
   let buffer = "";
   let pending = 0;
+  // Only idle connections time out: a long, quiet action (a backup snapshot of
+  // a big folder) must not be cut off; jobs have their own RuntimeMaxSec.
+  socket.setTimeout(IDLE_TIMEOUT_MS);
+  socket.on("timeout", () => {
+    if (pending === 0) socket.destroy();
+    else socket.setTimeout(IDLE_TIMEOUT_MS);
+  });
   let clientDone = false;
   // Aborts every streaming call on this connection when it closes.
   const closed = new AbortController();

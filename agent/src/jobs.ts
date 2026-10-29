@@ -8,13 +8,15 @@
  * name) is copied with SQLite's online backup API, which is safe while the
  * app writes (WAL included), and the copy must pass PRAGMA integrity_check.
  * The archive holds those checked copies in place of the live files and
- * leaves out -wal/-shm/-journal. The last stderr line is
- * `LAYER-SNAPSHOT {"sqlite":[{path,bytes}]}`.
+ * leaves out -wal/-shm/-journal. With DATABASE_URL set (the app has
+ * Postgres), a pg_dump made with the app's own role goes in as
+ * .layer-postgres.dump. The last stderr line is
+ * `LAYER-SNAPSHOT {"sqlite":[{path,bytes}],"postgres":{bytes}|null}`.
  */
 export const SNAPSHOT_JOB = String.raw`
 const fs = require("node:fs");
 const path = require("node:path");
-const { spawn } = require("node:child_process");
+const { spawn, spawnSync } = require("node:child_process");
 const { DatabaseSync, backup } = require("node:sqlite");
 
 const data = process.argv[1];
@@ -70,8 +72,23 @@ function findDatabases(dir, rel, out) {
     report.push({ path: rel, bytes: fs.statSync(dest).size });
   }
 
+  // The app's Postgres database, dumped with its own credentials. It travels
+  // in the archive as .layer-postgres.dump; restore loads it back.
+  let postgres = null;
+  if (process.env.DATABASE_URL) {
+    const dump = path.join(snap, ".layer-postgres.dump");
+    const r = spawnSync("/usr/bin/pg_dump", ["--format=custom", "--no-owner", "--no-privileges", "--file=" + dump, process.env.DATABASE_URL], { stdio: ["ignore", "ignore", "pipe"], encoding: "utf8" });
+    if (r.status !== 0) {
+      console.error("layer: pg_dump failed: " + String(r.stderr || r.error).trim().split("\n").pop());
+      process.exit(5);
+    }
+    postgres = { bytes: fs.statSync(dump).size };
+  }
+
   const excludes = path.join(stage, "excludes");
-  fs.writeFileSync(excludes, databases.flatMap((rel) => ["", "-wal", "-shm", "-journal"].map((s) => "./" + rel + s)).join("\n") + "\n");
+  const skip = databases.flatMap((rel) => ["", "-wal", "-shm", "-journal"].map((s) => "./" + rel + s));
+  skip.push("./.layer-postgres.dump");
+  fs.writeFileSync(excludes, skip.join("\n") + "\n");
   const tar = spawn(
     "/usr/bin/tar",
     [
@@ -91,7 +108,7 @@ function findDatabases(dir, rel, out) {
       console.error("layer: tar exited " + code);
       process.exit(4);
     }
-    console.error("LAYER-SNAPSHOT " + JSON.stringify({ sqlite: report }));
+    console.error("LAYER-SNAPSHOT " + JSON.stringify({ sqlite: report, postgres }));
   });
 })().catch((err) => {
   console.error("layer: snapshot failed: " + (err && err.message ? err.message : err));
@@ -113,6 +130,13 @@ export const RESTORE_JOB = [
   'chmod 700 -- "$new"',
   'if [ -e "$app/data" ]; then mv -- "$app/data" "$app/data.before-restore-$stamp"; fi',
   'mv -- "$new" "$app/data"',
+  // The app's Postgres, from the dump inside the backup (with the app's own role).
+  'dump="$app/data/.layer-postgres.dump"',
+  'if [ -f "$dump" ]; then',
+  '  if [ -z "${DATABASE_URL:-}" ]; then echo "layer: the backup has a Postgres dump, but the app has no Postgres now; skipped it"; rm -f -- "$dump";',
+  '  elif ! pg_restore --clean --if-exists --no-owner --no-privileges --exit-on-error --single-transaction --dbname="$DATABASE_URL" "$dump"; then rm -f -- "$dump"; echo "layer: files restored, but loading the Postgres dump failed"; exit 2;',
+  '  else rm -f -- "$dump"; echo "layer: Postgres database restored"; fi',
+  'fi',
   // Keep only the folder this restore replaced.
   'for old in "$app"/data.before-restore-*; do [ "$old" = "$app/data.before-restore-$stamp" ] || rm -rf -- "$old"; done',
 ].join("\n");

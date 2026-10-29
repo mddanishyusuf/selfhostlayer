@@ -7,6 +7,7 @@
 #   scripts/dev-vm.sh release  # build the release tarball, run the real installer with it
 #   scripts/dev-vm.sh e2e      # agent, blue/green and build end-to-end tests in the VM
 #   scripts/dev-vm.sh ui       # browser tour of the VM's panel (screenshots in dist/screenshots)
+#   scripts/dev-vm.sh fresh    # wipe the panel DB and test apps, sync the clock, new setup token
 #   scripts/dev-vm.sh lint     # shellcheck all scripts inside the VM
 #   scripts/dev-vm.sh shell    # open a shell in the VM
 #   scripts/dev-vm.sh reset    # destroy and recreate it (a fresh box)
@@ -105,7 +106,30 @@ verify() {
   multipass exec "$vm" -- sudo bash /home/ubuntu/verify.sh "$@"
 }
 
+# A fresh panel without reinstalling: empty DB, no test apps, a new setup
+# token (written as the installer does: only its hash on the box). Also syncs
+# the clock, which drifts while the Mac sleeps and breaks TOTP.
+fresh() {
+  local token hash
+  token="$(head -c 24 /dev/urandom | base64 | tr '+/' '-_' | tr -d '=')"
+  hash="$(printf '%s' "$token" | shasum -a 256 | cut -d' ' -f1)"
+  multipass exec "$vm" -- sudo bash -c "
+    date -s @$(date +%s) >/dev/null
+    systemctl stop layer-panel
+    rm -f /var/lib/layer/panel.db /var/lib/layer/panel.db-wal /var/lib/layer/panel.db-shm
+    rm -rf /var/lib/layer/logs
+    for app in next vite; do [ -d /srv/apps/\$app ] && layer call app.delete '{\"slug\":\"'\$app'\",\"keepData\":false}' >/dev/null; done
+    printf 'sha256:%s %s\n' $hash \$((\$(date +%s) + 7200)) >/etc/layer/setup-token
+    chown root:layer /etc/layer/setup-token
+    chmod 640 /etc/layer/setup-token
+    systemctl start layer-panel
+  " </dev/null
+  printf '%s\n' "$token" >"$root/dist/vm-setup-token"
+  echo "fresh panel; setup token in dist/vm-setup-token"
+}
+
 case "${1:-}" in
+  fresh) fresh ;;
   up) up ;;
   spike) spike ;;
   lint) lint ;;

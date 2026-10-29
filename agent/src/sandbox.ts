@@ -18,8 +18,8 @@ export interface SandboxOptions {
   envFiles?: string[];
   memoryMb: number;
   timeoutSec: number;
-  /** Builds need the npm registry; unpacking and cleanup don't. */
-  network: boolean;
+  /** Builds need the npm registry; unpacking and cleanup don't; "localhost" reaches only this box (the app's Postgres). */
+  network: boolean | "localhost";
   command: string[];
 }
 
@@ -61,9 +61,11 @@ export function sandboxArgs(o: SandboxOptions): string[] {
     "IOSchedulingClass=best-effort",
     "IOSchedulingPriority=7",
     `RuntimeMaxSec=${o.timeoutSec}`,
-    ...(o.network
+    ...(o.network === true
       ? ["RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK"]
-      : ["RestrictAddressFamilies=AF_UNIX", "IPAddressDeny=any"]),
+      : o.network === "localhost"
+        ? ["RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6", "IPAddressDeny=any", "IPAddressAllow=localhost"]
+        : ["RestrictAddressFamilies=AF_UNIX", "IPAddressDeny=any"]),
     // "-": a missing file is fine.
     ...(o.envFiles ?? []).map((f) => `EnvironmentFile=-${f}`),
   ];

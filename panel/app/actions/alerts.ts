@@ -2,15 +2,15 @@
 
 import { revalidatePath } from "next/cache";
 import { addChannel, configureAlerts, listChannels, notifyAll, removeChannel } from "@/lib/alerts/engine";
+import { parseChannel } from "@/lib/alerts/notify";
 import { boxConfig } from "@/lib/box";
+import { requireUser } from "@/lib/session";
 
 try {
   configureAlerts({ serverName: boxConfig().panelHost });
 } catch {
   // no box config (dev)
 }
-import { parseChannel } from "@/lib/alerts/notify";
-import { requireUser } from "@/lib/session";
 
 export interface ChannelState {
   error?: string;

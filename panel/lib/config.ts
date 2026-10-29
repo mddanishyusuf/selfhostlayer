@@ -3,7 +3,7 @@
 // That folder must stay outside the project: `next dev` watches the project,
 // and SQLite writing its WAL there makes every page reload itself forever.
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 
 const isProd = process.env.NODE_ENV === "production";
 const devDir = process.env.LAYER_DEV_DIR ?? join(homedir(), ".selfhostlayer-dev");
@@ -11,6 +11,10 @@ const devDir = process.env.LAYER_DEV_DIR ?? join(homedir(), ".selfhostlayer-dev"
 export const config = {
   isProd,
   dbPath: process.env.LAYER_DB ?? join(devDir, "panel.db"),
+  /** The panel's writable folder (/var/lib/layer): the DB, and backups being restored in restore/. */
+  get dataDir() {
+    return dirname(this.dbPath);
+  },
   secretKeyFile: process.env.LAYER_SECRET_KEY_FILE ?? join(devDir, "secret.key"),
   setupTokenFile: process.env.LAYER_SETUP_TOKEN_FILE ?? join(devDir, "setup-token"),
   agentSocket: process.env.LAYER_AGENT_SOCKET ?? "/run/layer/agent.sock",

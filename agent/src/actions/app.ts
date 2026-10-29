@@ -10,6 +10,7 @@ import { parseColorEnvPort, renderColorEnv, renderEnvFile } from "../templates/e
 import { unitName } from "../templates/app-unit.ts";
 import { parseLiveMarker } from "../templates/caddy-site.ts";
 import { cronNames, removeCronUnits } from "./cron.ts";
+import { removePostgres, removeRedis } from "./service.ts";
 
 export function appLayout(ctx: Context, slug: string) {
   const appDir = childOf(ctx.paths.appsRoot, slug);
@@ -100,6 +101,9 @@ async function appDelete(params: Params, ctx: Context) {
     await ctx.exec(BIN.systemctl, ["disable", unit], { allowFail: true });
   }
   for (const name of cronNames(ctx, slug)) await removeCronUnits(ctx, slug, name);
+  await removeRedis(ctx, slug, true);
+  // Before the app's files go: with keepData its database is dumped to the archive.
+  await removePostgres(ctx, slug, keepData);
   const unitFile = join(ctx.paths.systemdDir, unitName(slug));
   if (existsSync(unitFile)) {
     rmSync(unitFile);

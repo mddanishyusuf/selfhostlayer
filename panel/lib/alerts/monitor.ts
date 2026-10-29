@@ -7,6 +7,7 @@ import { checkCertificate } from "../cert";
 import { listCrons, liveCrons } from "../crons";
 import { db, now } from "../db";
 import { listDomains } from "../domains";
+import { backupProjects, markInterrupted, overdueSlugs, scheduledTick } from "../backup/runner";
 import { listProjects } from "../projects";
 import { configureAlerts, openIncident, raise, resolve } from "./engine";
 import { certVerdict, crashVerdict, cronVerdict, diskVerdict, type UnitSnapshot, type Verdict } from "./rules";
@@ -101,6 +102,17 @@ async function checkCertificates(): Promise<void> {
 }
 
 /** One round of checks; each check fails on its own without stopping the others. */
+/** Starts the daily backup at its hour (in the background: it can take a while), and flags apps without a recent backup. */
+async function checkBackups(): Promise<void> {
+  void scheduledTick().catch((err) => console.error("monitor: scheduled backup failed:", (err as Error).message));
+  const overdue = new Set(overdueSlugs());
+  for (const p of backupProjects()) {
+    const key = `backup-overdue:${p.slug}`;
+    if (overdue.has(p.slug)) await raise(key, { title: `No backup in over a day: ${p.slug}`, detail: "The last successful backup is more than 26 hours old.", link: panelUrl(`/projects/${p.slug}/backups`), projectId: p.id });
+    else if (openIncident(key)) await resolve(key, "A backup worked again.");
+  }
+}
+
 export async function tick(): Promise<void> {
   if (state.running) return;
   state.running = true;
@@ -108,6 +120,7 @@ export async function tick(): Promise<void> {
     for (const [name, check] of [["disk", checkDisk], ["apps", checkApps], ["crons", checkCrons]] as const) {
       await check().catch((err) => console.error(`monitor: ${name} check failed:`, (err as Error).message));
     }
+    await checkBackups().catch((err) => console.error("monitor: backup check failed:", (err as Error).message));
     if (Date.now() - state.lastCertCheck > CERT_EVERY_MS) {
       state.lastCertCheck = Date.now();
       await checkCertificates().catch((err) => console.error("monitor: certificate check failed:", (err as Error).message));
@@ -121,6 +134,7 @@ export function startMonitor(): void {
   if (state.started) return;
   state.started = true;
   db(); // run migrations before the first tick
+  markInterrupted();
   try {
     configureAlerts({ serverName: boxConfig().panelHost });
   } catch {

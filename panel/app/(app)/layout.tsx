@@ -1,4 +1,4 @@
-import { Bell, LogOut } from "lucide-react";
+import { Bell, DatabaseBackup, LogOut } from "lucide-react";
 import Link from "next/link";
 import { logout } from "@/app/actions/auth";
 import { Breadcrumbs } from "@/components/breadcrumbs";
@@ -23,6 +23,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             <Breadcrumbs />
           </div>
           <div className="flex items-center gap-1">
+            <Link href="/settings/backups" title="Backups" className="grid size-8 place-items-center rounded-md text-muted transition-colors duration-150 hover:bg-hover hover:text-foreground">
+              <DatabaseBackup className="size-4" aria-hidden />
+              <span className="sr-only">Backups</span>
+            </Link>
             <Link
               href="/settings/alerts"
               title={openIncidents ? `${openIncidents} open incident${openIncidents === 1 ? "" : "s"}` : "Alerts"}

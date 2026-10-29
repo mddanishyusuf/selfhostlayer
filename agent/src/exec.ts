@@ -12,6 +12,10 @@ export const BIN = {
   unzip: "/usr/bin/unzip",
   journalctl: "/usr/bin/journalctl",
   systemdAnalyze: "/usr/bin/systemd-analyze",
+  aptGet: "/usr/bin/apt-get",
+  runuser: "/usr/sbin/runuser",
+  psql: "/usr/bin/psql",
+  pgDump: "/usr/bin/pg_dump",
 } as const;
 
 export interface ExecResult {

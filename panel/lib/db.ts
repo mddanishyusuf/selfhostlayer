@@ -162,6 +162,34 @@ const MIGRATIONS = [
      notify_errors TEXT
    );
    CREATE UNIQUE INDEX alert_incidents_open ON alert_incidents (key) WHERE resolved_at IS NULL;`,
+  // Backups: one destination (S3-compatible) with the recovery key, and a row per backup.
+  `CREATE TABLE backup_settings (
+     id INTEGER PRIMARY KEY CHECK (id = 1),
+     provider TEXT NOT NULL,
+     config_enc TEXT NOT NULL,
+     recovery_key_enc TEXT NOT NULL,
+     key_confirmed_at INTEGER,
+     schedule_hour INTEGER NOT NULL DEFAULT 3,
+     keep INTEGER NOT NULL DEFAULT 14,
+     created_at INTEGER NOT NULL,
+     updated_at INTEGER NOT NULL
+   );
+   CREATE TABLE backups (
+     id INTEGER PRIMARY KEY,
+     kind TEXT NOT NULL CHECK (kind IN ('app', 'panel')),
+     project_id INTEGER REFERENCES projects(id) ON DELETE SET NULL,
+     slug TEXT NOT NULL,
+     status TEXT NOT NULL CHECK (status IN ('running', 'ok', 'failed')),
+     trigger TEXT NOT NULL CHECK (trigger IN ('schedule', 'manual')),
+     object_key TEXT,
+     bytes INTEGER,
+     contents TEXT,
+     error TEXT,
+     started_at INTEGER NOT NULL,
+     finished_at INTEGER,
+     deleted_at INTEGER
+   );
+   CREATE INDEX backups_by_slug ON backups (kind, slug, started_at);`,
 ];
 
 function open(): DatabaseSync {

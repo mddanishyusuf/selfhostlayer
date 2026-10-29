@@ -14,6 +14,7 @@ import { RESTORE_JOB, SNAPSHOT_JOB } from "../jobs.ts";
 import { sandboxArgs, SYSTEMD_RUN } from "../sandbox.ts";
 import { appLayout } from "./app.ts";
 import { diskGuard } from "./build.ts";
+import { readServices } from "./service.ts";
 
 const STAGED_FILE = /^[a-z][a-z0-9-]{0,62}-[0-9]{14}-[0-9a-f]{8}\.tar\.gz$/;
 /** Staged snapshots nobody collected (the panel crashed mid-upload) go after a day. */
@@ -57,6 +58,7 @@ async function backupSnapshot(params: Params, ctx: Context, io: CallIO) {
   const dir = await stagingDir(ctx);
   removeStale(dir);
 
+  const hasPostgres = readServices(ctx, slug).postgres !== undefined;
   const name = `${slug}-${stamp()}-${randomBytes(4).toString("hex")}.tar.gz`;
   const file = join(dir, name);
   const fd = openSync(file, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW, 0o640);
@@ -78,9 +80,11 @@ async function backupSnapshot(params: Params, ctx: Context, io: CallIO) {
         // Writable only so SQLite can open WAL databases (it touches -shm).
         readWrite: [app.data],
         env: { PATH: "/usr/bin:/bin" },
+        // DATABASE_URL, for pg_dump with the app's own role.
+        envFiles: [join(app.etcDir, "services.env")],
         memoryMb: 512,
         timeoutSec: 3600,
-        network: false,
+        network: hasPostgres ? "localhost" : false,
         command: [ctx.paths.runtimeNode, "--no-warnings", "-e", SNAPSHOT_JOB, app.data],
       }),
       {
@@ -100,8 +104,8 @@ async function backupSnapshot(params: Params, ctx: Context, io: CallIO) {
     throw new ActionError("snapshot_failed", reason ?? `the snapshot job exited ${code}`);
   }
   const manifest = /^LAYER-SNAPSHOT (.+)$/m.exec(output);
-  const sqlite = manifest ? (JSON.parse(manifest[1]!) as { sqlite: { path: string; bytes: number }[] }).sqlite : [];
-  return { slug, file: name, path: file, bytes: statSync(file).size, sqlite };
+  const parsed = manifest ? (JSON.parse(manifest[1]!) as { sqlite: { path: string; bytes: number }[]; postgres?: { bytes: number } | null }) : null;
+  return { slug, file: name, path: file, bytes: statSync(file).size, sqlite: parsed?.sqlite ?? [], postgres: parsed?.postgres ?? null };
 }
 
 /** Units of this app that are running now, to stop around a restore and start again after. */
@@ -152,9 +156,10 @@ async function backupRestore(params: Params, ctx: Context, io: CallIO) {
         cwd: app.appDir,
         readWrite: [app.appDir],
         env: { PATH: "/usr/bin:/bin" },
+        envFiles: [join(app.etcDir, "services.env")],
         memoryMb: 512,
         timeoutSec: 3600,
-        network: false,
+        network: readServices(ctx, slug).postgres ? "localhost" : false,
         command: ["/bin/sh", "-c", RESTORE_JOB, "layer-restore", app.appDir, when],
       }),
       { onData: io.emit, stdin: createReadStream("", { fd }) },
@@ -163,6 +168,7 @@ async function backupRestore(params: Params, ctx: Context, io: CallIO) {
     // Whatever happened, the app runs again (on the restored data, or the old).
     for (const unit of units) await ctx.exec(BIN.systemctl, ["start", unit], { allowFail: true });
   }
+  if (code === 2) throw new ActionError("restore_failed", `the files of ${name} were restored, but loading its Postgres dump failed (see the output above)`);
   if (code !== 0) throw new ActionError("restore_failed", `restoring ${name} failed (exit ${code}); data/ is unchanged`);
   return { slug, restored: name, previous: `data.before-restore-${when}`, restarted: units };
 }

@@ -50,6 +50,16 @@ export default async function ProjectPage({ params }: { params: Promise<{ slug: 
           <Link href={`/projects/${project.slug}/crons`} className="inline-flex h-9 items-center rounded-md border border-border px-4 text-sm font-medium transition-colors duration-150 hover:bg-hover">
             Crons
           </Link>
+          {project.runtime.kind !== "static" && (
+            <Link href={`/projects/${project.slug}/backups`} className="inline-flex h-9 items-center rounded-md border border-border px-4 text-sm font-medium transition-colors duration-150 hover:bg-hover">
+              Backups
+            </Link>
+          )}
+          {project.runtime.kind !== "static" && (
+            <Link href={`/projects/${project.slug}/databases`} className="inline-flex h-9 items-center rounded-md border border-border px-4 text-sm font-medium transition-colors duration-150 hover:bg-hover">
+              Databases
+            </Link>
+          )}
           <Link href={`/projects/${project.slug}/domains`} className="inline-flex h-9 items-center rounded-md border border-border px-4 text-sm font-medium transition-colors duration-150 hover:bg-hover">
             Domains
           </Link>
