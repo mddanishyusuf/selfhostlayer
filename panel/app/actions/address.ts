@@ -11,17 +11,18 @@ import { checkDomain } from "@/lib/dns";
 import { normalizeHost } from "@/lib/domains";
 import { setWebhookUrl } from "@/lib/github";
 import { getApp } from "@/lib/github-store";
+import { clearState, PANEL_MOVE, readState, writeState } from "@/lib/panel-state";
 import { requireUser } from "@/lib/session";
 
 export interface AddressState {
   error?: string;
-  /** The DNS record to create first. */
-  record?: { type: string; name: string; value: string };
-  /** Added, but its certificate isn't ready: the panel answers on both. */
-  pending?: string;
+  /** Not moved yet: what the last check found. The page checks again until it's done. */
+  waiting?: { host: string; message: string };
   /** Moved: open the panel here. */
   done?: string;
   warning?: string;
+  /** The wait was cancelled (set by the form, not the server). */
+  cancelled?: boolean;
 }
 
 // Test boxes run on Caddy's local CA and use names (.internal) no public resolver knows.
@@ -47,17 +48,26 @@ export async function movePanelAction(_prev: AddressState, form: FormData): Prom
   const host = normalizeHost(String(form.get("host") ?? ""));
   if (!host) return { error: "Enter a name like panel.example.com." };
   const box = boxConfig();
-  if (host === box.panelHost) return { error: "That's already the panel's address." };
+  if (host === box.panelHost) {
+    clearState(PANEL_MOVE);
+    return { error: "That's already the panel's address." };
+  }
+  // Remembered until the move is done, so the page keeps checking, even after a reload.
+  writeState(PANEL_MOVE, host);
   if (!testBox()) {
     const { verdict, message } = await checkDomain(host, box.publicIp);
-    if (verdict.status !== "ok") return { error: message, record: { type: "A", name: host, value: box.publicIp } };
+    if (verdict.status === "cloudflare") {
+      return { waiting: { host, message: `${host} goes through Cloudflare's proxy (orange cloud). Set the record to "DNS only" (grey cloud): the panel has to see your own address, for sign-in limits and Access.` } };
+    }
+    if (verdict.status !== "ok") return { waiting: { host, message } };
   }
   const aliases = (box.panelAliases ?? []).filter((h) => h !== host);
   await agent("panel.address", { hosts: [box.panelHost, host], redirects: aliases });
   if (!(await certificateReady(host, box.internalTls === true, 90_000))) {
     revalidatePath("/settings");
-    return { pending: host };
+    return { waiting: { host, message: `${host} points here, and the panel answers on it, but its certificate isn't issued yet. Nothing else has changed.` } };
   }
+  clearState(PANEL_MOVE);
   pinBackupFolder();
   await agent("panel.address", { hosts: [host], redirects: [box.panelHost, ...aliases] });
   let warning: string | undefined;
@@ -71,10 +81,22 @@ export async function movePanelAction(_prev: AddressState, form: FormData): Prom
   return { done: `https://${host}`, warning };
 }
 
+/** Stops waiting to move to a new address, and stops answering on it if it already did. */
+export async function cancelPanelMoveAction(host: string): Promise<void> {
+  await requireUser();
+  clearState(PANEL_MOVE);
+  const box = boxConfig();
+  if (box.panelPending?.includes(host)) {
+    await agent("panel.address", { hosts: [box.panelHost, ...box.panelPending.filter((h) => h !== host)], redirects: box.panelAliases ?? [] });
+  }
+  revalidatePath("/settings");
+}
+
 /** Stops answering on a pending address, or stops redirecting an old one. */
 export async function dropAddressAction(form: FormData): Promise<void> {
   await requireUser();
   const host = String(form.get("host") ?? "");
+  if (readState(PANEL_MOVE) === host) clearState(PANEL_MOVE);
   const box = boxConfig();
   await agent("panel.address", {
     hosts: [box.panelHost, ...(box.panelPending ?? []).filter((h) => h !== host)],

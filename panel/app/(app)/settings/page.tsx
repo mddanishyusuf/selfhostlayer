@@ -14,6 +14,7 @@ import { GITHUB_WEB } from "@/lib/github";
 import { getApp, listInstallations } from "@/lib/github-store";
 import { db } from "@/lib/db";
 import { requesterIp } from "@/lib/request";
+import { PANEL_MOVE, readState } from "@/lib/panel-state";
 import { listSessions, requireUser } from "@/lib/session";
 import { timeAgo } from "@/components/status";
 
@@ -45,7 +46,7 @@ export default async function ServerSettingsPage() {
             ["Public IP", <code key="i" className="font-mono text-[13.5px]">{box.publicIp}</code>],
           ]}
         />
-        <MovePanelForm />
+        <MovePanelForm waiting={readState(PANEL_MOVE)} ip={box.publicIp} />
       </SettingsRow>
       <SettingsRow title="Apps domain" description="Every app gets a free URL under it. Your own domain needs one wildcard record; the old URLs keep redirecting.">
         <KeyValues inset items={[["Free URLs", <code key="a" className="font-mono text-[13.5px]">&lt;app&gt;.{box.appsDomain}</code>]]} />

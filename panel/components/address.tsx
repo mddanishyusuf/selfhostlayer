@@ -1,9 +1,11 @@
 "use client";
 
-import { useActionState } from "react";
-import { moveAppsDomainAction, movePanelAction, type AddressState, type AppsDomainState } from "@/app/actions/address";
+import { useActionState, useEffect, useRef } from "react";
+import { useFormStatus } from "react-dom";
+import { cancelPanelMoveAction, moveAppsDomainAction, movePanelAction, type AddressState, type AppsDomainState } from "@/app/actions/address";
 import { CopyButton, SubmitButton } from "./form";
-import { FormError, Input } from "./ui";
+import { StatusText } from "./status";
+import { Button, FormError, Input } from "./ui";
 
 /** The DNS record to create before moving. */
 function Record({ record }: { record: { type: string; name: string; value: string } }) {
@@ -28,24 +30,48 @@ function Record({ record }: { record: { type: string; name: string; value: strin
   );
 }
 
-export function MovePanelForm() {
-  const [state, action] = useActionState(movePanelAction, {} as AddressState);
-  return (
-    <form action={action} className="grid gap-3" data-testid="move-panel">
-      <div className="flex flex-wrap gap-2">
-        <Input name="host" aria-label="New panel address" placeholder="panel.example.com" autoComplete="off" spellCheck={false} required className="min-w-0 flex-1" />
-        <SubmitButton pending="Moving… (up to a minute)" className="w-auto shrink-0">
-          Move the panel
-        </SubmitButton>
-      </div>
-      <FormError message={state.error} />
-      {state.record && <Record record={state.record} />}
-      {state.pending && (
-        <p className="text-[13.5px] text-gold">
-          The panel also answers on https://{state.pending} now, but its certificate isn&apos;t ready yet (DNS may still be spreading). Nothing else changed: press Move again in a few minutes.
-        </p>
-      )}
-      {state.done && (
+/** While a check runs: it may be the one that moves the panel. */
+function CheckingNote() {
+  const { pending } = useFormStatus();
+  return pending ? <span className="text-[12.5px] text-dim">Checking. If the record is right, the move takes up to a minute.</span> : null;
+}
+
+/**
+ * Moving the panel: enter an address, then the form waits for its DNS record.
+ * The address is remembered on the server, so the wait survives a reload, and
+ * the form checks every 15 seconds and finishes the move once it can.
+ */
+export function MovePanelForm({ waiting, ip }: { waiting: string | null; ip: string }) {
+  const [state, action, isPending] = useActionState(async (prev: AddressState, form: FormData): Promise<AddressState> => {
+    if (form.get("intent") === "cancel") {
+      await cancelPanelMoveAction(String(form.get("host") ?? ""));
+      return { cancelled: true };
+    }
+    return movePanelAction(prev, form);
+  }, {} as AddressState);
+  // The address being waited for: from the last check, or from the server on a fresh page.
+  const host = state.waiting?.host ?? (Object.keys(state).length === 0 ? waiting : null);
+  const form = useRef<HTMLFormElement>(null);
+  const busy = useRef(isPending);
+  busy.current = isPending;
+
+  useEffect(() => {
+    if (!host) return;
+    const check = () => {
+      if (!busy.current && document.visibilityState === "visible") form.current?.requestSubmit();
+    };
+    // A fresh page checks right away; after that, every 15 seconds.
+    const first = state.waiting ? undefined : setTimeout(check, 300);
+    const timer = setInterval(check, 15_000);
+    return () => {
+      clearTimeout(first);
+      clearInterval(timer);
+    };
+  }, [host, state]);
+
+  if (state.done) {
+    return (
+      <div className="grid gap-2" data-testid="move-panel">
         <p className="text-[13.5px] text-teal" data-testid="moved">
           Moved. Open{" "}
           <a href={state.done} className="font-medium underline underline-offset-4">
@@ -53,8 +79,46 @@ export function MovePanelForm() {
           </a>{" "}
           and sign in again: each address has its own sign-in. The old address redirects there.
         </p>
-      )}
-      {state.warning && <p className="text-[13px] text-gold">{state.warning}</p>}
+        {state.warning && <p className="text-[13px] text-gold">{state.warning}</p>}
+      </div>
+    );
+  }
+
+  if (host) {
+    return (
+      <form ref={form} action={action} className="grid gap-3" data-testid="move-panel-waiting">
+        <input type="hidden" name="host" value={host} />
+        <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+          <StatusText status="warn" label="Waiting" pulse />
+          <span className="min-w-0 text-[13.5px] text-muted">
+            to move to <code className="font-mono text-[13.5px] text-foreground">{host}</code>
+          </span>
+        </div>
+        <p className="text-[13.5px] text-muted">{state.waiting?.message ?? "Checking the DNS record…"}</p>
+        <Record record={{ type: "A", name: host, value: ip }} />
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-2">
+          <SubmitButton pending="Checking…" variant="secondary" size="sm" className="w-auto">
+            Check again
+          </SubmitButton>
+          <Button type="submit" name="intent" value="cancel" variant="ghost" size="sm">
+            Cancel
+          </Button>
+          <CheckingNote />
+        </div>
+        <p className="text-[12.5px] text-dim">Checks every 15 seconds while this page is open, and moves the panel as soon as the record is right.</p>
+      </form>
+    );
+  }
+
+  return (
+    <form ref={form} action={action} className="grid gap-3" data-testid="move-panel">
+      <div className="flex flex-wrap gap-2">
+        <Input name="host" aria-label="New panel address" placeholder="panel.example.com" autoComplete="off" spellCheck={false} required className="min-w-0 flex-1" />
+        <SubmitButton pending="Checking…" className="w-auto shrink-0">
+          Move the panel
+        </SubmitButton>
+      </div>
+      <FormError message={state.error} />
     </form>
   );
 }

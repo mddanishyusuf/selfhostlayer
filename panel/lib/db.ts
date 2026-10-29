@@ -214,6 +214,12 @@ const MIGRATIONS = [
      disk_mb REAL,
      PRIMARY KEY (target, step, at)
    );`,
+  // Small values kept between requests, like an address the panel waits to move to (lib/panel-state.ts).
+  `CREATE TABLE panel_state (
+     key TEXT PRIMARY KEY,
+     value TEXT NOT NULL,
+     updated_at INTEGER NOT NULL
+   );`,
 ];
 
 function open(): DatabaseSync {

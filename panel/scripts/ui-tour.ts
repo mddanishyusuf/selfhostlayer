@@ -127,8 +127,12 @@ const go = (path: string) => send("Page.navigate", { url: new URL(path, base).hr
 const email = "admin@example.com";
 const password = "a-long-test-password";
 let lastCounter = 0;
-/** A TOTP code for a step that hasn't been used yet (the panel refuses reuse). */
-function nextCode(secret: string): string {
+/**
+ * A TOTP code for a step that hasn't been used yet: the panel refuses reuse,
+ * and accepts at most one step ahead, so a quick run waits for the clock.
+ */
+async function nextCode(secret: string): Promise<string> {
+  while (lastCounter > currentCounter()) await sleep(500);
   const counter = Math.max(currentCounter(), lastCounter + 1);
   lastCounter = counter;
   return totpAt(secret, counter);
@@ -159,7 +163,7 @@ await click("button[type=submit]");
 await waitForPath("/setup/2fa");
 await screenshot("2fa-setup");
 const secret = String(await evaluate(`document.querySelector("code").textContent`)).replace(/\s/g, "");
-await typeCode(nextCode(secret));
+await typeCode(await nextCode(secret));
 await waitForPath("/setup/recovery");
 await screenshot("recovery-codes");
 await click("button[type=submit]");
@@ -189,7 +193,7 @@ await fill("#password", password);
 await click("button[type=submit]");
 await waitForPath("/login/2fa");
 await screenshot("login-2fa");
-await typeCode(nextCode(secret));
+await typeCode(await nextCode(secret));
 await waitForPath("/");
 await setViewport(1280, 820, true);
 await go("/login");
@@ -744,7 +748,7 @@ if (newAddress) {
     await fill("#password", password);
     await click("button[type=submit]");
     await waitForPath("/login/2fa");
-    await typeCode(nextCode(secret));
+    await typeCode(await nextCode(secret));
     await waitFor(`location.pathname === "/"`, `signed in on ${host}`, 30_000);
   };
   const move = async (from: string, to: string) => {
@@ -928,7 +932,7 @@ console.log("Account");
   await fill("#password", newPassword);
   await click("button[type=submit]");
   await waitForPath("/login/2fa");
-  await typeCode(nextCode(secret));
+  await typeCode(await nextCode(secret));
   await waitForPath("/");
   console.log("  ✓ changed the password: the old one is refused, the new one signs in");
 }
