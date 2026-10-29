@@ -21,7 +21,7 @@ export function AddDomainForm({ slug }: { slug: string }) {
         </SubmitButton>
       </div>
       <label className="flex items-center gap-2 text-[13px] text-muted">
-        <input type="checkbox" name="www" defaultChecked /> Also add www, redirecting to the domain
+        <input type="checkbox" name="www" defaultChecked /> Also add www, redirecting to the domain (root domains only, like example.com)
       </label>
       <FormError message={state.error} />
     </form>

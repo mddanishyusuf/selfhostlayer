@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canGoLive, evaluateDns, explainDns, isCloudflareIp, suggestedRecord, type DnsAnswers, type DnsVerdict } from "./dns";
+import { canGoLive, evaluateDns, explainDns, isCloudflareIp, isRootDomain, suggestedRecord, type DnsAnswers, type DnsVerdict } from "./dns";
 
 const IP = "37.27.25.45";
 const ans = (a: string[], aaaa: string[] = []): DnsAnswers => ({ a, aaaa, cname: [] });
@@ -64,5 +64,12 @@ describe("canGoLive", () => {
     expect(canGoLive("cloudflare", false)).toBe(false);
     expect(canGoLive("cloudflare", true)).toBe(true);
     for (const status of ["none", "wrong_ip", "ipv6_mismatch", "resolvers_disagree"] as const) expect(canGoLive(status, true)).toBe(false);
+  });
+});
+
+describe("isRootDomain", () => {
+  it("tells a bought domain from its subdomains, so www is only added in front of the first", () => {
+    for (const root of ["superdevpro.com", "example.co.uk", "piqo.app"]) expect(isRootDomain(root), root).toBe(true);
+    for (const sub of ["docs.superdevpro.com", "www.example.com", "shop.example.co.uk", "a.b.piqo.app"]) expect(isRootDomain(sub), sub).toBe(false);
   });
 });

@@ -117,7 +117,14 @@ const COUNTRY_SECOND_LEVEL = new Set(["co", "com", "net", "org", "ac", "gov", "e
  * networks that block it.
  */
 export function suggestedRecord(host: string, serverIp: string): { type: "A"; name: string; value: string } {
-  const labels = host.split(".");
-  const bought = labels.length >= 3 && labels.at(-1)!.length === 2 && COUNTRY_SECOND_LEVEL.has(labels.at(-2)!) ? 3 : 2;
-  return { type: "A", name: labels.slice(0, -bought).join(".") || "@", value: serverIp };
+  return { type: "A", name: host.split(".").slice(0, -boughtLabels(host)).join(".") || "@", value: serverIp };
 }
+
+/** How many labels make up the domain someone bought: 2 for example.com, 3 for example.co.uk. */
+function boughtLabels(host: string): number {
+  const labels = host.split(".");
+  return labels.length >= 3 && labels.at(-1)!.length === 2 && COUNTRY_SECOND_LEVEL.has(labels.at(-2)!) ? 3 : 2;
+}
+
+/** Whether host is the domain someone bought itself (example.com, example.co.uk), not a subdomain of it. */
+export const isRootDomain = (host: string) => host.split(".").length === boughtLabels(host);

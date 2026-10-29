@@ -7,6 +7,7 @@ import { boxConfig } from "../box";
 import { checkCertificate } from "../cert";
 import { listCrons, liveCrons } from "../crons";
 import { db, now } from "../db";
+import { recheckPendingDomains } from "../domain-check";
 import { resumeDeployments } from "../deploy";
 import { listDomains } from "../domains";
 import { backupProjects, markInterrupted, overdueSlugs, scheduledTick } from "../backup/runner";
@@ -124,6 +125,7 @@ export async function tick(): Promise<void> {
     }
     await checkBackups().catch((err) => console.error("monitor: backup check failed:", (err as Error).message));
     await sampleMetrics().catch((err) => console.error("monitor: metrics failed:", (err as Error).message));
+    await recheckPendingDomains().catch((err) => console.error("monitor: domain check failed:", (err as Error).message));
     if (Date.now() - state.lastCertCheck > CERT_EVERY_MS) {
       state.lastCertCheck = Date.now();
       await checkCertificates().catch((err) => console.error("monitor: certificate check failed:", (err as Error).message));

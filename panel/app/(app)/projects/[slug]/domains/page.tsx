@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { restoreFreeDomainAction } from "@/app/actions/domains";
 import { AddDomainForm } from "@/components/domains";
 import { DomainRow } from "@/components/domain-row";
+import { RefreshEvery } from "@/components/refresh";
 import { KeyValues, Notice, PageHeader, SettingsRow } from "@/components/page";
 import { Button } from "@/components/ui";
 import { boxConfig, freeHost } from "@/lib/box";
@@ -26,6 +27,8 @@ export default async function DomainsPage({ params }: { params: Promise<{ slug: 
   return (
     <>
       <PageHeader title={project.slug} crumb="Domains" meta="Verified through public DNS before going live" />
+      {/* The monitor re-checks pending domains; the page shows the news without a reload. */}
+      {pending.length > 0 && <RefreshEvery seconds={20} />}
       {pending.length > 0 && <Notice lead="Needs attention">{pending.map((d) => d.host).join(", ")} {pending.length === 1 ? "is" : "are"} waiting for DNS. Add the record shown below at your DNS provider.</Notice>}
       <SettingsRow title="Add a domain" description="Point it at this server first. We check public DNS, so visitors never land on a broken site.">
         <AddDomainForm slug={project.slug} />
