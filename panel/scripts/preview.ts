@@ -25,6 +25,26 @@ const db = new DatabaseSync(join(devDir, "panel.db"));
 const now = Math.floor(Date.now() / 1000);
 const sha256 = (s: string) => createHash("sha256").update(s).digest("hex");
 
+/** A day of minutes and a week of hours of plausible usage, for the charts. */
+function seedMetrics() {
+  if (db.prepare("SELECT 1 FROM metrics LIMIT 1").get()) return;
+  const insert = db.prepare("INSERT OR REPLACE INTO metrics (target, step, at, cpu, memory_mb, disk_mb) VALUES (?, ?, ?, ?, ?, ?)");
+  const nowMs = Date.now();
+  const wave = (t: number, period: number) => Math.sin((t / period) * 2 * Math.PI);
+  for (const [target, cpu, mem] of [["box", 18, 610], ["piqo", 4, 205], ["maillayer", 2, 160]] as const) {
+    for (let m = 24 * 60; m >= 0; m--) {
+      const at = Math.floor((nowMs - m * 60_000) / 60_000) * 60_000;
+      if (target !== "box" && m > 9 * 60 && m < 9 * 60 + 25) continue; // a gap: the app was being redeployed
+      const busy = cpu * (1 + 0.6 * wave(at, 86_400_000) + 0.25 * Math.random()) + (m % 180 < 4 ? cpu * 2 : 0);
+      insert.run(target, "minute", at, Math.round(busy * 10) / 10, Math.round(mem * (1 + 0.05 * wave(at, 7_200_000)) + Math.random() * 6), m % 15 === 0 ? (target === "box" ? 8_200 : 310) : null);
+    }
+    for (let h = 7 * 24; h > 0; h--) {
+      const at = Math.floor((nowMs - h * 3_600_000) / 3_600_000) * 3_600_000;
+      insert.run(target, "hour", at, Math.round(cpu * (1 + 0.5 * wave(at, 86_400_000)) * 10) / 10, Math.round(mem * (1 + 0.08 * wave(at, 3 * 86_400_000))), null);
+    }
+  }
+}
+
 function seed() {
   if (!db.prepare("SELECT 1 FROM users").get()) {
     db.prepare("INSERT INTO users (email, password_hash, totp_secret_enc, created_at) VALUES (?, 'x', 'x', ?)").run("danish@mvpstack.com", now);
@@ -94,6 +114,7 @@ function session(): string {
 }
 
 seed();
+seedMetrics();
 const token = session();
 
 const CHROME = process.env.CHROME ?? "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";

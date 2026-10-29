@@ -13,6 +13,8 @@ export interface Paths {
   toolsRoot: string;
   systemdDir: string;
   caddySitesDir: string;
+  /** Caddy's per-site access logs (<slug>.log). */
+  caddyLogDir: string;
   /** Facts about the box the panel reads (panel address, apps domain), written by the installer and panel.address. */
   boxConfig: string;
   /** Published static sites, served by Caddy's file_server. */
@@ -55,6 +57,7 @@ export const DEFAULT_PATHS: Paths = {
   toolsRoot: "/opt/layer/tools",
   systemdDir: "/etc/systemd/system",
   caddySitesDir: "/etc/caddy/sites",
+  caddyLogDir: "/var/log/caddy",
   boxConfig: "/etc/layer/config.json",
   staticRoot: "/srv/static",
   staticGroup: "caddy",

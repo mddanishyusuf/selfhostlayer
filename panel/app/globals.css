@@ -32,6 +32,7 @@
   --color-gold: var(--gold);
   --color-rose: var(--rose);
   --color-code: var(--code);
+  --color-chart: var(--chart);
 }
 
 :root,
@@ -57,6 +58,8 @@
   --inverse: #1c1a19;
   --inverse-fg: #faf8f5;
   --code: #1c1a19;
+  /* Chart series: checked with the dataviz validator against each surface. */
+  --chart: #7a66e0;
 }
 
 :root[data-theme="dark"] {
@@ -81,6 +84,7 @@
   --inverse: #ece8e3;
   --inverse-fg: #1c1a19;
   --code: #141211;
+  --chart: #9180ec;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -106,6 +110,7 @@
     --inverse: #ece8e3;
     --inverse-fg: #1c1a19;
     --code: #141211;
+    --chart: #9180ec;
   }
 }
 

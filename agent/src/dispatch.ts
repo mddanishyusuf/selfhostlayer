@@ -1,4 +1,5 @@
 import { isActionName, ValidationError, type Response } from "@layer/protocol";
+import { activityActions } from "./actions/activity.ts";
 import { appActions } from "./actions/app.ts";
 import { buildActions } from "./actions/build.ts";
 import { backupActions } from "./actions/backup.ts";
@@ -7,6 +8,7 @@ import { firewallActions } from "./actions/firewall.ts";
 import { serviceActions } from "./actions/service.ts";
 import { envActions } from "./actions/env.ts";
 import { logsActions } from "./actions/logs.ts";
+import { metricsActions } from "./actions/metrics.ts";
 import { panelActions } from "./actions/panel.ts";
 import { proxyActions } from "./actions/proxy.ts";
 import { repairActions } from "./actions/repair.ts";
@@ -41,6 +43,8 @@ export const ACTION_TABLE: ActionTable = {
   ...panelActions,
   ...repairActions,
   ...updateActions,
+  ...metricsActions,
+  ...activityActions,
 };
 
 export const MAX_LINE_BYTES = 1024 * 1024;
@@ -83,7 +87,8 @@ export function createDispatcher(ctx: Context, audit: Audit, table: ActionTable 
     const p = params as Record<string, unknown>;
 
     const started = Date.now();
-    audit.write({ id, action, phase: "start", params: def.redact ? def.redact(p) : p });
+    // Only what changes the box: status reads (the panel polls every minute) would bury it.
+    if (def.mutates) audit.write({ id, action, phase: "start", params: def.redact ? def.redact(p) : p });
     let response: Response;
     try {
       const io = makeIO(id);
@@ -101,7 +106,7 @@ export function createDispatcher(ctx: Context, audit: Audit, table: ActionTable 
         response = fail(id, "internal", `${action} failed (details: journalctl -u layer-agent)`);
       }
     }
-    audit.write({
+    if (def.mutates) audit.write({
       id,
       action,
       phase: "end",

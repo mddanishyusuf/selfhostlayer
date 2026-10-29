@@ -15,7 +15,7 @@ function osRelease(): Record<string, string> {
 }
 
 /** MemAvailable is what's really free (it counts reclaimable cache); os.freemem() isn't. */
-function memInfoMb(): Record<string, number> {
+export function memInfoMb(): Record<string, number> {
   if (!existsSync("/proc/meminfo")) {
     return { MemTotal: os.totalmem() / 2 ** 20, MemAvailable: os.freemem() / 2 ** 20 };
   }

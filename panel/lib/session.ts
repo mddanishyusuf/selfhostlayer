@@ -67,6 +67,29 @@ export async function endSession(): Promise<void> {
   jar.delete(SESSION_COOKIE);
 }
 
+export interface SessionInfo {
+  current: boolean;
+  createdAt: number;
+  ip: string | null;
+  userAgent: string | null;
+}
+
+/** The user's signed-in sessions, newest first. */
+export async function listSessions(userId: number): Promise<SessionInfo[]> {
+  const token = (await cookies()).get(SESSION_COOKIE)?.value;
+  const mine = token ? sha256(token) : "";
+  const rows = db()
+    .prepare("SELECT id_hash, created_at, ip, user_agent FROM sessions WHERE user_id = ? AND mfa_ok = 1 AND expires_at > ? ORDER BY created_at DESC")
+    .all(userId, now()) as { id_hash: string; created_at: number; ip: string | null; user_agent: string | null }[];
+  return rows.map((r) => ({ current: r.id_hash === mine, createdAt: r.created_at, ip: r.ip, userAgent: r.user_agent }));
+}
+
+/** Signs out every session of the user except this one. Returns how many ended. */
+export async function endOtherSessions(userId: number): Promise<number> {
+  const token = (await cookies()).get(SESSION_COOKIE)?.value;
+  return Number(db().prepare("DELETE FROM sessions WHERE user_id = ? AND id_hash != ?").run(userId, token ? sha256(token) : "").changes);
+}
+
 /** For app pages: a fully signed-in user, or a redirect to the right step. */
 export async function requireUser(): Promise<User> {
   if (!hasAdmin()) redirect("/setup");

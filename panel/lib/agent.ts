@@ -93,6 +93,30 @@ const FAKE: Partial<Record<ActionName, unknown>> = {
       },
     ],
   },
+  "metrics.sample": {
+    at: Date.now(),
+    box: { cpu: { busy: 1000, total: 10000 }, cpus: 2, memoryMb: { used: 610, total: 3800 }, diskGb: { used: 8, total: 38 } },
+    apps: { piqo: { cpuNs: 5_000_000_000, memoryMb: 212 } },
+  },
+  "metrics.disk": { apps: { piqo: 310 } },
+  "requests.tail": {
+    slug: "piqo",
+    requests: [
+      { at: Date.now() - 4_000, status: 200, method: "GET", host: "piqo.app", uri: "/", ip: "203.0.113.24", ms: 38, bytes: 14_220 },
+      { at: Date.now() - 9_000, status: 200, method: "POST", host: "piqo.app", uri: "/api/collect", ip: "198.51.100.7", ms: 6, bytes: 2 },
+      { at: Date.now() - 31_000, status: 304, method: "GET", host: "piqo.app", uri: "/_next/static/chunks/main.js", ip: "203.0.113.24", ms: 1, bytes: 0 },
+      { at: Date.now() - 64_000, status: 404, method: "GET", host: "piqo.app", uri: "/wp-login.php", ip: "45.148.10.243", ms: 3, bytes: 1_240 },
+      { at: Date.now() - 98_000, status: 502, method: "GET", host: "piqo.app", uri: "/dashboard", ip: "203.0.113.24", ms: 5_004, bytes: 0 },
+    ],
+  },
+  "audit.tail": {
+    entries: [
+      { id: "a3", ts: new Date(Date.now() - 120_000).toISOString(), action: "proxy.set", params: { slug: "piqo", color: "blue", domains: ["piqo.app"] }, ok: true, code: null, ms: 412 },
+      { id: "a2", ts: new Date(Date.now() - 180_000).toISOString(), action: "unit.start", params: { slug: "piqo", color: "blue" }, ok: true, code: null, ms: 2210 },
+      { id: "a1", ts: new Date(Date.now() - 260_000).toISOString(), action: "build.run", params: { slug: "piqo", sha: "a1c9e42" }, ok: true, code: null, ms: 61_000 },
+      { id: "a0", ts: new Date(Date.now() - 3_600_000).toISOString(), action: "postgres.add", params: { slug: "maillayer" }, ok: false, code: "install_failed", ms: 48_000 },
+    ],
+  },
   "data.import": {
     slug: "piqo",
     previous: "data.before-restore-20261030090000-1a2b3c",

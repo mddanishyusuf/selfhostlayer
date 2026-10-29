@@ -204,6 +204,16 @@ const MIGRATIONS = [
    ALTER TABLE alert_channels_new RENAME TO alert_channels;`,
   // The bucket folder for this server's backups, fixed when they start: moving the panel keeps them together.
   `ALTER TABLE backup_settings ADD COLUMN server_folder TEXT;`,
+  // Usage history for the charts: per minute for a day, then hourly for a week (lib/metrics.ts).
+  `CREATE TABLE metrics (
+     target TEXT NOT NULL,
+     step TEXT NOT NULL CHECK (step IN ('minute', 'hour')),
+     at INTEGER NOT NULL,
+     cpu REAL,
+     memory_mb REAL,
+     disk_mb REAL,
+     PRIMARY KEY (target, step, at)
+   );`,
 ];
 
 function open(): DatabaseSync {

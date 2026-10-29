@@ -1,8 +1,30 @@
 import { createHash, randomBytes } from "node:crypto";
-import { chmodSync, closeSync, constants, existsSync, fchmodSync, fchownSync, fsyncSync, mkdirSync, openSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync, writeSync } from "node:fs";
+import { chmodSync, closeSync, constants, existsSync, fchmodSync, fchownSync, fstatSync, fsyncSync, mkdirSync, openSync, readdirSync, readFileSync, readSync, renameSync, rmSync, statSync, writeFileSync, writeSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import type { Exec } from "./exec.ts";
 import { BIN } from "./exec.ts";
+
+/** The last maxBytes of a file as whole lines (a line cut off at the start is dropped). [] if it doesn't exist. */
+export function tailLines(path: string, maxBytes: number): string[] {
+  let fd: number;
+  try {
+    fd = openSync(path, constants.O_RDONLY | constants.O_NOFOLLOW);
+  } catch {
+    return [];
+  }
+  try {
+    const size = fstatSync(fd).size;
+    // One byte before the cut tells whether the first line read is whole.
+    const start = Math.max(0, size - maxBytes - 1);
+    const buf = Buffer.alloc(size - start);
+    readSync(fd, buf, 0, buf.length, start);
+    const lines = buf.toString("utf8").split("\n");
+    if (start > 0) lines.shift();
+    return lines.filter(Boolean);
+  } finally {
+    closeSync(fd);
+  }
+}
 
 /** join(root, name), refusing anything that isn't a direct child of root. */
 export function childOf(root: string, name: string): string {

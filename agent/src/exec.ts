@@ -11,6 +11,7 @@ export const BIN = {
   chmod: "/usr/bin/chmod",
   unzip: "/usr/bin/unzip",
   journalctl: "/usr/bin/journalctl",
+  du: "/usr/bin/du",
   systemdAnalyze: "/usr/bin/systemd-analyze",
   aptGet: "/usr/bin/apt-get",
   runuser: "/usr/sbin/runuser",

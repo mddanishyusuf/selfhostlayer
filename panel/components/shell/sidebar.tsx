@@ -18,6 +18,7 @@ import {
   Menu01Icon,
   Moon02Icon,
   Notification01Icon,
+  WorkHistoryIcon,
   PuzzleIcon,
   Rocket01Icon,
   Search01Icon,
@@ -79,6 +80,7 @@ function globalNav(p: SidebarProps): Item[][] {
     [
       { href: "/settings/backups", label: "Backups", icon: DatabaseRestoreIcon },
       { href: "/settings/alerts", label: "Alerts", icon: Notification01Icon, dot: p.openIncidents > 0 },
+      { href: "/settings/activity", label: "Activity", icon: WorkHistoryIcon },
       { href: "/settings", label: "Settings", icon: Settings01Icon, exact: true },
     ],
   ];
@@ -90,7 +92,7 @@ function projectNav(p: SidebarProject): Item[][] {
     [
       { href: base, label: "Overview", icon: DashboardSquare01Icon, exact: true },
       { href: `${base}/deployments`, label: "Deployments", icon: Rocket01Icon },
-      ...(p.isStatic ? [] : [{ href: `${base}/logs`, label: "Logs", icon: CommandLineIcon }]),
+      { href: `${base}/logs`, label: "Logs", icon: CommandLineIcon },
       { href: `${base}/domains`, label: "Domains", icon: Globe02Icon },
       ...(p.isStatic
         ? []

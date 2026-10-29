@@ -99,3 +99,30 @@
   - Repair puts back what was edited or deleted, reloads systemd or Caddy as needed, and restarts only the running units those files feed.
   - Installer-owned files (`layer-panel.service`, `config.json`) are left to a re-run of the installer, which also writes them.
 - **Found on the way:** port 4998 was already the alert receiver's in the test VM, so the test feed serves on 4996.
+
+## Day 5 result (2026-10-29)
+**Done when "an app under load shows its CPU and memory on the Overview": passed.** On the 2 vCPU VM, `ab` hit the example Next.js app for 150 seconds (435,269 requests at 2,900 a second, none failed). Its samples went from 0.3% CPU and 38 MB to 27–40% of the server's CPU and 128 MB, and back down once the load stopped. The full tour reads the app's CPU and memory from its Overview.
+
+- **Sampling, with no new daemon:** the panel's monitor (already running every minute) calls `metrics.sample`. That's one `systemctl show` for every app's units (CPU time and memory from systemd's cgroup accounting), plus the box's CPU, memory and disk from `/proc` and the filesystem. Each app's folder size comes from `metrics.disk` (`du`) every 15 minutes.
+- **Storage:** a `metrics` table in the panel's SQLite holds 24 hours at one-minute steps and 7 days of hourly averages. Older rows are deleted as it goes.
+- **Charts:**
+  - Project Overview → Usage: CPU and memory for the last 24 hours or 7 days. Each chart has a crosshair, arrow keys and a table view, and the app's disk size is in the description.
+  - The server popup charts the whole box.
+  - One color, checked for contrast in both themes.
+- **Honest limits:**
+  - CPU is the difference between two samples. A restart starts the counter over, so the first minute after one has no CPU value.
+  - Memory is what systemd counts for the app's units, page cache included.
+
+## Day 6 result (2026-10-29)
+**Done when "the tour sees its own requests and actions listed": passed.** The full VM tour (81 checks) finds its own health checks in the example app's Requests and its builds, starts and routing in Activity. It also makes new recovery codes, changes the password and signs in with the new one.
+
+- **Requests** (Logs → Requests, `requests.tail`): the last 200 requests from Caddy's access log for the app (`/var/log/caddy/<app>.log`, already written for every site). Each row shows the time, status, method and path, how long it took, the size and the client address, with server errors counted on top. Static sites have only this tab.
+- **Activity** (Server → Activity, `audit.tail`): every change the agent made, in words, with the app it was about, the result, how long it took and when.
+  - The audit log now records only changes, not reads (the monitor's calls were most of it), and rotates at 10MB.
+- **Account** (Settings → Account):
+  - Change the password: needs the current one, and signs out every other session.
+  - Make new recovery codes: shown once, and the old codes stop working.
+  - The list of signed-in sessions (browser, address, when), with "Sign out the others".
+- **Found on the way:**
+  - Reading the end of a log could drop a whole first line when the cut fell exactly on a line break. Fixed by reading one byte more.
+  - Two samples in one minute (a panel restart) wiped that minute's disk figure. Fixed: the second sample now updates the row and keeps the disk figure.

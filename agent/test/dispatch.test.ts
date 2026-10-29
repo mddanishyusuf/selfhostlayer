@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { assertSlug } from "@layer/protocol";
 import { Audit } from "../src/audit.ts";
@@ -129,6 +129,15 @@ describe("audit log", () => {
     ]);
     expect(entries[0].params).toEqual({ slug: "piqo", keys: ["DB_PASSWORD"] });
     expect(entries[3].code).toBe("not_found");
+  });
+
+  it("leaves out status reads, and rotates past its size limit", async () => {
+    await call({ id: "r1", action: "system.info", params: {} });
+    expect(existsSync(env.paths.auditLog)).toBe(false);
+    const audit = new Audit(env.paths.auditLog, 200);
+    for (let i = 0; i < 5; i++) audit.write({ id: `x${i}`, action: "app.create", phase: "start", params: { slug: "a".repeat(40) } });
+    expect(existsSync(`${env.paths.auditLog}.1`)).toBe(true);
+    expect(readFileSync(env.paths.auditLog, "utf8").trim().split("\n").length).toBeLessThan(5);
   });
 });
 

@@ -790,6 +790,47 @@ if (process.env.TOUR_ACCESS === "1") {
   console.log("  ✓ open to anyone again");
 }
 
+// The panel samples every minute. CPU takes two samples with no restart of the
+// app in between, so on a fast run the first value can be a couple of minutes off.
+if (process.env.TOUR_DEPLOY === "1") {
+  console.log("Usage");
+  let values = "";
+  for (const deadline = Date.now() + 180_000; !/\d+(\.\d)?% \| \d+ MB/.test(values) && Date.now() < deadline; ) {
+    if (values) await sleep(10_000);
+    await go("/projects/next");
+    await waitForPath("/projects/next");
+    await waitFor(`document.querySelectorAll('[data-testid="usage-chart"]').length === 2`, "the usage charts");
+    values = String(await evaluate(`[...document.querySelectorAll('[data-testid="usage-chart"]')].map((c) => c.firstElementChild.lastElementChild.textContent).join(" | ")`));
+  }
+  if (!/\d+(\.\d)?% \| \d+ MB/.test(values)) throw new Error(`no usage sampled for next: ${values}`);
+  console.log(`  ✓ next's Overview charts its CPU and memory (now ${values})`);
+  await screenshot("usage");
+
+  console.log("Requests");
+  await go("/projects/next/logs?tab=requests");
+  await waitForPath("/projects/next/logs");
+  await waitFor(`!!document.querySelector('[data-testid="requests"] [data-status]')`, "the request log");
+  const requests = String(await evaluate(`document.querySelector('[data-testid="requests"]').innerText`));
+  if (!requests.includes("/api/health")) throw new Error(`next's requests don't list the tour's health checks: ${requests.slice(0, 400)}`);
+  console.log("  ✓ next's Logs list its requests from Caddy's log, the tour's health checks among them");
+  await screenshot("requests");
+}
+
+console.log("Activity");
+{
+  await go("/settings/activity");
+  await waitForPath("/settings/activity");
+  await waitFor(`!!document.querySelector('[data-testid="activity"] [data-action]')`, "the activity log");
+  const actions = String(await evaluate(`[...document.querySelectorAll('[data-testid="activity"] [data-action]')].map((r) => r.dataset.action).join(" ")`)).split(" ");
+  for (const action of process.env.TOUR_DEPLOY === "1" ? ["build.run", "unit.start", "proxy.set"] : ["panel.site"]) {
+    if (!actions.includes(action)) throw new Error(`Activity doesn't list ${action}: ${actions.join(" ")}`);
+  }
+  const reads = actions.filter((a) => /\.(info|status|list|history|tail|sample|disk|check|score)$/.test(a));
+  if (reads.length) throw new Error(`Activity lists read-only calls: ${reads.join(" ")}`);
+  console.log(`  ✓ Activity lists the agent's ${actions.length} latest changes, and none of its reads`);
+  await screenshot("activity");
+}
+
 // TOUR_UPDATE=1: a feed (installer/test/release-feed.sh) offers a newer
 // version; update from Settings and follow it through the panel's restart.
 if (process.env.TOUR_UPDATE === "1") {
@@ -807,6 +848,42 @@ if (process.env.TOUR_UPDATE === "1") {
   // The page reloads itself once the new version answers.
   await waitFor(`!document.querySelector('[data-testid="update-progress"]') && !!document.querySelector('[data-testid="updates"]') && document.body.innerText.includes(${JSON.stringify(target)})`, `the panel on ${target}`, 600_000);
   console.log(`  ✓ updated to ${target} from Settings; the page followed the panel's restart`);
+}
+
+console.log("Account");
+{
+  await go("/settings");
+  await waitForPath("/settings");
+  const sessions = String(await evaluate(`document.querySelector('[data-testid="sessions"]').innerText`));
+  if (!sessions.includes("This browser")) throw new Error(`Settings doesn't mark this browser's session: ${sessions}`);
+  const open = (label: string) => evaluate(`[...document.querySelectorAll("main button")].find((b) => b.textContent === ${JSON.stringify(label)}).click(), true`);
+  await open("New recovery codes…");
+  await waitFor(`!!document.querySelector("#recovery-password")`, "the recovery codes form");
+  await fill("#recovery-password", password);
+  await click('[data-testid="recovery-codes"] button[type=submit]');
+  await waitFor(`document.querySelectorAll('[data-testid="new-recovery-codes"] li').length === 8`, "8 new recovery codes", 30_000);
+  console.log("  ✓ made new recovery codes");
+  await open("Change password…");
+  await waitFor(`!!document.querySelector("#current-password")`, "the change password form");
+  const newPassword = "another-long-test-password";
+  await fill("#current-password", password);
+  await fill("#new-password", newPassword);
+  await fill("#confirm-password", newPassword);
+  await click('[data-testid="change-password"] button[type=submit]');
+  await waitFor(`!!document.querySelector('[data-testid="password-changed"]')`, "the password change", 30_000);
+  await screenshot("account");
+  await click('button[title="Sign out"]');
+  await waitForPath("/login");
+  await fill("#email", email);
+  await fill("#password", password);
+  await click("button[type=submit]");
+  await waitFor(`!!document.querySelector('[role=alert]')`, "the old password refused");
+  await fill("#password", newPassword);
+  await click("button[type=submit]");
+  await waitForPath("/login/2fa");
+  await typeCode(nextCode(secret));
+  await waitForPath("/");
+  console.log("  ✓ changed the password: the old one is refused, the new one signs in");
 }
 
 console.log("Guards");

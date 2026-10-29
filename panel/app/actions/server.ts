@@ -1,12 +1,15 @@
 "use server";
 
 import { agent, type SystemInfo } from "@/lib/agent";
+import { history, type Point } from "@/lib/metrics";
 import { listProjects } from "@/lib/projects";
 import { requireUser } from "@/lib/session";
 
 export interface ServerStats {
   info: SystemInfo | null;
   apps: { slug: string; memoryMb: number | null }[];
+  /** The box over the last day, for the charts. */
+  usage: Point[];
 }
 
 interface UnitStatus {
@@ -32,5 +35,5 @@ export async function serverStats(): Promise<ServerStats> {
       }),
   );
   apps.sort((a, b) => (b.memoryMb ?? -1) - (a.memoryMb ?? -1));
-  return { info, apps };
+  return { info, apps, usage: history("box", "24h") };
 }

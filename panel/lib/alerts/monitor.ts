@@ -1,6 +1,7 @@
 // Watches the server and raises/resolves incidents. Runs inside the panel,
 // started once at server start (instrumentation.ts): every minute for disk,
 // crash loops and cron results; every 10 minutes for certificates.
+import { sampleMetrics } from "../metrics";
 import { agent, type SystemInfo } from "../agent";
 import { boxConfig } from "../box";
 import { checkCertificate } from "../cert";
@@ -121,6 +122,7 @@ export async function tick(): Promise<void> {
       await check().catch((err) => console.error(`monitor: ${name} check failed:`, (err as Error).message));
     }
     await checkBackups().catch((err) => console.error("monitor: backup check failed:", (err as Error).message));
+    await sampleMetrics().catch((err) => console.error("monitor: metrics failed:", (err as Error).message));
     if (Date.now() - state.lastCertCheck > CERT_EVERY_MS) {
       state.lastCertCheck = Date.now();
       await checkCertificates().catch((err) => console.error("monitor: certificate check failed:", (err as Error).message));

@@ -6,6 +6,7 @@ import { serverStats, type ServerStats } from "@/app/actions/server";
 import { Icon } from "../icon";
 import { Modal } from "../modal";
 import { Skeleton, StatusDot, cx } from "../ui";
+import { UsageChart } from "../usage-chart";
 
 /** Opens the server modal from anywhere (the sidebar, the Projects header). */
 export const openServerModal = () => window.dispatchEvent(new Event("layer:server"));
@@ -49,7 +50,7 @@ export function ServerModal({ name }: { name: string }) {
     const onOpen = () => {
       setOpen(true);
       setStats(null);
-      serverStats().then(setStats, () => setStats({ info: null, apps: [] }));
+      serverStats().then(setStats, () => setStats({ info: null, apps: [], usage: [] }));
     };
     window.addEventListener("layer:server", onOpen);
     return () => window.removeEventListener("layer:server", onOpen);
@@ -88,6 +89,7 @@ export function ServerModal({ name }: { name: string }) {
             <Stat odd label="Disk" value={`${(info.diskGb.total - info.diskGb.free).toFixed(1)} GB`} small={`of ${info.diskGb.total}`} meter={(info.diskGb.total - info.diskGb.free) / info.diskGb.total} detail={`${info.diskGb.free} GB free`} />
             <Stat label="Uptime" value={formatUptime(info.uptimeSec)} detail={`Caddy ${info.caddy} · agent ${info.agentVersion}`} />
           </div>
+          <ServerCharts usage={stats.usage} />
           {stats.apps.length > 0 && (
             <div className="pb-3">
               <p className="px-6 pb-2 pt-4 text-[13px] text-dim">Memory by app</p>
@@ -112,5 +114,16 @@ export function ServerModal({ name }: { name: string }) {
         </>
       )}
     </Modal>
+  );
+}
+
+/** The box over the last day: CPU and memory, sampled every minute by the panel. */
+function ServerCharts({ usage }: { usage: ServerStats["usage"] }) {
+  const [now] = useState(() => Date.now());
+  return (
+    <div className="grid gap-5 border-t border-border px-6 py-4 sm:grid-cols-2">
+      <UsageChart title="CPU, last 24 hours" unit="%" points={usage.map((p) => ({ at: p.at, value: p.cpu }))} from={now - 86_400_000} to={now} gapMs={15 * 60_000} />
+      <UsageChart title="Memory, last 24 hours" unit="MB" points={usage.map((p) => ({ at: p.at, value: p.memoryMb }))} from={now - 86_400_000} to={now} gapMs={15 * 60_000} />
+    </div>
   );
 }
