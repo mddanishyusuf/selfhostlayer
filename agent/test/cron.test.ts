@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, readlinkSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { appActions } from "../src/actions/app.ts";
@@ -78,6 +78,15 @@ describe("cron actions", () => {
     await expect(run("cron.delete", { slug: "piqo", name: "sync" })).rejects.toMatchObject({ code: "not_found" });
     await run("app.delete", { slug: "piqo", keepData: false });
     expect(existsSync(join(env.paths.systemdDir, "app-piqo-cron-report.timer"))).toBe(false);
+  });
+
+  it("deleting a job forgets its last run, so a new job with the same name doesn't fire at once", async () => {
+    await run("cron.write", job);
+    mkdirSync(env.paths.timerStampDir, { recursive: true });
+    const stamp = join(env.paths.timerStampDir, "stamp-app-piqo-cron-sync.timer");
+    writeFileSync(stamp, "");
+    await run("cron.delete", { slug: "piqo", name: "sync" });
+    expect(existsSync(stamp)).toBe(false);
   });
 
   it("cron.run starts the service without waiting", async () => {

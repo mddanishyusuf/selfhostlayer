@@ -25,6 +25,8 @@ export interface Paths {
   restoreDir: string;
   /** Files in restoreDir must belong to this user (the panel's). null skips the check (tests). */
   panelUser: string | null;
+  /** Where systemd keeps Persistent= timer stamps (stamp-<unit>.timer). */
+  timerStampDir: string;
   /** Node with node:sqlite, for jobs the agent runs as app users. */
   runtimeNode: string;
   /** Supplementary group for every app user. */
@@ -52,6 +54,7 @@ export const DEFAULT_PATHS: Paths = {
   restoreDir: "/var/lib/layer/restore",
   panelUser: "layer",
   runtimeNode: "/opt/layer/runtime/bin/node",
+  timerStampDir: "/var/lib/systemd/timers",
   appsGroup: "layer-apps",
   nodeDistBase: "https://nodejs.org/dist",
   portRange: { min: 4000, max: 4999 },

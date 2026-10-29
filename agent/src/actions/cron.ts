@@ -8,7 +8,7 @@ import type { ActionTable, Context, Params } from "../context.ts";
 import { parseCronHistory, type JournalEntry } from "../cron-history.ts";
 import { ActionError } from "../errors.ts";
 import { BIN } from "../exec.ts";
-import { ensureDir, writeFileAtomic } from "../fsutil.ts";
+import { childOf, ensureDir, writeFileAtomic } from "../fsutil.ts";
 import { assertCalendar, assertCronName, cronUnit, renderCronService, renderCronTimer } from "../templates/cron-unit.ts";
 import { appLayout } from "./app.ts";
 
@@ -62,6 +62,10 @@ export async function removeCronUnits(ctx: Context, slug: string, name: string):
   await ctx.exec(BIN.systemctl, ["disable", "--now", `${unit}.timer`], { allowFail: true });
   await ctx.exec(BIN.systemctl, ["stop", `${unit}.service`], { allowFail: true });
   for (const f of files) rmSync(f, { force: true });
+  // The timer is Persistent=, so systemd remembers its last run in a stamp
+  // file that outlives the unit. Left behind, a job recreated under the same
+  // name would count every slot since then as missed and run at once.
+  rmSync(childOf(ctx.paths.timerStampDir, `stamp-${unit}.timer`), { force: true });
   await ctx.exec(BIN.systemctl, ["daemon-reload"]);
   await ctx.exec(BIN.systemctl, ["reset-failed", `${unit}.service`], { allowFail: true });
   return true;

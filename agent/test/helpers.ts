@@ -96,6 +96,7 @@ export function testEnv(): TestEnv {
     stagingDir: join(root, "var", "lib", "layer-staging"),
     restoreDir: join(root, "var", "lib", "layer", "restore"),
     panelUser: null,
+    timerStampDir: join(root, "var", "lib", "systemd", "timers"),
     // High range, so the real isPortFree check doesn't collide with dev servers.
     portRange: { min: 46000, max: 46099 },
     // Tests must not depend on how full the developer's disk is.
