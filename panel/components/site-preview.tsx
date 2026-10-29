@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { sitePreview } from "@/lib/preview";
+import { projectIconUrl } from "@/lib/site-icon";
 import { Mark, Skeleton, cx } from "./ui";
 
 /** The page at link-preview proportions (1200×630), opening the site when there is one. */
@@ -16,7 +17,7 @@ function Frame({ host, href, children }: { host: string; href?: string; children
 
 const Card = ({ slug, index, title, text }: { slug: string; index: number; title: ReactNode; text?: ReactNode }) => (
   <div className="absolute inset-0 grid place-content-center justify-items-center gap-2 px-8 text-center">
-    <Mark name={slug} index={index} />
+    <Mark name={slug} index={index} icon={projectIconUrl(slug)} />
     <p className="text-[15px] font-semibold">{title}</p>
     {text && <p className="line-clamp-2 max-w-[340px] text-[12.5px] text-muted">{text}</p>}
   </div>

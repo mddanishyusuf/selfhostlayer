@@ -12,6 +12,7 @@ import { listBackups } from "@/lib/backup/runner";
 import { listProjects } from "@/lib/projects";
 import { serviceStatus, type ServiceStatus } from "@/lib/services";
 import { requireUser } from "@/lib/session";
+import { projectIconUrl } from "@/lib/site-icon";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Databases" };
@@ -19,7 +20,7 @@ export const metadata = { title: "Databases" };
 function Instance({ slug, index, name, detail, ok, url }: { slug: string; index: number; name: string; detail: ReactNode; ok: boolean; url?: string }) {
   return (
     <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-3.5 border-t border-border py-3.5 pl-4 pr-4 sm:pr-7 md:pl-[82px]">
-      <Mark name={slug} index={index} size="sm" />
+      <Mark name={slug} index={index} size="sm" icon={projectIconUrl(slug)} />
       <div className="grid min-w-0 gap-0.5">
         <div className="flex min-w-0 items-center gap-2 text-[15px] font-semibold">
           {slug} <code className="truncate font-mono text-[13px] font-normal text-muted">{name}</code>

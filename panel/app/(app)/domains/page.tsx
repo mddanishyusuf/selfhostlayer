@@ -7,6 +7,7 @@ import { listIncidents } from "@/lib/alerts/engine";
 import { listAllDomains, type ProjectDomain } from "@/lib/domains";
 import { listProjects } from "@/lib/projects";
 import { requireUser } from "@/lib/session";
+import { projectIconUrl } from "@/lib/site-icon";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Domains" };
@@ -66,7 +67,7 @@ export default async function AllDomainsPage({ searchParams }: { searchParams: P
                 key={p.id}
                 href={`/projects/${p.slug}/domains`}
                 data-testid={`domains-${p.slug}`}
-                lead={<Mark name={p.slug} index={index} />}
+                lead={<Mark name={p.slug} index={index} icon={projectIconUrl(p.slug)} />}
                 title={<span className="truncate">{p.slug}</span>}
                 sub={
                   problems.length ? (

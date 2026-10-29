@@ -1,6 +1,7 @@
 import { AlertCircleIcon, Layers01Icon } from "@hugeicons/core-free-icons";
 import type { ComponentProps, ReactNode } from "react";
 import { Icon } from "./icon";
+import { SiteIcon } from "./site-icon";
 
 const cx = (...parts: (string | false | null | undefined)[]) => parts.filter(Boolean).join(" ");
 export { cx };
@@ -149,8 +150,9 @@ const MARK_CLASS: Record<(typeof MARK_COLORS)[number], string> = {
   rose: "bg-rose/18 text-rose",
   foreground: "bg-foreground/12 text-foreground",
 };
-export function Mark({ name, index, size = "md" }: { name: string; index: number; size?: "sm" | "md" }) {
-  return (
+/** A project's mark: its first letter on its color, or its site's favicon when given (lib/site-icon). */
+export function Mark({ name, index, size = "md", icon }: { name: string; index: number; size?: "sm" | "md"; icon?: string }) {
+  const letter = (
     <span
       className={cx(
         "grid shrink-0 place-items-center font-bold uppercase",
@@ -162,4 +164,5 @@ export function Mark({ name, index, size = "md" }: { name: string; index: number
       {name.slice(0, 1)}
     </span>
   );
+  return icon ? <SiteIcon src={icon} size={size} fallback={letter} /> : letter;
 }

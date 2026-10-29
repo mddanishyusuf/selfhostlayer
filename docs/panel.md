@@ -8,7 +8,7 @@ The sidebar has two modes. Outside a project it lists the server's pages. Inside
 
 ## Projects
 
-All your projects, with their status, last deploy and address. Search and **New project** are in the bar under the header. The server button in the header opens CPU, memory and disk for the whole server, with the last 24 hours charted and memory by app.
+All your projects, with their status, last deploy and address. A project whose own domain is live shows that site's favicon instead of its letter. The panel fetches it from Google's favicon service once a day, so your browser only ever talks to the panel. Search and **New project** are in the bar under the header. The server button in the header opens CPU, memory and disk for the whole server, with the last 24 hours charted and memory by app.
 
 ### New project
 1. Pick a repository from your GitHub App's installations, or paste a public GitHub URL.
