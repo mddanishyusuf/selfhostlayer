@@ -241,7 +241,8 @@ async function buildRun(params: Params, ctx: Context, io: CallIO) {
     LAYER_CACHE: cache,
     LAYER_PM: pm,
     npm_config_cache: join(cache, "npm"),
-    npm_config_store_dir: join(cache, "pnpm-store"),
+    // pnpm's store, for pnpm only: npm warns about a setting it doesn't know.
+    ...(pm === "pnpm" ? { npm_config_store_dir: join(cache, "pnpm-store") } : {}),
     npm_config_update_notifier: "false",
     npm_config_fund: "false",
     npm_config_audit: "false",

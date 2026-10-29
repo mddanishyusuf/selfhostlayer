@@ -6,9 +6,12 @@ CADDY_KEY_FPR="65760C51EDEA2017CEA2CA15155B6D79CA56EA34"
 CADDY_KEYRING="/usr/share/keyrings/caddy-stable-archive-keyring.gpg"
 CADDY_LIST="/etc/apt/sources.list.d/caddy-stable.list"
 
+# build-essential (make, g++): npm compiles native modules like better-sqlite3
+# with node-gyp when no prebuilt binary matches the app's Node version.
 PACKAGES=(
   ca-certificates curl gnupg xz-utils unzip jq sqlite3
   ufw fail2ban python3-systemd unattended-upgrades
+  build-essential
   caddy
 )
 

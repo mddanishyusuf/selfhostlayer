@@ -50,6 +50,7 @@ check "/srv/static 711 root:root" mode_is /srv/static "711 root:root"
 
 echo "Services"
 check "caddy active" active caddy
+check "make and g++ for native modules" test -x /usr/bin/make -a -x /usr/bin/g++
 check "fail2ban active" active fail2ban
 check "fail2ban sshd jail watches ssh.service and sshd-session" \
   grep -q "sshd-session" <<<"$(fail2ban-client get sshd journalmatch)"
