@@ -41,3 +41,41 @@
 - **`backup.restore`** only reads a plain file owned by the panel user from `/var/lib/layer/restore/` (opened with `O_NOFOLLOW`; symlinks and root-owned files are refused). It stops the running colors, unpacks next to `data/` as the app user (a broken archive changes nothing), swaps the folders, keeps the replaced one as `data.before-restore-<time>` (only the latest), and starts the app again even if the restore failed.
 - **`backup.discard`** removes a staged file after upload.
 - **Every app and cron gets `DATA_DIR`**, and the units load `services.env` (for Day 4–5) before the user's `app.env`.
+
+## Day 2–6 result (2026-10-29)
+**Week 4 done.** The VM browser tour passes end to end: deploy → visits in SQLite → connect storage → save the recovery key → Back up now → more visits → Restore (5 visits → 3) → Back up everything (the panel too) → Add Redis (the app counts visits in it) → Add Postgres → the next backup includes a `pg_dump`. The e2e suites pass in the VM (`backup-e2e.sh`, `redis-e2e.sh` 20 checks, `postgres-e2e.sh` 21 checks), and `backup-e2e.sh` also passes on the Ubuntu 26.04 VPS. Deployed to the VPS (272MB RAM used, the user's app untouched). Nothing is installed there until someone clicks Add Redis/Postgres.
+
+**Backups (Days 2–3)**
+- **S3 client** (`panel/lib/backup/s3.ts`): SigV4 matches AWS's published examples. It does put/get/delete, paginated ListObjectsV2, and multipart uploads in 16MB parts (aborted on failure). Path-style URLs; queries are encoded by hand so they match what's signed. `panel/scripts/fake-s3.ts` verifies every signature and body hash and pages listings two at a time.
+- **Encryption** (`crypt.ts`): `LAYERBK1` + salt, a per-file key from HKDF(recovery key, salt), AES-256-GCM over 1MB chunks with the chunk counter in the nonce and a last-chunk flag in the AAD. A wrong key, a flipped byte and a cut at a chunk boundary are all rejected (tested). Recovery keys look like `lbk1-<43 chars>`.
+- **Settings → Backups:** pick a provider (R2, B2, AWS S3, Hetzner, other). "Connect" only saves after a test object is written, read, listed and deleted. The recovery key is shown until you tick "I saved it", and backups stay off until then. Schedule (hour, keep N), recent backups, "Back up everything now".
+- **Runs** (`runner.ts`): one at a time (queue on `globalThis`). The agent stages a snapshot, the panel streams it through encryption into a multipart upload, records size and contents, discards the staged file, and prunes past the retention count. Objects go to `<folder>/<panel host>/<app>/<time>-<id>.tar.gz.enc`. The panel's own backup is `panel.db` (a consistent `node:sqlite` copy) plus `secret.key`, written with a small JS tar writer: the panel's sandbox can't run GNU tar on 26.04.
+- **Restore:** type the app name. The panel downloads, decrypts and verifies the whole file into `/var/lib/layer/restore/` before the agent touches anything.
+- **Alerts:** `backup:<app>` on a failed backup, `backup-overdue:<app>` after 26 hours without a successful one. The daily run starts from the monitor at the chosen hour. Backups that were running when the panel restarted are marked as interrupted.
+- **Bug fixed on the way:** the agent dropped any connection quiet for 5 minutes, even mid-action. A silent snapshot of a big folder would have been cut off. Now only idle connections time out.
+
+**Redis (Day 4)**
+- `service.install redis` (apt in its own transient unit, because the agent's `/usr` is read-only; it falls back to `valkey-server`) masks the package's shared instance.
+- `redis.add` gives each app its own `layer-redis-<slug>.service` on a port from 6400–6999 on 127.0.0.1. It has its own password and memory cap (`noeviction`) and runs as the app's user in the same sandbox, writing only `data/redis` (so `dump.rdb` is in the app's backups).
+- **The config reaches Redis on stdin** (`StandardInput=file:`, `redis-server -`). `redis.conf` stays root 600, and not even the app's user can read it. The first try failed because app users can't traverse `/etc/layer`; this is the better design anyway.
+- Checked: another app's password is refused, unauthenticated access gets NOAUTH, `CONFIG SET dir` is refused, it listens on 127.0.0.1 only, and data survives a restart.
+
+**Postgres (Day 5)**
+- `service.install postgres` installs it (16 on 24.04) with `conf.d/layer.conf` set for small boxes: 127.0.0.1 only, SCRAM, 50 connections, shared_buffers RAM/16.
+- `postgres.add` creates the role and database `app_<slug>` (connection limit 20), revokes `CONNECT` from PUBLIC, and checks the new credentials over TCP. Another app's role can't connect, and app roles aren't superusers.
+- **Backups:** the snapshot job gets `DATABASE_URL` from `services.env` and a sandbox opened to localhost only (`IPAddressAllow=localhost`). It runs `pg_dump` with the app's own role, and the dump travels inside the same archive as `.layer-postgres.dump`. Restore runs `pg_restore --clean --single-transaction` the same way, then deletes the dump from `data/`.
+- `postgres.remove` and `app.delete` keep a final `pg_dump` in `/var/lib/layer-agent/archive` (root 600) unless told not to. The dump streams through a file descriptor, never through memory.
+- **Databases page:** SQLite files (from the last backup), Postgres and Redis cards with status, size, and masked connection URLs (Reveal, Copy). Add and Remove (type the app name) trigger a zero-downtime restart on the live build so the app gets the new URL.
+
+**Email alerts (Day 6)**
+- Our own SMTP client (`panel/lib/alerts/smtp.ts`): implicit TLS (465) or STARTTLS (587), AUTH PLAIN or LOGIN, base64 UTF-8 body, RFC 2047 subjects, dot-stuffing. Tested against a fake SMTP server. Plain SMTP is only allowed to a relay on the same machine.
+- The alert channel table was rebuilt to allow `email`.
+
+**Also:**
+- `scripts/dev-vm.sh fresh` gives a new panel and setup token without reinstalling, and syncs the VM clock, which drifts while the Mac sleeps and breaks TOTP.
+- The example Next.js app counts visits in SQLite (`/api/visits`) and Redis (`/api/redis`).
+- CI now runs the three new e2e suites and the backups, Redis and Postgres tour sections, with the fake S3 on the runner.
+
+**Needs from the user (optional):**
+- A real bucket (Cloudflare R2's free tier is enough), to connect under Backups on the VPS panel.
+- An SMTP sender (for example Resend) for email alerts.
