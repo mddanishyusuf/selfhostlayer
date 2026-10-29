@@ -329,6 +329,66 @@ if (process.env.TOUR_DEPLOY === "1") {
   console.log("  ✓ Run now: succeeded as the app, with its env var in the output");
   await screenshot("cron-runs");
 
+  // TOUR_ALERTS=1: needs the test receiver (installer/test/alert-receiver.sh) at https://hook.internal.
+  if (process.env.TOUR_ALERTS === "1") {
+    console.log("Alerts");
+    const hookLog = async () => {
+      await go("https://hook.internal/log");
+      await sleep(500);
+      return String(await evaluate("document.body?.innerText ?? ''"));
+    };
+    const waitForHook = async (text: string, what: string, timeoutMs = 150_000) => {
+      const deadline = Date.now() + timeoutMs;
+      let log = "";
+      while (Date.now() < deadline) {
+        log = await hookLog();
+        if (log.includes(text)) return;
+        await sleep(5000);
+      }
+      throw new Error(`no webhook with "${text}" (${what}) within ${timeoutMs / 1000}s. Received:\n${log.slice(-800)}`);
+    };
+    await go("/settings/alerts");
+    await waitForPath("/settings/alerts");
+    await evaluate(`[...document.querySelectorAll('button[role=radio]')].find((b) => b.textContent === "Webhook").click(), true`);
+    await waitFor(`!!document.querySelector("#url")`, "webhook fields");
+    await fill("#url", "https://hook.internal/in");
+    await fill("#secret", "tour-secret");
+    await click("form:has(#url) button[type=submit]");
+    await waitFor(`document.body.innerText.includes("A test message is on its way") || document.body.innerText.includes("test message failed")`, "channel saved", 30_000);
+    if (String(await evaluate("document.body.innerText")).includes("test message failed")) throw new Error(String(await evaluate(`document.querySelector('[role=alert]')?.innerText`)));
+    await waitForHook("Alerts from Self Host Layer are set up", "test message");
+    console.log("  ✓ webhook channel saved; its signed test message arrived");
+
+    // A failing cron job → one alert; fixed → one recovery message.
+    await go("/projects/next/crons");
+    await waitForPath("/projects/next/crons");
+    await fill("#name", "fails");
+    await setValue("#schedule", "@daily");
+    await fill("#command", "node -e process.exit(4)");
+    await click("form:has(#command) button[type=submit]");
+    await waitFor(`document.body.innerText.includes("Saved fails")`, "failing cron saved", 60_000);
+    await evaluate(`[...document.querySelectorAll("a")].find((a) => a.querySelector("p")?.textContent === "fails")?.closest("div").querySelector('button[title="Run now"]').click(), true`);
+    await waitForHook("Cron job failed: next/fails", "cron failure alert");
+    console.log("  ✓ a failed cron run raised an alert");
+    await go("/settings/alerts");
+    await waitForPath("/settings/alerts");
+    if (!(await evaluate(`!!document.querySelector('a[href="/settings/alerts"] span.bg-err')`))) throw new Error("the bell doesn't show an open incident");
+    console.log("  ✓ the bell shows the open incident");
+    await screenshot("alerts-open");
+    await go("/projects/next/crons");
+    await waitForPath("/projects/next/crons");
+    await fill("#name", "fails");
+    await setValue("#schedule", "@daily");
+    await fill("#command", "node -e process.exit(0)");
+    await click("form:has(#command) button[type=submit]");
+    await waitFor(`document.body.innerText.includes("Saved fails")`, "fixed cron saved", 60_000);
+    await evaluate(`[...document.querySelectorAll("a")].find((a) => a.querySelector("p")?.textContent === "fails")?.closest("div").querySelector('button[title="Run now"]').click(), true`);
+    await waitForHook('"event":"resolved","key":"cron:next:fails"', "cron recovery");
+    const log = await hookLog();
+    if ((log.match(/Cron job failed: next\/fails/g) ?? []).length !== 2) throw new Error("expected exactly one alert and one recovery for the cron job");
+    console.log("  ✓ the next successful run sent exactly one recovery message");
+  }
+
   // TOUR_DOMAIN: a host whose public DNS points at the box (e.g. shop.<ip-with-dashes>.sslip.io).
   const tourDomain = process.env.TOUR_DOMAIN;
   if (tourDomain) {

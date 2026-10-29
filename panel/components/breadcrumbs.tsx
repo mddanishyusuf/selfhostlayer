@@ -20,6 +20,8 @@ export function Breadcrumbs() {
     crumbs.push({ label: `Deployment #${parts[1]}` });
   } else if (parts[0] === "new") {
     crumbs.push({ label: "New project" });
+  } else if (parts[0] === "settings" && parts[1] === "alerts") {
+    crumbs.push({ label: "Alerts" });
   } else if (parts[0] === "github") {
     crumbs.push({ label: "GitHub" });
   }

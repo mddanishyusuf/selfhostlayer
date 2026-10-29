@@ -13,6 +13,8 @@ export interface ProjectDomain {
   redirectTo: string | null;
   status: "pending" | "active";
   message: string | null;
+  /** When DNS was verified (seconds). */
+  verifiedAt: number | null;
 }
 
 interface Row {
@@ -23,9 +25,10 @@ interface Row {
   redirect_to: string | null;
   status: ProjectDomain["status"];
   message: string | null;
+  verified_at: number | null;
 }
 
-const fromRow = (r: Row): ProjectDomain => ({ id: r.id, projectId: r.project_id, host: r.host, role: r.role, redirectTo: r.redirect_to, status: r.status, message: r.message });
+const fromRow = (r: Row): ProjectDomain => ({ id: r.id, projectId: r.project_id, host: r.host, role: r.role, redirectTo: r.redirect_to, status: r.status, message: r.message, verifiedAt: r.verified_at });
 
 const HOST = /^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z][a-z0-9-]{0,61}[a-z0-9]$/;
 

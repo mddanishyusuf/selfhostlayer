@@ -141,6 +141,27 @@ const MIGRATIONS = [
      created_at INTEGER NOT NULL,
      UNIQUE (project_id, name)
    );`,
+  // Alerts: where to send them, and incidents (one open incident per key).
+  `CREATE TABLE alert_channels (
+     id INTEGER PRIMARY KEY,
+     kind TEXT NOT NULL CHECK (kind IN ('telegram', 'discord', 'webhook')),
+     name TEXT NOT NULL,
+     config_enc TEXT NOT NULL,
+     enabled INTEGER NOT NULL DEFAULT 1,
+     created_at INTEGER NOT NULL
+   );
+   CREATE TABLE alert_incidents (
+     id INTEGER PRIMARY KEY,
+     key TEXT NOT NULL,
+     title TEXT NOT NULL,
+     detail TEXT NOT NULL DEFAULT '',
+     link TEXT,
+     project_id INTEGER REFERENCES projects(id) ON DELETE SET NULL,
+     opened_at INTEGER NOT NULL,
+     resolved_at INTEGER,
+     notify_errors TEXT
+   );
+   CREATE UNIQUE INDEX alert_incidents_open ON alert_incidents (key) WHERE resolved_at IS NULL;`,
 ];
 
 function open(): DatabaseSync {

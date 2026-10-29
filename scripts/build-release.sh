@@ -30,6 +30,10 @@ cp "$root/panel/server.mjs" "$stage/web/panel/server.mjs"
 cp "$root/system/layer-agent.service" "$root/system/layer-panel.service" "$stage/system/"
 echo "$version" >"$stage/VERSION"
 
+# Next's file tracing copies test files and dev scripts into standalone output
+# despite outputFileTracingExcludes; they don't belong in a release.
+find "$stage/web" -path "*/node_modules" -prune -o \( -name "*.test.ts" -o -path "*/panel/scripts" \) -print0 | xargs -0 rm -rf
+
 # Never ship local dev state (DB, keys, tokens).
 if find "$stage" -name ".dev" -o -name "*.db" -o -name "secret.key" -o -name "setup-token" | grep -q .; then
   echo "refusing to package dev state:" >&2

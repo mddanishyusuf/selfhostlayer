@@ -1,12 +1,14 @@
-import { LogOut } from "lucide-react";
+import { Bell, LogOut } from "lucide-react";
 import Link from "next/link";
 import { logout } from "@/app/actions/auth";
 import { Breadcrumbs } from "@/components/breadcrumbs";
 import { Logo } from "@/components/ui";
+import { listIncidents } from "@/lib/alerts/engine";
 import { requireUser } from "@/lib/session";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const user = await requireUser();
+  const openIncidents = listIncidents().filter((i) => !i.resolvedAt).length;
   return (
     <div className="min-h-dvh">
       <header className="sticky top-0 z-10 border-b border-border bg-background/80 backdrop-blur">
@@ -21,7 +23,16 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             <Breadcrumbs />
           </div>
           <div className="flex items-center gap-1">
-            <span className="hidden text-[13px] text-muted sm:inline">{user.email}</span>
+            <Link
+              href="/settings/alerts"
+              title={openIncidents ? `${openIncidents} open incident${openIncidents === 1 ? "" : "s"}` : "Alerts"}
+              className="relative grid size-8 place-items-center rounded-md text-muted transition-colors duration-150 hover:bg-hover hover:text-foreground"
+            >
+              <Bell className="size-4" aria-hidden />
+              {openIncidents > 0 && <span className="absolute right-1.5 top-1.5 size-2 rounded-full bg-err" aria-hidden />}
+              <span className="sr-only">Alerts</span>
+            </Link>
+            <span className="hidden px-1 text-[13px] text-muted sm:inline">{user.email}</span>
             <form action={logout}>
               <button
                 type="submit"

@@ -12,6 +12,8 @@ import { agent } from "./agent";
 import { config } from "./config";
 import { db, now } from "./db";
 import { installationToken } from "./github";
+import { raise, resolve } from "./alerts/engine";
+import { boxConfig } from "./box";
 import { checkCertificate } from "./cert";
 import { syncCrons } from "./crons";
 import { servingConfig } from "./domains";
@@ -217,6 +219,26 @@ function finish(id: number, status: DeployStatus, error: string | null, color?: 
   update(id, { status, error, finished_at: now(), ...(color !== undefined ? { color } : {}) });
   cancelRequested.delete(id);
   events.emit(`status:${id}`, status);
+  void alertOnDeploy(id, status, error).catch((err) => console.error("deploy alert failed:", err));
+}
+
+/** A failed deploy opens an incident for its project; the next successful deploy resolves it. */
+async function alertOnDeploy(id: number, status: DeployStatus, error: string | null): Promise<void> {
+  const d = getDeployment(id);
+  const p = d ? getProject(d.projectId) : null;
+  if (!d || !p) return;
+  const key = `deploy:${p.id}`;
+  if (status === "failed") {
+    let link: string | null = null;
+    try {
+      link = `https://${boxConfig().panelHost}/deployments/${id}`;
+    } catch {
+      // no box config (dev)
+    }
+    await raise(key, { title: `Deploy failed: ${p.slug}`, detail: `${d.sha.slice(0, 7)}${d.commitMessage ? ` "${d.commitMessage}"` : ""}: ${error ?? "unknown error"}. The live version is unchanged.`, link, projectId: p.id });
+  } else if (status === "ready") {
+    await resolve(key, `Deployed ${d.sha.slice(0, 7)} successfully.`);
+  }
 }
 
 /** Active domains and redirects; the free host as a fallback for projects from before domains existed. */

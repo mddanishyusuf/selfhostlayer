@@ -43,7 +43,7 @@ export default async function DeploymentPage({ params }: { params: Promise<{ id:
           {!done && (
             <form action={cancel}>
               <input type="hidden" name="deploymentId" value={d.id} />
-              <SubmitButton pending="Cancelling…" className="h-8 w-auto bg-transparent px-3 text-[13px] text-foreground ring-1 ring-border hover:bg-hover">
+              <SubmitButton pending="Cancelling…" variant="secondary" className="h-8 w-auto px-3 text-[13px]">
                 Cancel
               </SubmitButton>
             </form>

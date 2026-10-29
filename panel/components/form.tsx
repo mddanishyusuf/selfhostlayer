@@ -4,12 +4,22 @@ import { flushSync, useFormStatus } from "react-dom";
 import { useRef, useState } from "react";
 import { Button, cx } from "./ui";
 
-export function SubmitButton({ children, pending: pendingLabel, className }: { children: React.ReactNode; pending: string; className?: string }) {
+export function SubmitButton({
+  children,
+  pending: pendingLabel,
+  className,
+  variant,
+}: {
+  children: React.ReactNode;
+  pending: string;
+  className?: string;
+  variant?: "primary" | "secondary";
+}) {
   const { pending } = useFormStatus();
   return (
     // Full width unless the caller sets a width (w-auto, w-32, …): both classes
     // at once would leave the winner to CSS order.
-    <Button type="submit" disabled={pending} className={cx(/(^|\s)w-/.test(className ?? "") ? "" : "w-full", className)}>
+    <Button type="submit" variant={variant} disabled={pending} className={cx(/(^|\s)w-/.test(className ?? "") ? "" : "w-full", className)}>
       {pending ? pendingLabel : children}
     </Button>
   );

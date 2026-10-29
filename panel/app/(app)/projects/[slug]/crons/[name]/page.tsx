@@ -18,7 +18,7 @@ export default async function CronRunsPage({ params }: { params: Promise<{ slug:
   const project = getProjectBySlug(slug);
   const cron = project ? getCron(project.id, name) : null;
   if (!project || !cron) notFound();
-  const runs = await cronHistory(project.slug, cron.name).catch(() => []);
+  const runs = await cronHistory(project.slug, cron.name, cron.createdAt).catch(() => []);
 
   return (
     <div className="mx-auto grid max-w-[760px] gap-6">

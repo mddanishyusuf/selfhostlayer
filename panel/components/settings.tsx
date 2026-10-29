@@ -42,7 +42,9 @@ function EnvEditor({ initial, error }: { initial: [string, string][]; error?: st
   const [rows, setRows] = useState<{ key: string; value: string }[]>(initial.length ? initial.map(([key, value]) => ({ key, value })) : [{ key: "", value: "" }]);
   const [reveal, setReveal] = useState(false);
   const [paste, setPaste] = useState("");
-  const set = (i: number, patch: Partial<{ key: string; value: string }>) => setRows(rows.map((r, j) => (j === i ? { ...r, ...patch } : r)));
+  // Functional updates: two changes before a re-render (autofill, a password
+  // manager filling name and value at once) must both survive.
+  const set = (i: number, patch: Partial<{ key: string; value: string }>) => setRows((prev) => prev.map((r, j) => (j === i ? { ...r, ...patch } : r)));
   const vars = Object.fromEntries(rows.filter((r) => r.key.trim()).map((r) => [r.key.trim(), r.value]));
 
   return (
@@ -53,7 +55,7 @@ function EnvEditor({ initial, error }: { initial: [string, string][]; error?: st
           <div key={i} className="grid grid-cols-[1fr_1.4fr_auto] gap-2">
             <Input aria-label="Name" placeholder="NAME" value={r.key} spellCheck={false} autoComplete="off" className="font-mono text-[13px]" onChange={(e) => set(i, { key: e.target.value.toUpperCase().replace(/[^A-Z0-9_]/g, "_") })} />
             <Input aria-label="Value" placeholder="value" value={r.value} type={reveal ? "text" : "password"} spellCheck={false} autoComplete="off" className="font-mono text-[13px]" onChange={(e) => set(i, { value: e.target.value })} />
-            <button type="button" title="Remove" onClick={() => setRows(rows.length > 1 ? rows.filter((_, j) => j !== i) : [{ key: "", value: "" }])} className="grid size-9 place-items-center rounded-md text-muted transition-colors duration-150 hover:bg-hover hover:text-foreground">
+            <button type="button" title="Remove" onClick={() => setRows((prev) => (prev.length > 1 ? prev.filter((_, j) => j !== i) : [{ key: "", value: "" }]))} className="grid size-9 place-items-center rounded-md text-muted transition-colors duration-150 hover:bg-hover hover:text-foreground">
               <Trash2 className="size-4" aria-hidden />
               <span className="sr-only">Remove</span>
             </button>
@@ -61,7 +63,7 @@ function EnvEditor({ initial, error }: { initial: [string, string][]; error?: st
         ))}
       </div>
       <div className="flex flex-wrap items-center gap-2">
-        <Button type="button" variant="secondary" className="h-8 px-3 text-[13px]" onClick={() => setRows([...rows, { key: "", value: "" }])}>
+        <Button type="button" variant="secondary" className="h-8 px-3 text-[13px]" onClick={() => setRows((prev) => [...prev, { key: "", value: "" }])}>
           <Plus className="size-3.5" aria-hidden /> Add variable
         </Button>
         <Button type="button" variant="ghost" className="h-8 px-3 text-[13px]" onClick={() => setReveal(!reveal)}>
@@ -78,9 +80,11 @@ function EnvEditor({ initial, error }: { initial: [string, string][]; error?: st
             className="h-8 justify-self-start px-3 text-[13px]"
             onClick={() => {
               const parsed = parseDotEnv(paste);
-              const merged = new Map(rows.filter((r) => r.key).map((r) => [r.key, r.value]));
-              for (const [k, v] of Object.entries(parsed)) merged.set(k, v);
-              setRows([...merged].map(([key, value]) => ({ key, value })));
+              setRows((prev) => {
+                const merged = new Map(prev.filter((r) => r.key).map((r) => [r.key, r.value]));
+                for (const [k, v] of Object.entries(parsed)) merged.set(k, v);
+                return [...merged].map(([key, value]) => ({ key, value }));
+              });
               setPaste("");
             }}
           >

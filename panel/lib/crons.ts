@@ -14,6 +14,7 @@ export interface Cron {
   schedule: string;
   command: string;
   timeoutSec: number;
+  createdAt?: number;
 }
 
 interface Row {
@@ -23,9 +24,10 @@ interface Row {
   schedule: string;
   command: string;
   timeout_sec: number;
+  created_at: number;
 }
 
-const fromRow = (r: Row): Cron => ({ id: r.id, projectId: r.project_id, name: r.name, schedule: r.schedule, command: r.command, timeoutSec: r.timeout_sec });
+const fromRow = (r: Row): Cron => ({ id: r.id, projectId: r.project_id, name: r.name, schedule: r.schedule, command: r.command, timeoutSec: r.timeout_sec, createdAt: r.created_at });
 
 export const CRON_NAME = /^[a-z][a-z0-9-]{0,30}$/;
 
@@ -122,7 +124,8 @@ export interface CronRun {
   output: string[];
 }
 
-export async function cronHistory(slug: string, name: string): Promise<CronRun[]> {
-  const res = await agent<{ runs: CronRun[] }>("cron.history", { slug, name, limit: 30 });
+/** Runs since the job was created here (older journal entries may belong to an earlier job with the same name). */
+export async function cronHistory(slug: string, name: string, since?: number): Promise<CronRun[]> {
+  const res = await agent<{ runs: CronRun[] }>("cron.history", { slug, name, limit: 30, ...(since ? { since } : {}) });
   return res.runs;
 }

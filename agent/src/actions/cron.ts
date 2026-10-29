@@ -104,12 +104,16 @@ async function cronList(params: Params, ctx: Context) {
     const unit = cronUnit(slug, name);
     const timerFile = readFileSync(join(ctx.paths.systemdDir, `${unit}.timer`), "utf8");
     const timer = props((await ctx.exec(BIN.systemctl, ["show", `${unit}.timer`, "-pNextElapseUSecRealtime", "-pLastTriggerUSec"], { allowFail: true })).stdout);
-    const service = props((await ctx.exec(BIN.systemctl, ["show", `${unit}.service`, "-pActiveState", "-pResult", "-pExecMainStatus"], { allowFail: true })).stdout);
+    const service = props(
+      (await ctx.exec(BIN.systemctl, ["show", `${unit}.service`, "-pActiveState", "-pResult", "-pExecMainStatus", "-pExecMainStartTimestamp"], { allowFail: true })).stdout,
+    );
     jobs.push({
       name,
       calendar: /^OnCalendar=(.+)$/m.exec(timerFile)?.[1] ?? "",
       nextRun: timer.NextElapseUSecRealtime || null,
-      lastRun: timer.LastTriggerUSec && timer.LastTriggerUSec !== "n/a" ? timer.LastTriggerUSec : null,
+      // The service's own start time covers both scheduled runs and "Run now"
+      // (a manual start doesn't update the timer's LastTriggerUSec).
+      lastRun: service.ExecMainStartTimestamp || (timer.LastTriggerUSec && timer.LastTriggerUSec !== "n/a" ? timer.LastTriggerUSec : null),
       running: service.ActiveState === "activating" || service.ActiveState === "active",
       lastResult: service.Result ?? null,
       lastExitStatus: service.ExecMainStatus !== undefined ? Number(service.ExecMainStatus) : null,
@@ -122,8 +126,16 @@ async function cronHistory(params: Params, ctx: Context) {
   const slug = assertSlug(params.slug);
   const name = assertCronName(params.name);
   const limit = assertInt(params.limit ?? 20, "limit", 1, 100);
+  // The journal outlives units: a job deleted and recreated under the same name
+  // (or a new app reusing a slug) would inherit old runs. `since` (unix
+  // seconds, the job's creation in the panel) hides those.
+  const since = params.since === undefined ? null : assertInt(params.since, "since", 0, 4_102_444_800);
   const unit = cronUnit(slug, name);
-  const { stdout } = await ctx.exec(BIN.journalctl, ["--no-pager", "--output=json", "--lines=5000", `--unit=${unit}.service`], { allowFail: true });
+  const { stdout } = await ctx.exec(
+    BIN.journalctl,
+    ["--no-pager", "--output=json", "--lines=5000", `--unit=${unit}.service`, ...(since !== null ? [`--since=@${since}`] : [])],
+    { allowFail: true },
+  );
   const entries = stdout
     .split("\n")
     .filter((l) => l.startsWith("{"))
