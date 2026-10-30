@@ -147,7 +147,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
                 "Domains",
                 <span key="d" className="flex flex-wrap gap-x-3 gap-y-1">
                   {hosts.map((d) => (
-                    <a key={d} href={`https://${d}`} className="text-lavender hover:underline">
+                    <a key={d} href={`https://${d}`} className="text-accent hover:underline">
                       {d}
                     </a>
                   ))}
@@ -249,7 +249,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
         head={
           <div className="flex items-end justify-between gap-4 px-4 pb-3.5 pt-[22px] sm:px-7">
             <h2 className="text-[15px] font-semibold">Recent deployments</h2>
-            <Link href={`/projects/${project.slug}/deployments`} className="text-[13px] text-lavender hover:underline">
+            <Link href={`/projects/${project.slug}/deployments`} className="text-[13px] text-accent hover:underline">
               View all
             </Link>
           </div>

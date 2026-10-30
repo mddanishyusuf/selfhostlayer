@@ -214,7 +214,7 @@ export function AppLogs({ slug }: { slug: string }) {
       live={live}
       label={live ? "Live" : "Stopped (reload to reconnect)"}
       fileName={`${slug}.log`}
-      toolbar={<input {...NO_AUTOFILL} value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Filter…" aria-label="Filter lines" className="mr-2 h-[30px] w-[220px] rounded-lg border border-border-strong bg-transparent px-2.5 text-[13px] outline-none placeholder:text-dim focus:border-lavender max-sm:w-[130px]" />}
+      toolbar={<input {...NO_AUTOFILL} value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Filter…" aria-label="Filter lines" className="mr-2 h-[30px] w-[220px] rounded-lg border border-border-strong bg-transparent px-2.5 text-[13px] outline-none placeholder:text-dim focus:border-accent max-sm:w-[130px]" />}
     />
   );
 }

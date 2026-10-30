@@ -1,7 +1,8 @@
 @import "tailwindcss";
 
-/* Design tokens: a warm near-black in dark, and in light the neutral grays of
-   the homepage (selfhostlayer.com), with one set of accent colors. The theme
+/* Design tokens: a neutral charcoal in dark (from SuperDev Pro's extension),
+   and in light the neutral grays of the homepage (selfhostlayer.com). Links
+   and focus rings use --accent; fields sit a step darker than the page. The theme
    comes from <html data-theme="dark|light|system">, set on the server from the
    layer-theme cookie, so pages never flash. */
 @theme inline {
@@ -19,7 +20,8 @@
   --color-track: var(--track);
   --color-border: var(--border);
   --color-border-strong: var(--border-strong);
-  --color-accent: var(--lavender);
+  --color-accent: var(--accent);
+  --color-field: var(--field);
   --color-inverse: var(--inverse);
   --color-inverse-fg: var(--inverse-fg);
   --color-ok: var(--teal);
@@ -61,6 +63,8 @@
   --teal: #0f766e;
   --blue: #2563eb;
   --rose: #dc2626;
+  --accent: #6e56cf;
+  --field: #ffffff;
   --on-rose: #ffffff;
   --inverse: #171717;
   --inverse-fg: #fafafa;
@@ -76,27 +80,29 @@
 
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --background: #1c1a19;
-  --sidebar: #191716;
-  --foreground: #ece8e3;
-  --muted: #9a948e;
-  --dim: #6f6964;
-  --border: #2e2a28;
-  --border-strong: #403b38;
-  --hover: #242120;
-  --selected: #35312f;
-  --pill: #4a4543;
-  --track: #3a3533;
-  --gold: #f2b35b;
-  --lavender: #b4a6f5;
-  --coral: #f0976b;
-  --teal: #7ccfc2;
-  --blue: #6c9ef0;
-  --rose: #f2777a;
-  --on-rose: #1c1a19;
-  --inverse: #ece8e3;
-  --inverse-fg: #1c1a19;
-  --code: #141211;
+  --background: #1e1e1e;
+  --sidebar: #171717;
+  --foreground: #f2f2f2;
+  --muted: #9c9c9c;
+  --dim: #686868;
+  --border: #2b2b2b;
+  --border-strong: #383838;
+  --hover: #242424;
+  --selected: #2e2e2e;
+  --field: #191919;
+  --pill: #383838;
+  --track: #333333;
+  --gold: #f5c451;
+  --lavender: #a78bfa;
+  --coral: #f5874a;
+  --teal: #6fdc8c;
+  --blue: #4f8ff7;
+  --rose: #ff6b6b;
+  --accent: #4f8ff7;
+  --on-rose: #141414;
+  --inverse: #f2f2f2;
+  --inverse-fg: #141414;
+  --code: #141414;
   --chart: #9180ec;
   --logo-tile: #ece8e3;
   --logo-edge: transparent;
@@ -107,27 +113,29 @@
 @media (prefers-color-scheme: dark) {
   :root[data-theme="system"] {
     color-scheme: dark;
-    --background: #1c1a19;
-    --sidebar: #191716;
-    --foreground: #ece8e3;
-    --muted: #9a948e;
-    --dim: #6f6964;
-    --border: #2e2a28;
-    --border-strong: #403b38;
-    --hover: #242120;
-    --selected: #35312f;
-    --pill: #4a4543;
-    --track: #3a3533;
-    --gold: #f2b35b;
-    --lavender: #b4a6f5;
-    --coral: #f0976b;
-    --teal: #7ccfc2;
-    --blue: #6c9ef0;
-    --rose: #f2777a;
-    --on-rose: #1c1a19;
-    --inverse: #ece8e3;
-    --inverse-fg: #1c1a19;
-    --code: #141211;
+    --background: #1e1e1e;
+    --sidebar: #171717;
+    --foreground: #f2f2f2;
+    --muted: #9c9c9c;
+    --dim: #686868;
+    --border: #2b2b2b;
+    --border-strong: #383838;
+    --hover: #242424;
+    --selected: #2e2e2e;
+    --field: #191919;
+    --pill: #383838;
+    --track: #333333;
+    --gold: #f5c451;
+    --lavender: #a78bfa;
+    --coral: #f5874a;
+    --teal: #6fdc8c;
+    --blue: #4f8ff7;
+    --rose: #ff6b6b;
+    --accent: #4f8ff7;
+    --on-rose: #141414;
+    --inverse: #f2f2f2;
+    --inverse-fg: #141414;
+    --code: #141414;
     --chart: #9180ec;
     --logo-tile: #ece8e3;
     --logo-edge: transparent;
@@ -150,7 +158,7 @@ body {
 }
 
 ::selection {
-  background: color-mix(in srgb, var(--lavender) 35%, transparent);
+  background: color-mix(in srgb, var(--accent) 35%, transparent);
 }
 
 @keyframes shimmer {
@@ -164,25 +172,6 @@ body {
 
 @keyframes ping {
   75%, 100% { transform: scale(2.4); opacity: 0; }
-}
-
-/* A highlight sweeping along a row's top edge while it builds. */
-@keyframes sweep {
-  from { background-position: -50% 0; }
-  to { background-position: 150% 0; }
-}
-
-.sweep-top::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: -1px;
-  height: 2px;
-  background: linear-gradient(90deg, transparent, var(--gold), transparent);
-  background-size: 40% 100%;
-  background-repeat: no-repeat;
-  animation: sweep 1.8s linear infinite;
 }
 
 /* Native select styled as a pill with a caret. */

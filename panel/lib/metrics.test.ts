@@ -8,7 +8,7 @@ import { describe, expect, it } from "vitest";
 process.env.LAYER_DB = join(mkdtempSync(join(tmpdir(), "layer-metrics-")), "panel.db");
 process.env.LAYER_FAKE_AGENT = "1";
 const { db } = await import("./db");
-const { cpuPercent, history, latestDisk, rollUp, sampleMetrics } = await import("./metrics");
+const { cpuPercent, history, latestDisk, latestUsage, rollUp, sampleMetrics } = await import("./metrics");
 
 const HOUR = 3_600_000;
 const insert = (target: string, at: number, cpu: number | null, mem: number | null, disk: number | null = null) =>
@@ -53,6 +53,16 @@ describe("rollUp and history", () => {
     expect(history("piqo", "7d", now).map((p) => p.cpu)).toContain(15);
     expect(latestDisk("piqo")).toBe(310);
     expect(history("nobody", "24h", now)).toEqual([]);
+  });
+
+  it("gives each app's latest sample, and nothing for an app that stopped reporting", () => {
+    insert("piqo", now - 3 * 60_000, 6, 230);
+    insert("piqo", now - 60_000, 7.25, 240.4);
+    insert("maillayer", now - 20 * 60_000, 4, 180);
+    const usage = latestUsage(now);
+    expect(usage.get("piqo")).toEqual({ cpu: 7.3, memoryMb: 240 });
+    expect(usage.has("maillayer")).toBe(false);
+    expect(usage.has("box")).toBe(false);
   });
 });
 

@@ -1,38 +1,137 @@
-import { Add01Icon, GitBranchIcon } from "@hugeicons/core-free-icons";
+import { Add01Icon, Clock01Icon, GitBranchIcon, GridViewIcon, Menu01Icon } from "@hugeicons/core-free-icons";
 import Link from "next/link";
+import { Suspense, type ReactNode } from "react";
 import { FilterBox, ServerButton } from "@/components/header-controls";
 import { Icon } from "@/components/icon";
-import { Dot, Empty, Notice, PageHeader, PillLink } from "@/components/page";
-import { DeployStatusBadge, timeAgo } from "@/components/status";
+import { Empty, Notice, PageHeader, PillLink } from "@/components/page";
+import { SitePreviewFrame, SitePreviewSkeleton } from "@/components/site-preview";
+import { timeAgo } from "@/components/status";
 import { Mark, StatusDot, cx } from "@/components/ui";
 import { agent, type SystemInfo } from "@/lib/agent";
 import { frameworkLabel } from "@/lib/detect";
-import { FINISHED, listDeployments, liveDeployment } from "@/lib/deploy";
+import { FINISHED, listDeployments, liveDeployment, type Deployment } from "@/lib/deploy";
 import { servingConfig } from "@/lib/domains";
 import { allRepos } from "@/lib/github-repos";
 import { getApp } from "@/lib/github-store";
-import { listProjects } from "@/lib/projects";
+import { latestUsage } from "@/lib/metrics";
+import { listProjects, type Project } from "@/lib/projects";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Projects" };
 
-export default async function ProjectsPage({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
-  const { q } = await searchParams;
+type State = "live" | "building" | "failed" | "idle";
+const STATE: Record<State, { dot: "ok" | "warn" | "err" | "idle"; label: string; color: string }> = {
+  live: { dot: "ok", label: "Ready", color: "text-teal" },
+  building: { dot: "warn", label: "Building", color: "text-gold" },
+  failed: { dot: "err", label: "Build failed", color: "text-rose" },
+  idle: { dot: "idle", label: "Not deployed", color: "text-muted" },
+};
+const FILTERS = [
+  ["all", "All"],
+  ["live", "Live"],
+  ["building", "Building"],
+  ["failed", "Failed"],
+] as const;
+type Filter = (typeof FILTERS)[number][0];
+
+// Project, latest deployment, resources, status. Narrower screens drop resources, then the deployment.
+const COLUMNS = "grid-cols-[20px_minmax(0,1fr)_auto] md:grid-cols-[20px_minmax(150px,1fr)_minmax(0,1.4fr)_150px] xl:grid-cols-[20px_minmax(170px,1.1fr)_minmax(0,1.6fr)_160px_150px]";
+
+/** A recessed track with the chosen option raised: links, so the server filters. */
+function Segmented({ items }: { items: { href: string; label: ReactNode; title?: string; count?: number; on: boolean }[] }) {
+  return (
+    <div className="inline-flex gap-0.5 rounded-md border border-border bg-field p-0.5">
+      {items.map((it) => (
+        <Link
+          key={it.href}
+          href={it.href}
+          title={it.title}
+          aria-label={it.title}
+          aria-current={it.on ? "true" : undefined}
+          scroll={false}
+          className={cx("inline-flex h-7 items-center gap-1.5 whitespace-nowrap rounded px-2.5 text-[13px] font-medium transition-colors duration-150", it.on ? "bg-selected text-foreground" : "text-muted hover:text-foreground")}
+        >
+          {it.label}
+          {it.count !== undefined && <span className="font-mono text-[11.5px] tabular-nums text-dim">{it.count}</span>}
+        </Link>
+      ))}
+    </div>
+  );
+}
+
+function Meter({ label, value, fraction, hot }: { label: string; value: string; fraction: number; hot: boolean }) {
+  return (
+    <div className="grid grid-cols-[28px_minmax(0,1fr)_48px] items-center gap-2 text-[11.5px] text-dim">
+      {label}
+      <span className="h-1 overflow-hidden rounded-sm bg-track">
+        <span className={cx("block h-full", hot ? "bg-gold" : "bg-muted")} style={{ width: `${Math.max(1, Math.min(100, fraction * 100))}%` }} />
+      </span>
+      <span className="text-right font-mono tabular-nums text-muted">{value}</span>
+    </div>
+  );
+}
+
+function Commit({ project, latest }: { project: Project; latest?: Deployment }) {
+  if (!latest) return <span className="text-[13.5px] text-dim">No deployments yet</span>;
+  return (
+    <div className="grid min-w-0 gap-1">
+      <span className="truncate text-[13.5px] text-foreground/85">{latest.commitMessage || `Commit ${latest.sha.slice(0, 7)}`}</span>
+      <span className="flex min-w-0 items-center gap-3 whitespace-nowrap text-[12.5px] text-dim">
+        <span className="inline-flex items-center gap-1.5">
+          <Icon icon={GitBranchIcon} size={14} />
+          {project.branch}
+        </span>
+        <code className="font-mono text-[12px]">{latest.sha.slice(0, 7)}</code>
+        <span className="inline-flex items-center gap-1.5">
+          <Icon icon={Clock01Icon} size={14} />
+          {timeAgo(latest.createdAt)}
+        </span>
+      </span>
+    </div>
+  );
+}
+
+function StateWord({ state }: { state: State }) {
+  const s = STATE[state];
+  return (
+    <span className={cx("inline-flex items-center gap-2 whitespace-nowrap text-[13.5px] font-medium", s.color)}>
+      <StatusDot status={s.dot} pulse={state === "building"} /> {s.label}
+    </span>
+  );
+}
+
+export default async function ProjectsPage({ searchParams }: { searchParams: Promise<{ q?: string; status?: string; view?: string }> }) {
+  const { q, status, view } = await searchParams;
   // Warm the New project list in the background, so it opens without waiting on GitHub.
   if (getApp()) void allRepos().catch(() => {});
   const all = listProjects();
   const term = q?.trim().toLowerCase();
-  const projects = term ? all.filter((p) => `${p.slug} ${p.domains.join(" ")} ${p.repoName}`.toLowerCase().includes(term)) : all;
+  const matching = term ? all.filter((p) => `${p.slug} ${p.domains.join(" ")} ${p.repoName}`.toLowerCase().includes(term)) : all;
   const info = await agent<SystemInfo>("system.info").catch(() => null);
-  const rows = projects.map((p) => {
+  const usage = latestUsage();
+  const rows = matching.map((p) => {
     const latest = listDeployments(p.id, 1)[0];
     const live = liveDeployment(p.id);
     const hosts = servingConfig(p.id).domains;
+    // A custom domain (not the free URL) is the one to show, once it's live.
     const host = hosts.find((h) => h !== p.domains[0]) ?? hosts[0] ?? p.domains[0];
     const building = !!latest && !FINISHED.includes(latest.status);
-    return { p, latest, live, host, building };
+    // A failed build is worth saying even while an older one still serves the site.
+    const state: State = building ? "building" : latest?.status === "failed" ? "failed" : live ? "live" : "idle";
+    return { p, latest, live, host, hosts, state };
   });
-  const deploying = rows.find((r) => r.building);
+  const filter: Filter = FILTERS.some(([k]) => k === status) ? (status as Filter) : "all";
+  const shown = filter === "all" ? rows : rows.filter((r) => r.state === filter);
+  const grid = view === "grid";
+  const deploying = rows.find((r) => r.state === "building");
+  const href = (next: { status?: Filter; view?: "grid" | "list" }) => {
+    const params = new URLSearchParams();
+    if (q) params.set("q", q);
+    const s = next.status ?? filter;
+    if (s !== "all") params.set("status", s);
+    if ((next.view ?? (grid ? "grid" : "list")) === "grid") params.set("view", "grid");
+    return params.size ? `/?${params}` : "/";
+  };
 
   return (
     <>
@@ -51,19 +150,29 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
           )
         }
       />
+      {deploying?.latest && (
+        <Notice lead="Building">
+          {deploying.p.slug} is deploying <code className="font-mono text-[13px]">{deploying.latest.sha.slice(0, 7)}</code> “{deploying.latest.commitMessage || "deployment"}”, started{" "}
+          {timeAgo(deploying.latest.createdAt)}.{" "}
+          <Link href={`/projects/${deploying.p.slug}/deployments/${deploying.latest.id}`} className="text-accent hover:underline">
+            View logs
+          </Link>
+        </Notice>
+      )}
       {all.length > 0 && (
-        <div className="flex items-center gap-2.5 border-b border-border px-4 py-3 sm:px-7">
-          <FilterBox placeholder="Search projects" className="flex-1" />
+        <div className="flex flex-wrap items-center gap-2 border-b border-border px-4 py-3.5 sm:px-7">
+          <FilterBox placeholder="Search projects, domains, repos" className="min-w-full flex-1 md:min-w-[200px]" />
+          <Segmented items={FILTERS.map(([k, label]) => ({ href: href({ status: k }), label, count: k === "all" ? rows.length : rows.filter((r) => r.state === k).length, on: filter === k }))} />
+          <Segmented
+            items={[
+              { href: href({ view: "list" }), label: <Icon icon={Menu01Icon} size={15} />, title: "List", on: !grid },
+              { href: href({ view: "grid" }), label: <Icon icon={GridViewIcon} size={15} />, title: "Grid", on: grid },
+            ]}
+          />
           <PillLink href="/new" primary>
             <Icon icon={Add01Icon} size={16} strokeWidth={2} /> New project
           </PillLink>
         </div>
-      )}
-      {deploying?.latest && (
-        <Notice lead="Building">
-          {deploying.p.slug} is deploying <code className="font-mono text-[13px]">{deploying.latest.sha.slice(0, 7)}</code> “{deploying.latest.commitMessage || "deployment"}”, started{" "}
-          {timeAgo(deploying.latest.createdAt)}.
-        </Notice>
       )}
 
       {all.length === 0 ? (
@@ -77,56 +186,78 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
           <p className="text-[17px] font-semibold text-foreground">No projects yet</p>
           <p>Connect GitHub to deploy your first app. Each one runs as its own sandboxed user.</p>
         </Empty>
+      ) : shown.length === 0 ? (
+        <Empty>{q ? `No projects match “${q}”.` : "No projects here."}</Empty>
+      ) : grid ? (
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-x-5 gap-y-7 px-4 py-5 sm:px-7" data-testid="project-list">
+          {shown.map(({ p, latest, live, host, hosts, state }) => (
+            <div key={p.id} className="grid content-start gap-3">
+              {host && (
+                <Suspense fallback={<SitePreviewSkeleton host={host} />}>
+                  <SitePreviewFrame slug={p.slug} framework={p.framework} deploymentId={live?.id ?? null} url={`https://${host}`} own={hosts.length ? hosts : p.domains} />
+                </Suspense>
+              )}
+              <Link href={`/projects/${p.slug}`} className="group grid gap-2.5">
+                <div className="flex min-w-0 items-center gap-3">
+                  <Mark framework={p.framework} bare />
+                  <div className="grid min-w-0 flex-1 gap-0.5">
+                    <b className="truncate text-[15px] font-semibold group-hover:underline">{p.slug}</b>
+                    <span className="truncate text-[13px] text-muted">{live && host ? host : "Not live yet"}</span>
+                  </div>
+                  <StateWord state={state} />
+                </div>
+                <Commit project={p} latest={latest} />
+              </Link>
+            </div>
+          ))}
+        </div>
       ) : (
-        <div className="border-b border-border" data-testid="project-list">
-          {rows.length === 0 && <Empty>No projects match “{q}”.</Empty>}
-          {rows.map(({ p, latest, live, host, building }) => {
-            // Worth saying even while an older build still serves the site.
-            const failed = latest?.status === "failed";
+        <section data-testid="project-list">
+          <div className={cx("hidden h-9 items-center gap-x-5 border-b border-border px-4 text-[12px] font-medium text-dim sm:px-7 md:grid", COLUMNS)}>
+            <span className="col-span-2">Project</span>
+            <span>Latest deployment</span>
+            <span className="hidden xl:block">Resources</span>
+            <span>Status</span>
+          </div>
+          {shown.map(({ p, latest, live, host, state }) => {
+            const isStatic = p.runtime.kind === "static";
+            const u = usage.get(p.slug);
             return (
               <Link
                 key={p.id}
                 href={`/projects/${p.slug}`}
-                className={cx(
-                  "relative grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-4 border-t border-border px-4 py-4 transition-colors duration-150 first:border-t-0 hover:bg-hover sm:px-7",
-                  building && "sweep-top",
-                )}
+                className={cx("grid items-center gap-x-5 border-b border-border px-4 py-[15px] transition-colors duration-150 hover:bg-hover sm:px-7", COLUMNS)}
               >
-                <Mark framework={p.framework} />
+                <Mark framework={p.framework} bare />
                 <div className="grid min-w-0 gap-[3px]">
-                  <div className="flex min-w-0 items-baseline gap-2.5">
-                    <b className="whitespace-nowrap text-[15.5px] font-semibold">{p.slug}</b>
-                    <span className="truncate text-[13.5px] text-muted max-sm:hidden">{live && host ? host : "Not live yet"}</span>
-                  </div>
-                  <div className="flex min-w-0 items-center gap-[7px] truncate whitespace-nowrap text-[13.5px] text-muted">
-                    {building && <span className="font-medium text-gold">Deploying</span>}
-                    {failed && <span className="font-medium text-rose">Build failed</span>}
-                    <span className="truncate text-foreground">{latest?.commitMessage || (latest ? `Commit ${latest.sha.slice(0, 7)}` : "No deployments yet")}</span>
-                    {latest && (
-                      <>
-                        <span className="contents max-md:hidden">
-                          <Dot />
-                          <Icon icon={GitBranchIcon} size={13} className="text-dim" />
-                          <span>{p.branch}</span>
-                          <Dot />
-                          <code className="font-mono text-[12.5px]">{latest.sha.slice(0, 7)}</code>
-                        </span>
-                        <Dot />
-                        <span>{timeAgo(latest.createdAt)}</span>
-                      </>
-                    )}
-                  </div>
+                  <b className="truncate text-[15px] font-semibold">{p.slug}</b>
+                  <span className={cx("truncate text-[13px]", live && host ? "text-muted" : "text-dim")}>{live && host ? host : "Not live yet"}</span>
                 </div>
-                <div className="grid justify-items-end gap-1">
-                  {latest ? <DeployStatusBadge status={building ? latest.status : live ? "ready" : latest.status} /> : <span className="text-[13.5px] text-muted">Not deployed</span>}
-                  <span className="whitespace-nowrap text-[12.5px] text-dim max-sm:hidden">
-                    {frameworkLabel(p.framework)} · {p.runtime.kind === "static" ? "static" : `Node ${p.nodeVersion}`}
+                <div className="hidden min-w-0 md:block">
+                  <Commit project={p} latest={latest} />
+                </div>
+                <div className="hidden xl:block">
+                  {isStatic ? (
+                    <span className="text-[12.5px] text-dim">Served by Caddy</span>
+                  ) : u && live ? (
+                    <div className="grid gap-[7px]">
+                      <Meter label="RAM" value={u.memoryMb === null ? "—" : `${u.memoryMb} MB`} fraction={(u.memoryMb ?? 0) / p.memoryMb} hot={(u.memoryMb ?? 0) / p.memoryMb > 0.75} />
+                      <Meter label="CPU" value={u.cpu === null ? "—" : `${Math.round(u.cpu)}%`} fraction={(u.cpu ?? 0) / 100} hot={(u.cpu ?? 0) > 50} />
+                    </div>
+                  ) : (
+                    <span className="text-[12.5px] text-dim">{live ? "No samples yet" : "Not running"}</span>
+                  )}
+                </div>
+                <div className="grid min-w-0 justify-items-end gap-1 md:justify-items-start">
+                  <StateWord state={state} />
+                  <span className="max-w-full truncate text-[12px] text-dim max-sm:hidden">
+                    {state === "failed" && live ? `Still serving ${live.sha.slice(0, 7)}` : `${frameworkLabel(p.framework)} · ${isStatic ? "static" : `Node ${p.nodeVersion}`}`}
                   </span>
                 </div>
               </Link>
             );
           })}
-        </div>
+        </section>
       )}
     </>
   );

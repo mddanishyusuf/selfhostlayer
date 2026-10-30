@@ -82,7 +82,7 @@ export default async function DatabasesOverviewPage({ searchParams }: { searchPa
       <span className="flex flex-wrap items-center gap-1.5">
         <span className="text-muted">{lead}</span>
         {slugs.map((slug) => (
-          <Link key={slug} href={`/projects/${slug}/databases`} className="text-lavender hover:underline">
+          <Link key={slug} href={`/projects/${slug}/databases`} className="text-accent hover:underline">
             {slug}
           </Link>
         ))}

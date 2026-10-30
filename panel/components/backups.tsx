@@ -241,7 +241,7 @@ export function ImportData({ slug }: { slug: string }) {
   return (
     <div className="grid gap-3" data-testid="import-data">
       <div className="flex flex-wrap items-center gap-2">
-        <label className="inline-flex h-[34px] min-w-0 max-w-full cursor-pointer items-center gap-2 rounded-md border border-dashed border-border-strong px-3 text-[13px] text-muted transition-colors duration-150 hover:border-lavender hover:text-foreground">
+        <label className="inline-flex h-[34px] min-w-0 max-w-full cursor-pointer items-center gap-2 rounded-md border border-dashed border-border-strong px-3 text-[13px] text-muted transition-colors duration-150 hover:border-accent hover:text-foreground">
           <input
             type="file"
             name="archive"

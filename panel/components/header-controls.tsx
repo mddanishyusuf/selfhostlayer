@@ -32,7 +32,7 @@ export function FilterBox({ placeholder, param = "q", className }: { placeholder
   return (
     <label
       className={cx(
-        "flex h-[34px] min-w-0 items-center gap-2 rounded-md border border-border-strong px-3 text-dim transition-[border-color,box-shadow] duration-150 focus-within:border-lavender focus-within:shadow-[0_0_0_3px_color-mix(in_srgb,var(--lavender)_22%,transparent)]",
+        "flex h-[34px] min-w-0 items-center gap-2 rounded-md border border-border bg-field px-3 text-dim transition-[border-color,box-shadow] duration-150 focus-within:border-accent focus-within:shadow-[0_0_0_3px_color-mix(in_srgb,var(--accent)_20%,transparent)]",
         className,
       )}
     >

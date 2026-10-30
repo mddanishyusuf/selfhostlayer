@@ -46,7 +46,7 @@ export default async function NewProjectPage({ searchParams }: { searchParams: P
         back="/"
         meta="Pick a repository to deploy on this server"
         actions={
-          <a href={installUrl} className="text-[13px] text-lavender hover:underline">
+          <a href={installUrl} className="text-[13px] text-accent hover:underline">
             Adjust GitHub access
           </a>
         }

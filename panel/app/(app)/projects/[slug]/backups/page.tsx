@@ -46,7 +46,7 @@ export default async function ProjectBackupsPage({ params }: { params: Promise<{
       ) : (
         <Notice lead="Off">
           Backups aren&apos;t set up yet.{" "}
-          <Link href="/settings/backups" className="text-lavender hover:underline">
+          <Link href="/settings/backups" className="text-accent hover:underline">
             Connect a storage bucket
           </Link>{" "}
           to turn them on for every app.

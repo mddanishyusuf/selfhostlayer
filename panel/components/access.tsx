@@ -42,7 +42,7 @@ export function AccessForm({ allow, you }: { allow: string[]; you: string | null
             defaultValue={allow.length && allow.join(" ") !== TAILSCALE ? allow.join("\n") : (you ?? "")}
             placeholder={"203.0.113.7\n198.51.100.0/24"}
             aria-label="Allowed addresses"
-            className="w-full rounded-md border border-border-strong bg-transparent p-3 font-mono text-[13px] outline-none placeholder:text-dim focus:border-lavender"
+            className="w-full rounded-md border border-border bg-field p-3 font-mono text-[13px] outline-none placeholder:text-dim focus:border-accent"
           />
           <p className="text-[12.5px] text-dim">One per line: an IP, or a range like 203.0.113.0/24.{you ? ` You're on ${you} now.` : ""}</p>
         </div>

@@ -104,3 +104,16 @@ export function latestDisk(target: string): number | null {
   const row = db().prepare("SELECT disk_mb FROM metrics WHERE target = ? AND disk_mb IS NOT NULL ORDER BY at DESC LIMIT 1").get(target) as { disk_mb: number } | undefined;
   return row?.disk_mb ?? null;
 }
+
+/** Each app's latest minute sample from the last 5 minutes: what the projects list shows. */
+export function latestUsage(now = Date.now()): Map<string, Omit<Point, "at">> {
+  const rows = db()
+    .prepare(
+      `SELECT m.target, m.cpu, m.memory_mb FROM metrics m
+       JOIN (SELECT target, MAX(at) AS at FROM metrics WHERE step = 'minute' AND target != 'box' AND at >= ? GROUP BY target) l
+         ON l.target = m.target AND l.at = m.at
+       WHERE m.step = 'minute'`,
+    )
+    .all(now - 5 * MINUTE) as { target: string; cpu: number | null; memory_mb: number | null }[];
+  return new Map(rows.map((r) => [r.target, { cpu: r.cpu === null ? null : round(r.cpu), memoryMb: r.memory_mb === null ? null : Math.round(r.memory_mb) }]));
+}

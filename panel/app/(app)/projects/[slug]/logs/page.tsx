@@ -46,12 +46,12 @@ export default async function LogsPage({ params, searchParams }: { params: Promi
         meta={tab === "output" ? <code className="font-mono">journalctl -u &apos;app-{project.slug}@*&apos;</code> : <code className="font-mono">/var/log/caddy/{project.slug}.log</code>}
         actions={
           tab === "requests" ? (
-            <Link href={`${base}?tab=requests`} className="text-[13px] text-lavender hover:underline">
+            <Link href={`${base}?tab=requests`} className="text-[13px] text-accent hover:underline">
               Refresh
             </Link>
           ) : (
             latest && (
-              <a href={deploymentPath(project.slug, latest.id)} className="text-[13px] text-lavender hover:underline">
+              <a href={deploymentPath(project.slug, latest.id)} className="text-[13px] text-accent hover:underline">
                 Latest build log
               </a>
             )

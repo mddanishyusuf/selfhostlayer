@@ -87,7 +87,7 @@ export default async function DatabasesPage({ params, searchParams }: { params: 
           {n.quiet ? null : restart && /^\d+$/.test(restart) ? (
             <>
               Restarting {project.slug} on the same build so it gets the new connection URL:{" "}
-              <Link href={`/projects/${project.slug}/deployments/${restart}`} className="text-lavender hover:underline">
+              <Link href={`/projects/${project.slug}/deployments/${restart}`} className="text-accent hover:underline">
                 deployment #{restart}
               </Link>
               .
@@ -149,7 +149,7 @@ export default async function DatabasesPage({ params, searchParams }: { params: 
                   {sqlite.map((f) => (
                     <span key={f.path}>
                       <code className="font-mono text-[13px]">{f.path}</code> <span className="text-muted tabular-nums">· {formatBytes(f.bytes)} · checked</span>{" "}
-                      <Link href={`/projects/${project.slug}/databases/view?db=${encodeURIComponent(`sqlite:${f.path}`)}`} className="text-[13px] text-lavender hover:underline">
+                      <Link href={`/projects/${project.slug}/databases/view?db=${encodeURIComponent(`sqlite:${f.path}`)}`} className="text-[13px] text-accent hover:underline">
                         Browse
                       </Link>
                     </span>

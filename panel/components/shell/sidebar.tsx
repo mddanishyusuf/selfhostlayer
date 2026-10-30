@@ -171,7 +171,7 @@ function Nav(props: SidebarProps & { onNavigate?: () => void }) {
           props.onNavigate?.();
           openPalette();
         }}
-        className="mx-3 mb-1 mt-3 flex h-9 items-center gap-2.5 rounded-md border border-border px-2.5 text-left text-dim transition-colors hover:border-border-strong hover:text-muted"
+        className="mx-3 mb-1 mt-3 flex h-9 items-center gap-2.5 rounded-md border border-border bg-field px-2.5 text-left text-dim transition-colors hover:border-border-strong hover:text-muted"
       >
         <Icon icon={Search01Icon} size={16} />
         <span>Search</span>
@@ -194,16 +194,16 @@ function Nav(props: SidebarProps & { onNavigate?: () => void }) {
         </>
       )}
 
-      <nav className="flex-1 overflow-auto pb-3 pt-1.5" aria-label={project ? `${project.slug} navigation` : "Main navigation"}>
+      <nav className="flex-1 overflow-auto px-2 pb-3 pt-1.5" aria-label={project ? `${project.slug} navigation` : "Main navigation"}>
         {groups.map((group, gi) =>
           group.length === 0 ? null : (
             <div key={gi}>
-              {gi > 0 && (project ? <div className="my-2 h-px bg-border" /> : <p className="px-5 pb-1.5 pt-[18px] text-[12px] font-medium text-dim">Server</p>)}
+              {gi > 0 && (project ? <div className="mx-1 my-2 h-px bg-border" /> : <p className="px-3 pb-1.5 pt-[18px] text-[12px] font-medium text-dim">Server</p>)}
               {group.map((item) => {
                 const on = active(item, pathname);
                 const cls = cx(
-                  "relative flex h-[38px] items-center gap-3 px-5 text-sm transition-colors duration-150",
-                  on ? "bg-selected font-semibold text-foreground before:absolute before:inset-y-0 before:left-0 before:w-[3px] before:bg-foreground" : "text-muted hover:bg-hover hover:text-foreground",
+                  "flex h-9 items-center gap-3 rounded-md px-3 text-sm transition-colors duration-150",
+                  on ? "bg-selected font-medium text-foreground" : "text-muted hover:bg-hover hover:text-foreground",
                 );
                 const inner = (
                   <>

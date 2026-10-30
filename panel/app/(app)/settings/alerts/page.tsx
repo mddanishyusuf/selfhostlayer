@@ -57,7 +57,7 @@ export default async function AlertsPage() {
                 <>
                   <span className="whitespace-nowrap text-[13px] text-muted">{timeAgo(i.openedAt)}</span>
                   {i.link && (
-                    <a href={i.link} className="text-[13px] text-lavender hover:underline">
+                    <a href={i.link} className="text-[13px] text-accent hover:underline">
                       Open
                     </a>
                   )}

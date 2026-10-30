@@ -85,7 +85,7 @@ export function EnvEditor({ initial, error }: { initial: [string, string][]; err
             spellCheck={false}
             autoFocus
             placeholder={"DATABASE_URL=postgres://…\nAPI_KEY=…"}
-            className="w-full rounded-md border border-border-strong bg-transparent p-3 font-mono text-[13px] leading-relaxed outline-none placeholder:text-dim focus:border-lavender"
+            className="w-full rounded-md border border-border bg-field p-3 font-mono text-[13px] leading-relaxed outline-none placeholder:text-dim focus:border-accent"
           />
           <p className={cx("text-[12.5px]", bad.length ? "text-gold" : "text-dim")}>
             {bad.length

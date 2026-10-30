@@ -108,7 +108,7 @@ export function UsageChart({
         onFocus={() => setHover((h) => h ?? (values.length ? values.length - 1 : null))}
         onBlur={() => setHover(null)}
         onKeyDown={onKey}
-        className="relative h-[140px] cursor-crosshair rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-lavender/60"
+        className="relative h-[140px] cursor-crosshair rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
       >
         <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="absolute inset-0 size-full overflow-visible" aria-hidden>
           {[0, 0.5, 1].map((f) => (

@@ -6,7 +6,7 @@ import { stackLogo } from "./stack-logos";
 const cx = (...parts: (string | false | null | undefined)[]) => parts.filter(Boolean).join(" ");
 export { cx };
 
-const focus = "outline-none focus-visible:ring-2 focus-visible:ring-lavender/60 focus-visible:ring-offset-1 focus-visible:ring-offset-background";
+const focus = "outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-1 focus-visible:ring-offset-background";
 
 const VARIANTS = {
   primary: "border border-inverse bg-inverse text-inverse-fg hover:opacity-90",
@@ -53,7 +53,7 @@ export function Input({ className, ...props }: ComponentProps<"input">) {
   return (
     <input
       className={cx(
-        "h-[38px] w-full rounded-md border border-border-strong bg-transparent px-3 text-sm transition-[border-color,box-shadow] duration-150 placeholder:text-dim focus:border-lavender focus:shadow-[0_0_0_3px_color-mix(in_srgb,var(--lavender)_22%,transparent)]",
+        "h-[38px] w-full rounded-md border border-border bg-field px-3 text-sm transition-[border-color,box-shadow] duration-150 placeholder:text-dim focus:border-accent focus:shadow-[0_0_0_3px_color-mix(in_srgb,var(--accent)_20%,transparent)]",
         "outline-none aria-invalid:border-rose",
         className,
       )}
@@ -75,7 +75,7 @@ export function SecretInput({ reveal = false, className, ...props }: Omit<Compon
 export function Select({ className, ...props }: ComponentProps<"select">) {
   return (
     <select
-      className={cx("select-pill h-[38px] w-full rounded-md border border-border-strong bg-transparent pl-3 pr-8 text-sm outline-none focus:border-lavender", className)}
+      className={cx("select-pill h-[38px] w-full rounded-md border border-border bg-field pl-3 pr-8 text-sm outline-none focus:border-accent", className)}
       {...props}
     />
   );
@@ -164,10 +164,18 @@ export function Skeleton({ className }: { className?: string }) {
   );
 }
 
-/** A project's mark: the logo of its stack (its detected framework), in one color for every project. */
-export function Mark({ framework, size = "md" }: { framework: string; size?: "sm" | "md" }) {
+/** A project's mark: the logo of its stack (its detected framework), in one color for every project. Bare in lists: no tile. */
+export function Mark({ framework, size = "md", bare }: { framework: string; size?: "sm" | "md"; bare?: boolean }) {
   const logo = stackLogo(framework);
   const px = size === "sm" ? 15 : 19;
+  if (bare) {
+    return (
+      <svg role="img" aria-label={logo.title} viewBox="0 0 24 24" width={20} height={20} fill="currentColor" className="shrink-0 text-foreground">
+        <title>{logo.title}</title>
+        <path d={logo.path} />
+      </svg>
+    );
+  }
   return (
     <span
       role="img"

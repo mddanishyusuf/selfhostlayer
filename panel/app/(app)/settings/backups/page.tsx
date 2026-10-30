@@ -91,7 +91,7 @@ export default async function BackupsPage() {
           />
           <div className="flex flex-wrap items-center gap-2">
             <TestConnectionButton />
-            <a href="#change-storage" className="text-[13px] text-lavender hover:underline">
+            <a href="#change-storage" className="text-[13px] text-accent hover:underline">
               Change storage
             </a>
           </div>
@@ -113,7 +113,7 @@ export default async function BackupsPage() {
             </label>
             <label className="grid gap-1.5 text-[13px] font-medium">
               Keep the last (per app)
-              <input name="keep" type="number" min={1} max={365} defaultValue={settings.keep} className="h-[38px] rounded-lg border border-border-strong bg-transparent px-3 text-sm tabular-nums outline-none focus:border-lavender" />
+              <input name="keep" type="number" min={1} max={365} defaultValue={settings.keep} className="h-[38px] rounded-md border border-border bg-field px-3 text-sm tabular-nums outline-none focus:border-accent" />
             </label>
             <SubmitButton pending="Saving…" variant="secondary" className="w-auto">
               Save

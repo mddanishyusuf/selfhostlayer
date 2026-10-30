@@ -80,7 +80,7 @@ export default async function DeploymentPage({ params }: { params: Promise<{ slu
             <>
               {" "}
               · serving{" "}
-              <Link href={`/projects/${project.slug}`} className="text-lavender hover:underline">
+              <Link href={`/projects/${project.slug}`} className="text-accent hover:underline">
                 {project.slug}
               </Link>
             </>
