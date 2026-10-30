@@ -68,6 +68,7 @@ const FAKE: Partial<Record<ActionName, unknown>> = {
   "service.status": {
     slug: "piqo",
     installed: { redis: true, postgres: true, mysql: false, mongodb: true },
+    running: { postgres: true, mysql: false, mongodb: true },
     redis: { port: 6400, memoryMb: 64, url: "redis://default:51b0e9c2aa7741f8@127.0.0.1:6400", active: true, memoryUsedMb: 23, answering: true },
     postgres: { database: "app_piqo", url: "postgresql://app_piqo:9f2c41d07be6a1e3@127.0.0.1:5432/app_piqo", sizeMb: 48.2, answering: true },
     mongodb: { database: "app_piqo", url: "mongodb://app_piqo:7c1e93a0d24b5f68@127.0.0.1:27017/app_piqo", sizeMb: 12.4, answering: true },
@@ -116,7 +117,7 @@ const FAKE: Partial<Record<ActionName, unknown>> = {
       { id: "a3", ts: new Date(Date.now() - 120_000).toISOString(), action: "proxy.set", params: { slug: "piqo", color: "blue", domains: ["piqo.app"] }, ok: true, code: null, ms: 412 },
       { id: "a2", ts: new Date(Date.now() - 180_000).toISOString(), action: "unit.start", params: { slug: "piqo", color: "blue" }, ok: true, code: null, ms: 2210 },
       { id: "a1", ts: new Date(Date.now() - 260_000).toISOString(), action: "build.run", params: { slug: "piqo", sha: "a1c9e42" }, ok: true, code: null, ms: 61_000 },
-      { id: "a0", ts: new Date(Date.now() - 3_600_000).toISOString(), action: "postgres.add", params: { slug: "maillayer" }, ok: false, code: "install_failed", ms: 48_000 },
+      { id: "a0", ts: new Date(Date.now() - 3_600_000).toISOString(), action: "postgres.add", params: { slug: "maillayer" }, ok: false, code: "install_failed", message: "couldn't install postgresql with apt: E: Could not get lock /var/lib/dpkg/lock-frontend", ms: 48_000 },
     ],
   },
   "data.import": {

@@ -8,6 +8,7 @@ export interface AuditEntry {
   params?: unknown;
   ok?: boolean;
   code?: string;
+  message?: string;
   ms?: number;
 }
 

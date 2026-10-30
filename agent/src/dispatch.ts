@@ -111,7 +111,8 @@ export function createDispatcher(ctx: Context, audit: Audit, table: ActionTable 
       action,
       phase: "end",
       ok: "ok" in response && response.ok,
-      ...("error" in response ? { code: response.error.code } : {}),
+      // What the caller was told: unexpected errors already say only where to look.
+      ...("error" in response ? { code: response.error.code, message: response.error.message } : {}),
       ms: Date.now() - started,
     });
     return response;

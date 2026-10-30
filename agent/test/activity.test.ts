@@ -19,14 +19,14 @@ describe("audit.tail", () => {
     line({ ts: "2026-10-29T10:00:02Z", id: "s", action: "unit.status", phase: "start", params: { slug: "piqo" } });
     line({ ts: "2026-10-29T10:00:02Z", id: "s", action: "unit.status", phase: "end", ok: true, ms: 3 });
     line({ ts: "2026-10-29T10:01:00Z", id: "b", action: "proxy.set", phase: "start", params: { slug: "piqo", domains: ["piqo.app"] } });
-    line({ ts: "2026-10-29T10:01:01Z", id: "b", action: "proxy.set", phase: "end", ok: false, code: "invalid_config", ms: 900 });
+    line({ ts: "2026-10-29T10:01:01Z", id: "b", action: "proxy.set", phase: "end", ok: false, code: "invalid_config", message: "Caddy refused the new config", ms: 900 });
     line({ ts: "2026-10-29T10:02:00Z", id: "c", action: "build.run", phase: "start", params: { slug: "piqo" } });
     appendFileSync(env.paths.auditLog, "not json\n");
     const { entries } = (await activityActions["audit.tail"]!.run({}, env.ctx, NO_IO)) as any;
-    expect(entries.map((e: any) => [e.action, e.ok, e.code])).toEqual([
-      ["build.run", null, null],
-      ["proxy.set", false, "invalid_config"],
-      ["app.create", true, null],
+    expect(entries.map((e: any) => [e.action, e.ok, e.code, e.message])).toEqual([
+      ["build.run", null, null, null],
+      ["proxy.set", false, "invalid_config", "Caddy refused the new config"],
+      ["app.create", true, null, null],
     ]);
   });
 });

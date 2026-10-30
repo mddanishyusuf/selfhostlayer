@@ -111,6 +111,9 @@ describe("results and errors", () => {
     console.error = original;
     expect(res).toMatchObject({ error: { code: "internal" } });
     expect(JSON.stringify(res)).not.toContain("shadow");
+    // The audit log gets the same words as the caller, never the details.
+    expect(readFileSync(env.paths.auditLog, "utf8")).toContain('"message":"unit.start failed (details: journalctl -u layer-agent)"');
+    expect(readFileSync(env.paths.auditLog, "utf8")).not.toContain("shadow");
   });
 });
 
@@ -128,7 +131,7 @@ describe("audit log", () => {
       ["e2", "end", false],
     ]);
     expect(entries[0].params).toEqual({ slug: "piqo", keys: ["DB_PASSWORD"] });
-    expect(entries[3].code).toBe("not_found");
+    expect(entries[3]).toMatchObject({ code: "not_found", message: "app nope doesn't exist" });
   });
 
   it("leaves out status reads, and rotates past its size limit", async () => {

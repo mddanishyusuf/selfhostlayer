@@ -38,6 +38,11 @@ function Instance({ slug, index, name, detail, ok, url }: { slug: string; index:
   );
 }
 
+/** Whether an engine's shared server is up, as systemd sees it. */
+function ServerState({ up }: { up: boolean }) {
+  return <span className="max-sm:hidden">{up ? <StatusText status="ok" label="Running" /> : <StatusText status="err" label="Stopped" />}</span>;
+}
+
 function Footer({ add, note }: { add?: ReactNode; note: string }) {
   return (
     <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-border py-3 pl-4 pr-4 text-[13px] sm:pr-7 md:pl-[82px]">
@@ -53,7 +58,9 @@ export default async function DatabasesOverviewPage({ searchParams }: { searchPa
   const all = listProjects();
   const apps = all.filter((p) => p.runtime.kind !== "static");
   const statuses = (await Promise.all(apps.map((p) => serviceStatus(p.slug).catch(() => null)))).filter((s): s is ServiceStatus => s !== null);
-  const installed = statuses[0]?.installed ?? (await agent<{ installed: ServiceStatus["installed"] }>("service.status").then((r) => r.installed).catch(() => ({ redis: false, postgres: false, mysql: false, mongodb: false })));
+  const server = statuses[0] ?? (await agent<Pick<ServiceStatus, "installed" | "running">>("service.status").catch(() => null));
+  const installed = server?.installed ?? { redis: false, postgres: false, mysql: false, mongodb: false };
+  const running = server?.running ?? { postgres: false, mysql: false, mongodb: false };
   const indexOf = (slug: string) => all.findIndex((p) => p.slug === slug);
   const pg = statuses.filter((s) => s.postgres);
   const my = statuses.filter((s) => s.mysql);
@@ -110,7 +117,7 @@ export default async function DatabasesOverviewPage({ searchParams }: { searchPa
         lead={<TileIcon tone="blue"><Icon icon={Database01Icon} size={20} /></TileIcon>}
         title={<>PostgreSQL {installed.postgres ? <Pill outline>Installed</Pill> : <Pill outline>Not installed</Pill>}</>}
         sub={installed.postgres ? <>{pg.length} database{pg.length === 1 ? "" : "s"}<Dot />{pgMb.toFixed(1)} MB</> : "Installed the first time you add it to a project"}
-        side={installed.postgres ? <span className="max-sm:hidden"><StatusText status="ok" label="Running" /></span> : undefined}
+        side={installed.postgres ? <ServerState up={running.postgres} /> : undefined}
       >
         {pg.map((s) => (
           <Instance key={s.slug} slug={s.slug} index={indexOf(s.slug)} name={s.postgres!.database} ok={s.postgres!.answering} url={s.postgres!.url} detail={<>{s.postgres!.sizeMb !== null ? `${s.postgres!.sizeMb} MB` : "size unknown"}<Dot />a pg_dump in every backup</>} />
@@ -123,7 +130,7 @@ export default async function DatabasesOverviewPage({ searchParams }: { searchPa
         lead={<TileIcon tone="teal"><Icon icon={Database01Icon} size={20} /></TileIcon>}
         title={<>MySQL {installed.mysql ? <Pill outline>Installed</Pill> : <Pill outline>Not installed</Pill>}</>}
         sub={installed.mysql ? <>{my.length} database{my.length === 1 ? "" : "s"}<Dot />{myMb.toFixed(1)} MB<Dot />MariaDB</> : "MariaDB, installed the first time you add it to a project"}
-        side={installed.mysql ? <span className="max-sm:hidden"><StatusText status="ok" label="Running" /></span> : undefined}
+        side={installed.mysql ? <ServerState up={running.mysql} /> : undefined}
       >
         {my.map((s) => (
           <Instance key={s.slug} slug={s.slug} index={indexOf(s.slug)} name={s.mysql!.database} ok={s.mysql!.answering} url={s.mysql!.url} detail={<>{s.mysql!.sizeMb !== null ? `${s.mysql!.sizeMb} MB` : "size unknown"}<Dot />a dump in every backup</>} />
@@ -136,7 +143,18 @@ export default async function DatabasesOverviewPage({ searchParams }: { searchPa
         lead={<TileIcon tone="gold"><Icon icon={Database01Icon} size={20} /></TileIcon>}
         title={<>MongoDB {installed.mongodb ? <Pill outline>Installed</Pill> : <Pill outline>Not installed</Pill>}</>}
         sub={installed.mongodb ? <>{mongo.length} database{mongo.length === 1 ? "" : "s"}<Dot />{mongoMb.toFixed(1)} MB<Dot />one server for every project</> : "Installed once on this server; then each project gets its own database and user"}
-        side={installed.mongodb ? <span className="max-sm:hidden"><StatusText status="ok" label="Running" /></span> : <InstallMongodbForm compact />}
+        side={
+          !installed.mongodb ? (
+            <InstallMongodbForm compact />
+          ) : running.mongodb ? (
+            <ServerState up />
+          ) : (
+            <span className="flex items-center gap-3">
+              <ServerState up={false} />
+              <InstallMongodbForm compact start />
+            </span>
+          )
+        }
       >
         {mongo.map((s) => (
           <Instance key={s.slug} slug={s.slug} index={indexOf(s.slug)} name={s.mongodb!.database} ok={s.mongodb!.answering} url={s.mongodb!.url} detail={<>{s.mongodb!.sizeMb !== null ? `${s.mongodb!.sizeMb} MB` : "size unknown"}<Dot />a mongodump in every backup</>} />

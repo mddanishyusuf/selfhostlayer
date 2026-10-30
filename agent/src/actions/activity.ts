@@ -13,6 +13,8 @@ export interface ActivityEntry {
   params: unknown;
   ok: boolean | null;
   code: string | null;
+  /** Why it failed, in the words the caller got. */
+  message: string | null;
   ms: number | null;
 }
 
@@ -23,17 +25,17 @@ async function auditTail(params: Params, ctx: Context) {
   const limit = assertInt(params.limit ?? 200, "limit", 1, 1000);
   const byId = new Map<string, ActivityEntry>();
   for (const line of tailLines(ctx.paths.auditLog, 2 * 2 ** 20)) {
-    let e: { id?: string; ts?: string; action?: string; phase?: string; params?: unknown; ok?: boolean; code?: string; ms?: number };
+    let e: { id?: string; ts?: string; action?: string; phase?: string; params?: unknown; ok?: boolean; code?: string; message?: string; ms?: number };
     try {
       e = JSON.parse(line);
     } catch {
       continue;
     }
     if (!e.id || !e.action || READ_ONLY.test(e.action)) continue;
-    if (e.phase === "start") byId.set(e.id, { id: e.id, ts: e.ts ?? "", action: e.action, params: e.params ?? null, ok: null, code: null, ms: null });
+    if (e.phase === "start") byId.set(e.id, { id: e.id, ts: e.ts ?? "", action: e.action, params: e.params ?? null, ok: null, code: null, message: null, ms: null });
     else if (e.phase === "end") {
       const started = byId.get(e.id);
-      if (started) Object.assign(started, { ok: e.ok ?? null, code: e.code ?? null, ms: e.ms ?? null });
+      if (started) Object.assign(started, { ok: e.ok ?? null, code: e.code ?? null, message: e.message ?? null, ms: e.ms ?? null });
     }
   }
   return { entries: [...byId.values()].reverse().slice(0, limit) };

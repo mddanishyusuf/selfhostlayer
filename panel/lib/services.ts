@@ -6,6 +6,8 @@ import type { Project } from "./projects";
 export interface ServiceStatus {
   slug: string;
   installed: { redis: boolean; postgres: boolean; mysql: boolean; mongodb: boolean };
+  /** Whether systemd says each shared server is up. */
+  running: { postgres: boolean; mysql: boolean; mongodb: boolean };
   redis?: { port: number; memoryMb: number; url: string; active: boolean; memoryUsedMb: number | null; answering: boolean };
   postgres?: SqlDatabase;
   mysql?: SqlDatabase;

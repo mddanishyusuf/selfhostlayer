@@ -184,7 +184,7 @@ Every project's domains, one row per project: its main domain, the project's nam
 Coming soon: one-click apps built for Self Host Layer (analytics, email, scheduling and more).
 
 ### Databases
-Every engine on the server (PostgreSQL, MySQL, MongoDB, Redis, SQLite) with each app's database, its size and whether it answers. You can copy an app's connection URL, add an engine to an app, or install MongoDB, from here.
+Every engine on the server (PostgreSQL, MySQL, MongoDB, Redis, SQLite) with each app's database, its size and whether it answers. PostgreSQL, MySQL and MongoDB say Running or Stopped, as systemd sees their server; a stopped MongoDB has a Start button, which tells you why if it can't start. You can copy an app's connection URL, add an engine to an app, or install MongoDB, from here.
 
 ### Backups
 - **Storage:** any S3-compatible bucket: AWS S3, Cloudflare R2, Backblaze B2, MinIO, and others. Connecting tests it: the panel writes, reads, lists and deletes a test object.
@@ -206,7 +206,7 @@ Where alerts go: Telegram, Discord, a webhook (signed) or email over SMTP. Each 
 Each alert says when it's resolved. Open incidents are listed, and a gold dot on the sidebar item means one is open.
 
 ### Activity
-Every change the agent made to the server, in words, newest first: what it did, which app it was about, the result, how long it took and when. Reads aren't listed, only changes.
+Every change the agent made to the server, in words, newest first: what it did, which app it was about, the result, how long it took and when. A change that failed says why, in the same words the panel showed when it happened. Reads aren't listed, only changes.
 
 ```sh
 tail -f /var/log/layer/audit.jsonl

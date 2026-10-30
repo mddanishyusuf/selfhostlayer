@@ -13,6 +13,8 @@ interface Entry {
   params: Record<string, unknown> | null;
   ok: boolean | null;
   code: string | null;
+  /** Why it failed. Older log lines have none. */
+  message?: string | null;
   ms: number | null;
 }
 
@@ -92,6 +94,7 @@ export default async function ActivityPage() {
             <span className="text-right tabular-nums text-muted" title={e.ts}>
               {timeAgo(Math.floor(Date.parse(e.ts) / 1000))}
             </span>
+            {e.ok === false && e.message && <span className="basis-full break-words text-[13px] text-muted md:col-span-full">{e.message}</span>}
           </TableRow>
         ))}
       </section>

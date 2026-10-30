@@ -1,6 +1,6 @@
 "use client";
 
-import { Add01Icon, DatabaseAddIcon, Download04Icon } from "@hugeicons/core-free-icons";
+import { Add01Icon, DatabaseAddIcon, Download04Icon, PlayIcon } from "@hugeicons/core-free-icons";
 import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { addMongodbAction, addMysqlAction, addPostgresAction, addRedisAction, installMongodbAction, removeMongodbAction, removeMysqlAction, removePostgresAction, removeRedisAction, type ServiceState } from "@/app/actions/services";
@@ -68,15 +68,15 @@ export function SecretValue({ value }: { value: string }) {
   );
 }
 
-/** MongoDB on the server, once for every project. */
-export function InstallMongodbForm({ slug, compact = false }: { slug?: string; compact?: boolean }) {
+/** MongoDB on the server, once for every project. With start, the same install starts a stopped one and says why if it can't. */
+export function InstallMongodbForm({ slug, compact = false, start = false }: { slug?: string; compact?: boolean; start?: boolean }) {
   const [state, action] = useActionState(installMongodbAction, {} as ServiceState);
   return (
     <form action={action} className="grid gap-2">
       {slug && <input type="hidden" name="slug" value={slug} />}
       <div>
-        <SubmitButton pending="Installing MongoDB…" variant={compact ? "secondary" : undefined} size={compact ? "sm" : undefined} className="w-auto">
-          <Icon icon={Download04Icon} size={15} strokeWidth={2} /> {compact ? "Install" : "Install MongoDB on this server"}
+        <SubmitButton pending={start ? "Starting MongoDB…" : "Installing MongoDB…"} variant={compact ? "secondary" : undefined} size={compact ? "sm" : undefined} className="w-auto">
+          <Icon icon={start ? PlayIcon : Download04Icon} size={15} strokeWidth={2} /> {start ? "Start" : compact ? "Install" : "Install MongoDB on this server"}
         </SubmitButton>
       </div>
       <FormError message={state.error} />

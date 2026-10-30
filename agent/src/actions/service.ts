@@ -220,16 +220,25 @@ async function redisRemove(params: Params, ctx: Context) {
   return { slug, removed: true, keptData: keepData };
 }
 
+/** Whether systemd says each shared database server is up. */
+async function serversRunning(ctx: Context): Promise<{ postgres: boolean; mysql: boolean; mongodb: boolean }> {
+  const pg = postgresCluster();
+  const { stdout } = await ctx.exec(BIN.systemctl, ["is-active", pg ? `postgresql@${pg.version}-main` : "postgresql", "mariadb", "mongod"], { allowFail: true });
+  const [postgres, mysql, mongodb] = stdout.split("\n").map((state) => state.trim() === "active");
+  return { postgres: postgres ?? false, mysql: mysql ?? false, mongodb: mongodb ?? false };
+}
+
 async function serviceStatus(params: Params, ctx: Context) {
-  // Without an app: just which engines are installed on the server.
+  // Without an app: just which engines are installed on the server, and whether their servers are up.
   const installed = { redis: redisBinary() !== null, postgres: postgresCluster() !== null, mysql: mysqlInstalled(), mongodb: mongodbInstalled(ctx) };
-  if (params.slug === undefined) return { installed };
+  const running = await serversRunning(ctx);
+  if (params.slug === undefined) return { installed, running };
   const slug = assertSlug(params.slug);
   const app = appLayout(ctx, slug);
   if (!existsSync(app.etcDir)) throw new ActionError("not_found", `app ${slug} doesn't exist`);
   const state = readServices(ctx, slug);
   const env = serviceEnv(state);
-  const out: Record<string, unknown> = { slug, installed };
+  const out: Record<string, unknown> = { slug, installed, running };
   if (state.postgres && postgresCluster()) {
     const size = await psql(ctx, `SELECT pg_database_size('${state.postgres.database}')`, { allowFail: true });
     out.postgres = {

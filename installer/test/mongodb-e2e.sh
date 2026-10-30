@@ -57,6 +57,8 @@ chmod 000 /var/lib/mongodb
 out="$(call service.install '{"name":"mongodb"}')"
 expect "service.install says why from mongod's log" "$out" '.ok == false and .error.code == "start_failed" and (.error.message | test("From its log: .*Permission denied"))'
 [[ "$(systemctl is-active mongod)" != active && "$(systemctl is-enabled mongod)" == disabled ]] && pass "mongod is stopped, not failing again every 5 s" || fail "mongod after a failed start" "$(systemctl status mongod --no-pager 2>&1 | head -5)"
+expect "service.status says it's stopped" "$(call service.status)" '.result.running.mongodb == false'
+grep '"phase":"end"' /var/log/layer/audit.jsonl | tail -1 | jq -e '.code == "start_failed" and (.message | test("Permission denied"))' >/dev/null && pass "the Activity log keeps why it failed" || fail "audit entry" "$(tail -1 /var/log/layer/audit.jsonl)"
 chmod "$mode" /var/lib/mongodb
 out="$(call service.install '{"name":"mongodb"}')"
 expect "installing again brings it back" "$out" '.ok == true'
@@ -79,7 +81,7 @@ out="$(js mob 'JSON.stringify(db.adminCommand({ listDatabases: 1, nameOnly: true
 url="$(uri moa)"
 grep -q "^MONGODB_URI=\"$url\"$" /etc/layer/apps/moa/services.env && pass "services.env has MONGODB_URI" || fail "services.env" "$(cat /etc/layer/apps/moa/services.env)"
 out="$(call service.status '{"slug":"moa"}')"
-expect "service.status shows the database" "$out" '.result.mongodb.answering == true and .result.mongodb.database == "app_moa" and .result.installed.mongodb == true'
+expect "service.status shows the database" "$out" '.result.mongodb.answering == true and .result.mongodb.database == "app_moa" and .result.installed.mongodb == true and .result.running.mongodb == true'
 
 echo "Backup and restore include the database"
 out="$(call backup.snapshot '{"slug":"moa"}')"
