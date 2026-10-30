@@ -35,6 +35,10 @@
   --color-rose: var(--rose);
   --color-code: var(--code);
   --color-chart: var(--chart);
+  --color-logo-tile: var(--logo-tile);
+  --color-logo-edge: var(--logo-edge);
+  --color-logo-stem: var(--logo-stem);
+  --color-logo-base: var(--logo-base);
 }
 
 :root,
@@ -63,6 +67,11 @@
   --code: #171717;
   /* Chart series: checked with the dataviz validator against each surface. */
   --chart: #6e56cf;
+  /* The logo (design/logo): a violet app on an orange layer, on a light tile. */
+  --logo-tile: #ffffff;
+  --logo-edge: #e5e5e5;
+  --logo-stem: #6e56cf;
+  --logo-base: #ea580c;
 }
 
 :root[data-theme="dark"] {
@@ -89,6 +98,10 @@
   --inverse-fg: #1c1a19;
   --code: #141211;
   --chart: #9180ec;
+  --logo-tile: #ece8e3;
+  --logo-edge: transparent;
+  --logo-stem: #6e56cf;
+  --logo-base: #ea580c;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -116,6 +129,10 @@
     --inverse-fg: #1c1a19;
     --code: #141211;
     --chart: #9180ec;
+    --logo-tile: #ece8e3;
+    --logo-edge: transparent;
+    --logo-stem: #6e56cf;
+    --logo-base: #ea580c;
   }
 }
 

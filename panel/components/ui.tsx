@@ -110,12 +110,22 @@ export function FormError({ message }: { message?: string | null }) {
   );
 }
 
+/** The logo (design/logo): an L, a violet app standing on an orange layer, your server. */
+export function LogoMark() {
+  return (
+    <span className="grid size-[30px] shrink-0 place-items-center rounded-lg bg-logo-tile ring-1 ring-inset ring-logo-edge" aria-hidden>
+      <svg viewBox="0 0 32 32" className="size-[19px]">
+        <rect x="8.4" y="4.5" width="7" height="16" rx="1.6" className="fill-logo-stem" />
+        <rect x="8.4" y="23" width="17.5" height="4.8" rx="1.2" className="fill-logo-base" />
+      </svg>
+    </span>
+  );
+}
+
 export function Logo({ withName = true }: { withName?: boolean }) {
   return (
     <span className="inline-flex items-center gap-2.5">
-      <span className="grid size-[30px] place-items-center rounded-lg bg-foreground text-background">
-        <Icon icon={Layers01Icon} size={17} strokeWidth={2} />
-      </span>
+      <LogoMark />
       {withName && <span className="text-[15px] font-semibold tracking-tight">Self Host Layer</span>}
     </span>
   );

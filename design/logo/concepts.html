@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Logo concepts</title>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root { --fg: #171717; --muted: #737373; --line: #e5e5e5; --bg: #fafafa; }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 32px; background: var(--bg); color: var(--fg); font: 14px/1.5 "Geist", system-ui, sans-serif; }
+  h1 { margin: 0 0 4px; font-size: 20px; letter-spacing: -0.02em; }
+  p.lede { margin: 0 0 24px; color: var(--muted); }
+  .row { display: grid; grid-template-columns: 170px repeat(4, 96px) 150px 1fr; align-items: center; gap: 20px; padding: 20px 0; border-top: 1px solid var(--line); }
+  .name b { display: block; font-size: 15px; }
+  .name span { color: var(--muted); font-size: 12.5px; }
+  .tile { display: grid; place-items: center; width: 72px; height: 72px; border-radius: 18px; }
+  .tile.dark { background: #171717; color: #fafafa; }
+  .tile.light { background: #fff; color: #171717; box-shadow: inset 0 0 0 1px var(--line); }
+  .tile.warm { background: #1c1a19; color: #ece8e3; }
+  .bare { display: grid; place-items: center; width: 72px; height: 72px; color: #171717; }
+  .tile svg, .bare svg { width: 40px; height: 40px; }
+  .sizes { display: flex; align-items: center; gap: 12px; }
+  .sizes .t { display: grid; place-items: center; background: #171717; color: #fafafa; }
+  .lockup { display: flex; align-items: center; gap: 10px; font-weight: 600; font-size: 16px; letter-spacing: -0.02em; }
+  .lockup .t { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 7px; background: #171717; color: #fafafa; }
+  .lockup .t svg { width: 17px; height: 17px; }
+  .dark-lockup { display: inline-flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: 10px; background: #1c1a19; color: #ece8e3; font-weight: 600; font-size: 16px; letter-spacing: -0.02em; }
+  .dark-lockup .t { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 7px; background: #ece8e3; color: #1c1a19; }
+  .dark-lockup .t svg { width: 17px; height: 17px; }
+</style>
+</head>
+<body>
+<h1>Self Host Layer: logo concepts</h1>
+<p class="lede">Earlier rounds: <a href="?round=1">1</a> · <a href="?round=2">2</a>. Each mark on a dark tile, a light tile, the warm dark panel, bare; then at 32, 24 and 16 px; then with the name, as in the nav and the sidebar.</p>
+
+<svg width="0" height="0" style="position:absolute">
+  <defs>
+    <!-- 1. Stack: the layers idea, drawn as one solid plate and two bands. -->
+    <symbol id="stack" viewBox="0 0 32 32">
+      <path d="M16 4.6 27.4 10.6 16 16.6 4.6 10.6Z" fill="currentColor"/>
+      <path d="M4.6 15.8 16 21.8 27.4 15.8M4.6 21 16 27 27.4 21" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+    </symbol>
+    <!-- 2. Slab L: an L in two blocks, a layer apart. -->
+    <symbol id="slab" viewBox="0 0 32 32">
+      <rect x="6.5" y="5" width="7.5" height="22" rx="2.4" fill="currentColor"/>
+      <rect x="16.5" y="19.5" width="10" height="7.5" rx="2.4" fill="currentColor"/>
+    </symbol>
+    <!-- 3. Sliced orb: one round thing in three layers. -->
+    <symbol id="orb" viewBox="0 0 32 32">
+      <clipPath id="orb-clip"><circle cx="16" cy="16" r="11.5"/></clipPath>
+      <g clip-path="url(#orb-clip)" fill="currentColor">
+        <rect x="0" y="0" width="32" height="11.3"/>
+        <rect x="0" y="13.7" width="32" height="4.6"/>
+        <rect x="0" y="20.7" width="32" height="12"/>
+      </g>
+    </symbol>
+    <!-- 4. Steps: three layers growing to the right, which is also an L. -->
+    <symbol id="steps" viewBox="0 0 32 32">
+      <rect x="6" y="5.5" width="9" height="5.8" rx="2.9" fill="currentColor"/>
+      <rect x="6" y="13.1" width="14.5" height="5.8" rx="2.9" fill="currentColor"/>
+      <rect x="6" y="20.7" width="20" height="5.8" rx="2.9" fill="currentColor"/>
+    </symbol>
+    <!-- 5. Lift: two layers going up, like a deploy. -->
+    <symbol id="lift" viewBox="0 0 32 32">
+      <path d="M6.5 15 16 8.5l9.5 6.5M6.5 23.5 16 17l9.5 6.5" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>
+    </symbol>
+    <!-- 6. Box + layer: your server, with one layer on top. -->
+    <symbol id="box" viewBox="0 0 32 32">
+      <rect x="5.5" y="13" width="21" height="14" rx="3.5" fill="none" stroke="currentColor" stroke-width="2.6"/>
+      <rect x="8.5" y="5.5" width="15" height="4.6" rx="2.3" fill="currentColor"/>
+      <circle cx="10.6" cy="20" r="1.6" fill="currentColor"/>
+    </symbol>
+
+    <!-- 2a. L on a base: the stem stands on a long foot, a layer below it. -->
+    <symbol id="slab-a" viewBox="0 0 32 32">
+      <rect x="7" y="5" width="7" height="15.5" rx="2.4" fill="currentColor"/>
+      <rect x="7" y="22.8" width="18.5" height="4.6" rx="2.3" fill="currentColor"/>
+    </symbol>
+    <!-- 2b. Shifted L: the foot slides right, like two plates out of line. -->
+    <symbol id="slab-b" viewBox="0 0 32 32">
+      <rect x="6.5" y="5" width="7" height="15.5" rx="2.4" fill="currentColor"/>
+      <rect x="9.5" y="22.8" width="16.5" height="4.6" rx="2.3" fill="currentColor"/>
+    </symbol>
+    <!-- 2c. Corner L: the foot runs under the stem, split at the corner. -->
+    <symbol id="slab-c" viewBox="0 0 32 32">
+      <rect x="6.5" y="5" width="7" height="22.4" rx="2.4" fill="currentColor"/>
+      <rect x="15.8" y="21" width="10.2" height="6.4" rx="2.4" fill="currentColor"/>
+      <rect x="15.8" y="13.4" width="5" height="5" rx="1.6" fill="currentColor" opacity="0"/>
+    </symbol>
+    <!-- 3a. Orb in equal thirds. -->
+    <symbol id="orb-a" viewBox="0 0 32 32">
+      <clipPath id="orb-a-clip"><circle cx="16" cy="16" r="11.5"/></clipPath>
+      <g clip-path="url(#orb-a-clip)" fill="currentColor">
+        <rect x="0" y="0" width="32" height="10.6"/>
+        <rect x="0" y="13" width="32" height="6"/>
+        <rect x="0" y="21.4" width="32" height="12"/>
+      </g>
+    </symbol>
+    <!-- 3b. Orb sliced at an angle: the layers lift. -->
+    <symbol id="orb-b" viewBox="0 0 32 32">
+      <clipPath id="orb-b-clip"><circle cx="16" cy="16" r="11.5"/></clipPath>
+      <g clip-path="url(#orb-b-clip)" fill="currentColor" transform="rotate(-24 16 16)">
+        <rect x="-8" y="-8" width="48" height="18.9"/>
+        <rect x="-8" y="13.3" width="48" height="5.4"/>
+        <rect x="-8" y="21.1" width="48" height="20"/>
+      </g>
+    </symbol>
+    <!-- 1b. Two plates: one layer on top of another. -->
+    <symbol id="stack-b" viewBox="0 0 32 32">
+      <path d="M16 5.5 27 11.5 16 17.5 5 11.5Z" fill="currentColor"/>
+      <path d="M5 18.5 16 24.5 27 18.5" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+    </symbol>
+
+    <!-- Final: L on a base. An app (the stem) standing on your server (the layer below). -->
+    <symbol id="final" viewBox="0 0 32 32">
+      <rect x="8.4" y="4.5" width="7" height="16" rx="3.5" fill="currentColor"/>
+      <rect x="8.4" y="23" width="17.5" height="4.8" rx="2.4" fill="currentColor"/>
+    </symbol>
+
+    <!-- Round 3: A with crisper corners; stem and base colored per variant. -->
+    <symbol id="l3" viewBox="0 0 32 32">
+      <rect x="8.4" y="4.5" width="7" height="16" rx="1.6" fill="var(--stem, currentColor)"/>
+      <rect x="8.4" y="23" width="17.5" height="4.8" rx="1.2" fill="var(--base, currentColor)"/>
+    </symbol>
+  </defs>
+</svg>
+
+<div id="hero" style="display:none;gap:28px;align-items:center;margin:8px 0 28px">
+  <div class="tile dark" style="width:128px;height:128px;border-radius:30px"><svg viewBox="0 0 32 32" style="width:76px;height:76px"><use href="#final"/></svg></div>
+  <div class="tile light" style="width:128px;height:128px;border-radius:30px"><svg viewBox="0 0 32 32" style="width:76px;height:76px"><use href="#final"/></svg></div>
+  <div style="display:flex;align-items:center;gap:16px;font-weight:600;font-size:40px;letter-spacing:-0.04em"><span class="tile dark" style="width:56px;height:56px;border-radius:14px"><svg viewBox="0 0 32 32" style="width:34px;height:34px"><use href="#final"/></svg></span>Self Host Layer</div>
+</div>
+<div id="rows"></div>
+<div id="round3" style="display:none"></div>
+<script>
+  const round = new URLSearchParams(location.search).get("round");
+  if (round === "3") {
+    document.getElementById("hero").style.display = "none";
+    document.querySelector("p.lede").innerHTML = 'Option A with crisper corners, in flat colors. Each variant: big on light and dark, at 32, 24 and 16 px, and with the name in the nav (light) and the sidebar (dark).';
+    const variants = [
+      ["A1. Violet base", "The layer under your app is the color", { tile: "#171717", stem: "#fafafa", base: "#8b5cf6" }, { tile: "#ece8e3", stem: "#1c1a19", base: "#7c5cf0" }],
+      ["A2. Violet stem", "Your app is the color, on a white base", { tile: "#171717", stem: "#8b5cf6", base: "#fafafa" }, { tile: "#ece8e3", stem: "#6e56cf", base: "#1c1a19" }],
+      ["A3. Violet tile", "One brand color, a white L", { tile: "#6e56cf", stem: "#ffffff", base: "#ffffff" }, { tile: "#8b5cf6", stem: "#ffffff", base: "#ffffff" }],
+      ["A4. Two colors", "Violet app on an orange layer", { tile: "#171717", stem: "#8b5cf6", base: "#f97316" }, { tile: "#ece8e3", stem: "#6e56cf", base: "#ea580c" }],
+      ["A5. Teal base", "The layer in the panel's Ready color", { tile: "#171717", stem: "#fafafa", base: "#14b8a6" }, { tile: "#ece8e3", stem: "#1c1a19", base: "#0f766e" }],
+      ["A6. Violet, two-tone", "A violet tile; white app on a lavender layer", { tile: "#6e56cf", stem: "#ffffff", base: "#c4b5fd" }, { tile: "#8b5cf6", stem: "#ffffff", base: "#ddd6fe" }],
+    ];
+    const mark = (c, size) => `<svg viewBox="0 0 32 32" style="width:${size}px;height:${size}px;--stem:${c.stem};--base:${c.base}"><use href="#l3"/></svg>`;
+    const tile = (c, size, radius, inner) => `<span style="display:grid;place-items:center;width:${size}px;height:${size}px;border-radius:${radius}px;background:${c.tile}">${mark(c, inner)}</span>`;
+    const el = document.getElementById("round3");
+    el.style.display = "grid";
+    el.innerHTML = variants.map(([name, what, c, d]) => `
+      <div class="row" style="grid-template-columns: 170px 112px 112px 150px 1fr">
+        <div class="name"><b>${name}</b><span>${what}</span></div>
+        ${tile(c, 96, 22, 56)}
+        <span style="display:grid;place-items:center;width:112px;height:112px;border-radius:16px;background:#1c1a19">${tile(d, 72, 17, 42)}</span>
+        <div class="sizes">${[32, 24, 16].map((sz) => tile(c, sz, Math.round(sz * 0.25), Math.round(sz * 0.6))).join("")}</div>
+        <div style="display:grid;gap:10px;justify-items:start">
+          <div class="lockup">${tile(c, 26, 7, 17)}Self Host Layer</div>
+          <div class="dark-lockup">${tile(d, 26, 7, 17)}Self Host Layer</div>
+        </div>
+      </div>`).join("");
+  }
+  const concepts = round === "3" ? [] : round !== "1" && round !== "2" ? [
+    ["final", "A. L on a base", "Recommended: an app standing on your server; L for Layer"],
+    ["stack-b", "B. Two plates", "One layer on another: the classic layers idea"],
+    ["orb-a", "C. Sliced orb", "One round thing in three layers"],
+  ] : round === "2" ? [
+    ["slab", "2. Slab L", "Round 1, for comparison"],
+    ["slab-a", "2a. L on a base", "The stem stands on a long foot: a layer below it"],
+    ["slab-b", "2b. Shifted L", "The foot slides right, like two plates out of line"],
+    ["orb", "3. Sliced orb", "Round 1, for comparison"],
+    ["orb-a", "3a. Orb in thirds", "Equal layers, so 16 px doesn't read as an equals sign"],
+    ["orb-b", "3b. Lifted orb", "Sliced at an angle: the layers rise"],
+    ["stack-b", "1b. Two plates", "One layer on another; less like Buffer's three"],
+  ] : [
+    ["stack", "1. Stack", "The layers idea, as one solid plate and two bands"],
+    ["slab", "2. Slab L", "An L in two blocks, a layer apart"],
+    ["orb", "3. Sliced orb", "One round thing in three layers"],
+    ["steps", "4. Steps", "Three layers growing right; also an L"],
+    ["lift", "5. Lift", "Two layers going up, like a deploy"],
+    ["box", "6. Box + layer", "Your server, with one layer on top"],
+  ];
+  if (round !== "1" && round !== "2" && round !== "3") document.getElementById("hero").style.display = "flex";
+  const use = (id, size) => `<svg viewBox="0 0 32 32" width="${size}" height="${size}"><use href="#${id}"/></svg>`;
+  document.getElementById("rows").innerHTML = concepts.map(([id, name, what]) => `
+    <div class="row">
+      <div class="name"><b>${name}</b><span>${what}</span></div>
+      <div class="tile dark">${use(id, 40)}</div>
+      <div class="tile light">${use(id, 40)}</div>
+      <div class="tile warm">${use(id, 40)}</div>
+      <div class="bare">${use(id, 44)}</div>
+      <div class="sizes">${[32, 24, 16].map((s) => `<span class="t" style="width:${s}px;height:${s}px;border-radius:${Math.round(s * 0.25)}px">${use(id, Math.round(s * 0.66))}</span>`).join("")}</div>
+      <div style="display:grid;gap:10px;justify-items:start">
+        <div class="lockup"><span class="t">${use(id, 17)}</span>Self Host Layer</div>
+        <div class="dark-lockup"><span class="t">${use(id, 17)}</span>Self Host Layer</div>
+      </div>
+    </div>`).join("");
+</script>
+</body>
+</html>

@@ -13,7 +13,6 @@ import {
   FolderLibraryIcon,
   Globe02Icon,
   Key01Icon,
-  Layers01Icon,
   Logout01Icon,
   Menu01Icon,
   Moon02Icon,
@@ -33,7 +32,7 @@ import { useEffect, useState } from "react";
 import { logout } from "@/app/actions/auth";
 import { THEME_COOKIE, type Theme } from "@/lib/theme";
 import { Icon, type IconSvgElement } from "../icon";
-import { StatusDot, cx } from "../ui";
+import { cx, LogoMark, StatusDot } from "../ui";
 import { openPalette } from "./palette";
 import { openServerModal } from "./server-modal";
 
@@ -154,8 +153,8 @@ function Nav(props: SidebarProps & { onNavigate?: () => void }) {
   return (
     <div className="flex h-full flex-col bg-sidebar">
       <div className="flex h-[60px] shrink-0 items-center gap-2.5 border-b border-border px-4">
-        <Link href="/" onClick={props.onNavigate} aria-label="Projects" className="grid size-[30px] shrink-0 place-items-center rounded-lg bg-foreground text-background">
-          <Icon icon={Layers01Icon} size={17} strokeWidth={2} />
+        <Link href="/" onClick={props.onNavigate} aria-label="Projects" className="shrink-0 rounded-lg">
+          <LogoMark />
         </Link>
         <button type="button" onClick={openServerModal} title="Server status" className="grid min-w-0 flex-1 text-left leading-tight">
           <b className="truncate text-sm font-semibold">{props.server.name}</b>
@@ -269,8 +268,8 @@ export function Sidebar(props: SidebarProps) {
         <button type="button" onClick={() => setOpen(true)} aria-label="Open menu" className="grid size-10 place-items-center rounded-lg hover:bg-hover">
           <Icon icon={Menu01Icon} size={20} />
         </button>
-        <Link href="/" aria-label="Projects" className="grid size-[30px] place-items-center rounded-lg bg-foreground text-background">
-          <Icon icon={Layers01Icon} size={17} strokeWidth={2} />
+        <Link href="/" aria-label="Projects" className="rounded-lg">
+          <LogoMark />
         </Link>
         <button type="button" onClick={openPalette} aria-label="Search" className="grid size-10 place-items-center rounded-lg hover:bg-hover">
           <Icon icon={Search01Icon} size={20} />
