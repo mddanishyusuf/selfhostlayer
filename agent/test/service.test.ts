@@ -2,7 +2,7 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { appActions } from "../src/actions/app.ts";
-import { grantPattern, renderMariadbConf, serviceActions, serviceEnv } from "../src/actions/service.ts";
+import { grantPattern, mongodFailure, renderMariadbConf, serviceActions, serviceEnv } from "../src/actions/service.ts";
 import { NO_IO } from "../src/context.ts";
 import { mongodbSource, renderMongodConf, renderMongodDropin, renderMongoshConf } from "../src/templates/mongodb.ts";
 import { renderRedisConf, renderRedisUnit } from "../src/templates/redis.ts";
@@ -74,8 +74,31 @@ describe("MongoDB", () => {
     expect(renderMongodConf(8192)).toContain("cacheSizeGB: 0.5\n");
     expect(renderMongodConf(65536)).toContain("cacheSizeGB: 1\n");
     // The package's own config stays untouched; the drop-in points mongod at ours.
-    expect(renderMongodDropin()).toContain("ExecStart=\nExecStart=/usr/bin/mongod --config /etc/mongodb-layer.conf\n");
+    const dropin = renderMongodDropin();
+    expect(dropin).toContain("ExecStart=\nExecStart=/usr/bin/mongod --config /etc/mongodb-layer.conf\n");
+    // Per-thread allocator caches, or MongoDB refuses kernels 6.19.0 to 7.0.13 (all of Ubuntu 26.04's).
+    expect(dropin).toContain("Environment=GLIBC_TUNABLES=glibc.pthread.rseq=1\n");
+    expect(dropin).toContain("StartLimitBurst=5\n");
     expect(renderMongoshConf()).toContain("enableTelemetry: false\n");
+  });
+
+  it("finds why mongod stopped in its log", () => {
+    const systemd = "mongod.service: Main process exited, code=exited, status=1/FAILURE";
+    // From Ubuntu 26.04 (kernel 7.0.0-30), with the package's own allocator setting.
+    const kernel = `{"t":{"$date":"2026-10-30T13:08:06.052+00:00"},"s":"F",  "c":"CONTROL",  "id":12257600,"ctx":"main","msg":"MongoDB cannot start: Linux kernel versions 6.19.0 through 7.0.13 have a known incompatibility with this version of MongoDB. See https://jira.mongodb.org/browse/SERVER-121912 for more information."}`;
+    expect(mongodFailure([kernel, systemd].join("\n"))).toMatch(/^MongoDB cannot start: Linux kernel versions 6\.19\.0 through 7\.0\.13 /);
+
+    // A restart with the data folder unreadable: the old mongod aborts on its way out, the new one can't start.
+    const wiredTiger = `{"t":{"$date":"2026-10-30T13:23:09.157+00:00"},"s":"E",  "c":"WT",       "id":22435,   "ctx":"SignalHandler","msg":"WiredTiger error message","attr":{"error":13,"message":{"session_name":"close_ckpt","msg":"int __posix_fs_size(WT_FILE_SYSTEM *, WT_SESSION *, const char *, wt_off_t *):403:/var/lib/mongodb/_tmp/spilldb/WiredTigerHS.wt: file-size: stat","error_str":"Permission denied","error_code":13}}}`;
+    const assertion = `{"t":{"$date":"2026-10-30T13:23:09.158+00:00"},"s":"F",  "c":"ASSERT",   "id":23089,   "ctx":"SignalHandler","msg":"Fatal assertion","attr":{"msgid":28559,"location":"src/mongo/db/storage/wiredtiger/wiredtiger_error_util.cpp:149:69"}}`;
+    const aborting = `{"t":{"$date":"2026-10-30T13:23:09.158+00:00"},"s":"F",  "c":"ASSERT",   "id":23090,   "ctx":"SignalHandler","msg":"\\n\\n***aborting after fassert() failure\\n\\n"}`;
+    const fatal = `{"t":{"$date":"2026-10-30T13:23:09.158+00:00"},"s":"F",  "c":"CONTROL",  "id":6384300, "ctx":"SignalHandler","msg":"Writing fatal message","attr":{"message":"Got signal: 6 (Aborted).\\n"}}`;
+    const denied = `{"t":{"$date":"2026-10-30T13:23:12.182+00:00"},"s":"E",  "c":"CONTROL",  "id":20557,   "ctx":"initandlisten","msg":"DBException in initAndListen, terminating","attr":{"error":"Location28596: Unable to determine status of lock file in the data directory /var/lib/mongodb: boost::filesystem::status: Permission denied"}}`;
+    expect(mongodFailure([wiredTiger, assertion, aborting, fatal, fatal, systemd, denied, systemd].join("\n"))).toBe(
+      "DBException in initAndListen, terminating: Location28596: Unable to determine status of lock file in the data directory /var/lib/mongodb: boost::filesystem::status: Permission denied",
+    );
+    expect(mongodFailure([wiredTiger, assertion, aborting, fatal].join("\n"))).toBe("WiredTiger error message: Permission denied");
+    expect(mongodFailure([assertion, aborting, fatal, systemd, "{not json"].join("\n"))).toBeNull();
   });
 
   it("picks MongoDB's apt source for the OS, and says why when there's none", () => {

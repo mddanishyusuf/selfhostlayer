@@ -222,7 +222,7 @@ async function redisRemove(params: Params, ctx: Context) {
 
 async function serviceStatus(params: Params, ctx: Context) {
   // Without an app: just which engines are installed on the server.
-  const installed = { redis: redisBinary() !== null, postgres: postgresCluster() !== null, mysql: mysqlInstalled(), mongodb: mongodbInstalled() };
+  const installed = { redis: redisBinary() !== null, postgres: postgresCluster() !== null, mysql: mysqlInstalled(), mongodb: mongodbInstalled(ctx) };
   if (params.slug === undefined) return { installed };
   const slug = assertSlug(params.slug);
   const app = appLayout(ctx, slug);
@@ -518,8 +518,14 @@ async function mysqlRemove(params: Params, ctx: Context) {
 
 // ---------------------------------------------------------------- MongoDB
 
-export function mongodbInstalled(): boolean {
+/** MongoDB's packages are on the server. */
+function mongodbPackages(): boolean {
   return existsSync(BIN.mongod) && existsSync(BIN.mongosh);
+}
+
+/** Installed and set up: the packages, and the agent's login, which the install makes once mongod answers. */
+export function mongodbInstalled(ctx: Context): boolean {
+  return mongodbPackages() && existsSync(ctx.paths.mongodbAdmin);
 }
 
 /** /etc/os-release's ID and VERSION_CODENAME, which pick MongoDB's apt source. */
@@ -582,13 +588,49 @@ function lastJson(stdout: string): unknown {
   return null;
 }
 
-async function waitForMongodb(ctx: Context): Promise<void> {
+/** Lines about how mongod aborts, which come after the one that says why. */
+const MONGOD_ABORTING = /^(Writing fatal message|\s*\*\*\*aborting)/;
+
+/**
+ * Why mongod stopped, from its log (one JSON object a line): the last fatal or
+ * error line that says why, with the error it carries.
+ */
+export function mongodFailure(log: string): string | null {
+  let why: string | null = null;
+  for (const line of log.split("\n")) {
+    if (!line.startsWith("{")) continue;
+    let entry: { s?: string; msg?: unknown; attr?: { error?: unknown; message?: unknown } };
+    try {
+      entry = JSON.parse(line);
+    } catch {
+      continue; // not one of mongod's lines
+    }
+    if ((entry.s !== "F" && entry.s !== "E") || typeof entry.msg !== "string" || MONGOD_ABORTING.test(entry.msg)) continue;
+    // The error comes as a string, as { errmsg }, or from WiredTiger as message.error_str.
+    const { error, message } = entry.attr ?? {};
+    const detail = [error, (error as { errmsg?: unknown } | null)?.errmsg, (message as { error_str?: unknown } | null)?.error_str].find((d) => typeof d === "string");
+    if (!detail && entry.msg === "Fatal assertion") continue;
+    why = detail ? `${entry.msg}: ${detail}` : entry.msg;
+  }
+  return why;
+}
+
+/**
+ * Waits for mongod to answer. If it exits instead, stops it (it would only
+ * fail again every 5 s) and says why, from its log.
+ */
+async function waitForMongodb(ctx: Context, since: number): Promise<void> {
   for (let i = 0; i < 60; i++) {
     // ping needs no login.
     if ((await mongosh(ctx, "print(JSON.stringify(db.runCommand({ ping: 1 }).ok))", { as: "nobody", allowFail: true })).code === 0) return;
+    const { stdout } = await ctx.exec(BIN.systemctl, ["show", "mongod", "--property=ActiveState,SubState,NRestarts"], { allowFail: true });
+    if (/^(ActiveState=(failed|inactive)|SubState=auto-restart.*|NRestarts=[1-9]\d*)$/m.test(stdout)) break;
     await new Promise((r) => setTimeout(r, 500));
   }
-  throw new ActionError("start_failed", "MongoDB didn't come up");
+  const log = await ctx.exec(BIN.journalctl, ["--no-pager", "-o", "cat", "-n", "200", "-u", "mongod", `--since=@${Math.floor(since / 1000)}`], { allowFail: true });
+  await ctx.exec(BIN.systemctl, ["disable", "--now", "mongod"], { allowFail: true });
+  const why = mongodFailure(log.stdout);
+  throw new ActionError("start_failed", why ? `MongoDB didn't start. From its log: ${why}` : "MongoDB didn't start, and its log doesn't say why (journalctl -u mongod)");
 }
 
 /**
@@ -616,8 +658,8 @@ async function ensureMongoAdmin(ctx: Context): Promise<void> {
 }
 
 async function installMongodb(ctx: Context) {
-  const already = mongodbInstalled();
-  if (!already) {
+  const already = mongodbInstalled(ctx);
+  if (!mongodbPackages()) {
     const os = osRelease();
     const source = mongodbSource(os.id, os.codename, process.arch);
     if ("error" in source) throw new ActionError("unsupported", source.error);
@@ -626,7 +668,7 @@ async function installMongodb(ctx: Context) {
     writeFileAtomic(MONGODB_SOURCES, source.line + "\n", 0o644);
     await apt(ctx, ["update", "-q"], "layer-apt-update");
     const r = await apt(ctx, ["install", "-y", "-q", "--no-install-recommends", "mongodb-org-server", "mongodb-mongosh", "mongodb-database-tools"], "layer-apt-install");
-    if (r.code !== 0 || !mongodbInstalled()) {
+    if (r.code !== 0 || !mongodbPackages()) {
       // Without MongoDB, its repository has no business in apt's sources.
       rmSync(MONGODB_SOURCES, { force: true });
       throw new ActionError("install_failed", `couldn't install MongoDB with apt: ${(r.stderr || r.stdout).trim().split("\n").slice(-3).join(" ")}`);
@@ -638,8 +680,11 @@ async function installMongodb(ctx: Context) {
   writeFileAtomic(join(ctx.paths.systemdDir, "mongod.service.d", "layer.conf"), renderMongodDropin(), 0o644);
   await ctx.exec(BIN.systemctl, ["daemon-reload"]);
   await ctx.exec(BIN.systemctl, ["enable", "mongod"], { allowFail: true });
-  await ctx.exec(BIN.systemctl, ["restart", "mongod"]);
-  await waitForMongodb(ctx);
+  // Earlier failed starts don't count against the start limit, or as restarts.
+  await ctx.exec(BIN.systemctl, ["reset-failed", "mongod"], { allowFail: true });
+  const since = Date.now();
+  await ctx.exec(BIN.systemctl, ["restart", "mongod"], { allowFail: true });
+  await waitForMongodb(ctx, since);
   await ensureMongoAdmin(ctx);
   const version = lastJson((await mongosh(ctx, "print(JSON.stringify(db.version()))")).stdout);
   return { name: "mongodb", installed: true, version: typeof version === "string" ? version : null, already };
@@ -649,7 +694,7 @@ async function mongodbAdd(params: Params, ctx: Context) {
   const slug = assertSlug(params.slug);
   const app = appLayout(ctx, slug);
   if (!existsSync(app.etcDir)) throw new ActionError("not_found", `app ${slug} doesn't exist`);
-  if (!mongodbInstalled()) throw new ActionError("not_installed", "MongoDB isn't installed yet (service.install mongodb)");
+  if (!mongodbInstalled(ctx)) throw new ActionError("not_installed", "MongoDB isn't installed yet (service.install mongodb)");
   const state = readServices(ctx, slug);
   const name = pgName(slug);
   const m = state.mongodb ?? { database: name, user: name, password: randomBytes(24).toString("hex") };
@@ -689,7 +734,7 @@ export async function removeMongodb(ctx: Context, slug: string, keepData = true)
   const app = appLayout(ctx, slug);
   const state = existsSync(app.etcDir) ? readServices(ctx, slug) : {};
   const m = state.mongodb;
-  if (!m || !mongodbInstalled()) return null;
+  if (!m || !mongodbInstalled(ctx)) return null;
   const admin = readMongoAdmin(ctx);
   if (!admin) throw new ActionError("not_installed", "MongoDB has no login for the agent yet (service.install mongodb)");
   const archived = keepData

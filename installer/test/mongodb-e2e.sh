@@ -44,10 +44,23 @@ out="$(mongosh --quiet --norc mongodb://127.0.0.1:27017/admin --eval 'db.adminCo
 grep -q "^  authorization: enabled$" /etc/mongodb-layer.conf && grep -q "cacheSizeGB" /etc/mongodb-layer.conf && pass "tuned for a small box ($(grep -o 'cacheSizeGB: .*' /etc/mongodb-layer.conf))" || fail "no /etc/mongodb-layer.conf"
 systemctl cat mongod | grep -q "^ExecStart=/usr/bin/mongod --config /etc/mongodb-layer.conf$" && pass "mongod runs with those settings (the package's /etc/mongod.conf is untouched)" || fail "mongod's ExecStart" "$(systemctl cat mongod)"
 [[ "$(ps -o user= -C mongod | sort -u)" == mongodb ]] && pass "mongod runs as the mongodb user" || fail "mongod's user" "$(ps -o user=,cmd= -C mongod)"
+tunables="$(tr '\0' '\n' <"/proc/$(pgrep -xo mongod)/environ" | grep '^GLIBC_TUNABLES=')"
+[[ "$tunables" == "GLIBC_TUNABLES=glibc.pthread.rseq=1" ]] && pass "per-thread allocator caches, so it starts on kernels 6.19.0 to 7.0.13 too" || fail "mongod's GLIBC_TUNABLES" "$tunables"
 grep -q "enableTelemetry: false" /etc/mongosh.conf && pass "mongosh sends no usage data" || fail "mongosh telemetry is on"
 [[ "$(stat -c '%U %a' /var/lib/layer-agent/mongodb-admin.json)" == "root 600" ]] && pass "the agent's own login is root 600" || fail "agent login file" "$(ls -l /var/lib/layer-agent/mongodb-admin.json 2>&1)"
 out="$(call service.install '{"name":"mongodb"}')"
 expect "installing again is harmless" "$out" '.ok == true and .result.already == true'
+
+echo "A MongoDB that can't start says why, and stops retrying"
+mode="$(stat -c %a /var/lib/mongodb)"
+chmod 000 /var/lib/mongodb
+out="$(call service.install '{"name":"mongodb"}')"
+expect "service.install says why from mongod's log" "$out" '.ok == false and .error.code == "start_failed" and (.error.message | test("From its log: .*Permission denied"))'
+[[ "$(systemctl is-active mongod)" != active && "$(systemctl is-enabled mongod)" == disabled ]] && pass "mongod is stopped, not failing again every 5 s" || fail "mongod after a failed start" "$(systemctl status mongod --no-pager 2>&1 | head -5)"
+chmod "$mode" /var/lib/mongodb
+out="$(call service.install '{"name":"mongodb"}')"
+expect "installing again brings it back" "$out" '.ok == true'
+[[ "$(systemctl is-enabled mongod)" == enabled ]] && pass "mongod starts at boot again" || fail "mongod isn't enabled"
 
 echo "A user and database per app"
 for s in "${apps[@]}"; do
