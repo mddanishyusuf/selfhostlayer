@@ -1,10 +1,11 @@
 @import "tailwindcss";
 
-/* Design tokens: a warm near-black (or warm paper) with one set of accent
-   colors. The theme comes from <html data-theme="dark|light|system">, set
-   on the server from the layer-theme cookie, so pages never flash. */
+/* Design tokens: a warm near-black in dark, and in light the neutral grays of
+   the homepage (selfhostlayer.com), with one set of accent colors. The theme
+   comes from <html data-theme="dark|light|system">, set on the server from the
+   layer-theme cookie, so pages never flash. */
 @theme inline {
-  --font-sans: var(--font-albert-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, monospace;
   --color-background: var(--background);
   --color-sidebar: var(--sidebar);
@@ -25,6 +26,7 @@
   --color-warn: var(--gold);
   --color-err: var(--rose);
   --color-err-subtle: color-mix(in srgb, var(--rose) 12%, transparent);
+  --color-on-rose: var(--on-rose);
   --color-lavender: var(--lavender);
   --color-coral: var(--coral);
   --color-teal: var(--teal);
@@ -38,28 +40,29 @@
 :root,
 :root[data-theme="light"] {
   color-scheme: light;
-  --background: #faf8f5;
-  --sidebar: #f4f1ec;
-  --foreground: #1c1a19;
-  --muted: #6f6964;
-  --dim: #9a948e;
-  --border: #e7e2dc;
-  --border-strong: #d4ccc4;
-  --hover: #f1ede7;
-  --selected: #e9e3dc;
-  --pill: #ddd6ce;
-  --track: #e6e0d9;
-  --gold: #b7791f;
-  --lavender: #7a66e0;
-  --coral: #d4683a;
-  --teal: #2a9a88;
-  --blue: #3b72d6;
-  --rose: #d9483b;
-  --inverse: #1c1a19;
-  --inverse-fg: #faf8f5;
-  --code: #1c1a19;
+  --background: #fafafa;
+  --sidebar: #f5f5f5;
+  --foreground: #171717;
+  --muted: #6f6f6f;
+  --dim: #9a9a9a;
+  --border: #e5e5e5;
+  --border-strong: #d4d4d4;
+  --hover: #f0f0f0;
+  --selected: #e8e8e8;
+  --pill: #dedede;
+  --track: #e5e5e5;
+  --gold: #a16207;
+  --lavender: #6e56cf;
+  --coral: #ea580c;
+  --teal: #0f766e;
+  --blue: #2563eb;
+  --rose: #dc2626;
+  --on-rose: #ffffff;
+  --inverse: #171717;
+  --inverse-fg: #fafafa;
+  --code: #171717;
   /* Chart series: checked with the dataviz validator against each surface. */
-  --chart: #7a66e0;
+  --chart: #6e56cf;
 }
 
 :root[data-theme="dark"] {
@@ -81,6 +84,7 @@
   --teal: #7ccfc2;
   --blue: #6c9ef0;
   --rose: #f2777a;
+  --on-rose: #1c1a19;
   --inverse: #ece8e3;
   --inverse-fg: #1c1a19;
   --code: #141211;
@@ -107,6 +111,7 @@
     --teal: #7ccfc2;
     --blue: #6c9ef0;
     --rose: #f2777a;
+    --on-rose: #1c1a19;
     --inverse: #ece8e3;
     --inverse-fg: #1c1a19;
     --code: #141211;

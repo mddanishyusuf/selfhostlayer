@@ -12,7 +12,7 @@ const VARIANTS = {
   primary: "border border-inverse bg-inverse text-inverse-fg hover:opacity-90",
   secondary: "border border-border-strong text-foreground hover:bg-hover",
   ghost: "border border-transparent text-muted hover:bg-hover hover:text-foreground",
-  danger: "border border-rose bg-rose text-[#1c1a19] hover:opacity-90",
+  danger: "border border-rose bg-rose text-on-rose hover:opacity-90",
 } as const;
 
 /** A pill button. size "sm" for row actions. */
