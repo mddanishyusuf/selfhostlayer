@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { appActions } from "../src/actions/app.ts";
 import { grantPattern, renderMariadbConf, serviceActions, serviceEnv } from "../src/actions/service.ts";
 import { NO_IO } from "../src/context.ts";
+import { mongodbSource, renderMongodConf, renderMongodDropin, renderMongoshConf } from "../src/templates/mongodb.ts";
 import { renderRedisConf, renderRedisUnit } from "../src/templates/redis.ts";
 import { testEnv, type TestEnv } from "./helpers.ts";
 
@@ -54,6 +55,40 @@ describe("MySQL (MariaDB)", () => {
   });
 });
 
+describe("MongoDB", () => {
+  const login = { database: "app_piqo", user: "app_piqo", password: "x" };
+
+  it("hands apps MONGODB_URI, next to a SQL DATABASE_URL", () => {
+    expect(serviceEnv({ mongodb: login, postgres: login })).toEqual({
+      DATABASE_URL: "postgresql://app_piqo:x@127.0.0.1:5432/app_piqo",
+      MONGODB_URI: "mongodb://app_piqo:x@127.0.0.1:27017/app_piqo",
+    });
+  });
+
+  it("is tuned for a small box: 127.0.0.1 only, logins required, a small cache", async () => {
+    const conf = renderMongodConf(2048);
+    await expect(conf).toMatchFileSnapshot("./__snapshots__/mongodb-layer.conf");
+    expect(conf).toContain("  bindIp: 127.0.0.1\n");
+    expect(conf).toContain("  authorization: enabled\n");
+    expect(conf).toContain("cacheSizeGB: 0.25\n");
+    expect(renderMongodConf(8192)).toContain("cacheSizeGB: 0.5\n");
+    expect(renderMongodConf(65536)).toContain("cacheSizeGB: 1\n");
+    // The package's own config stays untouched; the drop-in points mongod at ours.
+    expect(renderMongodDropin()).toContain("ExecStart=\nExecStart=/usr/bin/mongod --config /etc/mongodb-layer.conf\n");
+    expect(renderMongoshConf()).toContain("enableTelemetry: false\n");
+  });
+
+  it("picks MongoDB's apt source for the OS, and says why when there's none", () => {
+    expect(mongodbSource("ubuntu", "resolute", "arm64")).toEqual({
+      line: "deb [ arch=arm64 signed-by=/etc/apt/keyrings/mongodb-server-9.asc ] https://repo.mongodb.org/apt/ubuntu resolute/mongodb-org/9.0 multiverse",
+    });
+    expect(mongodbSource("ubuntu", "noble", "x64")).toMatchObject({ line: expect.stringContaining("arch=amd64") });
+    expect(mongodbSource("debian", "bookworm", "x64")).toMatchObject({ line: expect.stringContaining("debian bookworm/mongodb-org/9.0 main") });
+    expect(mongodbSource("debian", "bookworm", "arm64")).toMatchObject({ error: expect.stringContaining("no ARM packages for Debian") });
+    expect(mongodbSource("ubuntu", "jammy", "x64")).toMatchObject({ error: expect.stringContaining("no packages for ubuntu jammy") });
+  });
+});
+
 describe("one SQL database per app", () => {
   let env: TestEnv;
   beforeEach(async () => {
@@ -85,6 +120,14 @@ describe("redis.add", () => {
     if (existsSync("/usr/bin/redis-server") || existsSync("/usr/bin/valkey-server")) return;
     await expect(serviceActions["redis.add"]!.run({ slug: "piqo" }, env.ctx, NO_IO)).rejects.toThrow(/isn't installed/);
     expect(existsSync(join(env.paths.appEtcRoot, "piqo", "services.env"))).toBe(false);
+  });
+
+  it("refuses MongoDB until it's installed", async () => {
+    // Test machines have no /usr/bin/mongod (and if they do, skip).
+    if (existsSync("/usr/bin/mongod")) return;
+    await expect(serviceActions["mongodb.add"]!.run({ slug: "piqo" }, env.ctx, NO_IO)).rejects.toThrow(/MongoDB isn't installed/);
+    await expect(serviceActions["mongodb.add"]!.run({ slug: "nope" }, env.ctx, NO_IO)).rejects.toThrow(/doesn't exist/);
+    await expect(serviceActions["mongodb.remove"]!.run({ slug: "piqo" }, env.ctx, NO_IO)).rejects.toThrow(/has no MongoDB/);
   });
 
   it("reports no services for a fresh app", async () => {

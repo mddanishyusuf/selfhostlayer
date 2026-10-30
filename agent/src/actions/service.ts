@@ -4,13 +4,15 @@
 // - Postgres: one shared server, a role and database per app.
 // - MySQL (MariaDB): the same, a user and database per app. An app gets one
 //   SQL database, Postgres or MySQL, since both hand it DATABASE_URL.
+// - MongoDB: one shared server from MongoDB's own repository, a user and
+//   database per app, handed over as MONGODB_URI (so next to SQL is fine).
 // The agent makes the passwords and writes them to services.env (root 600),
 // which the app's units load before the user's app.env.
 import { randomBytes } from "node:crypto";
-import { closeSync, constants, existsSync, openSync, readdirSync, readFileSync, rmSync } from "node:fs";
+import { closeSync, constants, existsSync, mkdirSync, mkdtempSync, openSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { connect } from "node:net";
-import { totalmem } from "node:os";
-import { join } from "node:path";
+import { tmpdir, totalmem } from "node:os";
+import { dirname, join } from "node:path";
 import { assertInt, assertSlug, ValidationError } from "@layer/protocol";
 import type { ActionTable, Context, Params } from "../context.ts";
 import { ActionError } from "../errors.ts";
@@ -19,6 +21,7 @@ import { ensureDir, lookupUser, removeManaged, writeFileAtomic } from "../fsutil
 import { isPortFree } from "../ports.ts";
 import { SYSTEMD_RUN } from "../sandbox.ts";
 import { renderEnvFile } from "../templates/env-file.ts";
+import { MONGOD_CONF, MONGODB_KEYRING, MONGODB_SIGNING_KEY, MONGODB_SOURCES, MONGOSH_CONF, mongodbSource, renderMongodConf, renderMongodDropin, renderMongoshConf } from "../templates/mongodb.ts";
 import { redisUnit, renderRedisConf, renderRedisUnit } from "../templates/redis.ts";
 import { appLayout } from "./app.ts";
 
@@ -29,6 +32,7 @@ export interface ServicesState {
   redis?: { port: number; password: string; memoryMb: number };
   postgres?: { database: string; user: string; password: string };
   mysql?: { database: string; user: string; password: string };
+  mongodb?: { database: string; user: string; password: string };
 }
 
 const servicesFile = (ctx: Context, slug: string) => join(appLayout(ctx, slug).etcDir, "services.json");
@@ -49,6 +53,11 @@ export function serviceEnv(state: ServicesState): Record<string, string> {
   if (state.mysql) {
     const m = state.mysql;
     env.DATABASE_URL = `mysql://${m.user}:${m.password}@127.0.0.1:3306/${m.database}`;
+  }
+  // The user lives in the app's own database, so the URL needs no authSource.
+  if (state.mongodb) {
+    const m = state.mongodb;
+    env.MONGODB_URI = `mongodb://${m.user}:${m.password}@127.0.0.1:27017/${m.database}`;
   }
   return env;
 }
@@ -79,7 +88,8 @@ async function serviceInstall(params: Params, ctx: Context) {
   const name = params.name;
   if (name === "postgres") return installPostgres(ctx);
   if (name === "mysql") return installMysql(ctx);
-  if (name !== "redis") throw new ValidationError("name", 'must be "redis", "postgres" or "mysql"');
+  if (name === "mongodb") return installMongodb(ctx);
+  if (name !== "redis") throw new ValidationError("name", 'must be "redis", "postgres", "mysql" or "mongodb"');
   if (redisBinary()) return { name, installed: true, binary: redisBinary(), already: true };
   await apt(ctx, ["update", "-q"], "layer-apt-update");
   // Some releases ship Valkey (the Redis fork) instead of Redis; both work the same here.
@@ -212,7 +222,7 @@ async function redisRemove(params: Params, ctx: Context) {
 
 async function serviceStatus(params: Params, ctx: Context) {
   // Without an app: just which engines are installed on the server.
-  const installed = { redis: redisBinary() !== null, postgres: postgresCluster() !== null, mysql: mysqlInstalled() };
+  const installed = { redis: redisBinary() !== null, postgres: postgresCluster() !== null, mysql: mysqlInstalled(), mongodb: mongodbInstalled() };
   if (params.slug === undefined) return { installed };
   const slug = assertSlug(params.slug);
   const app = appLayout(ctx, slug);
@@ -236,6 +246,16 @@ async function serviceStatus(params: Params, ctx: Context) {
       url: env.DATABASE_URL,
       sizeMb: size.code === 0 ? Math.round((Number(size.stdout.trim()) / 1048576) * 10) / 10 : null,
       answering: size.code === 0,
+    };
+  }
+  if (state.mongodb && installed.mongodb) {
+    const r = await mongosh(ctx, `const s = db.getSiblingDB(${q(state.mongodb.database)}).runCommand({ dbStats: 1 }); print(JSON.stringify(s.totalSize ?? s.storageSize + s.indexSize))`, { allowFail: true }).catch(() => null);
+    const bytes = r?.code === 0 ? lastJson(r.stdout) : null;
+    out.mongodb = {
+      database: state.mongodb.database,
+      url: env.MONGODB_URI,
+      sizeMb: typeof bytes === "number" ? Math.round((bytes / 1048576) * 10) / 10 : null,
+      answering: typeof bytes === "number",
     };
   }
   if (state.redis) {
@@ -496,6 +516,204 @@ async function mysqlRemove(params: Params, ctx: Context) {
   return { slug, removed: true, archived: result.archived };
 }
 
+// ---------------------------------------------------------------- MongoDB
+
+export function mongodbInstalled(): boolean {
+  return existsSync(BIN.mongod) && existsSync(BIN.mongosh);
+}
+
+/** /etc/os-release's ID and VERSION_CODENAME, which pick MongoDB's apt source. */
+function osRelease(): { id: string; codename: string } {
+  const text = existsSync("/etc/os-release") ? readFileSync("/etc/os-release", "utf8") : "";
+  const field = (key: string) => new RegExp(`^${key}="?([^"\\n]*)"?$`, "m").exec(text)?.[1] ?? "";
+  return { id: field("ID"), codename: field("VERSION_CODENAME") };
+}
+
+interface MongoLogin {
+  user: string;
+  password: string;
+}
+
+function readMongoAdmin(ctx: Context): MongoLogin | null {
+  return existsSync(ctx.paths.mongodbAdmin) ? (JSON.parse(readFileSync(ctx.paths.mongodbAdmin, "utf8")) as MongoLogin) : null;
+}
+
+/** Names are app_[a-z0-9_]+ and passwords hex: a JSON string is all the quoting a script needs. */
+const q = (s: string) => JSON.stringify(s);
+
+/** A connection that gives up after 5 s when nothing answers, instead of the driver's 30. */
+const quick = (url: string) => `${url}${url.includes("?") ? "&" : "?"}serverSelectionTimeoutMS=5000`;
+
+/**
+ * Runs a mongosh script logged in as the agent (by default), as the login in
+ * `url`, or with none. The script, and the password in it, go through a file
+ * only root can read: never the process list.
+ */
+async function mongosh(ctx: Context, body: string, opts: { as?: "agent" | "nobody" | { url: string }; allowFail?: boolean } = {}) {
+  const as = opts.as ?? "agent";
+  let url = "mongodb://127.0.0.1:27017/admin";
+  if (as === "agent") {
+    const admin = readMongoAdmin(ctx);
+    if (!admin) throw new ActionError("not_installed", "MongoDB has no login for the agent yet (service.install mongodb)");
+    url = `mongodb://${admin.user}:${admin.password}@127.0.0.1:27017/admin`;
+  } else if (as !== "nobody") {
+    url = as.url;
+  }
+  const dir = mkdtempSync(join(tmpdir(), "layer-mongosh-"));
+  try {
+    const script = join(dir, "script.js");
+    writeFileSync(script, `db = connect(${q(quick(url))});\n${body}\n`, { mode: 0o600 });
+    // HOME for mongosh's own log files, in the folder that goes away after.
+    return await ctx.exec(BIN.mongosh, ["--quiet", "--norc", "--nodb", script], { allowFail: opts.allowFail, timeoutMs: 120_000, env: { HOME: dir } });
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+/** The last line of output that parses as JSON: scripts end with print(JSON.stringify(…)). */
+function lastJson(stdout: string): unknown {
+  for (const line of stdout.trim().split("\n").reverse()) {
+    try {
+      return JSON.parse(line);
+    } catch {
+      // a log line: keep looking
+    }
+  }
+  return null;
+}
+
+async function waitForMongodb(ctx: Context): Promise<void> {
+  for (let i = 0; i < 60; i++) {
+    // ping needs no login.
+    if ((await mongosh(ctx, "print(JSON.stringify(db.runCommand({ ping: 1 }).ok))", { as: "nobody", allowFail: true })).code === 0) return;
+    await new Promise((r) => setTimeout(r, 500));
+  }
+  throw new ActionError("start_failed", "MongoDB didn't come up");
+}
+
+/**
+ * The agent's own login (root on MongoDB), saved root 600. The first install
+ * makes it through MongoDB's localhost exception: while there are no users at
+ * all, a connection from 127.0.0.1 may create the first one.
+ */
+async function ensureMongoAdmin(ctx: Context): Promise<void> {
+  const saved = readMongoAdmin(ctx);
+  if (saved) {
+    const r = await mongosh(ctx, "print(JSON.stringify(db.runCommand({ connectionStatus: 1 }).authInfo.authenticatedUsers.map((u) => u.user)))", { allowFail: true });
+    const users = lastJson(r.stdout);
+    if (r.code === 0 && Array.isArray(users) && users.includes(saved.user)) return;
+    throw new ActionError("auth_failed", `MongoDB doesn't accept the agent's login in ${ctx.paths.mongodbAdmin}`);
+  }
+  const admin = { user: "layer", password: randomBytes(24).toString("hex") };
+  // Saved before the user exists: losing it after would lock the agent out for good.
+  mkdirSync(dirname(ctx.paths.mongodbAdmin), { recursive: true, mode: 0o700 });
+  writeFileAtomic(ctx.paths.mongodbAdmin, JSON.stringify(admin) + "\n", 0o600);
+  const r = await mongosh(ctx, `db.getSiblingDB("admin").createUser({ user: ${q(admin.user)}, pwd: ${q(admin.password)}, roles: ["root"] }); print(JSON.stringify(1))`, { as: "nobody", allowFail: true });
+  if (r.code !== 0) {
+    rmSync(ctx.paths.mongodbAdmin, { force: true });
+    throw new ActionError("install_failed", `couldn't make the agent's MongoDB login (does the server have users already?): ${(r.stderr || r.stdout).trim().split("\n").slice(-2).join(" ")}`);
+  }
+}
+
+async function installMongodb(ctx: Context) {
+  const already = mongodbInstalled();
+  if (!already) {
+    const os = osRelease();
+    const source = mongodbSource(os.id, os.codename, process.arch);
+    if ("error" in source) throw new ActionError("unsupported", source.error);
+    ensureDir(dirname(MONGODB_KEYRING), 0o755);
+    writeFileAtomic(MONGODB_KEYRING, MONGODB_SIGNING_KEY, 0o644);
+    writeFileAtomic(MONGODB_SOURCES, source.line + "\n", 0o644);
+    await apt(ctx, ["update", "-q"], "layer-apt-update");
+    const r = await apt(ctx, ["install", "-y", "-q", "--no-install-recommends", "mongodb-org-server", "mongodb-mongosh", "mongodb-database-tools"], "layer-apt-install");
+    if (r.code !== 0 || !mongodbInstalled()) {
+      // Without MongoDB, its repository has no business in apt's sources.
+      rmSync(MONGODB_SOURCES, { force: true });
+      throw new ActionError("install_failed", `couldn't install MongoDB with apt: ${(r.stderr || r.stdout).trim().split("\n").slice(-3).join(" ")}`);
+    }
+  }
+  writeFileAtomic(MONGOSH_CONF, renderMongoshConf(), 0o644);
+  writeFileAtomic(MONGOD_CONF, renderMongodConf(Math.round(totalmem() / 1048576)), 0o644);
+  ensureDir(join(ctx.paths.systemdDir, "mongod.service.d"), 0o755);
+  writeFileAtomic(join(ctx.paths.systemdDir, "mongod.service.d", "layer.conf"), renderMongodDropin(), 0o644);
+  await ctx.exec(BIN.systemctl, ["daemon-reload"]);
+  await ctx.exec(BIN.systemctl, ["enable", "mongod"], { allowFail: true });
+  await ctx.exec(BIN.systemctl, ["restart", "mongod"]);
+  await waitForMongodb(ctx);
+  await ensureMongoAdmin(ctx);
+  const version = lastJson((await mongosh(ctx, "print(JSON.stringify(db.version()))")).stdout);
+  return { name: "mongodb", installed: true, version: typeof version === "string" ? version : null, already };
+}
+
+async function mongodbAdd(params: Params, ctx: Context) {
+  const slug = assertSlug(params.slug);
+  const app = appLayout(ctx, slug);
+  if (!existsSync(app.etcDir)) throw new ActionError("not_found", `app ${slug} doesn't exist`);
+  if (!mongodbInstalled()) throw new ActionError("not_installed", "MongoDB isn't installed yet (service.install mongodb)");
+  const state = readServices(ctx, slug);
+  const name = pgName(slug);
+  const m = state.mongodb ?? { database: name, user: name, password: randomBytes(24).toString("hex") };
+  // The user lives in the app's database and may read, write and manage that one only.
+  await mongosh(
+    ctx,
+    [
+      `const d = db.getSiblingDB(${q(m.database)});`,
+      `const roles = [{ role: "readWrite", db: ${q(m.database)} }, { role: "dbAdmin", db: ${q(m.database)} }];`,
+      `if (d.getUser(${q(m.user)})) d.updateUser(${q(m.user)}, { pwd: ${q(m.password)}, roles });`,
+      `else d.createUser({ user: ${q(m.user)}, pwd: ${q(m.password)}, roles });`,
+      "print(JSON.stringify(1));",
+    ].join("\n"),
+  );
+  writeServices(ctx, slug, { ...state, mongodb: m });
+  // Prove the URL the app gets works: log in with it, the way the app will.
+  const r = await mongosh(ctx, "print(JSON.stringify(db.runCommand({ connectionStatus: 1 }).authInfo.authenticatedUsers.map((u) => u.user)))", { as: { url: serviceEnv({ mongodb: m }).MONGODB_URI! }, allowFail: true });
+  const users = lastJson(r.stdout);
+  if (r.code !== 0 || !Array.isArray(users) || !users.includes(m.user)) throw new ActionError("start_failed", `the new login doesn't work: ${(r.stderr || r.stdout).trim().split("\n").slice(-2).join(" ")}`);
+  return { slug, database: m.database, env: ["MONGODB_URI"] };
+}
+
+/** A config file holding the login for MongoDB's tools (mongodump, mongorestore): never in their arguments. */
+async function withToolLogin<T>(url: string, run: (config: string) => Promise<T>): Promise<T> {
+  const dir = mkdtempSync(join(tmpdir(), "layer-mongotools-"));
+  try {
+    const config = join(dir, "login.yaml");
+    writeFileSync(config, `uri: ${q(url)}\n`, { mode: 0o600 });
+    return await run(config);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+/** Drops the app's database and user. With keepData, a mongodump goes to the archive first. */
+export async function removeMongodb(ctx: Context, slug: string, keepData = true): Promise<{ archived: string | null } | null> {
+  const app = appLayout(ctx, slug);
+  const state = existsSync(app.etcDir) ? readServices(ctx, slug) : {};
+  const m = state.mongodb;
+  if (!m || !mongodbInstalled()) return null;
+  const admin = readMongoAdmin(ctx);
+  if (!admin) throw new ActionError("not_installed", "MongoDB has no login for the agent yet (service.install mongodb)");
+  const archived = keepData
+    ? await withToolLogin(`mongodb://${admin.user}:${admin.password}@127.0.0.1:27017/?authSource=admin`, (config) =>
+        archiveDump(ctx, slug, "mongodump.gz", BIN.mongodump, [`--config=${config}`, `--db=${m.database}`, "--archive", "--gzip", "--quiet"], m.database),
+      )
+    : null;
+  await mongosh(ctx, `const d = db.getSiblingDB(${q(m.database)}); d.dropDatabase(); if (d.getUser(${q(m.user)})) d.dropUser(${q(m.user)}); print(JSON.stringify(1));`);
+  if (existsSync(app.etcDir)) {
+    const { mongodb: _removed, ...rest } = state;
+    writeServices(ctx, slug, rest);
+  }
+  return { archived };
+}
+
+async function mongodbRemove(params: Params, ctx: Context) {
+  const slug = assertSlug(params.slug);
+  const keepData = params.keepData ?? true;
+  if (typeof keepData !== "boolean") throw new ValidationError("keepData", "must be true or false");
+  const result = await removeMongodb(ctx, slug, keepData);
+  if (!result) throw new ActionError("not_found", `${slug} has no MongoDB`);
+  return { slug, removed: true, archived: result.archived };
+}
+
 export const serviceActions: ActionTable = {
   "service.install": { mutates: true, run: serviceInstall },
   "service.status": { mutates: false, run: serviceStatus },
@@ -505,4 +723,6 @@ export const serviceActions: ActionTable = {
   "postgres.remove": { mutates: true, run: postgresRemove },
   "mysql.add": { mutates: true, run: mysqlAdd },
   "mysql.remove": { mutates: true, run: mysqlRemove },
+  "mongodb.add": { mutates: true, run: mongodbAdd },
+  "mongodb.remove": { mutates: true, run: mongodbRemove },
 };

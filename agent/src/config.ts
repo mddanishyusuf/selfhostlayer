@@ -23,6 +23,8 @@ export interface Paths {
   staticGroup: string | null;
   /** Where app.delete moves data/ when keepData is set. */
   archiveRoot: string;
+  /** The agent's own MongoDB login (root 600), made when MongoDB is installed. */
+  mongodbAdmin: string;
   /** Copies of every generated file, for `layer repair`. */
   managedDir: string;
   /** Releases downloaded for panel.update. */
@@ -64,6 +66,7 @@ export const DEFAULT_PATHS: Paths = {
   staticRoot: "/srv/static",
   staticGroup: "caddy",
   archiveRoot: "/var/lib/layer-agent/archive",
+  mongodbAdmin: "/var/lib/layer-agent/mongodb-admin.json",
   managedDir: "/var/lib/layer-agent/managed",
   updatesDir: "/var/lib/layer-agent/updates",
   stagingDir: "/var/lib/layer-staging",

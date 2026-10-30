@@ -100,6 +100,7 @@ One of each per app, installed on the server the first time any app asks for it.
 
 - **PostgreSQL:** a role and database (`app_<app>`) on the server's shared PostgreSQL. The app gets `DATABASE_URL`.
 - **MySQL:** a user and database (`app_<app>`) on the server's MariaDB, the MySQL that comes with Ubuntu and Debian. The user can only log in over TCP from 127.0.0.1. The app gets `DATABASE_URL` (`mysql://…`). An app gets one SQL database, Postgres or MySQL, since both use that variable.
+- **MongoDB:** a user and database (`app_<app>`) on the server's shared MongoDB 9.0, from MongoDB's own repository (it isn't in Ubuntu's or Debian's). The user can read, write and manage its own database and no other. The app gets `MONGODB_URI` (`mongodb://…`), so it fits next to Postgres or MySQL. The page shows the URI with its password hidden, a button to reveal it and one to copy it. MongoDB listens on 127.0.0.1 only; to open a database in Compass or mongosh on your computer, tunnel the port first (`ssh -N -L 27017:127.0.0.1:27017 root@<server>`) and use the same URI. It runs on Ubuntu 24.04 and 26.04, and on Debian only on x86: MongoDB has no ARM packages for Debian.
 - **Redis:** a small Redis of its own: its own port, password and memory cap, running as the app's user, with its data in `data/redis`. The app gets `REDIS_URL`.
 - **SQLite:** nothing to install. Keep database files in `DATA_DIR` (`/srv/apps/<app>/data`), and backups find them by their header and copy them safely.
 
@@ -108,6 +109,7 @@ Adding or removing a database restarts the app on the same build, with zero down
 ```sh
 sudo -u postgres psql -c '\l'          # Postgres databases
 mariadb -e 'SHOW DATABASES'            # MySQL databases
+systemctl status mongod                # MongoDB (settings in /etc/mongodb-layer.conf)
 systemctl status layer-redis-<app>     # the app's Redis
 ```
 
@@ -115,7 +117,7 @@ systemctl status layer-redis-<app>     # the app's Redis
 **Back up now** takes a snapshot of the app's data folder:
 
 1. Every SQLite file is copied with SQLite's online backup API, safe while the app writes, and the copy must pass `PRAGMA integrity_check`.
-2. Postgres and MySQL are dumped with the app's own login.
+2. Postgres, MySQL and MongoDB are dumped with the app's own login.
 3. The archive is encrypted on the server and uploaded to your bucket (set up under Server → Backups).
 
 **Restore** puts a backup back:
@@ -124,7 +126,7 @@ systemctl status layer-redis-<app>     # the app's Redis
 2. It stops the app, swaps the folders and loads the database dump.
 3. It starts the app again.
 
-The replaced data stays next to it as `data.before-restore-<time>`. For MySQL, that folder also holds a dump of the database as it was.
+The replaced data stays next to it as `data.before-restore-<time>`. For MySQL and MongoDB, that folder also holds a dump of the database as it was.
 
 **Import** brings a data folder from another server. It goes through the same checks as a restore. See [Moving an app from pm2](moving-from-pm2.md).
 
@@ -182,14 +184,14 @@ Every project's domains, one row per project. **Manage** opens that project's Do
 Coming soon: one-click apps built for Self Host Layer (analytics, email, scheduling and more).
 
 ### Databases
-Every engine on the server (PostgreSQL, MySQL, Redis, SQLite) with each app's database, its size and whether it answers. You can add one to an app from here.
+Every engine on the server (PostgreSQL, MySQL, MongoDB, Redis, SQLite) with each app's database, its size and whether it answers. You can copy an app's connection URL, or add an engine to an app, from here.
 
 ### Backups
 - **Storage:** any S3-compatible bucket: AWS S3, Cloudflare R2, Backblaze B2, MinIO, and others. Connecting tests it: the panel writes, reads, lists and deletes a test object.
 - **Recovery key:** shown once. Write it down. Backups are encrypted with it before they leave the server, and it's the only way to read them on a new server.
 - **Schedule:** a daily backup of every app at the hour you pick, keeping as many as you choose.
 - **Back up everything:** every app, plus the panel's own database and key, so a new server can be restored from scratch.
-- **The list:** every backup with what it holds (SQLite files checked, Postgres or MySQL dump) and its size.
+- **The list:** every backup with what it holds (SQLite files checked, a Postgres, MySQL or MongoDB dump) and its size.
 
 ### Alerts
 Where alerts go: Telegram, Discord, a webhook (signed) or email over SMTP. Each channel has a test button. You get alerts for:

@@ -10,8 +10,9 @@
  * The archive holds those checked copies in place of the live files and
  * leaves out -wal/-shm/-journal. With DATABASE_URL set (the app has
  * Postgres or MySQL), a dump made with the app's own login goes in as
- * .layer-postgres.dump or .layer-mysql.sql. The last stderr line is
- * `LAYER-SNAPSHOT {"sqlite":[{path,bytes}],"postgres":{bytes}|null,"mysql":{bytes}|null}`.
+ * .layer-postgres.dump or .layer-mysql.sql; with MONGODB_URI, a mongodump as
+ * .layer-mongodb.archive. The last stderr line is
+ * `LAYER-SNAPSHOT {"sqlite":[{path,bytes}],"postgres":{bytes}|null,"mysql":{bytes}|null,"mongodb":{bytes}|null}`.
  */
 export const SNAPSHOT_JOB = String.raw`
 const fs = require("node:fs");
@@ -101,9 +102,26 @@ function findDatabases(dir, rel, out) {
     mysql = { bytes: fs.statSync(dump).size };
   }
 
+  // The app's MongoDB, the same way, as .layer-mongodb.archive. Its login goes
+  // to mongodump in a file only this job can read, not in the arguments.
+  let mongodb = null;
+  const mongoUrl = process.env.MONGODB_URI || "";
+  if (mongoUrl.startsWith("mongodb://")) {
+    const dump = path.join(snap, ".layer-mongodb.archive");
+    const login = path.join(stage, "mongodb-login.yaml");
+    fs.writeFileSync(login, "uri: " + JSON.stringify(mongoUrl) + "\n", { mode: 0o600 });
+    const r = spawnSync("/usr/bin/mongodump", ["--config=" + login, "--archive=" + dump, "--gzip", "--quiet"], { stdio: ["ignore", "ignore", "pipe"], encoding: "utf8" });
+    fs.rmSync(login, { force: true });
+    if (r.status !== 0) {
+      console.error("layer: mongodump failed: " + String(r.stderr || r.error).trim().split("\n").pop());
+      process.exit(5);
+    }
+    mongodb = { bytes: fs.statSync(dump).size };
+  }
+
   const excludes = path.join(stage, "excludes");
   const skip = databases.flatMap((rel) => ["", "-wal", "-shm", "-journal"].map((s) => "./" + rel + s));
-  skip.push("./.layer-postgres.dump", "./.layer-mysql.sql");
+  skip.push("./.layer-postgres.dump", "./.layer-mysql.sql", "./.layer-mongodb.archive");
   fs.writeFileSync(excludes, skip.join("\n") + "\n");
   const tar = spawn(
     "/usr/bin/tar",
@@ -124,7 +142,7 @@ function findDatabases(dir, rel, out) {
       console.error("layer: tar exited " + code);
       process.exit(4);
     }
-    console.error("LAYER-SNAPSHOT " + JSON.stringify({ sqlite: report, postgres, mysql }));
+    console.error("LAYER-SNAPSHOT " + JSON.stringify({ sqlite: report, postgres, mysql, mongodb }));
   });
 })().catch((err) => {
   console.error("layer: snapshot failed: " + (err && err.message ? err.message : err));
@@ -209,7 +227,7 @@ tar.on("close", (code) => {
     const top = fs.readdirSync(work, { withFileTypes: true });
     const root = top.length === 1 && top[0].isDirectory() ? top[0].name : "";
     const base = root ? path.join(work, root) : work;
-    for (const [dump, engine] of [[".layer-postgres.dump", "Postgres"], [".layer-mysql.sql", "MySQL"]]) {
+    for (const [dump, engine] of [[".layer-postgres.dump", "Postgres"], [".layer-mysql.sql", "MySQL"], [".layer-mongodb.archive", "MongoDB"]]) {
       if (!fs.existsSync(path.join(base, dump))) continue;
       fs.rmSync(path.join(base, dump));
       console.log("Skipped " + dump + ": " + engine + " data comes back through a backup restore.");
@@ -285,6 +303,22 @@ export const RESTORE_JOB = [
   '      if ! mariadb "$@" --batch "${rest##*/}" <"$dump"; then rm -f -- "$dump"; echo "layer: files restored, but loading the MySQL dump failed; the database as it was is in data.before-restore-$stamp/.layer-mysql.sql"; exit 2; fi',
   '      rm -f -- "$dump"; echo "layer: MySQL database restored" ;;',
   '    *) rm -f -- "$dump"; echo "layer: the backup has a MySQL dump, but the app has no MySQL now; skipped it" ;;',
+  '  esac',
+  'fi',
+  // The app's MongoDB, like MySQL: the database as it was is dumped next to the
+  // replaced files, then the backup's dump replaces its collections. The login
+  // goes to the tools in a file (authSource: the app's database, where its user
+  // lives), not in their arguments.
+  'dump="$app/data/.layer-mongodb.archive"',
+  'if [ -f "$dump" ]; then',
+  '  case "${MONGODB_URI:-}" in',
+  '    mongodb://*)',
+  '      db="${MONGODB_URI##*/}"; login="$(mktemp)"; echo "uri: \\"${MONGODB_URI%/*}/?authSource=$db\\"" >"$login"',
+  '      before="$app/data.before-restore-$stamp"; mkdir -p -m 700 -- "$before"',
+  '      if ! mongodump --config="$login" --db="$db" --archive="$before/.layer-mongodb.archive" --gzip --quiet; then rm -f -- "$dump" "$login"; echo "layer: files restored, but the MongoDB database could not be saved first, so it was left as it was"; exit 2; fi',
+  '      if ! mongorestore --config="$login" --nsInclude="$db.*" --archive="$dump" --gzip --drop --quiet; then rm -f -- "$dump" "$login"; echo "layer: files restored, but loading the MongoDB dump failed; the database as it was is in data.before-restore-$stamp/.layer-mongodb.archive"; exit 2; fi',
+  '      rm -f -- "$dump" "$login"; echo "layer: MongoDB database restored" ;;',
+  '    *) rm -f -- "$dump"; echo "layer: the backup has a MongoDB dump, but the app has no MongoDB now; skipped it" ;;',
   '  esac',
   'fi',
   // Keep only the folder this restore replaced.

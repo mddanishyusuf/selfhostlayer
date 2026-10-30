@@ -38,6 +38,7 @@ export default async function EnvPage({ params }: { params: Promise<{ slug: stri
         ...(status?.redis ? [secretRow("REDIS_URL", status.redis.url, "Redis")] : []),
         ...(status?.postgres ? [secretRow("DATABASE_URL", status.postgres.url, "Postgres")] : []),
         ...(status?.mysql ? [secretRow("DATABASE_URL", status.mysql.url, "MySQL")] : []),
+        ...(status?.mongodb ? [secretRow("MONGODB_URI", status.mongodb.url, "MongoDB")] : []),
       ];
 
   return (

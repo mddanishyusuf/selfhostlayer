@@ -97,6 +97,7 @@ export function testEnv(): TestEnv {
     staticRoot: join(root, "srv", "static"),
     staticGroup: null,
     archiveRoot: join(root, "var", "lib", "layer-agent", "archive"),
+    mongodbAdmin: join(root, "var", "lib", "layer-agent", "mongodb-admin.json"),
     managedDir: join(root, "var", "lib", "layer-agent", "managed"),
     updatesDir: join(root, "var", "lib", "layer-agent", "updates"),
     stagingDir: join(root, "var", "lib", "layer-staging"),

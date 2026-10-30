@@ -41,6 +41,8 @@ export const ACTIONS = [
   "postgres.remove",
   "mysql.add",
   "mysql.remove",
+  "mongodb.add",
+  "mongodb.remove",
   "firewall.status",
   "panel.site",
   "panel.address",

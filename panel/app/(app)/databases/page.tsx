@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import { Collapsible } from "@/components/collapsible";
 import { CopyButton } from "@/components/form";
 import { Icon } from "@/components/icon";
-import { Dot, Notice, PageHeader, Section, TileIcon } from "@/components/page";
+import { Dot, Notice, PageHeader, TileIcon } from "@/components/page";
 import { StatusText } from "@/components/status";
 import { Mark, Pill } from "@/components/ui";
 import { agent } from "@/lib/agent";
@@ -12,7 +12,6 @@ import { listBackups } from "@/lib/backup/runner";
 import { listProjects } from "@/lib/projects";
 import { serviceStatus, type ServiceStatus } from "@/lib/services";
 import { requireUser } from "@/lib/session";
-import { projectIconUrl } from "@/lib/site-icon";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Databases" };
@@ -20,7 +19,7 @@ export const metadata = { title: "Databases" };
 function Instance({ slug, index, name, detail, ok, url }: { slug: string; index: number; name: string; detail: ReactNode; ok: boolean; url?: string }) {
   return (
     <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-3.5 border-t border-border py-3.5 pl-4 pr-4 sm:pr-7 md:pl-[82px]">
-      <Mark name={slug} index={index} size="sm" icon={projectIconUrl(slug)} />
+      <Mark name={slug} index={index} size="sm" />
       <div className="grid min-w-0 gap-0.5">
         <div className="flex min-w-0 items-center gap-2 text-[15px] font-semibold">
           {slug} <code className="truncate font-mono text-[13px] font-normal text-muted">{name}</code>
@@ -52,20 +51,23 @@ export default async function DatabasesOverviewPage() {
   const all = listProjects();
   const apps = all.filter((p) => p.runtime.kind !== "static");
   const statuses = (await Promise.all(apps.map((p) => serviceStatus(p.slug).catch(() => null)))).filter((s): s is ServiceStatus => s !== null);
-  const installed = statuses[0]?.installed ?? (await agent<{ installed: ServiceStatus["installed"] }>("service.status").then((r) => r.installed).catch(() => ({ redis: false, postgres: false, mysql: false })));
+  const installed = statuses[0]?.installed ?? (await agent<{ installed: ServiceStatus["installed"] }>("service.status").then((r) => r.installed).catch(() => ({ redis: false, postgres: false, mysql: false, mongodb: false })));
   const indexOf = (slug: string) => all.findIndex((p) => p.slug === slug);
   const pg = statuses.filter((s) => s.postgres);
   const my = statuses.filter((s) => s.mysql);
+  const mongo = statuses.filter((s) => s.mongodb);
   const redis = statuses.filter((s) => s.redis);
   // SQLite files as the last successful backup found them.
   const sqlite = apps
     .map((p) => ({ p, files: listBackups({ slug: p.slug, limit: 5 }).find((b) => b.status === "ok")?.contents?.sqlite ?? [] }))
     .filter((x) => x.files.length > 0);
-  const down = [...pg.filter((s) => !s.postgres!.answering), ...my.filter((s) => !s.mysql!.answering), ...redis.filter((s) => !s.redis!.answering)];
-  const total = pg.length + my.length + redis.length + sqlite.reduce((n, x) => n + x.files.length, 0);
+  const down = [...pg.filter((s) => !s.postgres!.answering), ...my.filter((s) => !s.mysql!.answering), ...mongo.filter((s) => !s.mongodb!.answering), ...redis.filter((s) => !s.redis!.answering)];
+  const total = pg.length + my.length + mongo.length + redis.length + sqlite.reduce((n, x) => n + x.files.length, 0);
   const withoutRedis = statuses.filter((s) => !s.redis).map((s) => s.slug);
   // An app gets one SQL database: those with Postgres can't add MySQL, and the other way round.
   const withoutSql = statuses.filter((s) => !s.postgres && !s.mysql).map((s) => s.slug);
+  // MONGODB_URI fits next to either SQL database.
+  const withoutMongo = statuses.filter((s) => !s.mongodb).map((s) => s.slug);
   const addLinks = (engine: string, slugs: string[]) =>
     slugs.length ? (
       <span className="flex flex-wrap items-center gap-1.5">
@@ -79,6 +81,7 @@ export default async function DatabasesOverviewPage() {
     ) : undefined;
   const pgMb = pg.reduce((n, s) => n + (s.postgres!.sizeMb ?? 0), 0);
   const myMb = my.reduce((n, s) => n + (s.mysql!.sizeMb ?? 0), 0);
+  const mongoMb = mongo.reduce((n, s) => n + (s.mongodb!.sizeMb ?? 0), 0);
   const redisUsed = redis.reduce((n, s) => n + (s.redis!.memoryUsedMb ?? 0), 0);
   const redisCap = redis.reduce((n, s) => n + s.redis!.memoryMb, 0);
 
@@ -122,6 +125,19 @@ export default async function DatabasesOverviewPage() {
       </Collapsible>
 
       <Collapsible
+        testId="engine-mongodb"
+        lead={<TileIcon tone="gold"><Icon icon={Database01Icon} size={20} /></TileIcon>}
+        title={<>MongoDB {installed.mongodb ? <Pill outline>Installed</Pill> : <Pill outline>Not installed</Pill>}</>}
+        sub={installed.mongodb ? <>{mongo.length} database{mongo.length === 1 ? "" : "s"}<Dot />{mongoMb.toFixed(1)} MB</> : "From MongoDB's own repository, installed the first time you add it to a project"}
+        side={installed.mongodb ? <span className="max-sm:hidden"><StatusText status="ok" label="Running" /></span> : undefined}
+      >
+        {mongo.map((s) => (
+          <Instance key={s.slug} slug={s.slug} index={indexOf(s.slug)} name={s.mongodb!.database} ok={s.mongodb!.answering} url={s.mongodb!.url} detail={<>{s.mongodb!.sizeMb !== null ? `${s.mongodb!.sizeMb} MB` : "size unknown"}<Dot />a mongodump in every backup</>} />
+        ))}
+        <Footer add={addLinks("MongoDB", withoutMongo)} note="One server · a user and database per app · 127.0.0.1 only" />
+      </Collapsible>
+
+      <Collapsible
         testId="engine-redis"
         lead={<TileIcon tone="coral"><Icon icon={Database01Icon} size={20} /></TileIcon>}
         title={<>Redis {installed.redis ? <Pill outline>Installed</Pill> : <Pill outline>Not installed</Pill>}</>}
@@ -146,20 +162,6 @@ export default async function DatabasesOverviewPage() {
         <Footer note="Files in each app's DATA_DIR are found by their header and copied safely, even while the app writes" />
       </Collapsible>
 
-      <Section title="More engines" description="Installed the first time an app asks for one.">
-        {[["MongoDB", "Document data. Not in Ubuntu's packages; it needs MongoDB's own repository.", "dim"]].map(([name, what, tone]) => (
-          <div key={name} className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-3.5 border-t border-border px-4 py-3.5 sm:px-7">
-            <TileIcon tone={tone as "teal" | "dim"}>
-              <Icon icon={Database01Icon} size={20} />
-            </TileIcon>
-            <div className="grid min-w-0 gap-0.5">
-              <b className="text-[15px] font-semibold">{name}</b>
-              <span className="truncate text-[13px] text-muted">{what}</span>
-            </div>
-            <Pill outline>Coming soon</Pill>
-          </div>
-        ))}
-      </Section>
     </>
   );
 }

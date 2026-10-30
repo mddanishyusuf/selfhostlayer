@@ -2,11 +2,12 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { formatBytes } from "@/components/backup-list";
 import { Dot, KeyValues, Notice, PageHeader, SettingsRow } from "@/components/page";
-import { AddRedisForm, AddSqlForm, RemoveRedisForm, RemoveSqlForm, SecretUrl } from "@/components/services";
+import { AddDatabaseForm, AddRedisForm, RemoveDatabaseForm, RemoveRedisForm, SecretUrl } from "@/components/services";
 import { StatusText } from "@/components/status";
 import { listBackups } from "@/lib/backup/runner";
+import { boxConfig } from "@/lib/box";
 import { getProjectBySlug } from "@/lib/projects";
-import { serviceStatus, type ServiceStatus, type SqlKind } from "@/lib/services";
+import { serviceStatus, type DatabaseKind, type ServiceStatus } from "@/lib/services";
 import { requireUser } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
@@ -21,11 +22,33 @@ const NOTICES: Record<string, { lead: string; tone: "ok" | "lav"; text: string }
   "mysql-added": { lead: "Added", tone: "ok", text: "MySQL is ready." },
   "mysql-removed": { lead: "Removed", tone: "lav", text: "MySQL removed, and its data deleted." },
   "mysql-removed-kept": { lead: "Removed", tone: "lav", text: "MySQL removed. A final dump is kept on the server in /var/lib/layer-agent/archive." },
+  "mongodb-added": { lead: "Added", tone: "ok", text: "MongoDB is ready." },
+  "mongodb-removed": { lead: "Removed", tone: "lav", text: "MongoDB removed, and its data deleted." },
+  "mongodb-removed-kept": { lead: "Removed", tone: "lav", text: "MongoDB removed. A final dump is kept on the server in /var/lib/layer-agent/archive." },
 };
 
-const SQL = {
-  postgres: { title: "PostgreSQL", label: "Postgres", description: "A database and role only this app can use, on the server's PostgreSQL. Every backup includes a pg_dump." },
-  mysql: { title: "MySQL", label: "MySQL", description: "A database and user only this app can use, on the server's MariaDB, the MySQL that comes with Ubuntu and Debian. Every backup includes a dump." },
+const DATABASES = {
+  postgres: {
+    title: "PostgreSQL",
+    label: "Postgres",
+    env: "DATABASE_URL",
+    description: "A database and role only this app can use, on the server's PostgreSQL. Every backup includes a pg_dump.",
+    first: "Installed the first time and tuned for small boxes.",
+  },
+  mysql: {
+    title: "MySQL",
+    label: "MySQL",
+    env: "DATABASE_URL",
+    description: "A database and user only this app can use, on the server's MariaDB, the MySQL that comes with Ubuntu and Debian. Every backup includes a dump.",
+    first: "Installed the first time and tuned for small boxes.",
+  },
+  mongodb: {
+    title: "MongoDB",
+    label: "MongoDB",
+    env: "MONGODB_URI",
+    description: "A database and user only this app can use, on the server's MongoDB. Every backup includes a mongodump.",
+    first: "Installed the first time from MongoDB's own repository, and tuned for small boxes.",
+  },
 } as const;
 
 const Unreachable = () => <p className="text-[13px] text-rose">Couldn&apos;t ask the agent about this app&apos;s services.</p>;
@@ -62,8 +85,9 @@ export default async function DatabasesPage({ params, searchParams }: { params: 
         </Notice>
       )}
 
-      <SqlRow kind="postgres" slug={project.slug} status={status} />
-      <SqlRow kind="mysql" slug={project.slug} status={status} />
+      <DatabaseRow kind="postgres" slug={project.slug} status={status} />
+      <DatabaseRow kind="mysql" slug={project.slug} status={status} />
+      <DatabaseRow kind="mongodb" slug={project.slug} status={status} />
 
       <SettingsRow title="Redis" description="Its own small Redis on 127.0.0.1, with a password and a memory cap. Its data lives in data/redis, so it's in the backups.">
         <div className="grid gap-4" data-testid="redis-card">
@@ -126,25 +150,30 @@ export default async function DatabasesPage({ params, searchParams }: { params: 
   );
 }
 
-/** Postgres or MySQL: add it, or see it and remove it. An app with one can't add the other. */
-function SqlRow({ kind, slug, status }: { kind: SqlKind; slug: string; status: ServiceStatus | null }) {
+/**
+ * Postgres, MySQL or MongoDB: add it, or see it and remove it. An app gets one
+ * SQL database (both use DATABASE_URL); MongoDB's MONGODB_URI fits next to either.
+ */
+function DatabaseRow({ kind, slug, status }: { kind: DatabaseKind; slug: string; status: ServiceStatus | null }) {
+  const d = DATABASES[kind];
   const db = status?.[kind];
-  const other = kind === "postgres" ? "mysql" : "postgres";
+  const other = kind === "postgres" ? "mysql" : kind === "mysql" ? "postgres" : null;
+  const taken = other !== null && status?.[other] !== undefined;
   return (
-    <SettingsRow title={SQL[kind].title} description={SQL[kind].description}>
+    <SettingsRow title={d.title} description={d.description}>
       <div className="grid gap-4" data-testid={`${kind}-card`}>
         {!status && <Unreachable />}
-        {status && !db && status[other] && (
+        {status && !db && taken && (
           <p className="text-[13.5px] text-muted">
-            {slug} uses {SQL[other].label}. An app gets one SQL database, since both give it <code className="font-mono text-[12.5px]">DATABASE_URL</code>.
+            {slug} uses {DATABASES[other].label}. An app gets one SQL database, since both give it <code className="font-mono text-[12.5px]">DATABASE_URL</code>.
           </p>
         )}
-        {status && !db && !status[other] && (
+        {status && !db && !taken && (
           <>
             <p className="text-[13.5px] text-muted">
-              Installed the first time and tuned for small boxes. The app gets <code className="font-mono text-[12.5px]">DATABASE_URL</code>.
+              {d.first} The app gets <code className="font-mono text-[12.5px]">{d.env}</code>.
             </p>
-            <AddSqlForm slug={slug} kind={kind} installed={status.installed[kind]} />
+            <AddDatabaseForm slug={slug} kind={kind} installed={status.installed[kind]} />
           </>
         )}
         {db && (
@@ -161,10 +190,16 @@ function SqlRow({ kind, slug, status }: { kind: SqlKind; slug: string; status: S
               )}
             </div>
             <div className="grid gap-1.5">
-              <p className="text-[13px] font-medium">DATABASE_URL</p>
+              <p className="text-[13px] font-medium">{d.env}</p>
               <SecretUrl url={db.url} />
+              {kind === "mongodb" && (
+                <p className="text-[12.5px] text-dim">
+                  To open it from your computer (Compass, mongosh), tunnel the port first:{" "}
+                  <code className="font-mono text-[12px] text-muted">ssh -N -L 27017:127.0.0.1:27017 root@{boxConfig().publicIp}</code>, then use the same URI.
+                </p>
+              )}
             </div>
-            <RemoveSqlForm slug={slug} kind={kind} />
+            <RemoveDatabaseForm slug={slug} kind={kind} />
           </>
         )}
       </div>

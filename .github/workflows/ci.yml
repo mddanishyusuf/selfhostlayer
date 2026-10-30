@@ -89,6 +89,8 @@ jobs:
         run: sudo bash installer/test/postgres-e2e.sh
       - name: a MySQL (MariaDB) user and database per app, in backups
         run: sudo bash installer/test/mysql-e2e.sh
+      - name: a MongoDB user and database per app, in backups
+        run: sudo bash installer/test/mongodb-e2e.sh
       - name: importing a data folder from another server
         run: sudo bash installer/test/import-e2e.sh
       - name: moving the panel to another address and back

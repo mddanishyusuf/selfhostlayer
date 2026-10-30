@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getProjectBySlug } from "@/lib/projects";
-import { addRedis, addSqlDatabase, removeRedis, removeSqlDatabase, type SqlKind } from "@/lib/services";
+import { addDatabase, addRedis, removeDatabase, removeRedis, type DatabaseKind } from "@/lib/services";
 import { requireUser } from "@/lib/session";
 
 export interface ServiceState {
@@ -49,27 +49,27 @@ export async function removeRedisAction(_prev: ServiceState, form: FormData): Pr
   done(project.slug, "redis-removed", d?.id);
 }
 
-async function addSql(form: FormData, kind: SqlKind): Promise<ServiceState> {
+async function addDb(form: FormData, kind: DatabaseKind): Promise<ServiceState> {
   await requireUser();
   const project = getProjectBySlug(field(form, "slug"));
   if (!project) return { error: "Project not found." };
   let d;
   try {
-    d = await addSqlDatabase(project, kind);
+    d = await addDatabase(project, kind);
   } catch (err) {
     return { error: (err as Error).message };
   }
   done(project.slug, `${kind}-added`, d?.id);
 }
 
-async function removeSql(form: FormData, kind: SqlKind): Promise<ServiceState> {
+async function removeDb(form: FormData, kind: DatabaseKind): Promise<ServiceState> {
   await requireUser();
   const project = getProjectBySlug(field(form, "slug"));
   if (!project) return { error: "Project not found." };
   if (field(form, "confirm") !== project.slug) return { error: `Type ${project.slug} to confirm.` };
   let result;
   try {
-    result = await removeSqlDatabase(project, kind, form.get("deleteData") !== "on");
+    result = await removeDatabase(project, kind, form.get("deleteData") !== "on");
   } catch (err) {
     return { error: (err as Error).message };
   }
@@ -77,17 +77,25 @@ async function removeSql(form: FormData, kind: SqlKind): Promise<ServiceState> {
 }
 
 export async function addPostgresAction(_prev: ServiceState, form: FormData): Promise<ServiceState> {
-  return addSql(form, "postgres");
+  return addDb(form, "postgres");
 }
 
 export async function removePostgresAction(_prev: ServiceState, form: FormData): Promise<ServiceState> {
-  return removeSql(form, "postgres");
+  return removeDb(form, "postgres");
 }
 
 export async function addMysqlAction(_prev: ServiceState, form: FormData): Promise<ServiceState> {
-  return addSql(form, "mysql");
+  return addDb(form, "mysql");
 }
 
 export async function removeMysqlAction(_prev: ServiceState, form: FormData): Promise<ServiceState> {
-  return removeSql(form, "mysql");
+  return removeDb(form, "mysql");
+}
+
+export async function addMongodbAction(_prev: ServiceState, form: FormData): Promise<ServiceState> {
+  return addDb(form, "mongodb");
+}
+
+export async function removeMongodbAction(_prev: ServiceState, form: FormData): Promise<ServiceState> {
+  return removeDb(form, "mongodb");
 }

@@ -44,6 +44,8 @@ const LABELS: Record<string, string> = {
   "postgres.remove": "Removed Postgres",
   "mysql.add": "Added MySQL",
   "mysql.remove": "Removed MySQL",
+  "mongodb.add": "Added MongoDB",
+  "mongodb.remove": "Removed MongoDB",
   "proxy.set": "Routed its domains",
   "static.publish": "Published static files",
   "panel.site": "Wrote the panel's site",

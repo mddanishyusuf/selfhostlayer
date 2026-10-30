@@ -19,6 +19,9 @@ export const BIN = {
   pgDump: "/usr/bin/pg_dump",
   mariadb: "/usr/bin/mariadb",
   mariadbDump: "/usr/bin/mariadb-dump",
+  mongod: "/usr/bin/mongod",
+  mongosh: "/usr/bin/mongosh",
+  mongodump: "/usr/bin/mongodump",
   fail2banClient: "/usr/bin/fail2ban-client",
 } as const;
 

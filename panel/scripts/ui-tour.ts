@@ -594,6 +594,44 @@ if (process.env.TOUR_DEPLOY === "1") {
     }
   }
 
+  // TOUR_MONGODB=1: MongoDB comes in next to whatever SQL database the app has
+  // (it gets MONGODB_URI, not DATABASE_URL); the URI shows masked with Reveal and
+  // Copy, and the next backup has a mongodump.
+  if (process.env.TOUR_MONGODB === "1") {
+    console.log("MongoDB");
+    await go("/projects/next/databases");
+    await waitForPath("/projects/next/databases");
+    await click('[data-testid="mongodb-card"] form button[type=submit]');
+    await waitFor(`!!document.querySelector('[data-testid="notice"]') || /role="alert"/.test(document.querySelector('[data-testid="mongodb-card"]').innerHTML)`, "MongoDB to be added (installs it the first time)", 900_000);
+    const shown = () => evaluate(`[...document.querySelectorAll('[data-testid="secret-url"]')].map((e) => e.innerText).find((t) => t.startsWith("mongodb:")) ?? ""`).then(String);
+    const url = await shown();
+    if (!/^mongodb:\/\/app_next:••••••••@127\.0\.0\.1:27017\/app_next$/.test(url)) throw new Error(`MONGODB_URI isn't shown masked: ${url || await evaluate(`document.querySelector('[data-testid="mongodb-card"]').innerText`)}`);
+    await evaluate(`[...document.querySelectorAll('[data-testid="mongodb-card"] button')].find((b) => b.textContent === "Reveal").click(), true`);
+    await waitFor(`/^mongodb:\\/\\/app_next:[0-9a-f]{48}@/.test([...document.querySelectorAll('[data-testid="secret-url"]')].map((e) => e.innerText).find((t) => t.startsWith("mongodb:")) ?? "")`, "Reveal to show the password");
+    if (!(await evaluate(`[...document.querySelectorAll('[data-testid="mongodb-card"] button')].some((b) => /Copy/.test(b.textContent))`))) throw new Error("no Copy button next to MONGODB_URI");
+    await screenshot("databases-mongodb");
+    const notice = String(await evaluate(`document.querySelector('[data-testid="notice"]')?.innerText ?? ""`));
+    const deployment = /deployment #(\d+)/.exec(notice)?.[1];
+    if (!deployment) throw new Error(`adding MongoDB without a restart: ${notice}`);
+    await go(`/deployments/${deployment}`);
+    await waitForDeploy("the restart after adding MongoDB");
+    console.log(`  ✓ MongoDB installed, database app_next created, MONGODB_URI shown masked, revealed and copyable (#${deployment})`);
+    await go("/projects/next/env");
+    await waitForPath("/projects/next/env");
+    if (!String(await evaluate("document.querySelector('main').innerText")).includes("MONGODB_URI")) throw new Error("Environment doesn't list MONGODB_URI under Set for you");
+    console.log("  ✓ Environment lists MONGODB_URI as set for the app");
+    if (process.env.TOUR_BACKUPS === "1") {
+      await go("/projects/next/backups");
+      await waitForPath("/projects/next/backups");
+      const before = Number(await evaluate(`document.querySelectorAll('[data-testid="backup-list"] [data-status]').length`));
+      await click('form:has(input[name="slug"]) button[type=submit]');
+      await waitFor(`document.querySelectorAll('[data-testid="backup-list"] [data-status]').length > ${before} && !document.querySelector('[data-testid="backup-list"] [data-status="running"]')`, "the backup with MongoDB", 180_000);
+      const row = String(await evaluate(`document.querySelector('[data-testid="backup-list"] > div')?.innerText ?? ""`));
+      if (!row.includes("MongoDB dump")) throw new Error(`the backup has no MongoDB dump: ${row}`);
+      console.log("  ✓ the next backup includes a mongodump of the app's database");
+    }
+  }
+
   // Moving an app from another server: a data/ archive uploaded in the panel replaces the app's data.
   console.log("Import data");
   {

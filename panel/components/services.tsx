@@ -3,8 +3,8 @@
 import { Add01Icon } from "@hugeicons/core-free-icons";
 import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
-import { addMysqlAction, addPostgresAction, addRedisAction, removeMysqlAction, removePostgresAction, removeRedisAction, type ServiceState } from "@/app/actions/services";
-import type { SqlKind } from "@/lib/services";
+import { addMongodbAction, addMysqlAction, addPostgresAction, addRedisAction, removeMongodbAction, removeMysqlAction, removePostgresAction, removeRedisAction, type ServiceState } from "@/app/actions/services";
+import type { DatabaseKind } from "@/lib/services";
 import { CopyButton, SubmitButton } from "./form";
 import { Icon } from "./icon";
 import { Modal } from "./modal";
@@ -52,13 +52,14 @@ export function SecretUrl({ url }: { url: string }) {
   );
 }
 
-const ADD_SQL = {
+const ADD_DATABASE = {
   postgres: { action: addPostgresAction, label: "Postgres", installing: "Installing PostgreSQL…" },
   mysql: { action: addMysqlAction, label: "MySQL", installing: "Installing MariaDB…" },
+  mongodb: { action: addMongodbAction, label: "MongoDB", installing: "Installing MongoDB…" },
 } as const;
 
-export function AddSqlForm({ slug, kind, installed }: { slug: string; kind: SqlKind; installed: boolean }) {
-  const a = ADD_SQL[kind];
+export function AddDatabaseForm({ slug, kind, installed }: { slug: string; kind: DatabaseKind; installed: boolean }) {
+  const a = ADD_DATABASE[kind];
   const [state, action] = useActionState(a.action, {} as ServiceState);
   if (state.ok) return <p className="text-[13px] text-teal">{state.ok}</p>;
   return (
@@ -88,13 +89,19 @@ const REMOVE = {
     what: "Drops this app's database and user and removes DATABASE_URL. The app restarts without it.",
     data: "Don't keep a final dump on the server",
   },
+  mongodb: {
+    action: removeMongodbAction,
+    label: "MongoDB",
+    what: "Drops this app's database and user and removes MONGODB_URI. The app restarts without it.",
+    data: "Don't keep a final dump on the server",
+  },
 } as const;
 
 export function RemoveRedisForm({ slug }: { slug: string }) {
   return <RemoveServiceForm slug={slug} kind="redis" />;
 }
 
-export function RemoveSqlForm({ slug, kind }: { slug: string; kind: SqlKind }) {
+export function RemoveDatabaseForm({ slug, kind }: { slug: string; kind: DatabaseKind }) {
   return <RemoveServiceForm slug={slug} kind={kind} />;
 }
 

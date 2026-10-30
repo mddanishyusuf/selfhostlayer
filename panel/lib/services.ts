@@ -1,14 +1,16 @@
-// Databases next to an app (Redis, Postgres, MySQL), through the agent.
+// Databases next to an app (Redis, Postgres, MySQL, MongoDB), through the agent.
 import { agent } from "./agent";
 import { activeDeployment, liveDeployment, rollbackTo, type Deployment } from "./deploy";
 import type { Project } from "./projects";
 
 export interface ServiceStatus {
   slug: string;
-  installed: { redis: boolean; postgres: boolean; mysql: boolean };
+  installed: { redis: boolean; postgres: boolean; mysql: boolean; mongodb: boolean };
   redis?: { port: number; memoryMb: number; url: string; active: boolean; memoryUsedMb: number | null; answering: boolean };
   postgres?: SqlDatabase;
   mysql?: SqlDatabase;
+  /** The same shape: a database and user on the shared server, handed over as MONGODB_URI. */
+  mongodb?: SqlDatabase;
 }
 
 export interface SqlDatabase {
@@ -20,12 +22,14 @@ export interface SqlDatabase {
 
 /** An app gets one SQL database, Postgres or MySQL: both hand it DATABASE_URL. */
 export type SqlKind = "postgres" | "mysql";
+/** Every database on a shared server; MongoDB's MONGODB_URI can sit next to either SQL one. */
+export type DatabaseKind = SqlKind | "mongodb";
 
 export const serviceStatus = (slug: string) => agent<ServiceStatus>("service.status", { slug });
 
 /**
  * A zero-downtime restart on the live build, so the app picks up new
- * services.env values (REDIS_URL, DATABASE_URL). Null when nothing is live
+ * services.env values (REDIS_URL, DATABASE_URL, MONGODB_URI). Null when nothing is live
  * yet (the first deploy will load them) or a deploy is already running.
  */
 export function restartWithNewEnv(project: Project): Deployment | null {
@@ -47,15 +51,15 @@ export async function removeRedis(project: Project, keepData: boolean): Promise<
   return restartWithNewEnv(project);
 }
 
-export async function addSqlDatabase(project: Project, kind: SqlKind): Promise<Deployment | null> {
+export async function addDatabase(project: Project, kind: DatabaseKind): Promise<Deployment | null> {
   const status = await serviceStatus(project.slug);
-  // The first database of its kind installs the server (PostgreSQL or MariaDB, a minute or two).
+  // The first database of its kind installs the server (PostgreSQL, MariaDB or MongoDB, a minute or two).
   if (!status.installed[kind]) await agent("service.install", { name: kind });
   await agent(`${kind}.add` as const, { slug: project.slug });
   return restartWithNewEnv(project);
 }
 
-export async function removeSqlDatabase(project: Project, kind: SqlKind, keepData: boolean): Promise<{ archived: string | null; deployment: Deployment | null }> {
+export async function removeDatabase(project: Project, kind: DatabaseKind, keepData: boolean): Promise<{ archived: string | null; deployment: Deployment | null }> {
   const { archived } = await agent<{ archived: string | null }>(`${kind}.remove` as const, { slug: project.slug, keepData });
   return { archived, deployment: restartWithNewEnv(project) };
 }

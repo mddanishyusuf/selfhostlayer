@@ -28,6 +28,7 @@
 
 - Postgres: its own role and database, owned by it and closed to every other role.
 - MySQL: its own user, limited to its own database and to logins from 127.0.0.1.
+- MongoDB: its own user, kept in its own database, with access to that database only. MongoDB requires a login for everything and listens on 127.0.0.1 only. The agent has its own MongoDB login (`/var/lib/layer-agent/mongodb-admin.json`, root only) to create and drop app users.
 - Redis: its own Redis process, with its own password and memory cap.
 
 No two apps share a password.
