@@ -81,7 +81,7 @@ out="$(js mob 'JSON.stringify(db.adminCommand({ listDatabases: 1, nameOnly: true
 url="$(uri moa)"
 grep -q "^MONGODB_URI=\"$url\"$" /etc/layer/apps/moa/services.env && pass "services.env has MONGODB_URI" || fail "services.env" "$(cat /etc/layer/apps/moa/services.env)"
 out="$(call service.status '{"slug":"moa"}')"
-expect "service.status shows the database" "$out" '.result.mongodb.answering == true and .result.mongodb.database == "app_moa" and .result.installed.mongodb == true and .result.running.mongodb == true'
+expect "service.status shows the database and its one collection" "$out" '.result.mongodb.answering == true and .result.mongodb.database == "app_moa" and .result.installed.mongodb == true and .result.running.mongodb == true and .result.mongodb.collections == 1'
 
 echo "Backup and restore include the database"
 out="$(call backup.snapshot '{"slug":"moa"}')"

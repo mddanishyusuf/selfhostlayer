@@ -72,6 +72,22 @@ function isSqlite(file) {
   }
 }
 
+/** How many tables a SQLite database has, or null if it can't be read. */
+function tableCount(file) {
+  try {
+    const { DatabaseSync } = require("node:sqlite");
+    const db = new DatabaseSync(file, { readOnly: true, timeout: 2000 });
+    try {
+      db.exec("PRAGMA query_only = ON");
+      return Number(db.prepare("SELECT COUNT(*) AS n FROM sqlite_schema WHERE type = 'table' AND name NOT LIKE 'sqlite_%'").get().n);
+    } finally {
+      db.close();
+    }
+  } catch {
+    return null;
+  }
+}
+
 /** SQLite databases in the data folder, found by their header, not their name. */
 function sqliteFiles(dir, rel, out) {
   for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -79,7 +95,7 @@ function sqliteFiles(dir, rel, out) {
     const name = rel ? rel + "/" + e.name : e.name;
     const full = path.join(dir, e.name);
     if (e.isDirectory() && rel.split("/").length < 6) sqliteFiles(full, name, out);
-    else if (e.isFile() && !/-(wal|shm|journal)$/.test(e.name) && isSqlite(full)) out.push({ path: name, bytes: fs.statSync(full).size });
+    else if (e.isFile() && !/-(wal|shm|journal)$/.test(e.name) && isSqlite(full)) out.push({ path: name, bytes: fs.statSync(full).size, tables: tableCount(full) });
   }
   return out;
 }

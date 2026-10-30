@@ -194,7 +194,9 @@ Every project's domains, one row per project: its main domain, the project's nam
 Coming soon: one-click apps built for Self Host Layer (analytics, email, scheduling and more).
 
 ### Databases
-Every engine on the server (PostgreSQL, MySQL, MongoDB, Redis, SQLite) with each app's database, its size and whether it answers. PostgreSQL, MySQL and MongoDB say Running or Stopped, as systemd sees their server; a stopped MongoDB has a Start button, which tells you why if it can't start. You can copy an app's connection URL, add an engine to an app, or install MongoDB, from here.
+- **Engines:** SQLite, PostgreSQL, Redis, MongoDB and MySQL (MariaDB), each with its version, whether it runs (PostgreSQL, MySQL and MongoDB as systemd sees their server) and how much the apps use. MongoDB has its Install button here, and Start when it's stopped, which tells you why if it can't start.
+- **Every app's databases:** one list across all apps, with each database's size and its tables, collections or keys. SQLite files are found in each app's data folder by their header. **Browse** opens the read-only viewer (see a project's [Databases](#databases)); the **…** menu copies the connection URL or opens the app's Databases page. A database that doesn't answer says so.
+- **Add a database:** pick an engine and the app it's for. An app gets one SQL database (PostgreSQL or MySQL), and engines that aren't installed yet install first, in about a minute.
 
 ### Health
 The server itself: CPU, memory, disk and swap right now, CPU and memory charted over the last 24 hours or 7 days, each app's memory against its limit with its CPU and whether it runs, and the versions of Caddy, the agent, the panel and Node. The server's name at the top of the sidebar opens it too.

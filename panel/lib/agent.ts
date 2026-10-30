@@ -150,8 +150,31 @@ const FAKE: Partial<Record<ActionName, unknown>> = {
 };
 
 /** The viewer's sample databases, shaped like each engine's answers. */
+/** Sample databases per app for the dev previews: piqo and picker keep SQLite, the others use the shared servers. */
+const FAKE_SQLITE: Record<string, { path: string; bytes: number; tables: number | null }[]> = {
+  piqo: [{ path: "piqo.db", bytes: 222_300_000, tables: 14 }, { path: "cache/sessions.db", bytes: 81_920, tables: 1 }],
+  picker: [{ path: "picker.db", bytes: 18_870_000, tables: 6 }],
+  blogcms: [{ path: "blog.db", bytes: 9_430_000, tables: 7 }],
+};
+
+function fakeServiceStatus(p: Record<string, unknown>) {
+  const base = FAKE["service.status"] as Record<string, unknown>;
+  const engines = { installed: base.installed, running: base.running };
+  if (p.slug === undefined) return { ...engines, versions: { postgres: "17", redis: "8.0", mongodb: "9.0" } };
+  const url = (scheme: string, db: string, port: number) => `${scheme}://${db}:9f2c41d07be6a1e3@127.0.0.1:${port}/${db}`;
+  const sql = (db: string, sizeMb: number, tables: number) => ({ database: db, url: url("postgresql", db, 5432), sizeMb, tables, answering: true });
+  const redis = (port: number, memoryUsedMb: number, keys: number) => ({ port, memoryMb: 64, url: `redis://default:51b0e9c2aa7741f8@127.0.0.1:${port}`, active: true, memoryUsedMb, keys, answering: true });
+  const apps: Record<string, Record<string, unknown>> = {
+    piqo: { redis: redis(6400, 18, 2_410) },
+    maillayer: { postgres: sql("app_maillayer", 39.4, 22) },
+    postscheduler: { postgres: sql("app_postscheduler", 6.1, 9), redis: redis(6401, 32, 880) },
+    blogcms: { mongodb: { database: "app_blogcms", url: url("mongodb", "app_blogcms", 27017), sizeMb: 4.2, collections: 3, answering: true } },
+  };
+  return { slug: p.slug, ...engines, ...(apps[String(p.slug)] ?? {}) };
+}
+
 function fakeBrowse(p: Record<string, unknown>) {
-  if (p.engine === "sqlite" && !p.file) return { files: [{ path: "piqo.db", bytes: 210_000_000 }, { path: "cache/sessions.db", bytes: 81_920 }], tables: [] };
+  if (p.engine === "sqlite" && !p.file) return { files: FAKE_SQLITE[String(p.slug)] ?? [], tables: [] };
   const settings = JSON.stringify({ theme: "dark", publicDashboard: true, excludePaths: ["/admin", "/preview"], goals: [{ name: "Signup", path: "/thanks" }] });
   const byEngine: Record<string, { tables: { name: string; type: string; rows: number | null }[]; columns: string[]; rows: unknown[][]; total: number }> = {
     mongodb: {
@@ -188,6 +211,7 @@ function fakeBrowse(p: Record<string, unknown>) {
 
 export async function agent<T>(action: ActionName, params: Record<string, unknown> = {}, opts: Omit<CallOptions, "socket"> = {}): Promise<T> {
   if (config.fakeAgent && action === "db.browse") return fakeBrowse(params) as T;
+  if (config.fakeAgent && action === "service.status") return fakeServiceStatus(params) as T;
   if (config.fakeAgent && action in FAKE) return FAKE[action] as T;
   return callAgent<T>(action, params, { ...opts, socket: config.agentSocket });
 }

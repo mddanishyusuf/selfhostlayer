@@ -63,7 +63,7 @@ out="$(runuser -u app-mya -- env MYSQL_PWD="$(login mya password)" mariadb --use
 url="mysql://app_mya:$(login mya password)@127.0.0.1:3306/app_mya"
 grep -q "^DATABASE_URL=\"$url\"$" /etc/layer/apps/mya/services.env && pass "services.env has DATABASE_URL" || fail "services.env" "$(cat /etc/layer/apps/mya/services.env)"
 out="$(call service.status '{"slug":"mya"}')"
-expect "service.status shows the database" "$out" '.result.mysql.answering == true and .result.mysql.database == "app_mya" and .result.installed.mysql == true'
+expect "service.status shows the database and its one table" "$out" '.result.mysql.answering == true and .result.mysql.database == "app_mya" and .result.installed.mysql == true and .result.mysql.tables == 1'
 out="$(call postgres.add '{"slug":"mya"}')"
 expect "Postgres is refused next to MySQL (both use DATABASE_URL)" "$out" '.ok == false and .error.code == "conflict"'
 

@@ -4,7 +4,7 @@
 // logins, like a backup snapshot: the viewer sees no more than the app can,
 // and every engine is opened read-only.
 import { randomBytes } from "node:crypto";
-import { existsSync, lstatSync } from "node:fs";
+import { existsSync, lstatSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { assertInt, assertLine, assertRelativePath, assertSlug, ValidationError } from "@layer/protocol";
 import { BROWSE_JOB } from "../browse-job.ts";
@@ -69,6 +69,8 @@ async function dbBrowse(params: Params, ctx: Context) {
     if (!stat?.isFile()) throw new ActionError("not_found", `${file} isn't a file in ${slug}'s data folder`);
   }
   if (engine === "sqlite" && op !== "tables" && !file) throw new ValidationError("file", "is required to look inside a SQLite database");
+  // An empty data folder has no SQLite files: no job to look for them.
+  if (engine === "sqlite" && !file && !(existsSync(app.data) && readdirSync(app.data).length > 0)) return { files: [], tables: [] };
   const table = params.table === undefined || params.table === "" ? undefined : assertLine(params.table, "table", 512);
   if (op === "rows" && !table) throw new ValidationError("table", "is required to show rows");
   if (op === "query" && engine === "mongodb" && !table) throw new ValidationError("table", "is required: a MongoDB filter runs on one collection");

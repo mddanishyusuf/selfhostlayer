@@ -266,7 +266,10 @@ export function RowIcon({ children, tone = "dim" }: { children: ReactNode; tone?
 }
 
 /** A square tinted icon for engines and integrations. */
-export function TileIcon({ children, tone = "dim" }: { children: ReactNode; tone?: "dim" | "lav" | "blue" | "coral" | "teal" | "gold" | "rose" }) {
+export type TileTone = "dim" | "lav" | "blue" | "coral" | "teal" | "gold" | "rose";
+
+/** A tinted square behind an icon: 40px, or 32px in rows (size "sm"). */
+export function TileIcon({ children, tone = "dim", size = "md" }: { children: ReactNode; tone?: TileTone; size?: "sm" | "md" }) {
   const cls = {
     dim: "bg-foreground/7 text-muted",
     lav: "bg-lavender/16 text-lavender",
@@ -276,7 +279,7 @@ export function TileIcon({ children, tone = "dim" }: { children: ReactNode; tone
     gold: "bg-gold/16 text-gold",
     rose: "bg-rose/16 text-rose",
   }[tone];
-  return <span className={cx("grid size-10 shrink-0 place-items-center rounded-lg", cls)}>{children}</span>;
+  return <span className={cx("grid shrink-0 place-items-center", size === "sm" ? "size-8 rounded-md" : "size-10 rounded-lg", cls)}>{children}</span>;
 }
 
 /** Separator dot inside detail lines. */

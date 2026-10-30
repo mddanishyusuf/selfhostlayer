@@ -1,53 +1,95 @@
-import { ArrowUpRight01Icon, Database01Icon, HardDriveIcon } from "@hugeicons/core-free-icons";
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { Collapsible } from "@/components/collapsible";
-import { CopyButton } from "@/components/form";
+import { AddDatabaseDialog, DatabaseMenu, type AddOption } from "@/components/databases";
+import { ENGINE_LOOK } from "@/components/engines";
 import { Icon } from "@/components/icon";
-import { Dot, Notice, PageHeader, TileIcon } from "@/components/page";
+import { Empty, Notice, PageHeader, PillLink, Section, TileIcon } from "@/components/page";
 import { InstallMongodbForm } from "@/components/services";
-import { StatusText } from "@/components/status";
-import { Mark, Pill } from "@/components/ui";
-import { agent } from "@/lib/agent";
-import { listBackups } from "@/lib/backup/runner";
+import { StatusChip } from "@/components/status";
+import { browse, type BrowseResult, type Engine } from "@/lib/browse";
 import { listProjects } from "@/lib/projects";
-import { serviceStatus, type ServiceStatus } from "@/lib/services";
+import { engines, serviceStatus, type Engines, type ServiceStatus } from "@/lib/services";
 import { requireUser } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Databases" };
 
-function Instance({ slug, framework, name, detail, ok, url }: { slug: string; framework: string; name: string; detail: ReactNode; ok: boolean; url?: string }) {
+/** One database of one app, as a row in Every app's databases. */
+interface Row {
+  engine: Engine;
+  slug: string;
+  name: string;
+  /** The viewer's db= parameter. */
+  db: string;
+  url?: string;
+  /** Its size, and how many tables, collections or keys. */
+  meta: (string | null)[];
+  answering: boolean;
+}
+
+/** 212 MB, 6.2 MB, 340 KB. */
+function size(mb: number | null): string | null {
+  if (mb === null) return null;
+  if (mb < 1) return `${Math.max(1, Math.round(mb * 1024))} KB`;
+  return mb < 10 ? `${Math.round(mb * 10) / 10} MB` : `${Math.round(mb)} MB`;
+}
+
+const plural = (n: number, one: string) => `${n.toLocaleString("en-US")} ${one}${n === 1 ? "" : "s"}`;
+const count = (n: number | null | undefined, one: string) => (typeof n === "number" ? plural(n, one) : null);
+
+/** An app's databases: its SQLite files first, then those on the shared servers. */
+function rowsOf(slug: string, s: ServiceStatus | null, files: NonNullable<BrowseResult["files"]>): Row[] {
+  const rows: Row[] = files.map((f) => ({ engine: "sqlite", slug, name: `data/${f.path}`, db: `sqlite:${f.path}`, meta: [size(f.bytes / 1048576), count(f.tables, "table")], answering: true }));
+  if (s?.postgres) rows.push({ engine: "postgres", slug, name: s.postgres.database, db: "postgres", url: s.postgres.url, meta: [size(s.postgres.sizeMb), count(s.postgres.tables, "table")], answering: s.postgres.answering });
+  if (s?.mysql) rows.push({ engine: "mysql", slug, name: s.mysql.database, db: "mysql", url: s.mysql.url, meta: [size(s.mysql.sizeMb), count(s.mysql.tables, "table")], answering: s.mysql.answering });
+  if (s?.mongodb) rows.push({ engine: "mongodb", slug, name: s.mongodb.database, db: "mongodb", url: s.mongodb.url, meta: [size(s.mongodb.sizeMb), count(s.mongodb.collections, "collection")], answering: s.mongodb.answering });
+  if (s?.redis) {
+    const r = s.redis;
+    rows.push({ engine: "redis", slug, name: `redis-${slug}`, db: "redis", url: r.url, meta: [r.memoryUsedMb === null ? null : `${r.memoryUsedMb} of ${r.memoryMb} MB`, count(r.keys, "key")], answering: r.answering });
+  }
+  return rows;
+}
+
+/** An engine in the Engines card: what it is, whether it runs, and how much of it the apps use. */
+function EngineTile({ engine, title, children, chip, foot }: { engine: Engine; title: string; children: ReactNode; chip: ReactNode; foot: ReactNode }) {
+  const look = ENGINE_LOOK[engine];
   return (
-    <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-3.5 border-t border-border py-3.5 pl-4 pr-4 sm:pr-6 md:pl-[82px]">
-      <Mark framework={framework} size="sm" />
-      <div className="grid min-w-0 gap-0.5">
-        <div className="flex min-w-0 items-center gap-2 text-[15px] font-semibold">
-          {slug} <code className="truncate font-mono text-[13px] font-normal text-muted">{name}</code>
-        </div>
-        <div className="truncate text-[13px] text-muted">{detail}</div>
-      </div>
-      <div className="flex items-center gap-2">
-        <span className="max-sm:hidden">{ok ? <StatusText status="ok" label="Answering" /> : <StatusText status="err" label="Not answering" />}</span>
-        {url && <CopyButton text={url} label="Copy URL" />}
-        <Link href={`/projects/${slug}/databases`} title={`Open ${slug}`} className="grid size-8 place-items-center rounded-lg text-muted transition-colors hover:bg-hover hover:text-foreground">
-          <Icon icon={ArrowUpRight01Icon} size={16} />
-        </Link>
+    <div className="grid content-start gap-1 rounded-lg border border-border bg-card px-[18px] pb-[18px] pt-4" data-testid={`engine-${engine}`}>
+      <span className="mb-3.5">
+        <TileIcon tone={look.tone} size="sm">
+          <Icon icon={look.icon} size={17} />
+        </TileIcon>
+      </span>
+      <b className="font-medium">{title}</b>
+      <p className="text-[14px] leading-normal text-muted">{children}</p>
+      <div className="mt-3 flex flex-wrap items-center gap-2.5 text-[13px] text-muted">
+        {chip}
+        {foot}
       </div>
     </div>
   );
 }
 
-/** Whether an engine's shared server is up, as systemd sees it. */
-function ServerState({ up }: { up: boolean }) {
-  return <span className="max-sm:hidden">{up ? <StatusText status="ok" label="Running" /> : <StatusText status="err" label="Stopped" />}</span>;
-}
-
-function Footer({ add, note }: { add?: ReactNode; note: string }) {
+function DatabaseRow({ row, label }: { row: Row; label: string }) {
+  const look = ENGINE_LOOK[row.engine];
   return (
-    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-border py-3 pl-4 pr-4 text-[13px] sm:pr-6 md:pl-[82px]">
-      {add}
-      <span className="ml-auto text-dim">{note}</span>
+    <div className="group px-4 transition-colors duration-150 hover:bg-hover sm:px-6" data-testid="database">
+      <div className="grid grid-cols-[32px_minmax(0,1fr)_auto_auto] items-center gap-x-3.5 border-t border-border py-3.5 group-first:border-t-0">
+        <TileIcon tone={look.tone} size="sm">
+          <Icon icon={look.icon} size={17} />
+        </TileIcon>
+        <Link href={`/projects/${row.slug}/databases`} className="grid min-w-0 gap-0.5">
+          <code className="truncate font-mono text-[13.5px]">{row.name}</code>
+          <span className="text-[13.5px] text-muted sm:truncate">
+            {[row.slug, label, ...row.meta].filter(Boolean).join(" · ")}
+            {!row.answering && <span className="text-rose"> · not answering</span>}
+          </span>
+        </Link>
+        <PillLink href={`/projects/${row.slug}/databases/view?db=${encodeURIComponent(row.db)}`} size="sm">
+          Browse
+        </PillLink>
+        <DatabaseMenu slug={row.slug} url={row.url} />
+      </div>
     </div>
   );
 }
@@ -55,138 +97,98 @@ function Footer({ add, note }: { add?: ReactNode; note: string }) {
 export default async function DatabasesOverviewPage({ searchParams }: { searchParams: Promise<{ notice?: string }> }) {
   await requireUser();
   const { notice } = await searchParams;
-  const all = listProjects();
-  const apps = all.filter((p) => p.runtime.kind !== "static");
-  const statuses = (await Promise.all(apps.map((p) => serviceStatus(p.slug).catch(() => null)))).filter((s): s is ServiceStatus => s !== null);
-  const server = statuses[0] ?? (await agent<Pick<ServiceStatus, "installed" | "running">>("service.status").catch(() => null));
-  const installed = server?.installed ?? { redis: false, postgres: false, mysql: false, mongodb: false };
+  const apps = listProjects().filter((p) => p.runtime.kind !== "static");
+  const [server, statuses, sqlite] = await Promise.all([
+    engines().catch((): Engines | null => null),
+    Promise.all(apps.map((p) => serviceStatus(p.slug).catch(() => null))),
+    // Each app's SQLite files, found as the app's own user (no job when its data folder is empty).
+    Promise.all(apps.map((p) => browse(p.slug, { engine: "sqlite", op: "tables" }).then((r) => r.files ?? [], () => []))),
+  ]);
+  const installed = server?.installed ?? statuses.find((s) => s)?.installed ?? { redis: false, postgres: false, mysql: false, mongodb: false };
   const running = server?.running ?? { postgres: false, mysql: false, mongodb: false };
-  const frameworkOf = (slug: string) => all.find((p) => p.slug === slug)?.framework ?? "unknown";
-  const pg = statuses.filter((s) => s.postgres);
-  const my = statuses.filter((s) => s.mysql);
-  const mongo = statuses.filter((s) => s.mongodb);
-  const redis = statuses.filter((s) => s.redis);
-  // SQLite files as the last successful backup found them.
-  const sqlite = apps
-    .map((p) => ({ p, files: listBackups({ slug: p.slug, limit: 5 }).find((b) => b.status === "ok")?.contents?.sqlite ?? [] }))
-    .filter((x) => x.files.length > 0);
-  const down = [...pg.filter((s) => !s.postgres!.answering), ...my.filter((s) => !s.mysql!.answering), ...mongo.filter((s) => !s.mongodb!.answering), ...redis.filter((s) => !s.redis!.answering)];
-  const total = pg.length + my.length + mongo.length + redis.length + sqlite.reduce((n, x) => n + x.files.length, 0);
-  const withoutRedis = statuses.filter((s) => !s.redis).map((s) => s.slug);
-  // An app gets one SQL database: those with Postgres can't add MySQL, and the other way round.
-  const withoutSql = statuses.filter((s) => !s.postgres && !s.mysql).map((s) => s.slug);
-  // MONGODB_URI fits next to either SQL database.
-  const withoutMongo = statuses.filter((s) => !s.mongodb).map((s) => s.slug);
-  const addLinks = (lead: string, slugs: string[]) =>
-    slugs.length ? (
-      <span className="flex flex-wrap items-center gap-1.5">
-        <span className="text-muted">{lead}</span>
-        {slugs.map((slug) => (
-          <Link key={slug} href={`/projects/${slug}/databases`} className="text-accent hover:underline">
-            {slug}
-          </Link>
-        ))}
-      </span>
-    ) : undefined;
-  const pgMb = pg.reduce((n, s) => n + (s.postgres!.sizeMb ?? 0), 0);
-  const myMb = my.reduce((n, s) => n + (s.mysql!.sizeMb ?? 0), 0);
-  const mongoMb = mongo.reduce((n, s) => n + (s.mongodb!.sizeMb ?? 0), 0);
-  const redisUsed = redis.reduce((n, s) => n + (s.redis!.memoryUsedMb ?? 0), 0);
-  const redisCap = redis.reduce((n, s) => n + s.redis!.memoryMb, 0);
+  const versions = server?.versions;
+  const rows = apps.flatMap((p, i) => rowsOf(p.slug, statuses[i] ?? null, sqlite[i] ?? []));
+  const of = (engine: Engine) => rows.filter((r) => r.engine === engine);
+  const label = (engine: Engine) => {
+    const v = engine === "postgres" ? versions?.postgres : engine === "redis" ? versions?.redis : engine === "mongodb" ? versions?.mongodb : null;
+    return v ? `${ENGINE_LOOK[engine].name} ${v}` : ENGINE_LOOK[engine].name;
+  };
+  const known = statuses.filter((s): s is ServiceStatus => s !== null);
+  const sum = (list: (number | null)[]) => list.reduce<number>((n, mb) => n + (mb ?? 0), 0);
+  const down = rows.filter((r) => !r.answering);
+
+  const serverChip = (on: boolean, up: boolean) => (!on ? <StatusChip status="idle" label="Not installed" /> : up ? <StatusChip status="ok" label="Running" /> : <StatusChip status="err" label="Stopped" />);
+  const usage = (mb: number, apps: number) => `${size(mb)} · ${plural(apps, "app")}`;
+  const later = <span className="text-dim">Installed the first time an app asks for one</span>;
+  const redisRows = of("redis");
+
+  const options: AddOption[] = [
+    { kind: "postgres", apps: known.filter((s) => !s.postgres && !s.mysql).map((s) => s.slug), installed: installed.postgres },
+    { kind: "redis", apps: known.filter((s) => !s.redis).map((s) => s.slug), installed: installed.redis },
+    {
+      kind: "mongodb",
+      apps: known.filter((s) => !s.mongodb).map((s) => s.slug),
+      installed: installed.mongodb,
+      blocked: !installed.mongodb ? "Install MongoDB first, from its card on this page." : !running.mongodb ? "MongoDB is stopped: start it from its card." : undefined,
+    },
+    { kind: "mysql", apps: known.filter((s) => !s.postgres && !s.mysql).map((s) => s.slug), installed: installed.mysql },
+  ];
 
   return (
     <>
-      <PageHeader title="Databases" meta="Native, no Docker · one per app" />
+      <PageHeader title="Databases" meta="Native, no Docker · one per app" actions={<AddDatabaseDialog options={options} />} />
       {notice === "mongodb-installed" && (
         <Notice lead="Installed" tone="ok">
-          MongoDB is running on this server. Open a project&apos;s Databases page to create its database and user.
+          MongoDB is running on this server. Add a database to an app with Add a database, or from the app&apos;s Databases page.
         </Notice>
       )}
-      {down.length ? (
+      {down.length > 0 && (
         <Notice lead="Not answering" tone="err">
-          {down.map((s) => s.slug).join(", ")}: check the project&apos;s Databases page.
+          {[...new Set(down.map((r) => r.slug))].join(", ")}: check the project&apos;s Databases page.
         </Notice>
-      ) : total > 0 ? (
-        <Notice lead="Healthy" tone="ok">
-          All {total} database{total === 1 ? " is" : "s are"} answering.
-        </Notice>
-      ) : null}
+      )}
 
-      <Collapsible
-        testId="engine-postgres"
-        lead={<TileIcon tone="blue"><Icon icon={Database01Icon} size={20} /></TileIcon>}
-        title={<>PostgreSQL {installed.postgres ? <Pill outline>Installed</Pill> : <Pill outline>Not installed</Pill>}</>}
-        sub={installed.postgres ? <>{pg.length} database{pg.length === 1 ? "" : "s"}<Dot />{pgMb.toFixed(1)} MB</> : "Installed the first time you add it to a project"}
-        side={installed.postgres ? <ServerState up={running.postgres} /> : undefined}
-      >
-        {pg.map((s) => (
-          <Instance key={s.slug} slug={s.slug} framework={frameworkOf(s.slug)} name={s.postgres!.database} ok={s.postgres!.answering} url={s.postgres!.url} detail={<>{s.postgres!.sizeMb !== null ? `${s.postgres!.sizeMb} MB` : "size unknown"}<Dot />a pg_dump in every backup</>} />
-        ))}
-        <Footer add={addLinks("Add Postgres to", withoutSql)} note="One server · a role and database per app · 127.0.0.1 only" />
-      </Collapsible>
+      <Section title="Engines" description="Every app gets its own login and can't see the others.">
+        <div className="grid gap-2.5 px-4 pb-5 sm:px-6 md:grid-cols-2 xl:grid-cols-3">
+          <EngineTile engine="sqlite" title="SQLite" chip={<StatusChip status="ok" label="Built in" />} foot={plural(of("sqlite").length, "file")}>
+            Files in each app&apos;s data folder, backed up with their -wal and -shm.
+          </EngineTile>
+          <EngineTile engine="postgres" title={label("postgres")} chip={serverChip(installed.postgres, running.postgres)} foot={installed.postgres ? usage(sum(known.map((s) => s.postgres?.sizeMb ?? null)), of("postgres").length) : later}>
+            One server, a role and database per app.
+          </EngineTile>
+          <EngineTile
+            engine="redis"
+            title={label("redis")}
+            chip={!installed.redis ? <StatusChip status="idle" label="Not installed" /> : redisRows.some((r) => !r.answering) ? <StatusChip status="err" label="Not answering" /> : <StatusChip status={redisRows.length ? "ok" : "idle"} label={redisRows.length ? "Running" : "Installed"} />}
+            foot={installed.redis ? plural(redisRows.length, "app") : later}
+          >
+            One Redis per app, with its own password and memory cap.
+          </EngineTile>
+          <EngineTile
+            engine="mongodb"
+            title={label("mongodb")}
+            chip={serverChip(installed.mongodb, running.mongodb)}
+            foot={!installed.mongodb ? <InstallMongodbForm compact /> : !running.mongodb ? <InstallMongodbForm compact start /> : usage(sum(known.map((s) => s.mongodb?.sizeMb ?? null)), of("mongodb").length)}
+          >
+            One shared server, a user per app that sees only its own database.
+          </EngineTile>
+          <EngineTile engine="mysql" title="MySQL (MariaDB)" chip={serverChip(installed.mysql, running.mysql)} foot={installed.mysql ? usage(sum(known.map((s) => s.mysql?.sizeMb ?? null)), of("mysql").length) : later}>
+            One server, a user and database per app.
+          </EngineTile>
+        </div>
+      </Section>
 
-      <Collapsible
-        testId="engine-mysql"
-        lead={<TileIcon tone="teal"><Icon icon={Database01Icon} size={20} /></TileIcon>}
-        title={<>MySQL {installed.mysql ? <Pill outline>Installed</Pill> : <Pill outline>Not installed</Pill>}</>}
-        sub={installed.mysql ? <>{my.length} database{my.length === 1 ? "" : "s"}<Dot />{myMb.toFixed(1)} MB<Dot />MariaDB</> : "MariaDB, installed the first time you add it to a project"}
-        side={installed.mysql ? <ServerState up={running.mysql} /> : undefined}
-      >
-        {my.map((s) => (
-          <Instance key={s.slug} slug={s.slug} framework={frameworkOf(s.slug)} name={s.mysql!.database} ok={s.mysql!.answering} url={s.mysql!.url} detail={<>{s.mysql!.sizeMb !== null ? `${s.mysql!.sizeMb} MB` : "size unknown"}<Dot />a dump in every backup</>} />
-        ))}
-        <Footer add={addLinks("Add MySQL to", withoutSql)} note="One server · a user and database per app · 127.0.0.1 only" />
-      </Collapsible>
-
-      <Collapsible
-        testId="engine-mongodb"
-        lead={<TileIcon tone="gold"><Icon icon={Database01Icon} size={20} /></TileIcon>}
-        title={<>MongoDB {installed.mongodb ? <Pill outline>Installed</Pill> : <Pill outline>Not installed</Pill>}</>}
-        sub={installed.mongodb ? <>{mongo.length} database{mongo.length === 1 ? "" : "s"}<Dot />{mongoMb.toFixed(1)} MB<Dot />one server for every project</> : "Installed once on this server; then each project gets its own database and user"}
-        side={
-          !installed.mongodb ? (
-            <InstallMongodbForm compact />
-          ) : running.mongodb ? (
-            <ServerState up />
-          ) : (
-            <span className="flex items-center gap-3">
-              <ServerState up={false} />
-              <InstallMongodbForm compact start />
-            </span>
-          )
-        }
-      >
-        {mongo.map((s) => (
-          <Instance key={s.slug} slug={s.slug} framework={frameworkOf(s.slug)} name={s.mongodb!.database} ok={s.mongodb!.answering} url={s.mongodb!.url} detail={<>{s.mongodb!.sizeMb !== null ? `${s.mongodb!.sizeMb} MB` : "size unknown"}<Dot />a mongodump in every backup</>} />
-        ))}
-        <Footer add={installed.mongodb ? addLinks("Create a database for", withoutMongo) : undefined} note="One server for every project · a user and database per project · 127.0.0.1 only" />
-      </Collapsible>
-
-      <Collapsible
-        testId="engine-redis"
-        lead={<TileIcon tone="coral"><Icon icon={Database01Icon} size={20} /></TileIcon>}
-        title={<>Redis {installed.redis ? <Pill outline>Installed</Pill> : <Pill outline>Not installed</Pill>}</>}
-        sub={installed.redis ? <>{redis.length} instance{redis.length === 1 ? "" : "s"}<Dot />{redisUsed} MB used of {redisCap} MB</> : "Installed the first time you add it to a project"}
-        side={installed.redis ? <span className="max-sm:hidden"><StatusText status="ok" label="Running" /></span> : undefined}
-      >
-        {redis.map((s) => (
-          <Instance key={s.slug} slug={s.slug} framework={frameworkOf(s.slug)} name={`port ${s.redis!.port}`} ok={s.redis!.answering} url={s.redis!.url} detail={<>{s.redis!.memoryUsedMb ?? "?"} MB of {s.redis!.memoryMb} MB<Dot />noeviction</>} />
-        ))}
-        <Footer add={addLinks("Add Redis to", withoutRedis)} note="One small Redis per app · its own password and memory cap" />
-      </Collapsible>
-
-      <Collapsible
-        testId="engine-sqlite"
-        lead={<TileIcon tone="lav"><Icon icon={HardDriveIcon} size={20} /></TileIcon>}
-        title={<>SQLite <Pill outline>Built in</Pill></>}
-        sub={<>{sqlite.length} app{sqlite.length === 1 ? "" : "s"} with SQLite files<Dot />checked at every backup</>}
-      >
-        {sqlite.flatMap(({ p, files }) =>
-          files.map((f) => <Instance key={`${p.slug}/${f.path}`} slug={p.slug} framework={p.framework} name={f.path} ok detail={<>{(f.bytes / 1048576).toFixed(1)} MB<Dot />integrity ok at the last backup</>} />),
+      <Section title="Every app's databases">
+        {rows.length === 0 ? (
+          <Empty>No databases yet. Add one with Add a database. SQLite files in an app&apos;s data folder show up here on their own.</Empty>
+        ) : (
+          <div className="pb-1.5">
+            {rows.map((r) => (
+              <DatabaseRow key={`${r.slug}/${r.db}`} row={r} label={label(r.engine)} />
+            ))}
+          </div>
         )}
-        <Footer note="Files in each app's DATA_DIR are found by their header and copied safely, even while the app writes" />
-      </Collapsible>
-
+      </Section>
     </>
   );
 }

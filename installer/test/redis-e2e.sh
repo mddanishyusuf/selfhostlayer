@@ -75,7 +75,7 @@ for _ in $(seq 1 20); do [[ "$(rcli "$pa" "$pwa" PING)" == PONG ]] && break; sle
 [[ "$(rcli "$pa" "$pwa" GET greeting)" == hello ]] && pass "the key is back after a restart" || fail "data lost"
 [[ -f /srv/apps/rdsa/data/redis/dump.rdb ]] && pass "dump.rdb is in data/redis (so it's backed up)" || fail "no dump.rdb"
 out="$(call service.status '{"slug":"rdsa"}')"
-expect "service.status shows it answering" "$out" '.result.redis.answering == true and .result.redis.active == true'
+expect "service.status shows it answering, with its key" "$out" '.result.redis.answering == true and .result.redis.active == true and .result.redis.keys >= 1'
 
 echo "Remove"
 out="$(call redis.remove '{"slug":"rdsb"}')"

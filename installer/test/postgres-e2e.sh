@@ -54,7 +54,8 @@ out="$(sql pga "${ua/:5432/:5432}" "SELECT rolsuper FROM pg_roles WHERE rolname 
 [[ "$out" == f ]] && pass "app roles aren't superusers" || fail "rolsuper=$out"
 grep -q "^DATABASE_URL=\"$ua\"$" /etc/layer/apps/pga/services.env && pass "services.env has DATABASE_URL" || fail "services.env" "$(cat /etc/layer/apps/pga/services.env)"
 out="$(call service.status '{"slug":"pga"}')"
-expect "service.status shows the database" "$out" '.result.postgres.answering == true and .result.postgres.database == "app_pga"'
+expect "service.status shows the database and its one table" "$out" '.result.postgres.answering == true and .result.postgres.database == "app_pga" and .result.postgres.tables == 1'
+expect "service.status names the server's version" "$(call service.status)" '.result.versions.postgres | test("^[0-9]+$")'
 
 echo "Backup and restore include the database"
 out="$(call backup.snapshot '{"slug":"pga"}')"

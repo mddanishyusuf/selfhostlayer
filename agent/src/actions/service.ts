@@ -21,7 +21,7 @@ import { ensureDir, lookupUser, removeManaged, writeFileAtomic } from "../fsutil
 import { isPortFree } from "../ports.ts";
 import { SYSTEMD_RUN } from "../sandbox.ts";
 import { renderEnvFile } from "../templates/env-file.ts";
-import { MONGOD_CONF, MONGODB_KEYRING, MONGODB_SIGNING_KEY, MONGODB_SOURCES, MONGOSH_CONF, mongodbSource, renderMongodConf, renderMongodDropin, renderMongoshConf } from "../templates/mongodb.ts";
+import { MONGOD_CONF, MONGODB_KEYRING, MONGODB_SERIES, MONGODB_SIGNING_KEY, MONGODB_SOURCES, MONGOSH_CONF, mongodbSource, renderMongodConf, renderMongodDropin, renderMongoshConf } from "../templates/mongodb.ts";
 import { redisUnit, renderRedisConf, renderRedisUnit } from "../templates/redis.ts";
 import { appLayout } from "./app.ts";
 
@@ -145,6 +145,27 @@ export function redisPing(port: number, password: string, timeoutMs = 2000): Pro
   });
 }
 
+/** How many keys an app's Redis holds (DBSIZE), or null when it doesn't answer. */
+export function redisKeys(port: number, password: string, timeoutMs = 1000): Promise<number | null> {
+  return new Promise((resolve) => {
+    const socket = connect({ host: "127.0.0.1", port });
+    let data = "";
+    const done = (keys: number | null) => {
+      socket.destroy();
+      resolve(keys);
+    };
+    socket.setTimeout(timeoutMs, () => done(null));
+    socket.on("error", () => done(null));
+    socket.on("connect", () => socket.write(`AUTH ${password}\r\nDBSIZE\r\n`));
+    socket.on("data", (chunk) => {
+      data += chunk.toString();
+      const reply = /^\+OK\r\n:(\d+)\r\n/.exec(data);
+      if (reply) done(Number(reply[1]));
+      else if (data.startsWith("-") || data.includes("\r\n-")) done(null);
+    });
+  });
+}
+
 async function waitForRedis(port: number, password: string): Promise<boolean> {
   for (let i = 0; i < 40; i++) {
     if (await redisPing(port, password)) return true;
@@ -232,7 +253,7 @@ async function serviceStatus(params: Params, ctx: Context) {
   // Without an app: just which engines are installed on the server, and whether their servers are up.
   const installed = { redis: redisBinary() !== null, postgres: postgresCluster() !== null, mysql: mysqlInstalled(), mongodb: mongodbInstalled(ctx) };
   const running = await serversRunning(ctx);
-  if (params.slug === undefined) return { installed, running };
+  if (params.slug === undefined) return { installed, running, versions: await engineVersions(ctx, installed.mongodb) };
   const slug = assertSlug(params.slug);
   const app = appLayout(ctx, slug);
   if (!existsSync(app.etcDir)) throw new ActionError("not_found", `app ${slug} doesn't exist`);
@@ -240,31 +261,39 @@ async function serviceStatus(params: Params, ctx: Context) {
   const env = serviceEnv(state);
   const out: Record<string, unknown> = { slug, installed, running };
   if (state.postgres && postgresCluster()) {
-    const size = await psql(ctx, `SELECT pg_database_size('${state.postgres.database}')`, { allowFail: true });
+    // In the app's own database: its size and its tables.
+    const r = await psql(ctx, "SELECT pg_database_size(current_database()), (SELECT count(*) FROM pg_catalog.pg_tables WHERE schemaname NOT IN ('pg_catalog', 'information_schema'))", { allowFail: true, database: state.postgres.database });
+    const [bytes, tables] = r.stdout.trim().split("|").map(Number);
     out.postgres = {
       database: state.postgres.database,
       url: env.DATABASE_URL,
-      sizeMb: size.code === 0 ? Math.round((Number(size.stdout.trim()) / 1048576) * 10) / 10 : null,
-      answering: size.code === 0,
+      sizeMb: r.code === 0 ? megabytes(bytes) : null,
+      tables: r.code === 0 && Number.isInteger(tables) ? tables : null,
+      answering: r.code === 0,
     };
   }
   if (state.mysql && installed.mysql) {
-    const size = await mysql(ctx, `SELECT COALESCE(SUM(data_length + index_length), 0) FROM information_schema.tables WHERE table_schema = '${state.mysql.database}'`, { allowFail: true });
+    const r = await mysql(ctx, `SELECT COALESCE(SUM(data_length + index_length), 0), COUNT(*) FROM information_schema.tables WHERE table_schema = '${state.mysql.database}'`, { allowFail: true });
+    const [bytes, tables] = r.stdout.trim().split("\t").map(Number);
     out.mysql = {
       database: state.mysql.database,
       url: env.DATABASE_URL,
-      sizeMb: size.code === 0 ? Math.round((Number(size.stdout.trim()) / 1048576) * 10) / 10 : null,
-      answering: size.code === 0,
+      sizeMb: r.code === 0 ? megabytes(bytes) : null,
+      tables: r.code === 0 && Number.isInteger(tables) ? tables : null,
+      answering: r.code === 0,
     };
   }
   if (state.mongodb && installed.mongodb) {
-    const r = await mongosh(ctx, `const s = db.getSiblingDB(${q(state.mongodb.database)}).runCommand({ dbStats: 1 }); print(JSON.stringify(s.totalSize ?? s.storageSize + s.indexSize))`, { allowFail: true }).catch(() => null);
-    const bytes = r?.code === 0 ? lastJson(r.stdout) : null;
+    // dbStats sends some counts as 64-bit integers (Long objects in mongosh): Number() makes them plain.
+    const r = await mongosh(ctx, `const s = db.getSiblingDB(${q(state.mongodb.database)}).runCommand({ dbStats: 1 }); print(JSON.stringify({ bytes: Number(s.totalSize ?? Number(s.storageSize) + Number(s.indexSize)), collections: Number(s.collections) }))`, { allowFail: true }).catch(() => null);
+    const stats = (r?.code === 0 ? lastJson(r.stdout) : null) as { bytes?: unknown; collections?: unknown } | null;
+    const bytes = typeof stats?.bytes === "number" ? stats.bytes : null;
     out.mongodb = {
       database: state.mongodb.database,
       url: env.MONGODB_URI,
-      sizeMb: typeof bytes === "number" ? Math.round((bytes / 1048576) * 10) / 10 : null,
-      answering: typeof bytes === "number",
+      sizeMb: bytes === null ? null : megabytes(bytes),
+      collections: typeof stats?.collections === "number" ? stats.collections : null,
+      answering: bytes !== null,
     };
   }
   if (state.redis) {
@@ -277,10 +306,23 @@ async function serviceStatus(params: Params, ctx: Context) {
       url: env.REDIS_URL,
       active: props.ActiveState === "active",
       memoryUsedMb: Number.isFinite(memory) ? Math.round(memory / 1048576) : null,
-      answering: await redisPing(state.redis.port, state.redis.password, 1000),
+      ...(await redisKeys(state.redis.port, state.redis.password).then((keys) => ({ keys, answering: keys !== null }))),
     };
   }
   return out;
+}
+
+const megabytes = (bytes: number | undefined) => Math.round(((bytes ?? 0) / 1048576) * 10) / 10;
+
+/** The engines' versions for the Databases page: Postgres's cluster, Redis's server, the MongoDB series this agent installs. */
+async function engineVersions(ctx: Context, mongodb: boolean) {
+  const redis = redisBinary();
+  const r = redis ? await ctx.exec(redis, ["--version"], { allowFail: true }) : null;
+  return {
+    postgres: postgresCluster()?.version ?? null,
+    redis: r?.code === 0 ? (/v=(\d+\.\d+)/.exec(r.stdout)?.[1] ?? null) : null,
+    mongodb: mongodb ? MONGODB_SERIES : null,
+  };
 }
 
 // ---------------------------------------------------------------- Postgres
@@ -327,9 +369,9 @@ async function installPostgres(ctx: Context) {
   return { name: "postgres", installed: true, version: cluster.version, already };
 }
 
-/** Runs SQL as the postgres superuser (peer auth over the local socket). Returns rows as text. */
-async function psql(ctx: Context, sql: string, opts: { allowFail?: boolean } = {}) {
-  return ctx.exec(BIN.runuser, ["-u", "postgres", "--", BIN.psql, "-X", "-q", "-tA", "-v", "ON_ERROR_STOP=1", "-c", sql], { allowFail: opts.allowFail, timeoutMs: 120_000 });
+/** Runs SQL as the postgres superuser (peer auth over the local socket), in the postgres database or the one named. Returns rows as text. */
+async function psql(ctx: Context, sql: string, opts: { allowFail?: boolean; database?: string } = {}) {
+  return ctx.exec(BIN.runuser, ["-u", "postgres", "--", BIN.psql, "-X", "-q", "-tA", "-v", "ON_ERROR_STOP=1", ...(opts.database ? ["-d", opts.database] : []), "-c", sql], { allowFail: opts.allowFail, timeoutMs: 120_000 });
 }
 
 async function waitForPostgres(ctx: Context): Promise<void> {

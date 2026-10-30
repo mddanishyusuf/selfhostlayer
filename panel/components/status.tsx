@@ -1,4 +1,4 @@
-import { StatusDot } from "./ui";
+import { StatusDot, cx } from "./ui";
 
 const STATUS: Record<string, { label: string; dot: "ok" | "warn" | "err" | "idle" }> = {
   queued: { label: "Queued", dot: "idle" },
@@ -50,3 +50,13 @@ export function timeIn(ms: number): string {
 }
 
 export const duration = (ms: number | null) => (ms === null ? "…" : ms < 60_000 ? `${(ms / 1000).toFixed(ms < 10_000 ? 1 : 0)}s` : `${Math.floor(ms / 60_000)}m ${Math.round((ms % 60_000) / 1000)}s`);
+
+/** A state as a small chip: a colored dot, then the word in its color. */
+export function StatusChip({ status, label, pulse }: { status: "ok" | "warn" | "err" | "idle"; label: string; pulse?: boolean }) {
+  const color = { ok: "text-teal", warn: "text-gold", err: "text-rose", idle: "text-muted" }[status];
+  return (
+    <span className={cx("inline-flex h-7 items-center gap-2 whitespace-nowrap rounded-md border border-border bg-card px-2.5 text-[13px] font-medium", color)}>
+      <StatusDot status={status} pulse={pulse} /> {label}
+    </span>
+  );
+}

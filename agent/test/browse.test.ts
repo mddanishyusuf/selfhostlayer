@@ -62,6 +62,15 @@ describe("db.browse", () => {
     expect(env.spawner.calls).toEqual([]);
   });
 
+  it("finds no SQLite files in an empty data folder, without a job", async () => {
+    expect(await browse({ engine: "sqlite" })).toEqual({ files: [], tables: [] });
+    expect(env.spawner.calls).toEqual([]);
+    writeFileSync(join(data(), "app.db"), "x");
+    env.spawner.respond = () => ({ code: 0, output: 'LAYER-BROWSE {"files":[{"path":"app.db","bytes":1,"tables":null}],"tables":[]}\n' });
+    expect(await browse({ engine: "sqlite" })).toEqual({ files: [{ path: "app.db", bytes: 1, tables: null }], tables: [] });
+    expect(env.spawner.calls).toHaveLength(1);
+  });
+
   it("runs one sandboxed job as the app's user, with the app's logins only for a database server", async () => {
     writeFileSync(join(data(), "app.db"), "x");
     env.spawner.respond = () => ({ code: 0, output: 'LAYER-BROWSE {"tables":[{"name":"licenses","type":"table","rows":3}]}\n' });

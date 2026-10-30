@@ -16,8 +16,8 @@ export interface BrowseTable {
 }
 
 export interface BrowseResult {
-  /** SQLite with no file picked: the databases found in the data folder. */
-  files?: { path: string; bytes: number }[];
+  /** SQLite with no file picked: the databases found in the data folder, with their table counts (null if one can't be read). */
+  files?: { path: string; bytes: number; tables?: number | null }[];
   tables: BrowseTable[];
   /** Redis: more keys than the 500 listed. */
   more?: boolean;

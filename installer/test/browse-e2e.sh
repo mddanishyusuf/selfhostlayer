@@ -46,7 +46,8 @@ echo "SQLite"
   setTimeout(() => {}, 8000);' &)
 sleep 2
 out="$(browse '{"engine":"sqlite"}')"
-expect "finds the SQLite databases in data/ by their header" "$out" '.ok and (.result.files | map(.path)) == ["app.db"]'
+expect "finds the SQLite databases in data/ by their header, with their tables" "$out" '.ok and (.result.files | map(.path)) == ["app.db"] and .result.files[0].tables == 1'
+expect "an empty data folder has none" "$(call db.browse '{"slug":"vwb","engine":"sqlite"}')" '.ok and .result.files == []'
 out="$(browse '{"engine":"sqlite","file":"app.db"}')"
 expect "lists its tables and views, with row counts" "$out" '.ok and .result.tables == [{"name":"licenses","type":"table","rows":3},{"name":"recent","type":"view","rows":null}]'
 out="$(browse '{"engine":"sqlite","file":"app.db","op":"rows","table":"licenses","sort":"id","desc":true,"limit":2}')"

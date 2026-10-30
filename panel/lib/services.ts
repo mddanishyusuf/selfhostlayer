@@ -8,7 +8,7 @@ export interface ServiceStatus {
   installed: { redis: boolean; postgres: boolean; mysql: boolean; mongodb: boolean };
   /** Whether systemd says each shared server is up. */
   running: { postgres: boolean; mysql: boolean; mongodb: boolean };
-  redis?: { port: number; memoryMb: number; url: string; active: boolean; memoryUsedMb: number | null; answering: boolean };
+  redis?: { port: number; memoryMb: number; url: string; active: boolean; memoryUsedMb: number | null; keys?: number | null; answering: boolean };
   postgres?: SqlDatabase;
   mysql?: SqlDatabase;
   /** The same shape: a database and user on the shared server, handed over as MONGODB_URI. */
@@ -19,7 +19,18 @@ export interface SqlDatabase {
   database: string;
   url: string;
   sizeMb: number | null;
+  /** Postgres and MySQL: how many tables. */
+  tables?: number | null;
+  /** MongoDB: how many collections. */
+  collections?: number | null;
   answering: boolean;
+}
+
+/** The engines on this server, whether their shared servers are up, and their versions (service.status without an app). */
+export interface Engines {
+  installed: ServiceStatus["installed"];
+  running: ServiceStatus["running"];
+  versions?: { postgres: string | null; redis: string | null; mongodb: string | null };
 }
 
 /** An app gets one SQL database, Postgres or MySQL: both hand it DATABASE_URL. */
@@ -28,6 +39,7 @@ export type SqlKind = "postgres" | "mysql";
 export type DatabaseKind = SqlKind | "mongodb";
 
 export const serviceStatus = (slug: string) => agent<ServiceStatus>("service.status", { slug });
+export const engines = () => agent<Engines>("service.status");
 
 /**
  * A zero-downtime restart on the live build, so the app picks up new
