@@ -106,7 +106,7 @@ One of each per app. PostgreSQL, MySQL and Redis are installed on the server the
 
 Adding or removing a database restarts the app on the same build, with zero downtime, so it gets the new URL. Removing one asks you to type the app's name. Unless you say otherwise, it keeps a final dump in `/var/lib/layer-agent/archive/`.
 
-**Browse data** (next to each database, and **Browse SQLite databases** for the files in `DATA_DIR`) opens a read-only viewer: the tables, collections or keys on the left, a page of rows on the right. Click a column to sort by it, a row to see every value whole (JSON indented). Above the rows:
+**Browse data** (next to each database, and **Browse SQLite databases** for the files in `DATA_DIR`) opens a read-only viewer: the tables, collections or keys on the left, a page of rows on the right. The sidebar shrinks to its icons there, to give the rows the width; the button at its bottom opens the whole menu. Click a column to sort by it, a row to see every value whole (JSON indented). Above the rows:
 
 - **SQL** (SQLite, PostgreSQL, MySQL): run a query. One statement, without `;` (also not inside quotes), up to 500 rows and 5 seconds.
 - **MongoDB:** filter a collection with JSON, like `{"status": "active"}` or `{"_id": {"$oid": "…"}}`. Filters that run JavaScript (`$where`, `$function`) are refused.

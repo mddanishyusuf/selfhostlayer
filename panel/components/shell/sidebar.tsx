@@ -17,6 +17,7 @@ import {
   Menu01Icon,
   Moon02Icon,
   Notification01Icon,
+  PanelLeftOpenIcon,
   WorkHistoryIcon,
   PuzzleIcon,
   Rocket01Icon,
@@ -28,7 +29,7 @@ import {
 } from "@hugeicons/core-free-icons";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { logout } from "@/app/actions/auth";
 import { THEME_COOKIE, type Theme } from "@/lib/theme";
 import { Icon, type IconSvgElement } from "../icon";
@@ -253,15 +254,78 @@ function Nav(props: SidebarProps & { onNavigate?: () => void }) {
   );
 }
 
-/** Fixed to the left edge on desktop; a top bar with a drawer on phones. */
+/** Pages that need the width: the sidebar shrinks to its icons there. */
+const COMPACT = /^\/projects\/[^/]+\/databases\/view/;
+
+/**
+ * The sidebar as a column of icons, each named on hover. The last button
+ * opens the whole menu over the page, as on phones.
+ */
+function Rail(props: SidebarProps & { onExpand: () => void }) {
+  const pathname = usePathname();
+  const slug = /^\/projects\/([^/]+)/.exec(pathname)?.[1];
+  const project = props.projects.find((p) => p.slug === slug);
+  const groups = project ? projectNav(project) : globalNav(props);
+  const cls = (on: boolean) => cx("relative grid size-10 place-items-center rounded-md transition-colors duration-150", on ? "bg-selected text-foreground" : "text-muted hover:bg-hover hover:text-foreground");
+  return (
+    <div className="flex h-full flex-col items-center bg-sidebar">
+      <div className="grid h-[60px] w-full shrink-0 place-items-center border-b border-border">
+        <Link href="/" aria-label="Projects" title="Projects" className="rounded-lg">
+          <LogoMark />
+        </Link>
+      </div>
+      <button type="button" onClick={openPalette} aria-label="Search" title="Search (⌘K)" className={cx(cls(false), "mt-3")}>
+        <Icon icon={Search01Icon} size={18} />
+      </button>
+      {project && (
+        <Link href="/" aria-label="All projects" title="All projects" className={cls(false)}>
+          <Icon icon={ArrowLeft01Icon} size={18} />
+        </Link>
+      )}
+      <nav className="grid min-h-0 flex-1 content-start justify-items-center gap-0.5 overflow-y-auto py-2" aria-label={project ? `${project.slug} navigation` : "Main navigation"}>
+        {groups.map((group, gi) =>
+          group.length === 0 ? null : (
+            <Fragment key={gi}>
+              {gi > 0 && <div className="my-1.5 h-px w-6 bg-border" />}
+              {group.map((item) => {
+                const on = active(item, pathname);
+                const inner = (
+                  <>
+                    <Icon icon={item.icon} size={18} />
+                    {item.dot && <span className="absolute right-1.5 top-1.5 size-[7px] rounded-full bg-gold" aria-label="needs attention" />}
+                  </>
+                );
+                return item.external ? (
+                  <a key={item.href} href={item.href} target="_blank" rel="noreferrer" aria-label={item.label} title={item.label} className={cls(false)}>
+                    {inner}
+                  </a>
+                ) : (
+                  <Link key={item.href} href={item.href} aria-label={item.label} title={item.label} aria-current={on ? "page" : undefined} className={cls(on)}>
+                    {inner}
+                  </Link>
+                );
+              })}
+            </Fragment>
+          ),
+        )}
+      </nav>
+      <button type="button" onClick={props.onExpand} aria-label="Open the menu" title="Open the menu" className={cx(cls(false), "mb-3")}>
+        <Icon icon={PanelLeftOpenIcon} size={18} />
+      </button>
+    </div>
+  );
+}
+
+/** Fixed to the left edge on desktop (icons only where pages need the width); a top bar with a drawer on phones. */
 export function Sidebar(props: SidebarProps) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
+  const compact = COMPACT.test(pathname);
   useEffect(() => setOpen(false), [pathname]);
   return (
     <>
-      <aside className="sticky top-0 hidden h-dvh w-[252px] shrink-0 border-r border-border md:block">
-        <Nav {...props} />
+      <aside className={cx("sticky top-0 hidden h-dvh shrink-0 border-r border-border transition-[width] duration-150 ease-out md:block", compact ? "w-[60px]" : "w-[252px]")}>
+        {compact ? <Rail {...props} onExpand={() => setOpen(true)} /> : <Nav {...props} />}
       </aside>
 
       <div className="fixed inset-x-0 top-0 z-20 flex h-14 items-center justify-between border-b border-border bg-background px-2.5 md:hidden">
@@ -276,7 +340,7 @@ export function Sidebar(props: SidebarProps) {
         </button>
       </div>
       {open && (
-        <div className="fixed inset-0 z-40 md:hidden" role="dialog" aria-modal="true" aria-label="Menu">
+        <div className={cx("fixed inset-0 z-40", !compact && "md:hidden")} role="dialog" aria-modal="true" aria-label="Menu">
           <button type="button" aria-label="Close menu" className="absolute inset-0 bg-black/40" onClick={() => setOpen(false)} />
           <div className="absolute inset-y-0 left-0 w-[280px] border-r border-border shadow-xl">
             <Nav {...props} onNavigate={() => setOpen(false)} />
