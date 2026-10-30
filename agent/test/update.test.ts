@@ -8,6 +8,7 @@ import { parseFeed, UPDATE_UNIT, updateActions } from "../src/actions/update.ts"
 import { NO_IO } from "../src/context.ts";
 import { BIN } from "../src/exec.ts";
 import { SYSTEMD_RUN } from "../src/sandbox.ts";
+import { isNewer } from "../src/version.ts";
 import { testEnv, type TestEnv } from "./helpers.ts";
 
 const TARBALL = Buffer.from("tarball bytes");
@@ -62,10 +63,43 @@ describe("parseFeed", () => {
   });
 });
 
+describe("isNewer", () => {
+  it("follows semver, prereleases before their release", () => {
+    const pairs: [string, string][] = [
+      ["0.2.0", "0.1.0"],
+      ["0.10.0", "0.9.9"],
+      ["1.0.0", "0.99.0"],
+      ["0.2.0", "0.2.0-dev.9eaf83d"],
+      ["0.2.0-dev.abc", "0.1.0"],
+      ["0.2.0-rc.10", "0.2.0-rc.9"],
+      ["0.2.0-rc.1", "0.2.0-beta.2"],
+      ["0.2.0-rc.1.1", "0.2.0-rc.1"],
+      ["0.2.0-dev.abc-next", "0.2.0-dev.abc"],
+      ["0.2.0-rc", "0.2.0-1"],
+    ];
+    for (const [a, b] of pairs) {
+      expect(isNewer(a, b), `${a} > ${b}`).toBe(true);
+      expect(isNewer(b, a), `${b} < ${a}`).toBe(false);
+    }
+    expect(isNewer("0.2.0", "0.2.0")).toBe(false);
+  });
+
+  it("counts any other change as newer", () => {
+    expect(isNewer("ci-tour", "ci")).toBe(true);
+    expect(isNewer("0.2.0", "dev-abc1234")).toBe(true);
+    expect(isNewer("ci", "ci")).toBe(false);
+  });
+});
+
 describe("update.check", () => {
   it("compares the feed's newest release with this server's", async () => {
     expect(await run("update.check")).toEqual({ current: "0.1.0", latest: { version: "0.2.0", date: "2026-11-01", notes: "Faster deploys." }, available: true, running: false });
     feed = JSON.stringify({ releases: [release({ version: "0.1.0" })] });
+    expect((await run("update.check")).available).toBe(false);
+  });
+
+  it("offers nothing older than this server", async () => {
+    writeFileSync(env.paths.boxConfig, JSON.stringify({ panelHost: "p.example.com", appsDomain: "x", publicIp: "1.2.3.4", version: "0.3.0-dev.abc1234", defaultNode: "24.13.1", updatesUrl: `${base}/releases.json` }));
     expect((await run("update.check")).available).toBe(false);
   });
 });

@@ -14,7 +14,7 @@ Run it as root (or with `sudo`).
 | `layer import <app> <file.tar.gz>` | Replaces the app's `data/` folder with an archive from another server. SQLite files are checked first; the app is stopped and started around the swap; the replaced folder is kept next to it. | |
 | `layer access` | Who may open the panel: anyone, or a list of addresses. | `/etc/caddy/sites/_panel.caddy` |
 | `layer access reset` | Lets everyone reach the sign-in page again, for when you've locked yourself out. | |
-| `layer update [version]` | Updates the panel, agent and CLI from the update feed and follows the installer's output. Apps keep running. | `journalctl -u layer-update.service -f` |
+| `layer update [version]` | Updates the panel, agent and CLI from the update feed (without a version: to the newest release, if it's newer) and follows the installer's output. Apps keep running. | `journalctl -u layer-update.service -f` |
 | `layer repair` | Puts back generated files that were edited or deleted by hand (units, Caddy sites, env files) and restarts what they feed. | |
 | `layer call <action> [json]` | Sends one raw action to the agent and prints the answer, for debugging. | |
 

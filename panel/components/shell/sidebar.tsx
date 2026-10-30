@@ -4,6 +4,7 @@ import {
   Analytics01Icon,
   ArrowLeft01Icon,
   ArrowUpRight01Icon,
+  CircleArrowUp02Icon,
   Clock01Icon,
   CommandLineIcon,
   ComputerIcon,
@@ -36,6 +37,7 @@ import { Icon, type IconSvgElement } from "../icon";
 import { cx, LogoMark, StatusDot } from "../ui";
 import { openPalette } from "./palette";
 import { openServerModal } from "./server-modal";
+import { openUpdateModal } from "./update-modal";
 
 export interface SidebarProject {
   slug: string;
@@ -54,6 +56,8 @@ export interface SidebarProps {
   email: string;
   server: { name: string; spec: string; host: string };
   theme: Theme;
+  /** A newer release, once a check found one. */
+  update: { version: string } | null;
 }
 
 interface Item {
@@ -230,6 +234,21 @@ function Nav(props: SidebarProps & { onNavigate?: () => void }) {
       </nav>
 
       <div className="shrink-0 border-t border-border">
+        {props.update && (
+          <button
+            type="button"
+            onClick={() => {
+              props.onNavigate?.();
+              openUpdateModal();
+            }}
+            data-testid="sidebar-update"
+            className="flex w-full items-center gap-2.5 border-b border-border px-4 py-2.5 text-left transition-colors hover:bg-hover"
+          >
+            <Icon icon={CircleArrowUp02Icon} size={16} className="text-accent" />
+            <span className="flex-1 text-[13px] font-medium">Update available</span>
+            <span className="font-mono text-[12px] text-dim">{props.update.version}</span>
+          </button>
+        )}
         <div className="flex items-center gap-2.5 px-4 py-2.5">
           <span className="flex-1 text-[12.5px] text-dim">Theme</span>
           <ThemeSwitch initial={props.theme} />
@@ -309,6 +328,11 @@ function Rail(props: SidebarProps & { onExpand: () => void }) {
           ),
         )}
       </nav>
+      {props.update && (
+        <button type="button" onClick={openUpdateModal} aria-label={`Update to ${props.update.version}`} title={`Update available: ${props.update.version}`} className={cls(false)}>
+          <Icon icon={CircleArrowUp02Icon} size={18} className="text-accent" />
+        </button>
+      )}
       <button type="button" onClick={props.onExpand} aria-label="Open the menu" title="Open the menu" className={cx(cls(false), "mb-3")}>
         <Icon icon={PanelLeftOpenIcon} size={18} />
       </button>

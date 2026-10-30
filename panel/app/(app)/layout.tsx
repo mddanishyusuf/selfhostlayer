@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { CommandPalette, type PaletteItem } from "@/components/shell/palette";
 import { ServerModal } from "@/components/shell/server-modal";
 import { Sidebar, type SidebarProject } from "@/components/shell/sidebar";
+import { UpdateModal } from "@/components/shell/update-modal";
 import { agent, type SystemInfo } from "@/lib/agent";
 import { listIncidents } from "@/lib/alerts/engine";
 import { boxConfig } from "@/lib/box";
@@ -10,6 +11,7 @@ import { listAllDomains, servingConfig } from "@/lib/domains";
 import { listProjects } from "@/lib/projects";
 import { requireUser } from "@/lib/session";
 import { THEME_COOKIE, parseTheme } from "@/lib/theme";
+import { offeredUpdate, updateState } from "@/lib/updates";
 
 function sidebarProjects(): SidebarProject[] {
   return listProjects().map((p) => {
@@ -48,11 +50,13 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const user = await requireUser();
   const projects = sidebarProjects();
   let host = "this server";
+  let version = "dev";
   try {
-    host = boxConfig().panelHost;
+    ({ panelHost: host, version } = boxConfig());
   } catch {
     // dev: no box config
   }
+  const update = offeredUpdate(updateState(), version);
   // The server's name and size for the sidebar; quick (the agent answers locally).
   const info = await agent<SystemInfo>("system.info").catch(() => null);
   const spec = info ? `${info.cpus} vCPU · ${Math.round(info.memoryMb.total / 1024)} GB · ${info.os.name.replace(/ LTS$/, "")}` : "agent not reachable";
@@ -74,9 +78,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         email={user.email}
         server={{ name: info?.hostname ?? "Server", spec, host }}
         theme={parseTheme((await cookies()).get(THEME_COOKIE)?.value)}
+        update={update && { version: update.version }}
       />
       <main className="min-h-dvh min-w-0 flex-1 pt-14 md:pt-0">{children}</main>
       <ServerModal name={info?.hostname ?? "Server"} />
+      {update && <UpdateModal current={version} release={update} />}
       <CommandPalette items={items} />
     </div>
   );

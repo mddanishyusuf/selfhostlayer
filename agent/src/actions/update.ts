@@ -11,6 +11,7 @@ import { ActionError } from "../errors.ts";
 import { BIN } from "../exec.ts";
 import { ensureDir } from "../fsutil.ts";
 import { SYSTEMD_RUN } from "../sandbox.ts";
+import { isNewer } from "../version.ts";
 import { download } from "./node.ts";
 import { readBox } from "./panel.ts";
 
@@ -94,7 +95,7 @@ async function updateCheck(_params: Params, ctx: Context) {
   return {
     current,
     latest: latest && { version: latest.version, date: latest.date, notes: latest.notes },
-    available: latest !== null && latest.version !== current,
+    available: latest !== null && isNewer(latest.version, current),
     running: await running(ctx),
   };
 }

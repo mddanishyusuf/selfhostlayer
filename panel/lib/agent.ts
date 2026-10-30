@@ -51,6 +51,17 @@ const FAKE: Partial<Record<ActionName, unknown>> = {
       { slug: "picker", ports: { blue: 4004, green: 4005 }, live: null, domains: [], unitFile: false },
     ] satisfies AppSummary[],
   },
+  // A newer release in the feed, and an update that never ends (dev has no installer to run).
+  "update.check": { current: "dev", latest: { version: "0.2.0", date: "2026-11-02", notes: "An Update button in the sidebar when a newer release is out.\nAlbert Sans in the panel." }, available: true, running: false },
+  "update.start": { from: "dev", to: "0.2.0", unit: "layer-update.service" },
+  "update.status": {
+    running: true,
+    state: "active",
+    result: null,
+    exitStatus: null,
+    version: "dev",
+    log: ["==> Checking this server", "  ✓ Ubuntu 24.04 on x86_64", "==> Installing Self Host Layer", "  ✓ Release 0.2.0 in /opt/layer/current", "==> Restarting the agent and the panel"],
+  },
   // Sample answers for the dev previews (the same for every app).
   "firewall.status": {
     ufw: {

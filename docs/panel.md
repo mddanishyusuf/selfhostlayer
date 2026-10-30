@@ -232,6 +232,6 @@ tail -f /var/log/layer/audit.jsonl
   - Change your password; that signs out every other session.
   - Make new recovery codes; the old ones stop working.
   - See where you're signed in, and sign out the others.
-- **Version:** check for and install updates. Apps keep running. The same as `layer update`.
+- **Version:** the panel, agent and server versions, with Check for updates and the switch for the automatic checks (every 6 hours). A newer release also shows as **Update available** at the bottom of the sidebar. Updating keeps your apps running. The same as `layer update`.
 - **Repair:** put back generated files edited or deleted by hand. The same as `layer repair`.
 - **Remove the panel:** how to remove only the panel; your apps keep running. See [Install](install.md#remove-the-panel-your-apps-keep-running).

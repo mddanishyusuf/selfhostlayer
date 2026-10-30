@@ -18,6 +18,7 @@ import { db } from "@/lib/db";
 import { requesterIp } from "@/lib/request";
 import { PANEL_MOVE, readState } from "@/lib/panel-state";
 import { listSessions, requireUser } from "@/lib/session";
+import { autoCheck, offeredUpdate, updateState } from "@/lib/updates";
 import { timeAgo } from "@/components/status";
 
 export const dynamic = "force-dynamic";
@@ -31,6 +32,7 @@ export default async function ServerSettingsPage() {
   const info = await agent<SystemInfo>("system.info").catch(() => null);
   const you = await requesterIp();
   const sessions = await listSessions(user.id);
+  const updates = updateState();
   const codesLeft = (db().prepare("SELECT COUNT(*) AS n FROM recovery_codes WHERE user_id = ? AND used_at IS NULL").get(user.id) as { n: number }).n;
   return (
     <>
@@ -136,7 +138,7 @@ export default async function ServerSettingsPage() {
             ["Server", info ? `${info.os.name} · ${info.arch} · Node ${info.nodeVersions.join(", ")}` : "—"],
           ]}
         />
-        <UpdatePanel current={box.version} />
+        <UpdatePanel current={box.version} state={updates} offered={offeredUpdate(updates, box.version)} checked={updates && timeAgo(updates.checkedAt)} auto={autoCheck()} />
       </SettingsRow>
       <SettingsRow title="Repair" description="Puts back unit files, Caddy sites and env files someone edited or deleted by hand, and restarts what they feed. layer repair on the server does the same.">
         <RepairButton />

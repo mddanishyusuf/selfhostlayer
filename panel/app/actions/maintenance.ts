@@ -1,23 +1,21 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { agent } from "@/lib/agent";
 import { requireUser } from "@/lib/session";
+import { checkForUpdates, setAutoCheck } from "@/lib/updates";
 
-export interface UpdateCheck {
-  current?: string;
-  latest?: { version: string; date: string | null; notes: string | null } | null;
-  available?: boolean;
-  running?: boolean;
-  error?: string;
+/** Checks the release feed now; the sidebar and Settings show the answer. */
+export async function checkUpdatesAction(): Promise<void> {
+  await requireUser();
+  await checkForUpdates();
+  revalidatePath("/", "layout");
 }
 
-export async function checkUpdatesAction(): Promise<UpdateCheck> {
+export async function setAutoCheckAction(on: boolean): Promise<void> {
   await requireUser();
-  try {
-    return await agent<UpdateCheck>("update.check");
-  } catch (err) {
-    return { error: err instanceof Error ? err.message : "Couldn't check for updates." };
-  }
+  setAutoCheck(on);
+  revalidatePath("/settings");
 }
 
 /** Starts the update; the page then follows /api/update while the panel restarts. */

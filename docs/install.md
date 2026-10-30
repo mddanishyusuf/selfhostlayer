@@ -81,14 +81,14 @@ The full log is in `/var/log/layer-install.log`.
 
 ## Update
 
-**Settings → Version → Check for updates**, or on the server:
+The panel checks the update feed every 6 hours. When a newer release is out, **Update available** shows at the bottom of the sidebar: click it to read what's new and update. **Settings → Version** checks now and turns the automatic checks off. On the server:
 
 ```sh
-layer update            # the newest release
-layer update 0.2.0      # a specific one
+layer update            # the newest release, if it's newer than yours
+layer update 0.2.0      # a specific one, also an older one to go back
 ```
 
-The agent downloads the release and its installer from the update feed and checks both against the checksums the feed lists. Then it runs the installer in its own systemd unit (`layer-update.service`). Your apps keep running: only the panel and the agent restart. The installer keeps the server's settings as they are.
+The agent downloads the release and its installer from the update feed (`https://get.selfhostlayer.com/releases.json` unless the installer was given `--updates-url`) and checks both against the checksums the feed lists. Then it runs the installer in its own systemd unit (`layer-update.service`). Your apps keep running: only the panel and the agent restart. The installer keeps the server's settings as they are.
 
 ## Repair
 

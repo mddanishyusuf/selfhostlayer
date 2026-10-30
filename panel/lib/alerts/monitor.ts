@@ -1,6 +1,7 @@
 // Watches the server and raises/resolves incidents. Runs inside the panel,
 // started once at server start (instrumentation.ts): every minute for disk,
-// crash loops and cron results; every 10 minutes for certificates.
+// crash loops and cron results; every 10 minutes for certificates; every 6
+// hours for a newer release.
 import { sampleMetrics } from "../metrics";
 import { agent, type SystemInfo } from "../agent";
 import { boxConfig } from "../box";
@@ -12,6 +13,7 @@ import { resumeDeployments } from "../deploy";
 import { listDomains } from "../domains";
 import { backupProjects, markInterrupted, overdueSlugs, scheduledTick } from "../backup/runner";
 import { listProjects } from "../projects";
+import { autoCheck, checkForUpdates, UPDATE_CHECK_EVERY_MS } from "../updates";
 import { configureAlerts, openIncident, raise, resolve } from "./engine";
 import { certVerdict, crashVerdict, cronVerdict, diskVerdict, type UnitSnapshot, type Verdict } from "./rules";
 
@@ -22,10 +24,11 @@ interface MonitorState {
   started: boolean;
   units: Map<string, UnitSnapshot>;
   lastCertCheck: number;
+  lastUpdateCheck: number;
   running: boolean;
 }
 const g = globalThis as unknown as { layerMonitor?: MonitorState };
-const state: MonitorState = (g.layerMonitor ??= { started: false, units: new Map(), lastCertCheck: 0, running: false });
+const state: MonitorState = (g.layerMonitor ??= { started: false, units: new Map(), lastCertCheck: 0, lastUpdateCheck: 0, running: false });
 
 const panelUrl = (path: string) => `https://${boxConfig().panelHost}${path}`;
 
@@ -129,6 +132,10 @@ export async function tick(): Promise<void> {
     if (Date.now() - state.lastCertCheck > CERT_EVERY_MS) {
       state.lastCertCheck = Date.now();
       await checkCertificates().catch((err) => console.error("monitor: certificate check failed:", (err as Error).message));
+    }
+    if (autoCheck() && Date.now() - state.lastUpdateCheck > UPDATE_CHECK_EVERY_MS) {
+      state.lastUpdateCheck = Date.now();
+      await checkForUpdates().catch((err) => console.error("monitor: update check failed:", (err as Error).message));
     }
   } finally {
     state.running = false;
