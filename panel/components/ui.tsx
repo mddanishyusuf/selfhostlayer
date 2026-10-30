@@ -111,12 +111,24 @@ export function FormError({ message }: { message?: string | null }) {
 }
 
 /** The logo (design/logo): an L, a violet app standing on an orange layer, your server. */
+/**
+ * The logo's four bars (design/logo/icon.svg): two L's turned into each
+ * other, each bar its own color, on no tile. The same colors in both themes.
+ */
+const LOGO_BARS = [
+  { x: 4, y: 4, width: 17.4, height: 5, fill: "#8b5cf6" },
+  { x: 23, y: 4, width: 5, height: 17.4, fill: "#f97316" },
+  { x: 10.6, y: 23, width: 17.4, height: 5, fill: "#10b981" },
+  { x: 4, y: 10.6, width: 5, height: 17.4, fill: "#3b82f6" },
+];
+
 export function LogoMark() {
   return (
-    <span className="grid size-[30px] shrink-0 place-items-center rounded-lg bg-logo-tile ring-1 ring-inset ring-logo-edge" aria-hidden>
-      <svg viewBox="0 0 32 32" className="size-[19px]">
-        <rect x="8.4" y="4.5" width="7" height="16" rx="1.6" className="fill-logo-stem" />
-        <rect x="8.4" y="23" width="17.5" height="4.8" rx="1.2" className="fill-logo-base" />
+    <span className="grid size-[30px] shrink-0 place-items-center" aria-hidden>
+      <svg viewBox="3 3 26 26" className="size-[22px]">
+        {LOGO_BARS.map((bar) => (
+          <rect key={bar.fill} {...bar} rx="1.2" />
+        ))}
       </svg>
     </span>
   );

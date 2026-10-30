@@ -122,6 +122,59 @@
       <rect x="8.4" y="4.5" width="7" height="16" rx="1.6" fill="var(--stem, currentColor)"/>
       <rect x="8.4" y="23" width="17.5" height="4.8" rx="1.2" fill="var(--base, currentColor)"/>
     </symbol>
+
+    <!-- Round 4: four lines in four colors, no tile. Colors come from --c1 to --c4. -->
+    <!-- 4a. Pinwheel: two L's locked into a square, one turned around the other. -->
+    <symbol id="r4-pinwheel" viewBox="0 0 32 32">
+      <rect x="4" y="4" width="17.4" height="5" rx="1.2" fill="var(--c1)"/>
+      <rect x="23" y="4" width="5" height="17.4" rx="1.2" fill="var(--c2)"/>
+      <rect x="10.6" y="23" width="17.4" height="5" rx="1.2" fill="var(--c3)"/>
+      <rect x="4" y="10.6" width="5" height="17.4" rx="1.2" fill="var(--c4)"/>
+    </symbol>
+    <!-- 4b. Two L's, stepped: one layer up and behind the other. -->
+    <symbol id="r4-stepped" viewBox="0 0 32 32">
+      <rect x="14" y="3.5" width="4.6" height="11.5" rx="1.2" fill="var(--c1)"/>
+      <rect x="14" y="16.5" width="14" height="4.6" rx="1.2" fill="var(--c2)"/>
+      <rect x="4" y="10.9" width="4.6" height="11.5" rx="1.2" fill="var(--c3)"/>
+      <rect x="4" y="23.9" width="14" height="4.6" rx="1.2" fill="var(--c4)"/>
+    </symbol>
+    <!-- 4c. Four steps: four layers growing right, which is also an L. -->
+    <symbol id="r4-steps" viewBox="0 0 32 32">
+      <rect x="5" y="4.5" width="8.5" height="4.6" rx="1.2" fill="var(--c1)"/>
+      <rect x="5" y="10.8" width="13" height="4.6" rx="1.2" fill="var(--c2)"/>
+      <rect x="5" y="17.1" width="17.5" height="4.6" rx="1.2" fill="var(--c3)"/>
+      <rect x="5" y="23.4" width="22" height="4.6" rx="1.2" fill="var(--c4)"/>
+    </symbol>
+    <!-- 4d. Today's L, cut in four: two blocks of app on two blocks of server. -->
+    <symbol id="r4-blocks" viewBox="0 0 32 32">
+      <rect x="8.4" y="4.5" width="7" height="7.25" rx="1.2" fill="var(--c1)"/>
+      <rect x="8.4" y="13.25" width="7" height="7.25" rx="1.2" fill="var(--c2)"/>
+      <rect x="8.4" y="23" width="8" height="4.8" rx="1.2" fill="var(--c3)"/>
+      <rect x="17.9" y="23" width="8" height="4.8" rx="1.2" fill="var(--c4)"/>
+    </symbol>
+
+    <!-- Round 5: L's only. -->
+    <!-- 5a. Two L's: one inside the other, each a stem and a base. -->
+    <symbol id="r5-double" viewBox="0 0 32 32">
+      <rect x="4" y="4" width="4.4" height="18" rx="1.2" fill="var(--c1)"/>
+      <rect x="4" y="23.6" width="24" height="4.4" rx="1.2" fill="var(--c2)"/>
+      <rect x="10" y="4" width="4.4" height="12" rx="1.2" fill="var(--c3)"/>
+      <rect x="10" y="17.6" width="18" height="4.4" rx="1.2" fill="var(--c4)"/>
+    </symbol>
+    <!-- 5b. Four lines side by side: one tall, three short, an L together. -->
+    <symbol id="r5-bars" viewBox="0 0 32 32">
+      <rect x="4" y="4" width="4.6" height="24" rx="1.2" fill="var(--c1)"/>
+      <rect x="10.4" y="21" width="4.6" height="7" rx="1.2" fill="var(--c2)"/>
+      <rect x="16.8" y="21" width="4.6" height="7" rx="1.2" fill="var(--c3)"/>
+      <rect x="23.2" y="21" width="4.6" height="7" rx="1.2" fill="var(--c4)"/>
+    </symbol>
+    <!-- 5c. Layers on a base: three short layers (your apps) on one long one (your server). -->
+    <symbol id="r5-layers" viewBox="0 0 32 32">
+      <rect x="4" y="4.5" width="9.5" height="4.6" rx="1.2" fill="var(--c1)"/>
+      <rect x="4" y="10.8" width="9.5" height="4.6" rx="1.2" fill="var(--c2)"/>
+      <rect x="4" y="17.1" width="9.5" height="4.6" rx="1.2" fill="var(--c3)"/>
+      <rect x="4" y="23.4" width="24" height="4.6" rx="1.2" fill="var(--c4)"/>
+    </symbol>
   </defs>
 </svg>
 
@@ -132,8 +185,64 @@
 </div>
 <div id="rows"></div>
 <div id="round3" style="display:none"></div>
+<div id="round4" style="display:none"></div>
 <script>
   const round = new URLSearchParams(location.search).get("round");
+  if (round === "4" || round === "5") {
+    document.getElementById("hero").style.display = "none";
+    document.querySelector("h1").textContent = `Self Host Layer: logo, round ${round}`;
+    document.querySelector("p.lede").innerHTML =
+      (round === "5" ? "L's only, in four lines and four colors, no tile." : "Four lines in four colors, no tile: just the mark.") +
+      ' Each one big on the light page and on the charcoal panel, at 32, 24 and 16 px on both, and next to the name as in the nav and the sidebar. Earlier: <a href="?round=1">1</a> · <a href="?round=2">2</a> · <a href="?round=3">3</a> · <a href="?round=4">4</a>.';
+    // Mid-tone colors that read on #fafafa and on #1e1e1e alike, since there's no tile behind them.
+    const palettes = {
+      brand: ["#8b5cf6", "#f97316", "#10b981", "#3b82f6"],
+      bright: ["#8b5cf6", "#f97316", "#ec4899", "#06b6d4"],
+      cool: ["#6366f1", "#8b5cf6", "#0ea5e9", "#14b8a6"],
+    };
+    const marks = round === "5" ? [
+      ["r5-double", "5a. Two L's", "One L inside the other, each a stem and a base"],
+      ["r5-bars", "5b. Four lines side by side", "One tall and three short: an L together"],
+      ["r5-layers", "5c. Layers on a base", "Three short layers, your apps, on one long one, your server"],
+    ] : [
+      ["r4-pinwheel", "4a. Pinwheel", "Two L's locked into a square, one turned around the other"],
+      ["r4-stepped", "4b. Two L's, stepped", "One layer up and behind the other: your apps on your server"],
+      ["r4-steps", "4c. Four steps", "Four layers growing right, which is also an L"],
+      ["r4-blocks", "4d. L in four blocks", "Today's L, cut in four: app blocks on server blocks"],
+    ];
+    const vars = (p) => p.map((c, i) => `--c${i + 1}:${c}`).join(";");
+    const mark = (id, size, p = palettes.brand) => `<svg viewBox="0 0 32 32" style="width:${size}px;height:${size}px;display:block;${vars(p)}"><use href="#${id}"/></svg>`;
+    const on = (bg, inner, pad = 18) => `<span style="display:grid;place-items:center;padding:${pad}px;border-radius:14px;background:${bg};${bg === "#fafafa" ? "box-shadow:inset 0 0 0 1px #e5e5e5" : ""}">${inner}</span>`;
+    const sizes = (id) => [32, 24, 16].map((sz) => mark(id, sz)).join("");
+    const el = document.getElementById("round4");
+    el.style.display = "grid";
+    el.innerHTML =
+      marks.map(([id, name, what]) => `
+      <div class="row" style="grid-template-columns: 200px 132px 132px 200px 1fr">
+        <div class="name"><b>${name}</b><span>${what}</span></div>
+        ${on("#fafafa", mark(id, 96))}
+        ${on("#1e1e1e", mark(id, 96))}
+        <div style="display:grid;gap:10px">
+          ${on("#fafafa", `<span class="sizes">${sizes(id)}</span>`, 12)}
+          ${on("#1e1e1e", `<span class="sizes">${sizes(id)}</span>`, 12)}
+        </div>
+        <div style="display:grid;gap:10px;justify-items:start">
+          <div class="lockup" style="padding:10px 14px;border-radius:10px;background:#fafafa;box-shadow:inset 0 0 0 1px #e5e5e5">${mark(id, 24)}Self Host Layer</div>
+          <div class="lockup" style="padding:10px 14px;border-radius:10px;background:#171717;color:#f2f2f2">${mark(id, 24)}Self Host Layer</div>
+        </div>
+      </div>`).join("") +
+      `<div class="row" style="grid-template-columns: 200px 1fr">
+        <div class="name"><b>Other colors</b><span>The same marks in two more sets of four colors</span></div>
+        <div style="display:grid;gap:12px">
+          ${Object.entries(palettes).map(([name, p]) => `
+            <div style="display:flex;align-items:center;gap:14px">
+              <span style="width:56px;color:var(--muted);font-size:12.5px">${name}</span>
+              ${marks.map(([id]) => on("#fafafa", mark(id, 44, p), 10)).join("")}
+              ${marks.map(([id]) => on("#1e1e1e", mark(id, 44, p), 10)).join("")}
+            </div>`).join("")}
+        </div>
+      </div>`;
+  }
   if (round === "3") {
     document.getElementById("hero").style.display = "none";
     document.querySelector("p.lede").innerHTML = 'Option A with crisper corners, in flat colors. Each variant: big on light and dark, at 32, 24 and 16 px, and with the name in the nav (light) and the sidebar (dark).';
@@ -161,7 +270,7 @@
         </div>
       </div>`).join("");
   }
-  const concepts = round === "3" ? [] : round !== "1" && round !== "2" ? [
+  const concepts = round === "3" || round === "4" || round === "5" ? [] : round !== "1" && round !== "2" ? [
     ["final", "A. L on a base", "Recommended: an app standing on your server; L for Layer"],
     ["stack-b", "B. Two plates", "One layer on another: the classic layers idea"],
     ["orb-a", "C. Sliced orb", "One round thing in three layers"],
@@ -181,7 +290,7 @@
     ["lift", "5. Lift", "Two layers going up, like a deploy"],
     ["box", "6. Box + layer", "Your server, with one layer on top"],
   ];
-  if (round !== "1" && round !== "2" && round !== "3") document.getElementById("hero").style.display = "flex";
+  if (!["1", "2", "3", "4", "5"].includes(round)) document.getElementById("hero").style.display = "flex";
   const use = (id, size) => `<svg viewBox="0 0 32 32" width="${size}" height="${size}"><use href="#${id}"/></svg>`;
   document.getElementById("rows").innerHTML = concepts.map(([id, name, what]) => `
     <div class="row">
