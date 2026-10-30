@@ -25,7 +25,9 @@ describe("cpuPercent", () => {
 });
 
 describe("rollUp and history", () => {
-  const now = Date.UTC(2026, 9, 30, 12, 30);
+  // Long past: the sampleMetrics test below reads rows the fake agent stamps
+  // with the real time, and these rows must never land in its window.
+  const now = Date.UTC(2025, 0, 15, 12, 30);
   const hour = Math.floor(now / HOUR) * HOUR;
 
   it("averages finished hours once, keeps a day of minutes and a week of hours", () => {
