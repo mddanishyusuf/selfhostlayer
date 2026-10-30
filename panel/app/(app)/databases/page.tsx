@@ -17,10 +17,10 @@ import { requireUser } from "@/lib/session";
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Databases" };
 
-function Instance({ slug, index, name, detail, ok, url }: { slug: string; index: number; name: string; detail: ReactNode; ok: boolean; url?: string }) {
+function Instance({ slug, framework, name, detail, ok, url }: { slug: string; framework: string; name: string; detail: ReactNode; ok: boolean; url?: string }) {
   return (
     <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-3.5 border-t border-border py-3.5 pl-4 pr-4 sm:pr-7 md:pl-[82px]">
-      <Mark name={slug} index={index} size="sm" />
+      <Mark framework={framework} size="sm" />
       <div className="grid min-w-0 gap-0.5">
         <div className="flex min-w-0 items-center gap-2 text-[15px] font-semibold">
           {slug} <code className="truncate font-mono text-[13px] font-normal text-muted">{name}</code>
@@ -61,7 +61,7 @@ export default async function DatabasesOverviewPage({ searchParams }: { searchPa
   const server = statuses[0] ?? (await agent<Pick<ServiceStatus, "installed" | "running">>("service.status").catch(() => null));
   const installed = server?.installed ?? { redis: false, postgres: false, mysql: false, mongodb: false };
   const running = server?.running ?? { postgres: false, mysql: false, mongodb: false };
-  const indexOf = (slug: string) => all.findIndex((p) => p.slug === slug);
+  const frameworkOf = (slug: string) => all.find((p) => p.slug === slug)?.framework ?? "unknown";
   const pg = statuses.filter((s) => s.postgres);
   const my = statuses.filter((s) => s.mysql);
   const mongo = statuses.filter((s) => s.mongodb);
@@ -120,7 +120,7 @@ export default async function DatabasesOverviewPage({ searchParams }: { searchPa
         side={installed.postgres ? <ServerState up={running.postgres} /> : undefined}
       >
         {pg.map((s) => (
-          <Instance key={s.slug} slug={s.slug} index={indexOf(s.slug)} name={s.postgres!.database} ok={s.postgres!.answering} url={s.postgres!.url} detail={<>{s.postgres!.sizeMb !== null ? `${s.postgres!.sizeMb} MB` : "size unknown"}<Dot />a pg_dump in every backup</>} />
+          <Instance key={s.slug} slug={s.slug} framework={frameworkOf(s.slug)} name={s.postgres!.database} ok={s.postgres!.answering} url={s.postgres!.url} detail={<>{s.postgres!.sizeMb !== null ? `${s.postgres!.sizeMb} MB` : "size unknown"}<Dot />a pg_dump in every backup</>} />
         ))}
         <Footer add={addLinks("Add Postgres to", withoutSql)} note="One server · a role and database per app · 127.0.0.1 only" />
       </Collapsible>
@@ -133,7 +133,7 @@ export default async function DatabasesOverviewPage({ searchParams }: { searchPa
         side={installed.mysql ? <ServerState up={running.mysql} /> : undefined}
       >
         {my.map((s) => (
-          <Instance key={s.slug} slug={s.slug} index={indexOf(s.slug)} name={s.mysql!.database} ok={s.mysql!.answering} url={s.mysql!.url} detail={<>{s.mysql!.sizeMb !== null ? `${s.mysql!.sizeMb} MB` : "size unknown"}<Dot />a dump in every backup</>} />
+          <Instance key={s.slug} slug={s.slug} framework={frameworkOf(s.slug)} name={s.mysql!.database} ok={s.mysql!.answering} url={s.mysql!.url} detail={<>{s.mysql!.sizeMb !== null ? `${s.mysql!.sizeMb} MB` : "size unknown"}<Dot />a dump in every backup</>} />
         ))}
         <Footer add={addLinks("Add MySQL to", withoutSql)} note="One server · a user and database per app · 127.0.0.1 only" />
       </Collapsible>
@@ -157,7 +157,7 @@ export default async function DatabasesOverviewPage({ searchParams }: { searchPa
         }
       >
         {mongo.map((s) => (
-          <Instance key={s.slug} slug={s.slug} index={indexOf(s.slug)} name={s.mongodb!.database} ok={s.mongodb!.answering} url={s.mongodb!.url} detail={<>{s.mongodb!.sizeMb !== null ? `${s.mongodb!.sizeMb} MB` : "size unknown"}<Dot />a mongodump in every backup</>} />
+          <Instance key={s.slug} slug={s.slug} framework={frameworkOf(s.slug)} name={s.mongodb!.database} ok={s.mongodb!.answering} url={s.mongodb!.url} detail={<>{s.mongodb!.sizeMb !== null ? `${s.mongodb!.sizeMb} MB` : "size unknown"}<Dot />a mongodump in every backup</>} />
         ))}
         <Footer add={installed.mongodb ? addLinks("Create a database for", withoutMongo) : undefined} note="One server for every project · a user and database per project · 127.0.0.1 only" />
       </Collapsible>
@@ -170,7 +170,7 @@ export default async function DatabasesOverviewPage({ searchParams }: { searchPa
         side={installed.redis ? <span className="max-sm:hidden"><StatusText status="ok" label="Running" /></span> : undefined}
       >
         {redis.map((s) => (
-          <Instance key={s.slug} slug={s.slug} index={indexOf(s.slug)} name={`port ${s.redis!.port}`} ok={s.redis!.answering} url={s.redis!.url} detail={<>{s.redis!.memoryUsedMb ?? "?"} MB of {s.redis!.memoryMb} MB<Dot />noeviction</>} />
+          <Instance key={s.slug} slug={s.slug} framework={frameworkOf(s.slug)} name={`port ${s.redis!.port}`} ok={s.redis!.answering} url={s.redis!.url} detail={<>{s.redis!.memoryUsedMb ?? "?"} MB of {s.redis!.memoryMb} MB<Dot />noeviction</>} />
         ))}
         <Footer add={addLinks("Add Redis to", withoutRedis)} note="One small Redis per app · its own password and memory cap" />
       </Collapsible>
@@ -182,7 +182,7 @@ export default async function DatabasesOverviewPage({ searchParams }: { searchPa
         sub={<>{sqlite.length} app{sqlite.length === 1 ? "" : "s"} with SQLite files<Dot />checked at every backup</>}
       >
         {sqlite.flatMap(({ p, files }) =>
-          files.map((f) => <Instance key={`${p.slug}/${f.path}`} slug={p.slug} index={indexOf(p.slug)} name={f.path} ok detail={<>{(f.bytes / 1048576).toFixed(1)} MB<Dot />integrity ok at the last backup</>} />),
+          files.map((f) => <Instance key={`${p.slug}/${f.path}`} slug={p.slug} framework={p.framework} name={f.path} ok detail={<>{(f.bytes / 1048576).toFixed(1)} MB<Dot />integrity ok at the last backup</>} />),
         )}
         <Footer note="Files in each app's DATA_DIR are found by their header and copied safely, even while the app writes" />
       </Collapsible>

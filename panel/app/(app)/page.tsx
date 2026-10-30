@@ -16,19 +16,6 @@ import { listProjects } from "@/lib/projects";
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Projects" };
 
-const FW_DOT: Record<string, string> = {
-  nextjs: "bg-foreground",
-  vite: "bg-lavender",
-  cra: "bg-lavender",
-  "astro-node": "bg-coral",
-  "astro-static": "bg-coral",
-  "node-server": "bg-blue",
-  nuxt: "bg-teal",
-  remix: "bg-rose",
-  "react-router": "bg-rose",
-  "static-html": "bg-gold",
-};
-
 export default async function ProjectsPage({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
   const { q } = await searchParams;
   // Warm the New project list in the background, so it opens without waiting on GitHub.
@@ -43,7 +30,7 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
     const hosts = servingConfig(p.id).domains;
     const host = hosts.find((h) => h !== p.domains[0]) ?? hosts[0] ?? p.domains[0];
     const building = !!latest && !FINISHED.includes(latest.status);
-    return { p, latest, live, host, building, index: all.indexOf(p) };
+    return { p, latest, live, host, building };
   });
   const deploying = rows.find((r) => r.building);
 
@@ -93,7 +80,7 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
       ) : (
         <div className="border-b border-border" data-testid="project-list">
           {rows.length === 0 && <Empty>No projects match “{q}”.</Empty>}
-          {rows.map(({ p, latest, live, host, building, index }) => {
+          {rows.map(({ p, latest, live, host, building }) => {
             // Worth saying even while an older build still serves the site.
             const failed = latest?.status === "failed";
             return (
@@ -105,7 +92,7 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
                   building && "sweep-top",
                 )}
               >
-                <Mark name={p.slug} index={index} />
+                <Mark framework={p.framework} />
                 <div className="grid min-w-0 gap-[3px]">
                   <div className="flex min-w-0 items-baseline gap-2.5">
                     <b className="whitespace-nowrap text-[15.5px] font-semibold">{p.slug}</b>
@@ -132,8 +119,7 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
                 </div>
                 <div className="grid justify-items-end gap-1">
                   {latest ? <DeployStatusBadge status={building ? latest.status : live ? "ready" : latest.status} /> : <span className="text-[13.5px] text-muted">Not deployed</span>}
-                  <span className="inline-flex items-center gap-[7px] whitespace-nowrap text-[12.5px] text-dim max-sm:hidden">
-                    <span className={cx("size-2 rounded-full", FW_DOT[p.framework] ?? "bg-dim")} />
+                  <span className="whitespace-nowrap text-[12.5px] text-dim max-sm:hidden">
                     {frameworkLabel(p.framework)} · {p.runtime.kind === "static" ? "static" : `Node ${p.nodeVersion}`}
                   </span>
                 </div>

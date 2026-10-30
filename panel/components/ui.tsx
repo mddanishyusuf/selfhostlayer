@@ -1,22 +1,7 @@
-import {
-  AlertCircleIcon,
-  Atom01Icon,
-  Compass01Icon,
-  CubeIcon,
-  Diamond01Icon,
-  Flower01Icon,
-  Globe02Icon,
-  Idea01Icon,
-  Layers01Icon,
-  Leaf01Icon,
-  PuzzleIcon,
-  Rocket01Icon,
-  StarIcon,
-  Sun03Icon,
-  ZapIcon,
-} from "@hugeicons/core-free-icons";
+import { AlertCircleIcon } from "@hugeicons/core-free-icons";
 import type { ComponentProps, ReactNode } from "react";
 import { Icon } from "./icon";
+import { stackLogo } from "./stack-logos";
 
 const cx = (...parts: (string | false | null | undefined)[]) => parts.filter(Boolean).join(" ");
 export { cx };
@@ -179,28 +164,20 @@ export function Skeleton({ className }: { className?: string }) {
   );
 }
 
-/** A project's icon in a tinted square; the color is stable per index. */
-export const MARK_COLORS = ["lavender", "coral", "teal", "blue", "gold", "rose", "foreground"] as const;
-const MARK_CLASS: Record<(typeof MARK_COLORS)[number], string> = {
-  lavender: "bg-lavender/18 text-lavender",
-  coral: "bg-coral/18 text-coral",
-  teal: "bg-teal/18 text-teal",
-  blue: "bg-blue/18 text-blue",
-  gold: "bg-gold/18 text-gold",
-  rose: "bg-rose/18 text-rose",
-  foreground: "bg-foreground/12 text-foreground",
-};
-/** Picked by index like the colors, so the first 14 projects all look different. */
-const MARK_ICONS = [Rocket01Icon, Globe02Icon, CubeIcon, Layers01Icon, Leaf01Icon, ZapIcon, StarIcon, Diamond01Icon, Sun03Icon, Compass01Icon, PuzzleIcon, Atom01Icon, Idea01Icon, Flower01Icon];
-
-/** A project's mark: its icon on its color. `name` is the project it stands for (the row says it in words). */
-export function Mark({ index, size = "md" }: { name: string; index: number; size?: "sm" | "md" }) {
+/** A project's mark: the logo of its stack (its detected framework), in one color for every project. */
+export function Mark({ framework, size = "md" }: { framework: string; size?: "sm" | "md" }) {
+  const logo = stackLogo(framework);
+  const px = size === "sm" ? 15 : 19;
   return (
     <span
-      className={cx("grid shrink-0 place-items-center", size === "sm" ? "size-[30px] rounded-[9px]" : "size-10 rounded-[11px]", MARK_CLASS[MARK_COLORS[Math.abs(index) % MARK_COLORS.length]!])}
-      aria-hidden
+      role="img"
+      aria-label={logo.title}
+      title={logo.title}
+      className={cx("grid shrink-0 place-items-center border border-border bg-foreground/[0.04] text-foreground", size === "sm" ? "size-[30px] rounded-[9px]" : "size-10 rounded-[11px]")}
     >
-      <Icon icon={MARK_ICONS[Math.abs(index) % MARK_ICONS.length]!} size={size === "sm" ? 16 : 20} strokeWidth={1.8} />
+      <svg viewBox="0 0 24 24" width={px} height={px} fill="currentColor" aria-hidden>
+        <path d={logo.path} />
+      </svg>
     </span>
   );
 }

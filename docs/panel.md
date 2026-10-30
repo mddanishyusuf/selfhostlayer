@@ -8,7 +8,7 @@ The sidebar has two modes. Outside a project it lists the server's pages. Inside
 
 ## Projects
 
-All your projects, with their status, last deploy and address. Each project has its own icon, picked from its name. Search and **New project** are in the bar under the header. The server button in the header opens CPU, memory and disk for the whole server, with the last 24 hours charted and memory by app.
+All your projects, with their status, last deploy and address. Each project shows the logo of its stack (Next.js, Vite, Astro, Node.js…), in one color for all. Search and **New project** are in the bar under the header. The server button in the header opens CPU, memory and disk for the whole server, with the last 24 hours charted and memory by app.
 
 ### New project
 1. Pick a repository from your GitHub App's installations, or paste a public GitHub URL.

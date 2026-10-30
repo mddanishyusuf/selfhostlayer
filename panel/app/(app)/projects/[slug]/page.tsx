@@ -15,7 +15,7 @@ import { frameworkLabel } from "@/lib/detect";
 import { FINISHED, listDeployments, liveDeployment } from "@/lib/deploy";
 import { servingConfig } from "@/lib/domains";
 import { history, latestDisk, type Point, type Range } from "@/lib/metrics";
-import { getProjectBySlug, listProjects } from "@/lib/projects";
+import { getProjectBySlug } from "@/lib/projects";
 import { requireUser } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
@@ -137,7 +137,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
         <div className="grid border-t border-border lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
           <div className="border-b border-border px-4 py-5 sm:px-7 lg:border-b-0 lg:border-r">
             <Suspense fallback={<SitePreviewSkeleton host={new URL(url).host} />}>
-              <SitePreviewFrame slug={project.slug} index={listProjects().findIndex((p) => p.id === project.id)} deploymentId={live?.id ?? null} url={url} own={hosts} />
+              <SitePreviewFrame slug={project.slug} framework={project.framework} deploymentId={live?.id ?? null} url={url} own={hosts} />
             </Suspense>
           </div>
           <KeyValues
