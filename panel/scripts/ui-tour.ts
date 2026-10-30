@@ -305,6 +305,36 @@ if (process.env.TOUR_DEPLOY === "1") {
   await waitForPath("/projects/next");
   await screenshot("project-next");
 
+  // Environment: values are text fields drawn as dots, so no browser takes the
+  // form for a login and fills in a saved password; Raw .env is the same
+  // variables as text, and a pasted line comes back as a row.
+  await go("/projects/next/env");
+  await waitForPath("/projects/next/env");
+  const envForm = `document.querySelector('input[name="env"]').form`;
+  if (Number(await evaluate(`${envForm}.querySelectorAll('input[type=password]').length`))) throw new Error("the env form has a password field, which browsers fill with a saved login");
+  if (Number(await evaluate(`[...${envForm}.querySelectorAll('input:not([type=hidden])')].filter((i) => i.autocomplete !== "off").length`))) throw new Error("an env field lets the browser autofill it");
+  const envRows = async () => JSON.parse(String(await evaluate(`JSON.stringify([...document.querySelectorAll('input[aria-label="Name"]')].map((i) => [i.value, i.closest("div").querySelector('input[aria-label="Value"]').value]))`))) as [string, string][];
+  await click('button[data-mode="text"]');
+  await waitFor(`/^GREETING=hello from the panel$/m.test(document.querySelector('textarea[aria-label=".env"]')?.value ?? "")`, "the variables as .env text");
+  await evaluate(`(() => {
+    const t = document.querySelector('textarea[aria-label=".env"]');
+    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value").set.call(t, t.value + '\\n# pasted from a .env file\\nexport TOUR_FLAG="on"');
+    t.dispatchEvent(new Event("input", { bubbles: true }));
+    return true;
+  })()`);
+  await click('button[data-mode="rows"]');
+  await waitFor(`[...document.querySelectorAll('input[aria-label="Name"]')].some((i) => i.value === "TOUR_FLAG")`, "the pasted variable as a row");
+  const afterText = await envRows();
+  if (!afterText.some(([k, v]) => k === "GREETING" && v === "hello from the panel") || !afterText.some(([k, v]) => k === "TOUR_FLAG" && v === "on")) throw new Error(`rows after Raw .env: ${JSON.stringify(afterText)}`);
+  await click('form:has(input[name="env"]) button[value="save"]');
+  await waitFor(`!!document.querySelector('form:has(input[name="env"]) p.text-teal')`, "the variables to save");
+  await go("/projects/next/env");
+  await waitForPath("/projects/next/env");
+  await waitFor(`!!document.querySelector('input[aria-label="Value"]')`, "the env editor");
+  if (!(await envRows()).some(([k, v]) => k === "TOUR_FLAG" && v === "on")) throw new Error(`TOUR_FLAG wasn't saved: ${JSON.stringify(await envRows())}`);
+  await screenshot("env-next");
+  console.log("  ✓ Environment: no password field for a browser to fill; Raw .env shows the variables as text, and a pasted line came back as a row and saved");
+
   await importFolder("vite");
   await deployFromSettings();
   await waitForDeploy("Vite (static) deploy");

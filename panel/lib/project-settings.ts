@@ -34,13 +34,15 @@ export function parseStartCommand(command: string): string[] | string {
   return argv;
 }
 
+const DOTENV_LINE = /^(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$/;
+
 /** KEY=VALUE lines (a pasted .env): comments, `export ` and surrounding quotes are handled. */
 export function parseDotEnv(content: string): Record<string, string> {
   const vars: Record<string, string> = {};
   for (const raw of content.split(/\r?\n/)) {
     const line = raw.trim();
     if (!line || line.startsWith("#")) continue;
-    const m = /^(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$/.exec(line);
+    const m = DOTENV_LINE.exec(line);
     if (!m) continue;
     let value = m[2]!;
     const quoted = /^(['"])(.*)\1$/.exec(value);
@@ -49,6 +51,19 @@ export function parseDotEnv(content: string): Record<string, string> {
     vars[m[1]!] = value;
   }
   return vars;
+}
+
+/** The line numbers (from 1) that parseDotEnv leaves out: not blank, not a comment, not KEY=VALUE. */
+export function badDotEnvLines(content: string): number[] {
+  return content.split(/\r?\n/).flatMap((raw, i) => {
+    const line = raw.trim();
+    return line && !line.startsWith("#") && !DOTENV_LINE.test(line) ? [i + 1] : [];
+  });
+}
+
+/** Variables as .env lines that parseDotEnv reads back the same: values it would trim, cut at " #" or unquote go in double quotes. */
+export function formatDotEnv(vars: [string, string][]): string {
+  return vars.map(([key, value]) => `${key}=${value !== value.trim() || /\s#|^(['"]).*\1$/.test(value) ? `"${value}"` : value}`).join("\n");
 }
 
 export function parseSettings(form: FormData): SettingsResult {

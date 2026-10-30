@@ -6,7 +6,7 @@ import { useFormStatus } from "react-dom";
 import { restoreBackupAction, saveDestinationAction, testDestinationAction, type DestinationState, type RestoreState } from "@/app/actions/backups";
 import { SubmitButton } from "./form";
 import { Modal } from "./modal";
-import { Button, Field, FormError, Input, cx } from "./ui";
+import { Button, Field, FormError, Input, SecretInput, cx } from "./ui";
 
 export interface ProviderInfo {
   id: string;
@@ -73,7 +73,7 @@ export function DestinationForm({ providers, saved }: { providers: ProviderInfo[
           <Input id="accessKeyId" name="accessKeyId" defaultValue={saved?.accessKeyId} autoComplete="off" spellCheck={false} className="font-mono text-[13px]" />
         </Field>
         <Field label="Secret access key" htmlFor="secretAccessKey" hint={saved ? "Leave empty to keep the saved one." : undefined}>
-          <Input id="secretAccessKey" name="secretAccessKey" type="password" autoComplete="off" />
+          <SecretInput id="secretAccessKey" name="secretAccessKey" className="font-mono text-[13px]" />
         </Field>
       </div>
       <FormError message={state.error} />

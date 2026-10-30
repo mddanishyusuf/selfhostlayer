@@ -3,7 +3,7 @@
 import { useActionState, useEffect, useRef, useState } from "react";
 import { addChannelAction, type ChannelState } from "@/app/actions/alerts";
 import { SubmitButton } from "./form";
-import { Field, FormError, Input, cx } from "./ui";
+import { Field, FormError, Input, SecretInput, cx } from "./ui";
 
 const KINDS = [
   ["telegram", "Telegram"],
@@ -57,7 +57,7 @@ export function AddChannelForm() {
             <Input id="url" name="url" autoComplete="off" spellCheck={false} placeholder="https://example.com/hooks/layer" className="font-mono text-[13px]" />
           </Field>
           <Field label="Secret (optional)" htmlFor="secret" hint="Signs X-Layer-Signature (HMAC-SHA256).">
-            <Input id="secret" name="secret" type="password" autoComplete="off" />
+            <SecretInput id="secret" name="secret" className="font-mono text-[13px]" />
           </Field>
         </div>
       )}
@@ -82,7 +82,7 @@ export function AddChannelForm() {
               <Input id="user" name="user" autoComplete="off" spellCheck={false} />
             </Field>
             <Field label="Password" htmlFor="pass" hint="An API key or app password, not your account password.">
-              <Input id="pass" name="pass" type="password" autoComplete="off" />
+              <SecretInput id="pass" name="pass" className="font-mono text-[13px]" />
             </Field>
           </div>
           <div className="grid gap-4 sm:grid-cols-2">

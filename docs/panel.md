@@ -143,6 +143,8 @@ journalctl -u 'app-<app>-cron-<name>'
 ### Environment
 Your variables, encrypted in the panel's database. On deploy they're written to `/etc/layer/apps/<app>/app.env` (root-only), which systemd hands to the app's process. **Save and restart** loads changes without a rebuild and without downtime. Variables read at build time, like `NEXT_PUBLIC_*`, need a redeploy.
 
+Edit them as rows, or switch to **Raw .env** to see them all as one `.env` file. Paste a whole file there; switching back to **Rows** turns each `KEY=value` line into a row, and lines that aren't `KEY=value` are pointed out before they're left out. Values stay hidden until you click **Show values**, and the browser never fills them in with a saved password.
+
 **Set for you** lists what the server provides:
 
 - `DATA_DIR`: the folder that survives deploys.

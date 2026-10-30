@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 import { importAndDeploy, type ImportState } from "@/app/actions/projects";
 import { SubmitButton } from "./form";
-import { Field, FormError, Input, cx } from "./ui";
+import { Field, FormError, Input, NO_AUTOFILL, cx } from "./ui";
 
 /** Import button for one repo in the list. */
 export function ImportButton({ repo, installationId }: { repo: string; installationId: number }) {
@@ -214,7 +214,7 @@ export function AppLogs({ slug }: { slug: string }) {
       live={live}
       label={live ? "Live" : "Stopped (reload to reconnect)"}
       fileName={`${slug}.log`}
-      toolbar={<input value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Filter…" aria-label="Filter lines" className="mr-2 h-[30px] w-[220px] rounded-lg border border-border-strong bg-transparent px-2.5 text-[13px] outline-none placeholder:text-dim focus:border-lavender max-sm:w-[130px]" />}
+      toolbar={<input {...NO_AUTOFILL} value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Filter…" aria-label="Filter lines" className="mr-2 h-[30px] w-[220px] rounded-lg border border-border-strong bg-transparent px-2.5 text-[13px] outline-none placeholder:text-dim focus:border-lavender max-sm:w-[130px]" />}
     />
   );
 }

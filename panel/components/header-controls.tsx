@@ -4,7 +4,7 @@ import { Search01Icon } from "@hugeicons/core-free-icons";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Icon } from "./icon";
-import { cx } from "./ui";
+import { NO_AUTOFILL, cx } from "./ui";
 import { openServerModal } from "./shell/server-modal";
 
 /** The "● server · CPU · RAM" pill that opens the server modal. */
@@ -38,6 +38,7 @@ export function FilterBox({ placeholder, param = "q", className }: { placeholder
     >
       <Icon icon={Search01Icon} size={15} />
       <input
+        {...NO_AUTOFILL}
         value={value}
         onChange={(e) => {
           const next = e.target.value;

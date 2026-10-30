@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseDotEnv, parseEnvVars, parseSettings, parseStartCommand } from "./project-settings";
+import { badDotEnvLines, formatDotEnv, parseDotEnv, parseEnvVars, parseSettings, parseStartCommand } from "./project-settings";
 
 const form = (fields: Record<string, string>) => {
   const f = new FormData();
@@ -78,5 +78,28 @@ EMPTY=
 not a line
 lower_case=ok`),
     ).toEqual({ DATABASE_URL: "postgres://u:p@h/db", API_KEY: "abc def", PLAIN: "value", HASH: "a#b", EMPTY: "", lower_case: "ok" });
+  });
+
+  it("names the lines it leaves out", () => {
+    expect(badDotEnvLines("# comment\nA=1\n\nnot a line\nexport B=2\nC: 3")).toEqual([4, 6]);
+    expect(badDotEnvLines("A=1\n")).toEqual([]);
+  });
+});
+
+describe("formatDotEnv", () => {
+  it("writes lines parseDotEnv reads back the same", () => {
+    const vars: [string, string][] = [
+      ["PLAIN", "value"],
+      ["SPACES", "a b"],
+      ["EDGES", " padded "],
+      ["HASH", "a #b"],
+      ["QUOTED", '"x"'],
+      ["SINGLE", "'y'"],
+      ["URL", "postgres://u:p@h/db?x=1#frag"],
+      ["EMPTY", ""],
+    ];
+    const text = formatDotEnv(vars);
+    expect(text.split("\n")).toEqual(["PLAIN=value", "SPACES=a b", 'EDGES=" padded "', 'HASH="a #b"', 'QUOTED=""x""', `SINGLE="'y'"`, "URL=postgres://u:p@h/db?x=1#frag", "EMPTY="]);
+    expect(parseDotEnv(text)).toEqual(Object.fromEntries(vars));
   });
 });

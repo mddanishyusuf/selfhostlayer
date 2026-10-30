@@ -6,7 +6,7 @@ import type { PickerRepo, RepoPage } from "@/lib/github-repos";
 import { ImportButton } from "./deploy";
 import { Icon } from "./icon";
 import { Dot, ListRow, RowIcon } from "./page";
-import { Button, Field, FormError, Input, Pill, Skeleton } from "./ui";
+import { Button, Field, FormError, Input, NO_AUTOFILL, Pill, Skeleton } from "./ui";
 
 /**
  * Posts the app manifest to GitHub from the browser (GitHub's manifest flow
@@ -87,6 +87,7 @@ export function RepoPicker() {
       <div className="flex h-[52px] items-center gap-2.5 border-b border-border px-4 sm:px-7">
         <Icon icon={Search01Icon} size={16} className="text-dim" />
         <input
+          {...NO_AUTOFILL}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder={page.total === null ? "Search repositories" : `Search ${page.total} repositories`}

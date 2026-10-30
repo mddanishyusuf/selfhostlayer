@@ -4,7 +4,7 @@ import { Search01Icon } from "@hugeicons/core-free-icons";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Icon } from "../icon";
-import { cx } from "../ui";
+import { NO_AUTOFILL, cx } from "../ui";
 
 export interface PaletteItem {
   label: string;
@@ -63,6 +63,7 @@ export function CommandPalette({ items }: { items: PaletteItem[] }) {
         <div className="flex items-center gap-3 border-b border-border px-5">
           <Icon icon={Search01Icon} size={18} className="text-dim" />
           <input
+            {...NO_AUTOFILL}
             ref={input}
             value={query}
             onChange={(e) => {

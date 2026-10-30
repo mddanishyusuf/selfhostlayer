@@ -4,11 +4,11 @@ import { Add01Icon, Delete02Icon, ViewIcon, ViewOffSlashIcon } from "@hugeicons/
 import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { removeProject, saveEnvAction, saveSettings, type EnvState, type SettingsState } from "@/app/actions/projects";
-import { parseDotEnv } from "@/lib/project-settings";
+import { badDotEnvLines, formatDotEnv, parseDotEnv } from "@/lib/project-settings";
 import { Icon } from "./icon";
 import { Modal } from "./modal";
 import { SettingsRow } from "./page";
-import { Button, Field, FormError, Input, cx } from "./ui";
+import { Button, Field, FormError, Input, NO_AUTOFILL, SecretInput, cx } from "./ui";
 
 export interface SettingsDefaults {
   slug: string;
@@ -30,77 +30,97 @@ export interface SettingsDefaults {
 
 const Err = ({ msg }: { msg?: string }) => (msg ? <p className="text-[13px] text-rose">{msg}</p> : null);
 
-/** Name/value rows. Posts them as one JSON field named "env". */
+type EnvRow = { key: string; value: string };
+const toRows = (vars: [string, string][]): EnvRow[] => (vars.length ? vars.map(([key, value]) => ({ key, value })) : [{ key: "", value: "" }]);
+
+/** Name/value rows, or the same variables as .env text. Posts them as one JSON field named "env". */
 export function EnvEditor({ initial, error }: { initial: [string, string][]; error?: string }) {
-  const [rows, setRows] = useState<{ key: string; value: string }[]>(initial.length ? initial.map(([key, value]) => ({ key, value })) : [{ key: "", value: "" }]);
+  const [rows, setRows] = useState<EnvRow[]>(toRows(initial));
   const [reveal, setReveal] = useState(false);
-  const [paste, setPaste] = useState("");
-  // Functional updates: two changes before a re-render (autofill, a password
-  // manager filling name and value at once) must both survive.
-  const set = (i: number, patch: Partial<{ key: string; value: string }>) => setRows((prev) => prev.map((r, j) => (j === i ? { ...r, ...patch } : r)));
-  const vars = Object.fromEntries(rows.filter((r) => r.key.trim()).map((r) => [r.key.trim(), r.value]));
+  // The .env text while editing as text; null while editing rows.
+  const [text, setText] = useState<string | null>(null);
+  // Functional updates: two changes before a re-render must both survive.
+  const set = (i: number, patch: Partial<EnvRow>) => setRows((prev) => prev.map((r, j) => (j === i ? { ...r, ...patch } : r)));
+  const named = rows.filter((r) => r.key.trim()).map((r): [string, string] => [r.key.trim(), r.value]);
+  const vars = text === null ? Object.fromEntries(named) : parseDotEnv(text);
+  const bad = text === null ? [] : badDotEnvLines(text);
+  const switchTo = (mode: "rows" | "text") => {
+    if (mode === "text" && text === null) setText(formatDotEnv(named));
+    if (mode === "rows" && text !== null) {
+      setRows(toRows(Object.entries(parseDotEnv(text))));
+      setText(null);
+    }
+  };
 
   return (
     <div className="grid gap-3">
       <input type="hidden" name="env" value={JSON.stringify(vars)} />
-      <div className="grid gap-2">
-        {rows.map((r, i) => (
-          <div key={i} className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)_auto] gap-2">
-            <Input aria-label="Name" placeholder="NAME" value={r.key} spellCheck={false} autoComplete="off" className="font-mono text-[13px]" onChange={(e) => set(i, { key: e.target.value.toUpperCase().replace(/[^A-Z0-9_]/g, "_") })} />
-            <Input aria-label="Value" placeholder="value" value={r.value} type={reveal ? "text" : "password"} spellCheck={false} autoComplete="off" className="font-mono text-[13px]" onChange={(e) => set(i, { value: e.target.value })} />
-            <button
-              type="button"
-              title="Remove"
-              onClick={() => setRows((prev) => (prev.length > 1 ? prev.filter((_, j) => j !== i) : [{ key: "", value: "" }]))}
-              className="grid size-[38px] place-items-center rounded-lg text-muted transition-colors duration-150 hover:bg-hover hover:text-foreground"
-            >
-              <Icon icon={Delete02Icon} size={16} />
-              <span className="sr-only">Remove</span>
-            </button>
-          </div>
-        ))}
-      </div>
-      <div className="flex flex-wrap items-center gap-2">
-        <Button type="button" variant="secondary" size="sm" onClick={() => setRows((prev) => [...prev, { key: "", value: "" }])}>
-          <Icon icon={Add01Icon} size={14} /> Add variable
-        </Button>
-        <Button type="button" variant="ghost" size="sm" onClick={() => setReveal(!reveal)}>
-          <Icon icon={reveal ? ViewOffSlashIcon : ViewIcon} size={14} /> {reveal ? "Hide values" : "Show values"}
-        </Button>
-      </div>
-      <details className="group border-t border-border pt-3">
-        <summary className="cursor-pointer list-none text-[13px] text-muted transition-colors hover:text-foreground">
-          <span className="group-open:hidden">+</span>
-          <span className="hidden group-open:inline">−</span> Paste a .env file
-        </summary>
-        <div className="mt-3 grid gap-2">
-          <textarea
-            value={paste}
-            onChange={(e) => setPaste(e.target.value)}
-            rows={4}
-            spellCheck={false}
-            placeholder={"DATABASE_URL=postgres://…\nAPI_KEY=…"}
-            className="w-full rounded-md border border-border-strong bg-transparent p-3 font-mono text-[12.5px] outline-none placeholder:text-dim focus:border-lavender"
-          />
-          <Button
-            type="button"
-            variant="secondary"
-            size="sm"
-            className="justify-self-start"
-            onClick={() => {
-              const parsed = parseDotEnv(paste);
-              setRows((prev) => {
-                const merged = new Map(prev.filter((r) => r.key).map((r) => [r.key, r.value]));
-                for (const [k, v] of Object.entries(parsed)) merged.set(k, v);
-                return [...merged].map(([key, value]) => ({ key, value }));
-              });
-              setPaste("");
-            }}
-          >
-            Add these variables
-          </Button>
+      {text === null ? (
+        <div className="grid gap-2">
+          {rows.map((r, i) => (
+            <div key={i} className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)_auto] gap-2">
+              <Input aria-label="Name" placeholder="NAME" value={r.key} spellCheck={false} className="font-mono text-[13px]" onChange={(e) => set(i, { key: e.target.value.toUpperCase().replace(/[^A-Z0-9_]/g, "_") })} />
+              <SecretInput aria-label="Value" placeholder="value" value={r.value} reveal={reveal} className="font-mono text-[13px]" onChange={(e) => set(i, { value: e.target.value })} />
+              <button
+                type="button"
+                title="Remove"
+                onClick={() => setRows((prev) => (prev.length > 1 ? prev.filter((_, j) => j !== i) : [{ key: "", value: "" }]))}
+                className="grid size-[38px] place-items-center rounded-lg text-muted transition-colors duration-150 hover:bg-hover hover:text-foreground"
+              >
+                <Icon icon={Delete02Icon} size={16} />
+                <span className="sr-only">Remove</span>
+              </button>
+            </div>
+          ))}
         </div>
-      </details>
+      ) : (
+        <div className="grid gap-1.5">
+          <textarea
+            {...NO_AUTOFILL}
+            aria-label=".env"
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            rows={Math.min(18, Math.max(6, text.split("\n").length + 1))}
+            wrap="off"
+            spellCheck={false}
+            autoFocus
+            placeholder={"DATABASE_URL=postgres://…\nAPI_KEY=…"}
+            className="w-full rounded-md border border-border-strong bg-transparent p-3 font-mono text-[13px] leading-relaxed outline-none placeholder:text-dim focus:border-lavender"
+          />
+          <p className={cx("text-[12.5px]", bad.length ? "text-gold" : "text-dim")}>
+            {bad.length
+              ? `${bad.length === 1 ? "Line" : "Lines"} ${bad.join(", ")} ${bad.length === 1 ? "isn't" : "aren't"} KEY=value, so ${bad.length === 1 ? "it's" : "they're"} left out.`
+              : "One KEY=value per line. Paste a whole .env file; comments and export are fine."}
+          </p>
+        </div>
+      )}
+      <div className="flex flex-wrap items-center gap-2">
+        {text === null && (
+          <>
+            <Button type="button" variant="secondary" size="sm" onClick={() => setRows((prev) => [...prev, { key: "", value: "" }])}>
+              <Icon icon={Add01Icon} size={14} /> Add variable
+            </Button>
+            <Button type="button" variant="ghost" size="sm" onClick={() => setReveal(!reveal)}>
+              <Icon icon={reveal ? ViewOffSlashIcon : ViewIcon} size={14} /> {reveal ? "Hide values" : "Show values"}
+            </Button>
+          </>
+        )}
+        <div className="ml-auto inline-flex gap-0.5 rounded-lg border border-border-strong p-[3px]" role="group" aria-label="Edit as">
+          {(
+            [
+              ["rows", "Rows"],
+              ["text", "Raw .env"],
+            ] as const
+          ).map(([mode, label]) => {
+            const on = (mode === "text") === (text !== null);
+            return (
+              <button key={mode} type="button" data-mode={mode} aria-pressed={on} onClick={() => switchTo(mode)} className={cx("flex h-[22px] items-center rounded-md px-2.5 text-[12.5px] font-medium transition-colors duration-150", on ? "bg-selected text-foreground" : "text-muted hover:text-foreground")}>
+                {label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
       <Err msg={error} />
     </div>
   );

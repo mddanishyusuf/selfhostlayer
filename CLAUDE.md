@@ -70,6 +70,7 @@ A sidebar flush against the left edge and one main area that fills the rest. No 
 - **Motion and feedback:** 150ms ease-out transitions, skeletons instead of spinners, a pulsing dot for anything in progress. Later: optimistic updates, toasts.
 - **Logs:** monospace on a pane that is always dark, streaming, auto-scroll that pauses when you scroll up, ANSI colors, copy and download buttons.
 - **Copy:** short and plain ("Deploying…", "Ready", "Build failed: exit code 1"). Every destructive action opens a dialog where you type the app name to confirm.
+- **No autofill (decided 2026-10-30):** `Input` turns off browser autofill and password managers unless the field says what it is with `autoComplete` (only the panel's own login, setup and Account fields do). Secrets that aren't the panel login (env values, API keys, SMTP passwords) use `SecretInput`, a text field drawn as dots, never `type="password"`: browsers took the env editor for a login form and filled in the saved email and password.
 
 ## Security plan (no Docker)
 

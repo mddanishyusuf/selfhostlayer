@@ -59,7 +59,12 @@ export const buttonClass = (variant: keyof typeof VARIANTS = "primary", size: "s
     VARIANTS[variant],
   );
 
+/** Keeps the browser's autofill and password managers out of a field. */
+export const NO_AUTOFILL = { autoComplete: "off", "data-1p-ignore": "", "data-lpignore": "true", "data-bwignore": "", "data-form-type": "other" } as const;
+
+/** Nothing gets filled in by the browser unless the field says what it is (the panel's own login does). */
 export function Input({ className, ...props }: ComponentProps<"input">) {
+  const own = props.autoComplete !== undefined && props.autoComplete !== "off";
   return (
     <input
       className={cx(
@@ -67,9 +72,19 @@ export function Input({ className, ...props }: ComponentProps<"input">) {
         "outline-none aria-invalid:border-rose",
         className,
       )}
+      {...(own ? {} : NO_AUTOFILL)}
       {...props}
     />
   );
+}
+
+/**
+ * A secret that isn't the panel's own login (an env value, an API key): a text
+ * field drawn as dots. As type=password, browsers take the form for a login
+ * and fill in your saved email and password, whatever autocomplete says.
+ */
+export function SecretInput({ reveal = false, className, ...props }: Omit<ComponentProps<"input">, "type"> & { reveal?: boolean }) {
+  return <Input {...props} type="text" spellCheck={false} autoCapitalize="off" autoCorrect="off" className={cx(!reveal && "[-webkit-text-security:disc]", className)} />;
 }
 
 export function Select({ className, ...props }: ComponentProps<"select">) {
