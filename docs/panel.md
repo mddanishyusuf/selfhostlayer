@@ -106,6 +106,14 @@ One of each per app. PostgreSQL, MySQL and Redis are installed on the server the
 
 Adding or removing a database restarts the app on the same build, with zero downtime, so it gets the new URL. Removing one asks you to type the app's name. Unless you say otherwise, it keeps a final dump in `/var/lib/layer-agent/archive/`.
 
+**Browse data** (next to each database, and **Browse SQLite databases** for the files in `DATA_DIR`) opens a read-only viewer: the tables, collections or keys on the left, a page of rows on the right. Click a column to sort by it, a row to see every value whole (JSON indented). Above the rows:
+
+- **SQL** (SQLite, PostgreSQL, MySQL): run a query. One statement, without `;` (also not inside quotes), up to 500 rows and 5 seconds.
+- **MongoDB:** filter a collection with JSON, like `{"status": "active"}` or `{"_id": {"$oid": "…"}}`. Filters that run JavaScript (`$where`, `$function`) are refused.
+- **Redis:** narrow the keys with a pattern, like `session:*`. A key shows its value: a string, a hash's fields, a list or a sorted set page by page, and when it expires.
+
+The viewer reads with the app's own login, as the app's own user, so it sees exactly what the app can. Nothing it runs can write: SQLite is opened read-only, Postgres and MySQL in read-only transactions, MongoDB only finds, and Redis only reads. Values longer than 2,000 characters are cut, with their full length shown.
+
 ```sh
 sudo -u postgres psql -c '\l'          # Postgres databases
 mariadb -e 'SHOW DATABASES'            # MySQL databases

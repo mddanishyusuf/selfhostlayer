@@ -138,7 +138,45 @@ const FAKE: Partial<Record<ActionName, unknown>> = {
   },
 };
 
+/** The viewer's sample databases, shaped like each engine's answers. */
+function fakeBrowse(p: Record<string, unknown>) {
+  if (p.engine === "sqlite" && !p.file) return { files: [{ path: "piqo.db", bytes: 210_000_000 }, { path: "cache/sessions.db", bytes: 81_920 }], tables: [] };
+  const settings = JSON.stringify({ theme: "dark", publicDashboard: true, excludePaths: ["/admin", "/preview"], goals: [{ name: "Signup", path: "/thanks" }] });
+  const byEngine: Record<string, { tables: { name: string; type: string; rows: number | null }[]; columns: string[]; rows: unknown[][]; total: number }> = {
+    mongodb: {
+      tables: [{ name: "posts", type: "collection", rows: 214 }, { name: "comments", type: "collection", rows: 1_840 }, { name: "drafts", type: "view", rows: null }],
+      columns: ["_id", "title", "tags", "published", "author"],
+      rows: [
+        ['ObjectId("65f0c0ffee0000000000ab01")', "Self-hosting on a $5 box", '["hosting","indie"]', true, '{"name":"Danish","handle":"mddanishyusuf"}'],
+        ['ObjectId("65f0c0ffee0000000000ab02")', "Why no Docker", '["docker"]', false, { missing: true }],
+      ],
+      total: 214,
+    },
+    redis: {
+      tables: [{ name: "queue:emails", type: "list", rows: 3 }, { name: "session:8f2a41c0", type: "string", rows: 128 }, { name: "stats:today", type: "hash", rows: 4 }],
+      columns: ["field", "value"],
+      rows: [["visits", "1843"], ["signups", "12"], ["bounce", "0.41"], ["top", "/pricing"]],
+      total: 4,
+    },
+  };
+  const sql = {
+    tables: [{ name: "daily_stats", type: "view", rows: null }, { name: "events", type: "table", rows: 48_210 }, { name: "sites", type: "table", rows: 12 }, { name: "users", type: "table", rows: 3 }],
+    columns: ["id", "domain", "owner_id", "created_at", "settings", "logo"],
+    rows: [
+      [1, "piqo.app", 1, "2026-03-02 09:14:00", settings, { bytes: 18_204 }],
+      [2, "maillayer.com", 1, "2026-04-11 17:02:41", { text: settings.repeat(40).slice(0, 2000), length: 9_800 }, null],
+      [3, "blog.mohddanish.com", 2, "2026-05-30 08:00:12", null, null],
+    ],
+    total: 12,
+  };
+  const d = byEngine[String(p.engine)] ?? sql;
+  if (p.op === "tables") return { tables: d.tables };
+  if (p.op === "query" && p.engine !== "mongodb" && p.engine !== "redis") return { tables: d.tables, result: { columns: ["domain", "visits"], rows: [["piqo.app", 48_210], ["maillayer.com", 9_120]], total: null, truncated: false, ms: 3 } };
+  return { tables: d.tables, result: { columns: d.columns, rows: d.rows, total: d.total, truncated: false, ms: 4, ...(p.engine === "redis" ? { ttl: -1 } : {}) } };
+}
+
 export async function agent<T>(action: ActionName, params: Record<string, unknown> = {}, opts: Omit<CallOptions, "socket"> = {}): Promise<T> {
+  if (config.fakeAgent && action === "db.browse") return fakeBrowse(params) as T;
   if (config.fakeAgent && action in FAKE) return FAKE[action] as T;
   return callAgent<T>(action, params, { ...opts, socket: config.agentSocket });
 }

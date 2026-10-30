@@ -33,6 +33,8 @@
 
 No two apps share a password.
 
+The panel's database viewer works inside these walls. Each page it shows is a short sandboxed job running as the app's own user with the app's own logins, so it can't see another app's data, and every engine is opened read-only: SQLite read-only with `query_only`, Postgres with `default_transaction_read_only` and a 5-second statement limit, MySQL in a read-only session, MongoDB with `find` alone (no server-side JavaScript), Redis with read commands alone. A query is one statement: a `;` in the middle is refused before anything runs.
+
 **Secrets it can read but not change.** Env vars are encrypted in the panel's database (AES-256-GCM). On disk they exist only as `/etc/layer/apps/<app>/app.env`, owned by root and readable by nobody else. systemd reads that file and hands the variables to the app's process, so the app gets its env but has no file it could rewrite. Values never appear in build logs.
 
 ## The network

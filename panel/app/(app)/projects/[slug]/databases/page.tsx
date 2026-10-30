@@ -1,7 +1,9 @@
+import { Table01Icon } from "@hugeicons/core-free-icons";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { formatBytes } from "@/components/backup-list";
-import { Dot, KeyValues, Notice, PageHeader, SettingsRow } from "@/components/page";
+import { Icon } from "@/components/icon";
+import { Dot, KeyValues, Notice, PageHeader, PillLink, SettingsRow } from "@/components/page";
 import { AddDatabaseForm, AddRedisForm, InstallMongodbForm, RemoveDatabaseForm, RemoveRedisForm, SecretUrl, SecretValue } from "@/components/services";
 import { StatusText } from "@/components/status";
 import { listBackups } from "@/lib/backup/runner";
@@ -54,6 +56,15 @@ const DATABASES = {
 } as const;
 
 const Unreachable = () => <p className="text-[13px] text-rose">Couldn&apos;t ask the agent about this app&apos;s services.</p>;
+
+/** Opens the read-only viewer on one database (db: "postgres", "sqlite:app.db"…). */
+function BrowseLink({ slug, db, label = "Browse data" }: { slug: string; db: string; label?: string }) {
+  return (
+    <PillLink href={`/projects/${slug}/databases/view?db=${encodeURIComponent(db)}`} size="sm">
+      <Icon icon={Table01Icon} size={14} /> {label}
+    </PillLink>
+  );
+}
 
 export default async function DatabasesPage({ params, searchParams }: { params: Promise<{ slug: string }>; searchParams: Promise<{ notice?: string; restart?: string }> }) {
   await requireUser();
@@ -112,6 +123,9 @@ export default async function DatabasesPage({ params, searchParams }: { params: 
                 </span>
                 <Dot />
                 <span className="tabular-nums">port {redis.port}</span>
+                <span className="ml-auto">
+                  <BrowseLink slug={project.slug} db="redis" />
+                </span>
               </div>
               <div className="grid gap-1.5">
                 <p className="text-[13px] font-medium">REDIS_URL</p>
@@ -134,7 +148,10 @@ export default async function DatabasesPage({ params, searchParams }: { params: 
                 <span key="f" className="grid gap-1">
                   {sqlite.map((f) => (
                     <span key={f.path}>
-                      <code className="font-mono text-[13px]">{f.path}</code> <span className="text-muted tabular-nums">· {formatBytes(f.bytes)} · checked</span>
+                      <code className="font-mono text-[13px]">{f.path}</code> <span className="text-muted tabular-nums">· {formatBytes(f.bytes)} · checked</span>{" "}
+                      <Link href={`/projects/${project.slug}/databases/view?db=${encodeURIComponent(`sqlite:${f.path}`)}`} className="text-[13px] text-lavender hover:underline">
+                        Browse
+                      </Link>
                     </span>
                   ))}
                   <span className="text-[12.5px] text-dim">As of the last backup</span>
@@ -147,6 +164,9 @@ export default async function DatabasesPage({ params, searchParams }: { params: 
             ],
           ]}
         />
+        <div>
+          <BrowseLink slug={project.slug} db="sqlite" label="Browse SQLite databases" />
+        </div>
       </SettingsRow>
     </>
   );
@@ -198,6 +218,9 @@ function DatabaseRow({ kind, slug, status }: { kind: DatabaseKind; slug: string;
                   <span className="tabular-nums">{db.sizeMb} MB</span>
                 </>
               )}
+              <span className="ml-auto">
+                <BrowseLink slug={slug} db={kind} />
+              </span>
             </div>
             {kind === "mongodb" && <MongoLogin url={db.url} />}
             <div className="grid gap-1.5">

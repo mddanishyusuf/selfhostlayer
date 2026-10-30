@@ -714,6 +714,32 @@ if (process.env.TOUR_DEPLOY === "1") {
     if (count !== 42) throw new Error(`after the import the app counts ${count} visits, expected 42`);
     console.log("  ✓ import: a data/ archive uploaded in the panel replaced the app's data (42 visits), with the app restarted on it");
     rmSync(dir, { recursive: true, force: true });
+
+    // The viewer on the imported database: its rows, a query, and a write refused.
+    await go("/projects/next/databases");
+    await waitForPath("/projects/next/databases");
+    await click('a[href="/projects/next/databases/view?db=sqlite"]');
+    await waitFor(`!!document.querySelector('[data-testid="db-files"] a[href*="visits.db"], [data-testid="db-tables"] a')`, "the SQLite databases in data/", 60_000);
+    if (await evaluate(`!!document.querySelector('[data-testid="db-files"]')`)) await click('[data-testid="db-files"] a[href*="visits.db"]');
+    await waitFor(`/visits\\s+42/.test(document.querySelector('[data-testid="db-tables"]')?.innerText ?? "")`, "the visits table with its 42 rows", 60_000);
+    await click('[data-testid="db-tables"] a[href*="t=visits"]');
+    await waitFor(`/42 rows/.test(document.querySelector("main").innerText) && document.querySelectorAll('[data-testid="data-grid"] tbody tr').length === 42`, "the visits rows", 60_000);
+    await screenshot("database-viewer");
+    const runQuery = async (sql: string) => {
+      // An uncontrolled textarea: setting its value is all the form needs.
+      await fill('[data-testid="db-query"] textarea', sql);
+      await evaluate(`document.querySelector('[data-testid="db-query"]').requestSubmit(), true`);
+      await waitFor(`new URLSearchParams(location.search).get("q") === ${JSON.stringify(sql)} && document.readyState === "complete" && !!document.querySelector('[data-testid="db-query"]')`, "the query to run", 60_000);
+      return String(await evaluate("document.querySelector('main').innerText"));
+    };
+    const counted = await runQuery("SELECT count(*) AS n FROM visits");
+    if (!/Query\s*·\s*1 rows/.test(counted) || !/\b42\b/.test(String(await evaluate(`document.querySelector('[data-testid="data-grid"] tbody')?.innerText ?? ""`)))) throw new Error(`the count query didn't show 42: ${counted.slice(0, 400)}`);
+    const refused = await runQuery("DELETE FROM visits");
+    if (!/Couldn.t run it[\s\S]*readonly/.test(refused)) throw new Error(`a DELETE wasn't refused: ${refused.slice(0, 400)}`);
+    await go(`https://next.${appsDomain}/api/visits`);
+    await sleep(500);
+    if (Number(JSON.parse(String(await evaluate("document.body.innerText"))).visits) !== 42) throw new Error("the viewer's DELETE changed the visits");
+    console.log("  ✓ database viewer: the imported visits table (42 rows), a count query, and a DELETE refused with the data untouched");
   }
 
   // TOUR_DOMAIN: a host whose public DNS points at the box (e.g. shop.<ip-with-dashes>.sslip.io).
