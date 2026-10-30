@@ -1,7 +1,7 @@
 // Watches the server and raises/resolves incidents. Runs inside the panel,
 // started once at server start (instrumentation.ts): every minute for disk,
 // crash loops and cron results; every 10 minutes for certificates; every 6
-// hours for a newer release.
+// hours for a newer release (30 minutes after a failed check).
 import { sampleMetrics } from "../metrics";
 import { agent, type SystemInfo } from "../agent";
 import { boxConfig } from "../box";
@@ -13,7 +13,7 @@ import { resumeDeployments } from "../deploy";
 import { listDomains } from "../domains";
 import { backupProjects, markInterrupted, overdueSlugs, scheduledTick } from "../backup/runner";
 import { listProjects } from "../projects";
-import { autoCheck, checkForUpdates, UPDATE_CHECK_EVERY_MS } from "../updates";
+import { checkForUpdates, updateCheckDue } from "../updates";
 import { configureAlerts, openIncident, raise, resolve } from "./engine";
 import { certVerdict, crashVerdict, cronVerdict, diskVerdict, type UnitSnapshot, type Verdict } from "./rules";
 
@@ -133,7 +133,7 @@ export async function tick(): Promise<void> {
       state.lastCertCheck = Date.now();
       await checkCertificates().catch((err) => console.error("monitor: certificate check failed:", (err as Error).message));
     }
-    if (autoCheck() && Date.now() - state.lastUpdateCheck > UPDATE_CHECK_EVERY_MS) {
+    if (updateCheckDue(state.lastUpdateCheck)) {
       state.lastUpdateCheck = Date.now();
       await checkForUpdates().catch((err) => console.error("monitor: update check failed:", (err as Error).message));
     }

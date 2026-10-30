@@ -1,6 +1,7 @@
 // Whether a newer release is out. The monitor asks the agent every 6 hours
-// (unless that's turned off in Settings → Version), and so does Check for
-// updates. The answer is kept in panel_state, so every page can offer it.
+// (30 minutes after a check that failed; never if that's turned off in
+// Settings → Version), and so does Check for updates. The answer is kept in
+// panel_state, so every page can offer it.
 import { agent } from "./agent";
 import { boxConfig } from "./box";
 import { now } from "./db";
@@ -24,7 +25,8 @@ export interface UpdateState {
 
 const KEY = "update-check";
 const AUTO = "update-auto-check";
-export const UPDATE_CHECK_EVERY_MS = 6 * 3600_000;
+const EVERY_MS = 6 * 3600_000;
+const RETRY_MS = 30 * 60_000;
 
 export function updateState(): UpdateState | null {
   const raw = readState(KEY);
@@ -53,3 +55,8 @@ export function offeredUpdate(state: UpdateState | null = updateState(), version
 
 export const autoCheck = () => readState(AUTO) !== "off";
 export const setAutoCheck = (on: boolean) => writeState(AUTO, on ? "on" : "off");
+
+/** Whether the monitor should check now, its last check at lastMs: a failed one (the network or the feed was down) is retried sooner. */
+export function updateCheckDue(lastMs: number, at = Date.now()): boolean {
+  return autoCheck() && at - lastMs > (updateState()?.error ? RETRY_MS : EVERY_MS);
+}
