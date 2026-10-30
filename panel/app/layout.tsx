@@ -1,11 +1,13 @@
 import type { Metadata, Viewport } from "next";
 import { GeistMono } from "geist/font/mono";
-import { GeistSans } from "geist/font/sans";
+import { Albert_Sans } from "next/font/google";
 import { cookies } from "next/headers";
 import { THEME_COOKIE, parseTheme } from "@/lib/theme";
 import "./globals.css";
 
-// Both fonts ship inside the geist package and are served by the panel itself: no font requests to anyone.
+// Albert Sans is fetched at build time and Geist Mono ships in the geist package:
+// both are served by the panel itself, so no font requests to anyone at runtime.
+const albertSans = Albert_Sans({ subsets: ["latin"], variable: "--font-albert-sans", display: "swap" });
 
 export const metadata: Metadata = {
   title: { default: "Self Host Layer", template: "%s · Self Host Layer" },
@@ -23,7 +25,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   // Set on the server from the cookie, so the first paint is already in the right theme.
   const theme = parseTheme((await cookies()).get(THEME_COOKIE)?.value);
   return (
-    <html lang="en" data-theme={theme} className={`${GeistSans.variable} ${GeistMono.variable}`}>
+    <html lang="en" data-theme={theme} className={`${albertSans.variable} ${GeistMono.variable}`}>
       <body className="min-h-dvh">{children}</body>
     </html>
   );

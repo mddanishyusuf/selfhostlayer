@@ -110,7 +110,6 @@ export function FormError({ message }: { message?: string | null }) {
   );
 }
 
-/** The logo (design/logo): an L, a violet app standing on an orange layer, your server. */
 /**
  * The logo's four bars (design/logo/icon.svg): two L's turned into each
  * other, on no tile, in the text color (black, or near-white in the dark

@@ -6,7 +6,7 @@
    comes from <html data-theme="dark|light|system">, set on the server from the
    layer-theme cookie, so pages never flash. */
 @theme inline {
-  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-albert-sans), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, monospace;
   --color-background: var(--background);
   --color-sidebar: var(--sidebar);
