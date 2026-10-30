@@ -65,6 +65,7 @@ describe("sampleMetrics", () => {
     const [a, b] = [Date.now() - 5 * 60_000, Date.now() + 60_000];
     const rows = db().prepare("SELECT memory_mb, disk_mb FROM metrics WHERE target = 'piqo' AND step = 'minute' AND at BETWEEN ? AND ?").all(a, b);
     expect(rows).toEqual([{ memory_mb: 212, disk_mb: 310 }]);
-    expect(db().prepare("SELECT memory_mb FROM metrics WHERE target = 'box' AND at BETWEEN ? AND ?").all(a, b)).toEqual([{ memory_mb: 610 }]);
+    // Minute rows only: rolling up at the test's time can turn real-time samples into an hour row in the window.
+    expect(db().prepare("SELECT memory_mb FROM metrics WHERE target = 'box' AND step = 'minute' AND at BETWEEN ? AND ?").all(a, b)).toEqual([{ memory_mb: 610 }]);
   });
 });
