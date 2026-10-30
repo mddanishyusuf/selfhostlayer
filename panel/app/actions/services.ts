@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getProjectBySlug } from "@/lib/projects";
-import { addDatabase, addRedis, removeDatabase, removeRedis, type DatabaseKind } from "@/lib/services";
+import { addDatabase, addRedis, installMongodb, removeDatabase, removeRedis, type DatabaseKind } from "@/lib/services";
 import { requireUser } from "@/lib/session";
 
 export interface ServiceState {
@@ -98,4 +98,23 @@ export async function addMongodbAction(_prev: ServiceState, form: FormData): Pro
 
 export async function removeMongodbAction(_prev: ServiceState, form: FormData): Promise<ServiceState> {
   return removeDb(form, "mongodb");
+}
+
+/** Installs MongoDB on the server, once for every project; back to the page that asked. */
+export async function installMongodbAction(_prev: ServiceState, form: FormData): Promise<ServiceState> {
+  await requireUser();
+  const slug = field(form, "slug");
+  const project = slug ? getProjectBySlug(slug) : null;
+  if (slug && !project) return { error: "Project not found." };
+  try {
+    await installMongodb();
+  } catch (err) {
+    return { error: (err as Error).message };
+  }
+  revalidatePath("/databases");
+  if (project) {
+    revalidatePath(`/projects/${project.slug}/databases`);
+    redirect(`/projects/${project.slug}/databases?notice=mongodb-installed`);
+  }
+  redirect("/databases?notice=mongodb-installed");
 }

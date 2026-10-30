@@ -5,6 +5,7 @@ import { Collapsible } from "@/components/collapsible";
 import { CopyButton } from "@/components/form";
 import { Icon } from "@/components/icon";
 import { Dot, Notice, PageHeader, TileIcon } from "@/components/page";
+import { InstallMongodbForm } from "@/components/services";
 import { StatusText } from "@/components/status";
 import { Mark, Pill } from "@/components/ui";
 import { agent } from "@/lib/agent";
@@ -46,8 +47,9 @@ function Footer({ add, note }: { add?: ReactNode; note: string }) {
   );
 }
 
-export default async function DatabasesOverviewPage() {
+export default async function DatabasesOverviewPage({ searchParams }: { searchParams: Promise<{ notice?: string }> }) {
   await requireUser();
+  const { notice } = await searchParams;
   const all = listProjects();
   const apps = all.filter((p) => p.runtime.kind !== "static");
   const statuses = (await Promise.all(apps.map((p) => serviceStatus(p.slug).catch(() => null)))).filter((s): s is ServiceStatus => s !== null);
@@ -68,10 +70,10 @@ export default async function DatabasesOverviewPage() {
   const withoutSql = statuses.filter((s) => !s.postgres && !s.mysql).map((s) => s.slug);
   // MONGODB_URI fits next to either SQL database.
   const withoutMongo = statuses.filter((s) => !s.mongodb).map((s) => s.slug);
-  const addLinks = (engine: string, slugs: string[]) =>
+  const addLinks = (lead: string, slugs: string[]) =>
     slugs.length ? (
       <span className="flex flex-wrap items-center gap-1.5">
-        <span className="text-muted">Add {engine} to</span>
+        <span className="text-muted">{lead}</span>
         {slugs.map((slug) => (
           <Link key={slug} href={`/projects/${slug}/databases`} className="text-lavender hover:underline">
             {slug}
@@ -88,6 +90,11 @@ export default async function DatabasesOverviewPage() {
   return (
     <>
       <PageHeader title="Databases" meta="Native, no Docker · one per app" />
+      {notice === "mongodb-installed" && (
+        <Notice lead="Installed" tone="ok">
+          MongoDB is running on this server. Open a project&apos;s Databases page to create its database and user.
+        </Notice>
+      )}
       {down.length ? (
         <Notice lead="Not answering" tone="err">
           {down.map((s) => s.slug).join(", ")}: check the project&apos;s Databases page.
@@ -108,7 +115,7 @@ export default async function DatabasesOverviewPage() {
         {pg.map((s) => (
           <Instance key={s.slug} slug={s.slug} index={indexOf(s.slug)} name={s.postgres!.database} ok={s.postgres!.answering} url={s.postgres!.url} detail={<>{s.postgres!.sizeMb !== null ? `${s.postgres!.sizeMb} MB` : "size unknown"}<Dot />a pg_dump in every backup</>} />
         ))}
-        <Footer add={addLinks("Postgres", withoutSql)} note="One server · a role and database per app · 127.0.0.1 only" />
+        <Footer add={addLinks("Add Postgres to", withoutSql)} note="One server · a role and database per app · 127.0.0.1 only" />
       </Collapsible>
 
       <Collapsible
@@ -121,20 +128,20 @@ export default async function DatabasesOverviewPage() {
         {my.map((s) => (
           <Instance key={s.slug} slug={s.slug} index={indexOf(s.slug)} name={s.mysql!.database} ok={s.mysql!.answering} url={s.mysql!.url} detail={<>{s.mysql!.sizeMb !== null ? `${s.mysql!.sizeMb} MB` : "size unknown"}<Dot />a dump in every backup</>} />
         ))}
-        <Footer add={addLinks("MySQL", withoutSql)} note="One server · a user and database per app · 127.0.0.1 only" />
+        <Footer add={addLinks("Add MySQL to", withoutSql)} note="One server · a user and database per app · 127.0.0.1 only" />
       </Collapsible>
 
       <Collapsible
         testId="engine-mongodb"
         lead={<TileIcon tone="gold"><Icon icon={Database01Icon} size={20} /></TileIcon>}
         title={<>MongoDB {installed.mongodb ? <Pill outline>Installed</Pill> : <Pill outline>Not installed</Pill>}</>}
-        sub={installed.mongodb ? <>{mongo.length} database{mongo.length === 1 ? "" : "s"}<Dot />{mongoMb.toFixed(1)} MB</> : "From MongoDB's own repository, installed the first time you add it to a project"}
-        side={installed.mongodb ? <span className="max-sm:hidden"><StatusText status="ok" label="Running" /></span> : undefined}
+        sub={installed.mongodb ? <>{mongo.length} database{mongo.length === 1 ? "" : "s"}<Dot />{mongoMb.toFixed(1)} MB<Dot />one server for every project</> : "Installed once on this server; then each project gets its own database and user"}
+        side={installed.mongodb ? <span className="max-sm:hidden"><StatusText status="ok" label="Running" /></span> : <InstallMongodbForm compact />}
       >
         {mongo.map((s) => (
           <Instance key={s.slug} slug={s.slug} index={indexOf(s.slug)} name={s.mongodb!.database} ok={s.mongodb!.answering} url={s.mongodb!.url} detail={<>{s.mongodb!.sizeMb !== null ? `${s.mongodb!.sizeMb} MB` : "size unknown"}<Dot />a mongodump in every backup</>} />
         ))}
-        <Footer add={addLinks("MongoDB", withoutMongo)} note="One server · a user and database per app · 127.0.0.1 only" />
+        <Footer add={installed.mongodb ? addLinks("Create a database for", withoutMongo) : undefined} note="One server for every project · a user and database per project · 127.0.0.1 only" />
       </Collapsible>
 
       <Collapsible
@@ -147,7 +154,7 @@ export default async function DatabasesOverviewPage() {
         {redis.map((s) => (
           <Instance key={s.slug} slug={s.slug} index={indexOf(s.slug)} name={`port ${s.redis!.port}`} ok={s.redis!.answering} url={s.redis!.url} detail={<>{s.redis!.memoryUsedMb ?? "?"} MB of {s.redis!.memoryMb} MB<Dot />noeviction</>} />
         ))}
-        <Footer add={addLinks("Redis", withoutRedis)} note="One small Redis per app · its own password and memory cap" />
+        <Footer add={addLinks("Add Redis to", withoutRedis)} note="One small Redis per app · its own password and memory cap" />
       </Collapsible>
 
       <Collapsible

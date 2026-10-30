@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { formatBytes } from "@/components/backup-list";
 import { Dot, KeyValues, Notice, PageHeader, SettingsRow } from "@/components/page";
-import { AddDatabaseForm, AddRedisForm, RemoveDatabaseForm, RemoveRedisForm, SecretUrl } from "@/components/services";
+import { AddDatabaseForm, AddRedisForm, InstallMongodbForm, RemoveDatabaseForm, RemoveRedisForm, SecretUrl, SecretValue } from "@/components/services";
 import { StatusText } from "@/components/status";
 import { listBackups } from "@/lib/backup/runner";
 import { boxConfig } from "@/lib/box";
@@ -13,7 +13,8 @@ import { requireUser } from "@/lib/session";
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Databases" };
 
-const NOTICES: Record<string, { lead: string; tone: "ok" | "lav"; text: string }> = {
+// quiet: nothing about the app changed, so no word about restarting it.
+const NOTICES: Record<string, { lead: string; tone: "ok" | "lav"; text: string; quiet?: boolean }> = {
   "redis-added": { lead: "Added", tone: "ok", text: "Redis is running." },
   "redis-removed": { lead: "Removed", tone: "lav", text: "Redis removed." },
   "postgres-added": { lead: "Added", tone: "ok", text: "Postgres is ready." },
@@ -22,7 +23,8 @@ const NOTICES: Record<string, { lead: string; tone: "ok" | "lav"; text: string }
   "mysql-added": { lead: "Added", tone: "ok", text: "MySQL is ready." },
   "mysql-removed": { lead: "Removed", tone: "lav", text: "MySQL removed, and its data deleted." },
   "mysql-removed-kept": { lead: "Removed", tone: "lav", text: "MySQL removed. A final dump is kept on the server in /var/lib/layer-agent/archive." },
-  "mongodb-added": { lead: "Added", tone: "ok", text: "MongoDB is ready." },
+  "mongodb-installed": { lead: "Installed", tone: "ok", text: "MongoDB is running on this server, shared by every project. Create this project's database and user below.", quiet: true },
+  "mongodb-added": { lead: "Added", tone: "ok", text: "This project's MongoDB database and user are ready." },
   "mongodb-removed": { lead: "Removed", tone: "lav", text: "MongoDB removed, and its data deleted." },
   "mongodb-removed-kept": { lead: "Removed", tone: "lav", text: "MongoDB removed. A final dump is kept on the server in /var/lib/layer-agent/archive." },
 };
@@ -46,8 +48,8 @@ const DATABASES = {
     title: "MongoDB",
     label: "MongoDB",
     env: "MONGODB_URI",
-    description: "A database and user only this app can use, on the server's MongoDB. Every backup includes a mongodump.",
-    first: "Installed the first time from MongoDB's own repository, and tuned for small boxes.",
+    description: "One MongoDB on this server, shared by every project. This project gets its own database and a user with its own password. Every backup includes a mongodump.",
+    first: "MongoDB is installed on this server. Create a database and a user, with its own password, only this project can use.",
   },
 } as const;
 
@@ -71,7 +73,7 @@ export default async function DatabasesPage({ params, searchParams }: { params: 
       {n && (
         <Notice lead={n.lead} tone={n.tone}>
           {n.text}{" "}
-          {restart && /^\d+$/.test(restart) ? (
+          {n.quiet ? null : restart && /^\d+$/.test(restart) ? (
             <>
               Restarting {project.slug} on the same build so it gets the new connection URL:{" "}
               <Link href={`/projects/${project.slug}/deployments/${restart}`} className="text-lavender hover:underline">
@@ -159,6 +161,8 @@ function DatabaseRow({ kind, slug, status }: { kind: DatabaseKind; slug: string;
   const db = status?.[kind];
   const other = kind === "postgres" ? "mysql" : kind === "mysql" ? "postgres" : null;
   const taken = other !== null && status?.[other] !== undefined;
+  // MongoDB is installed on its own first, once for every project.
+  const needsServer = kind === "mongodb" && status !== null && !status.installed.mongodb;
   return (
     <SettingsRow title={d.title} description={d.description}>
       <div className="grid gap-4" data-testid={`${kind}-card`}>
@@ -168,7 +172,13 @@ function DatabaseRow({ kind, slug, status }: { kind: DatabaseKind; slug: string;
             {slug} uses {DATABASES[other].label}. An app gets one SQL database, since both give it <code className="font-mono text-[12.5px]">DATABASE_URL</code>.
           </p>
         )}
-        {status && !db && !taken && (
+        {status && !db && needsServer && (
+          <>
+            <p className="text-[13.5px] text-muted">MongoDB isn&apos;t installed on this server yet. It&apos;s installed once and every project shares it, each with its own database and user.</p>
+            <InstallMongodbForm slug={slug} />
+          </>
+        )}
+        {status && !db && !taken && !needsServer && (
           <>
             <p className="text-[13.5px] text-muted">
               {d.first} The app gets <code className="font-mono text-[12.5px]">{d.env}</code>.
@@ -189,6 +199,7 @@ function DatabaseRow({ kind, slug, status }: { kind: DatabaseKind; slug: string;
                 </>
               )}
             </div>
+            {kind === "mongodb" && <MongoLogin url={db.url} />}
             <div className="grid gap-1.5">
               <p className="text-[13px] font-medium">{d.env}</p>
               <SecretUrl url={db.url} />
@@ -204,5 +215,21 @@ function DatabaseRow({ kind, slug, status }: { kind: DatabaseKind; slug: string;
         )}
       </div>
     </SettingsRow>
+  );
+}
+
+/** The pieces of the project's MongoDB login, for tools that ask for them one by one. */
+function MongoLogin({ url }: { url: string }) {
+  const u = new URL(url);
+  return (
+    <KeyValues
+      inset
+      items={[
+        ["Host", <code key="h" className="font-mono text-[13px]">{u.host}</code>],
+        ["Database", <code key="d" className="font-mono text-[13px]">{u.pathname.slice(1)}</code>],
+        ["Username", <code key="u" className="font-mono text-[13px]">{decodeURIComponent(u.username)}</code>],
+        ["Password", <SecretValue key="p" value={decodeURIComponent(u.password)} />],
+      ]}
+    />
   );
 }

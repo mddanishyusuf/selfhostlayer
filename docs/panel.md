@@ -96,11 +96,11 @@ journalctl -u caddy | grep <domain>
 ```
 
 ### Databases
-One of each per app, installed on the server the first time any app asks for it. Only this app can reach its databases.
+One of each per app. PostgreSQL, MySQL and Redis are installed on the server the first time any app asks for one; MongoDB is installed once, with its own button. Only this app can reach its databases.
 
 - **PostgreSQL:** a role and database (`app_<app>`) on the server's shared PostgreSQL. The app gets `DATABASE_URL`.
 - **MySQL:** a user and database (`app_<app>`) on the server's MariaDB, the MySQL that comes with Ubuntu and Debian. The user can only log in over TCP from 127.0.0.1. The app gets `DATABASE_URL` (`mysql://…`). An app gets one SQL database, Postgres or MySQL, since both use that variable.
-- **MongoDB:** a user and database (`app_<app>`) on the server's shared MongoDB 9.0, from MongoDB's own repository (it isn't in Ubuntu's or Debian's). The user can read, write and manage its own database and no other. The app gets `MONGODB_URI` (`mongodb://…`), so it fits next to Postgres or MySQL. The page shows the URI with its password hidden, a button to reveal it and one to copy it. MongoDB listens on 127.0.0.1 only; to open a database in Compass or mongosh on your computer, tunnel the port first (`ssh -N -L 27017:127.0.0.1:27017 root@<server>`) and use the same URI. It runs on Ubuntu 24.04 and 26.04, and on Debian only on x86: MongoDB has no ARM packages for Debian.
+- **MongoDB:** one MongoDB 9.0 for the whole server, from MongoDB's own repository (it isn't in Ubuntu's or Debian's). Install it once (**Install MongoDB on this server**, on a project's Databases page or under Databases); then each project's **Create database and user** gives it a database and a user (`app_<app>`) with its own password, which can read, write and manage that database and no other. The page shows the host, database, username and password (hidden, with Reveal and Copy) and the whole `MONGODB_URI`, which the app gets too, so it fits next to Postgres or MySQL. MongoDB listens on 127.0.0.1 only; to open a database in Compass or mongosh on your computer, tunnel the port first (`ssh -N -L 27017:127.0.0.1:27017 root@<server>`) and use the same URI. It runs on Ubuntu 24.04 and 26.04, and on Debian only on x86: MongoDB has no ARM packages for Debian.
 - **Redis:** a small Redis of its own: its own port, password and memory cap, running as the app's user, with its data in `data/redis`. The app gets `REDIS_URL`.
 - **SQLite:** nothing to install. Keep database files in `DATA_DIR` (`/srv/apps/<app>/data`), and backups find them by their header and copy them safely.
 
@@ -184,7 +184,7 @@ Every project's domains, one row per project: its main domain, the project's nam
 Coming soon: one-click apps built for Self Host Layer (analytics, email, scheduling and more).
 
 ### Databases
-Every engine on the server (PostgreSQL, MySQL, MongoDB, Redis, SQLite) with each app's database, its size and whether it answers. You can copy an app's connection URL, or add an engine to an app, from here.
+Every engine on the server (PostgreSQL, MySQL, MongoDB, Redis, SQLite) with each app's database, its size and whether it answers. You can copy an app's connection URL, add an engine to an app, or install MongoDB, from here.
 
 ### Backups
 - **Storage:** any S3-compatible bucket: AWS S3, Cloudflare R2, Backblaze B2, MinIO, and others. Connecting tests it: the panel writes, reads, lists and deletes a test object.

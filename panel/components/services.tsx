@@ -1,9 +1,9 @@
 "use client";
 
-import { Add01Icon } from "@hugeicons/core-free-icons";
+import { Add01Icon, DatabaseAddIcon, Download04Icon } from "@hugeicons/core-free-icons";
 import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
-import { addMongodbAction, addMysqlAction, addPostgresAction, addRedisAction, removeMongodbAction, removeMysqlAction, removePostgresAction, removeRedisAction, type ServiceState } from "@/app/actions/services";
+import { addMongodbAction, addMysqlAction, addPostgresAction, addRedisAction, installMongodbAction, removeMongodbAction, removeMysqlAction, removePostgresAction, removeRedisAction, type ServiceState } from "@/app/actions/services";
 import type { DatabaseKind } from "@/lib/services";
 import { CopyButton, SubmitButton } from "./form";
 import { Icon } from "./icon";
@@ -52,10 +52,43 @@ export function SecretUrl({ url }: { url: string }) {
   );
 }
 
+/** A value (a password) hidden until asked, with Copy. */
+export function SecretValue({ value }: { value: string }) {
+  const [shown, setShown] = useState(false);
+  return (
+    <span className="flex min-w-0 items-center gap-1">
+      <code className="min-w-0 truncate font-mono text-[13px]" data-testid="secret-value">
+        {shown ? value : "••••••••••••"}
+      </code>
+      <button type="button" onClick={() => setShown((s) => !s)} className="h-[26px] shrink-0 rounded-md px-2 text-[12px] font-medium text-muted transition-colors duration-150 hover:bg-hover hover:text-foreground">
+        {shown ? "Hide" : "Reveal"}
+      </button>
+      <CopyButton text={value} />
+    </span>
+  );
+}
+
+/** MongoDB on the server, once for every project. */
+export function InstallMongodbForm({ slug, compact = false }: { slug?: string; compact?: boolean }) {
+  const [state, action] = useActionState(installMongodbAction, {} as ServiceState);
+  return (
+    <form action={action} className="grid gap-2">
+      {slug && <input type="hidden" name="slug" value={slug} />}
+      <div>
+        <SubmitButton pending="Installing MongoDB…" variant={compact ? "secondary" : undefined} size={compact ? "sm" : undefined} className="w-auto">
+          <Icon icon={Download04Icon} size={15} strokeWidth={2} /> {compact ? "Install" : "Install MongoDB on this server"}
+        </SubmitButton>
+      </div>
+      <FormError message={state.error} />
+    </form>
+  );
+}
+
 const ADD_DATABASE = {
-  postgres: { action: addPostgresAction, label: "Postgres", installing: "Installing PostgreSQL…" },
-  mysql: { action: addMysqlAction, label: "MySQL", installing: "Installing MariaDB…" },
-  mongodb: { action: addMongodbAction, label: "MongoDB", installing: "Installing MongoDB…" },
+  postgres: { action: addPostgresAction, label: "Add Postgres", icon: Add01Icon, installing: "Installing PostgreSQL…" },
+  mysql: { action: addMysqlAction, label: "Add MySQL", icon: Add01Icon, installing: "Installing MariaDB…" },
+  // MongoDB is installed on its own first: this only makes the project's database and user.
+  mongodb: { action: addMongodbAction, label: "Create database and user", icon: DatabaseAddIcon, installing: "Creating the database…" },
 } as const;
 
 export function AddDatabaseForm({ slug, kind, installed }: { slug: string; kind: DatabaseKind; installed: boolean }) {
@@ -67,7 +100,7 @@ export function AddDatabaseForm({ slug, kind, installed }: { slug: string; kind:
       <input type="hidden" name="slug" value={slug} />
       <div>
         <SubmitButton pending={installed ? "Creating the database…" : a.installing} className="w-auto">
-          <Icon icon={Add01Icon} size={15} strokeWidth={2} /> Add {a.label}
+          <Icon icon={a.icon} size={15} strokeWidth={2} /> {a.label}
         </SubmitButton>
       </div>
       <FormError message={state.error} />

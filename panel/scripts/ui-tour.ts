@@ -601,21 +601,32 @@ if (process.env.TOUR_DEPLOY === "1") {
     console.log("MongoDB");
     await go("/projects/next/databases");
     await waitForPath("/projects/next/databases");
+    const card = () => evaluate(`document.querySelector('[data-testid="mongodb-card"]').innerText`).then(String);
+    const notice = () => evaluate(`document.querySelector('[data-testid="notice"]')?.innerText ?? ""`).then(String);
+    // Once for the whole server: MongoDB is installed on its own; then each project creates its database and user.
+    if ((await card()).includes("Install MongoDB on this server")) {
+      await click('[data-testid="mongodb-card"] form button[type=submit]');
+      await waitFor(`/MongoDB is running on this server/.test(document.querySelector('[data-testid="notice"]')?.innerText ?? "") || /role="alert"/.test(document.querySelector('[data-testid="mongodb-card"]').innerHTML)`, "MongoDB to be installed on the server", 900_000);
+      if (!(await notice()).includes("MongoDB is running on this server")) throw new Error(`installing MongoDB failed: ${await card()}`);
+      console.log("  ✓ MongoDB installed once, for the whole server");
+    }
+    if (!(await card()).includes("Create database and user")) throw new Error(`no Create database and user: ${await card()}`);
     await click('[data-testid="mongodb-card"] form button[type=submit]');
-    await waitFor(`!!document.querySelector('[data-testid="notice"]') || /role="alert"/.test(document.querySelector('[data-testid="mongodb-card"]').innerHTML)`, "MongoDB to be added (installs it the first time)", 900_000);
+    await waitFor(`/database and user are ready/.test(document.querySelector('[data-testid="notice"]')?.innerText ?? "") || /role="alert"/.test(document.querySelector('[data-testid="mongodb-card"]').innerHTML)`, "the project's database and user", 300_000);
+    const login = await card();
+    if (!/Database\s+app_next/.test(login) || !/Username\s+app_next/.test(login) || !/Host\s+127\.0\.0\.1:27017/.test(login)) throw new Error(`the login isn't shown piece by piece: ${login}`);
     const shown = () => evaluate(`[...document.querySelectorAll('[data-testid="secret-url"]')].map((e) => e.innerText).find((t) => t.startsWith("mongodb:")) ?? ""`).then(String);
     const url = await shown();
     if (!/^mongodb:\/\/app_next:••••••••@127\.0\.0\.1:27017\/app_next$/.test(url)) throw new Error(`MONGODB_URI isn't shown masked: ${url || await evaluate(`document.querySelector('[data-testid="mongodb-card"]').innerText`)}`);
-    await evaluate(`[...document.querySelectorAll('[data-testid="mongodb-card"] button')].find((b) => b.textContent === "Reveal").click(), true`);
+    await evaluate(`document.querySelector('[data-testid="mongodb-card"] [data-testid="secret-url"]').parentElement.querySelector("button").click(), true`);
     await waitFor(`/^mongodb:\\/\\/app_next:[0-9a-f]{48}@/.test([...document.querySelectorAll('[data-testid="secret-url"]')].map((e) => e.innerText).find((t) => t.startsWith("mongodb:")) ?? "")`, "Reveal to show the password");
     if (!(await evaluate(`[...document.querySelectorAll('[data-testid="mongodb-card"] button')].some((b) => /Copy/.test(b.textContent))`))) throw new Error("no Copy button next to MONGODB_URI");
     await screenshot("databases-mongodb");
-    const notice = String(await evaluate(`document.querySelector('[data-testid="notice"]')?.innerText ?? ""`));
-    const deployment = /deployment #(\d+)/.exec(notice)?.[1];
-    if (!deployment) throw new Error(`adding MongoDB without a restart: ${notice}`);
+    const deployment = /deployment #(\d+)/.exec(await notice())?.[1];
+    if (!deployment) throw new Error(`adding MongoDB without a restart: ${await notice()}`);
     await go(`/deployments/${deployment}`);
     await waitForDeploy("the restart after adding MongoDB");
-    console.log(`  ✓ MongoDB installed, database app_next created, MONGODB_URI shown masked, revealed and copyable (#${deployment})`);
+    console.log(`  ✓ database and user app_next created; host, database, username and password shown; MONGODB_URI masked, revealed and copyable (#${deployment})`);
     await go("/projects/next/env");
     await waitForPath("/projects/next/env");
     if (!String(await evaluate("document.querySelector('main').innerText")).includes("MONGODB_URI")) throw new Error("Environment doesn't list MONGODB_URI under Set for you");
