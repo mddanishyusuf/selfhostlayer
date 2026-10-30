@@ -113,21 +113,22 @@ export function FormError({ message }: { message?: string | null }) {
 /** The logo (design/logo): an L, a violet app standing on an orange layer, your server. */
 /**
  * The logo's four bars (design/logo/icon.svg): two L's turned into each
- * other, each bar its own color, on no tile. The same colors in both themes.
+ * other, on no tile, in the text color (black, or near-white in the dark
+ * theme), each bar a step lighter going round.
  */
 const LOGO_BARS = [
-  { x: 4, y: 4, width: 17.4, height: 5, fill: "#8b5cf6" },
-  { x: 23, y: 4, width: 5, height: 17.4, fill: "#f97316" },
-  { x: 10.6, y: 23, width: 17.4, height: 5, fill: "#10b981" },
-  { x: 4, y: 10.6, width: 5, height: 17.4, fill: "#3b82f6" },
+  { x: 4, y: 4, width: 17.4, height: 5, opacity: 1 },
+  { x: 23, y: 4, width: 5, height: 17.4, opacity: 0.72 },
+  { x: 10.6, y: 23, width: 17.4, height: 5, opacity: 0.48 },
+  { x: 4, y: 10.6, width: 5, height: 17.4, opacity: 0.28 },
 ];
 
 export function LogoMark() {
   return (
-    <span className="grid size-[30px] shrink-0 place-items-center" aria-hidden>
-      <svg viewBox="3 3 26 26" className="size-[22px]">
-        {LOGO_BARS.map((bar) => (
-          <rect key={bar.fill} {...bar} rx="1.2" />
+    <span className="grid size-[30px] shrink-0 place-items-center text-foreground" aria-hidden>
+      <svg viewBox="3 3 26 26" className="size-[22px]" fill="currentColor">
+        {LOGO_BARS.map(({ opacity, ...bar }) => (
+          <rect key={opacity} {...bar} rx="1.2" fillOpacity={opacity} />
         ))}
       </svg>
     </span>
