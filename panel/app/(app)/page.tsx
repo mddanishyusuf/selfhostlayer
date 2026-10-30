@@ -12,7 +12,6 @@ import { servingConfig } from "@/lib/domains";
 import { allRepos } from "@/lib/github-repos";
 import { getApp } from "@/lib/github-store";
 import { listProjects } from "@/lib/projects";
-import { projectIconUrl } from "@/lib/site-icon";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Projects" };
@@ -106,7 +105,7 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
                   building && "sweep-top",
                 )}
               >
-                <Mark name={p.slug} index={index} icon={projectIconUrl(p.slug)} />
+                <Mark name={p.slug} index={index} />
                 <div className="grid min-w-0 gap-[3px]">
                   <div className="flex min-w-0 items-baseline gap-2.5">
                     <b className="whitespace-nowrap text-[15.5px] font-semibold">{p.slug}</b>

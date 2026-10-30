@@ -2,12 +2,11 @@ import { Add01Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/icon";
 import { Dot, Empty, ListRow, Notice, PageHeader, PillLink, Tabs } from "@/components/page";
 import { StatusText } from "@/components/status";
-import { Mark, buttonClass } from "@/components/ui";
+import { buttonClass } from "@/components/ui";
 import { listIncidents } from "@/lib/alerts/engine";
 import { listAllDomains, type ProjectDomain } from "@/lib/domains";
 import { listProjects } from "@/lib/projects";
 import { requireUser } from "@/lib/session";
-import { projectIconUrl } from "@/lib/site-icon";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Domains" };
@@ -22,7 +21,7 @@ export default async function AllDomainsPage({ searchParams }: { searchParams: P
   const attention = (d: ProjectDomain) => d.status === "pending" || certIssues.has(d.host);
   const projects = listProjects();
   const groups = projects
-    .map((p, index) => ({ p, index, all: domains.filter((d) => d.projectId === p.id) }))
+    .map((p) => ({ p, all: domains.filter((d) => d.projectId === p.id) }))
     .filter((g) => g.all.length > 0)
     .filter((g) => tab === "all" || g.all.some(attention));
   const issues = domains.filter(attention);
@@ -58,8 +57,9 @@ export default async function AllDomainsPage({ searchParams }: { searchParams: P
       {groups.length === 0 && <Empty>{tab === "attention" ? "Nothing needs attention. Every domain is live with a valid certificate." : "No domains yet."}</Empty>}
       {groups.length > 0 && (
         <section className="border-b border-border">
-          {groups.map(({ p, index, all }) => {
-            const main = all.find((d) => d.role === "primary" && d.status === "active") ?? all.find((d) => d.role === "primary") ?? all[0]!;
+          {groups.map(({ p, all }) => {
+            // A domain that works leads; a pending one is named below, in the warning.
+            const main = all.find((d) => d.role === "primary" && d.status === "active") ?? all.find((d) => d.status === "active") ?? all.find((d) => d.role === "primary") ?? all[0]!;
             const problems = all.filter(attention);
             return (
               // The whole row opens the project's Domains page, where domains are added and checked.
@@ -67,22 +67,24 @@ export default async function AllDomainsPage({ searchParams }: { searchParams: P
                 key={p.id}
                 href={`/projects/${p.slug}/domains`}
                 data-testid={`domains-${p.slug}`}
-                lead={<Mark name={p.slug} index={index} icon={projectIconUrl(p.slug)} />}
-                title={<span className="truncate">{p.slug}</span>}
+                title={<span className="truncate">{main.host}</span>}
                 sub={
-                  problems.length ? (
-                    <span className="truncate text-gold">{problems[0]!.status === "pending" ? `${problems[0]!.host} is waiting for DNS` : `Certificate problem on ${problems[0]!.host}`}</span>
-                  ) : (
-                    <>
-                      <span className="truncate">{main.host}</span>
-                      {all.length > 1 && (
+                  <>
+                    <span className="shrink-0">{p.slug}</span>
+                    {problems.length ? (
+                      <>
+                        <Dot />
+                        <span className="truncate text-gold">{problems[0]!.status === "pending" ? `${problems[0]!.host} is waiting for DNS` : `Certificate problem on ${problems[0]!.host}`}</span>
+                      </>
+                    ) : (
+                      all.length > 1 && (
                         <>
                           <Dot />
                           <span className="text-dim">+{all.length - 1} more</span>
                         </>
-                      )}
-                    </>
-                  )
+                      )
+                    )}
+                  </>
                 }
                 side={
                   <>

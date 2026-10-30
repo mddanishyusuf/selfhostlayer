@@ -8,7 +8,7 @@ The sidebar has two modes. Outside a project it lists the server's pages. Inside
 
 ## Projects
 
-All your projects, with their status, last deploy and address. A project whose own domain is live shows that site's favicon instead of its letter. The panel fetches it from Google's favicon service once a day, so your browser only ever talks to the panel. Search and **New project** are in the bar under the header. The server button in the header opens CPU, memory and disk for the whole server, with the last 24 hours charted and memory by app.
+All your projects, with their status, last deploy and address. Each project has its own icon, picked from its name. Search and **New project** are in the bar under the header. The server button in the header opens CPU, memory and disk for the whole server, with the last 24 hours charted and memory by app.
 
 ### New project
 1. Pick a repository from your GitHub App's installations, or paste a public GitHub URL.
@@ -178,7 +178,7 @@ fail2ban-client status sshd
 ```
 
 ### Domains
-Every project's domains, one row per project. **Manage** opens that project's Domains page.
+Every project's domains, one row per project: its main domain, the project's name and how many more it has, or what needs attention. **Manage** opens that project's Domains page.
 
 ### Integrations
 Coming soon: one-click apps built for Self Host Layer (analytics, email, scheduling and more).

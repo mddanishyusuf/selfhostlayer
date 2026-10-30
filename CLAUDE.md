@@ -64,7 +64,7 @@ A sidebar flush against the left edge and one main area that fills the rest. No 
   - **Main area.** Every page starts with a sticky 60px `PageHeader`, level with the sidebar's top row: back arrow, a "project / Page" title, quiet meta text on the right, then actions.
   - **Projects page:** the list of projects, with search and New project in a bar under the header. The server button in the header opens a modal with CPU, memory, disk and memory by app.
   - **Project Overview:** a stats strip, then Production in two columns: the live site's preview on the left, details on the right. The preview is the image the site offers for link previews (`og:image`), fetched by the panel once per deployment (`lib/preview.ts`): no headless browser on the box. Sites without one get a card with their title.
-  - **Domains (all projects):** one row per project; Manage opens that project's Domains page.
+  - **Domains (all projects):** one row per project, led by its domain (no project icon); Manage opens that project's Domains page.
 - **Not built yet, shown as "Coming soon":** Analytics (Piqo's layout is in the prototype), editing firewall rules (the page lists the ufw rules and fail2ban bans), and Integrations.
 - **Motion and feedback:** 150ms ease-out transitions, skeletons instead of spinners, a pulsing dot for anything in progress. Later: optimistic updates, toasts.
 - **Logs:** monospace on a pane that is always dark, streaming, auto-scroll that pauses when you scroll up, ANSI colors, copy and download buttons.

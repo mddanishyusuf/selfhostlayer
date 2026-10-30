@@ -1,7 +1,22 @@
-import { AlertCircleIcon, Layers01Icon } from "@hugeicons/core-free-icons";
+import {
+  AlertCircleIcon,
+  Atom01Icon,
+  Compass01Icon,
+  CubeIcon,
+  Diamond01Icon,
+  Flower01Icon,
+  Globe02Icon,
+  Idea01Icon,
+  Layers01Icon,
+  Leaf01Icon,
+  PuzzleIcon,
+  Rocket01Icon,
+  StarIcon,
+  Sun03Icon,
+  ZapIcon,
+} from "@hugeicons/core-free-icons";
 import type { ComponentProps, ReactNode } from "react";
 import { Icon } from "./icon";
-import { SiteIcon } from "./site-icon";
 
 const cx = (...parts: (string | false | null | undefined)[]) => parts.filter(Boolean).join(" ");
 export { cx };
@@ -139,7 +154,7 @@ export function Skeleton({ className }: { className?: string }) {
   );
 }
 
-/** Project initial in a tinted square; the color is stable per index. */
+/** A project's icon in a tinted square; the color is stable per index. */
 export const MARK_COLORS = ["lavender", "coral", "teal", "blue", "gold", "rose", "foreground"] as const;
 const MARK_CLASS: Record<(typeof MARK_COLORS)[number], string> = {
   lavender: "bg-lavender/18 text-lavender",
@@ -150,19 +165,17 @@ const MARK_CLASS: Record<(typeof MARK_COLORS)[number], string> = {
   rose: "bg-rose/18 text-rose",
   foreground: "bg-foreground/12 text-foreground",
 };
-/** A project's mark: its first letter on its color, or its site's favicon when given (lib/site-icon). */
-export function Mark({ name, index, size = "md", icon }: { name: string; index: number; size?: "sm" | "md"; icon?: string }) {
-  const letter = (
+/** Picked by index like the colors, so the first 14 projects all look different. */
+const MARK_ICONS = [Rocket01Icon, Globe02Icon, CubeIcon, Layers01Icon, Leaf01Icon, ZapIcon, StarIcon, Diamond01Icon, Sun03Icon, Compass01Icon, PuzzleIcon, Atom01Icon, Idea01Icon, Flower01Icon];
+
+/** A project's mark: its icon on its color. `name` is the project it stands for (the row says it in words). */
+export function Mark({ index, size = "md" }: { name: string; index: number; size?: "sm" | "md" }) {
+  return (
     <span
-      className={cx(
-        "grid shrink-0 place-items-center font-bold uppercase",
-        size === "sm" ? "size-[30px] rounded-[9px] text-[13px]" : "size-10 rounded-[11px] text-[17px]",
-        MARK_CLASS[MARK_COLORS[Math.abs(index) % MARK_COLORS.length]!],
-      )}
+      className={cx("grid shrink-0 place-items-center", size === "sm" ? "size-[30px] rounded-[9px]" : "size-10 rounded-[11px]", MARK_CLASS[MARK_COLORS[Math.abs(index) % MARK_COLORS.length]!])}
       aria-hidden
     >
-      {name.slice(0, 1)}
+      <Icon icon={MARK_ICONS[Math.abs(index) % MARK_ICONS.length]!} size={size === "sm" ? 16 : 20} strokeWidth={1.8} />
     </span>
   );
-  return icon ? <SiteIcon src={icon} size={size} fallback={letter} /> : letter;
 }
