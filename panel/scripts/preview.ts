@@ -164,7 +164,7 @@ for (const spec of paths) {
     waiters.push(check);
   });
   await sleep(700);
-  // @click:<css selector> clicks something first (a Manage button, the server button…).
+  // @click:<css selector> clicks something first (a Manage button, a Delete button…).
   for (const o of opts.filter((x) => x.startsWith("click:"))) {
     await send("Runtime.evaluate", { expression: `document.querySelector(${JSON.stringify(o.slice(6))})?.click()` });
     await sleep(900);

@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { runCronAction } from "@/app/actions/crons";
 import { SubmitButton } from "@/components/form";
-import { Empty, PageHeader } from "@/components/page";
+import { CARD, Empty, PageHeader } from "@/components/page";
 import { duration } from "@/components/status";
 import { StatusDot, cx } from "@/components/ui";
 import { describeCron } from "@/lib/cron";
@@ -41,11 +41,11 @@ export default async function CronRunsPage({ params }: { params: Promise<{ slug:
           </form>
         }
       />
-      <section className="border-b border-border">
+      <section className={CARD}>
         {runs.length === 0 && <Empty>No runs yet. Reload after a run starts.</Empty>}
         {runs.map((r, i) => (
           <details key={r.invocation} className="group border-b border-border last:border-b-0" open={i === 0}>
-            <summary className="flex min-h-[56px] cursor-pointer list-none items-center gap-4 px-4 transition-colors duration-150 hover:bg-hover sm:px-7">
+            <summary className="flex min-h-[56px] cursor-pointer list-none items-center gap-4 px-4 transition-colors duration-150 hover:bg-hover sm:px-6">
               <StatusDot status={r.status === "success" ? "ok" : r.status === "failed" ? "err" : "warn"} pulse={r.status === "running"} />
               <span className={cx("w-28 text-[14px] font-medium", r.status === "failed" && "text-rose")}>
                 {r.status === "success" ? "Succeeded" : r.status === "failed" ? `Failed (${r.exitStatus ?? "?"})` : "Running"}

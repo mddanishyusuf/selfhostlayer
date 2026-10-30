@@ -1,4 +1,4 @@
-import { Empty, PageHeader, TableHead, TableRow } from "@/components/page";
+import { CARD, Empty, PageHeader, TableHead, TableRow } from "@/components/page";
 import { StatusText, timeAgo } from "@/components/status";
 import { agent } from "@/lib/agent";
 import { requireUser } from "@/lib/session";
@@ -75,7 +75,7 @@ export default async function ActivityPage() {
   return (
     <>
       <PageHeader title="Activity" meta="Every change the agent made, from its root-only log" />
-      <section className="border-b border-border" data-testid="activity">
+      <section className={CARD} data-testid="activity">
         <TableHead columns={columns}>
           <span>What</span>
           <span>About</span>

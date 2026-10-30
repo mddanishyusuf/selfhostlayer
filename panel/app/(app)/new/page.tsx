@@ -3,7 +3,7 @@ import Link from "next/link";
 import { PublicRepoForm } from "@/components/deploy";
 import { RepoPicker } from "@/components/github-connect";
 import { Icon } from "@/components/icon";
-import { Empty, PageHeader, PillLink, SettingsRow } from "@/components/page";
+import { CARD, Empty, PageHeader, PillLink, SettingsRow } from "@/components/page";
 import { FormError } from "@/components/ui";
 import { GITHUB_WEB } from "@/lib/github";
 import { getApp, listInstallations } from "@/lib/github-store";
@@ -52,12 +52,12 @@ export default async function NewProjectPage({ searchParams }: { searchParams: P
         }
       />
       {message && (
-        <div className="border-b border-border px-4 py-4 sm:px-7">
+        <div className="border-b border-border px-4 py-4 sm:px-6">
           <FormError message={message} />
         </div>
       )}
       {installs.length === 0 ? (
-        <section className="border-b border-border">
+        <section className={CARD}>
           <Empty
             action={
               <PillLink href={installUrl} external primary>
@@ -73,18 +73,18 @@ export default async function NewProjectPage({ searchParams }: { searchParams: P
         <RepoPicker />
       )}
       <details className="group border-b border-border">
-        <summary className="flex h-[52px] cursor-pointer list-none items-center gap-2 px-4 text-[14px] font-medium text-muted transition-colors hover:bg-hover hover:text-foreground sm:px-7">
+        <summary className="flex h-[52px] cursor-pointer list-none items-center gap-2 px-4 text-[14px] font-medium text-muted transition-colors hover:bg-hover hover:text-foreground sm:px-6">
           <span className="w-3 text-dim group-open:hidden">+</span>
           <span className="hidden w-3 text-dim group-open:inline">−</span>
           Deploy a public repository or a monorepo folder
         </summary>
-        <div className="px-4 pb-6 pt-2 sm:px-7">
+        <div className="px-4 pb-6 pt-2 sm:px-6">
           <div className="max-w-[680px]">
             <PublicRepoForm />
           </div>
         </div>
       </details>
-      <p className="px-4 py-4 text-[12.5px] text-dim sm:px-7">
+      <p className="px-4 py-4 text-[12.5px] text-dim sm:px-6">
         Connected through{" "}
         <Link href="/github/connect" className="text-muted hover:text-foreground hover:underline">
           {app.name}

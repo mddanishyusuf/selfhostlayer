@@ -8,7 +8,7 @@ The sidebar has two modes. Outside a project it lists the server's pages. Inside
 
 ## Projects
 
-All your projects, with their status, last deploy and address. Each project shows the logo of its stack (Next.js, Vite, Astro, Node.js…), in one color for all. Search and **New project** are in the bar under the header. The server button in the header opens CPU, memory and disk for the whole server, with the last 24 hours charted and memory by app.
+All your projects, with their status, last deploy and address. Each project shows the logo of its stack (Next.js, Vite, Astro, Node.js…), in one color for all. Filter by status (All, Live, Building, Failed), search, or switch between the list and a grid of site previews. **New project** is at the top right.
 
 ### New project
 1. Pick a repository from your GitHub App's installations, or paste a public GitHub URL.
@@ -195,6 +195,9 @@ Coming soon: one-click apps built for Self Host Layer (analytics, email, schedul
 
 ### Databases
 Every engine on the server (PostgreSQL, MySQL, MongoDB, Redis, SQLite) with each app's database, its size and whether it answers. PostgreSQL, MySQL and MongoDB say Running or Stopped, as systemd sees their server; a stopped MongoDB has a Start button, which tells you why if it can't start. You can copy an app's connection URL, add an engine to an app, or install MongoDB, from here.
+
+### Health
+The server itself: CPU, memory, disk and swap right now, CPU and memory charted over the last 24 hours or 7 days, each app's memory against its limit with its CPU and whether it runs, and the versions of Caddy, the agent, the panel and Node. The server's name at the top of the sidebar opens it too.
 
 ### Backups
 - **Storage:** any S3-compatible bucket: AWS S3, Cloudflare R2, Backblaze B2, MinIO, and others. Connecting tests it: the panel writes, reads, lists and deletes a test object.

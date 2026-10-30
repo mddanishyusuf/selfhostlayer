@@ -3,7 +3,7 @@ import { restoreFreeDomainAction } from "@/app/actions/domains";
 import { AddDomainForm } from "@/components/domains";
 import { DomainRow } from "@/components/domain-row";
 import { RefreshEvery } from "@/components/refresh";
-import { KeyValues, Notice, PageHeader, SettingsRow } from "@/components/page";
+import { CARD, KeyValues, Notice, PageHeader, SettingsRow } from "@/components/page";
 import { Button } from "@/components/ui";
 import { boxConfig, freeHost } from "@/lib/box";
 import { canRemove, listDomains } from "@/lib/domains";
@@ -33,12 +33,12 @@ export default async function DomainsPage({ params }: { params: Promise<{ slug: 
       <SettingsRow title="Add a domain" description="Point it at this server first. We check public DNS, so visitors never land on a broken site.">
         <AddDomainForm slug={project.slug} />
       </SettingsRow>
-      <section className="border-b border-border" data-testid="domain-list">
+      <section className={CARD} data-testid="domain-list">
         {domains.map((d) => (
           <DomainRow key={d.id} d={d} serverIp={box.publicIp} removable={canRemove(d)} />
         ))}
         {!domains.some((d) => d.role === "free") && (
-          <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-t border-border px-4 py-3.5 text-[13.5px] text-muted sm:px-7" data-testid="free-off">
+          <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-t border-border px-4 py-3.5 text-[13.5px] text-muted sm:px-6" data-testid="free-off">
             <span>
               The free address <code className="font-mono text-[13px] text-foreground">{freeHost(project.slug, box)}</code> is off.
             </span>

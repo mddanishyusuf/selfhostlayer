@@ -10,7 +10,7 @@ const focus = "outline-none focus-visible:ring-2 focus-visible:ring-accent/60 fo
 
 const VARIANTS = {
   primary: "border border-inverse bg-inverse text-inverse-fg hover:opacity-90",
-  secondary: "border border-border-strong text-foreground hover:bg-hover",
+  secondary: "border border-border-strong bg-card text-foreground hover:bg-hover",
   ghost: "border border-transparent text-muted hover:bg-hover hover:text-foreground",
   danger: "border border-rose bg-rose text-on-rose hover:opacity-90",
 } as const;
@@ -25,7 +25,7 @@ export function Button({
   return (
     <button
       className={cx(
-        "inline-flex select-none items-center justify-center gap-1.5 whitespace-nowrap rounded-md font-semibold transition-[background-color,opacity] duration-150 ease-out disabled:pointer-events-none disabled:opacity-50",
+        "inline-flex select-none items-center justify-center gap-1.5 whitespace-nowrap rounded-md font-medium transition-[background-color,opacity] duration-150 ease-out disabled:pointer-events-none disabled:opacity-50",
         size === "sm" ? "h-7 px-3 text-[12.5px]" : "h-[34px] px-3.5 text-[13px]",
         focus,
         VARIANTS[variant],
@@ -38,7 +38,7 @@ export function Button({
 
 export const buttonClass = (variant: keyof typeof VARIANTS = "primary", size: "sm" | "md" = "md") =>
   cx(
-    "inline-flex select-none items-center justify-center gap-1.5 whitespace-nowrap rounded-md font-semibold transition-[background-color,opacity] duration-150 ease-out",
+    "inline-flex select-none items-center justify-center gap-1.5 whitespace-nowrap rounded-md font-medium transition-[background-color,opacity] duration-150 ease-out",
     size === "sm" ? "h-7 px-3 text-[12.5px]" : "h-[34px] px-3.5 text-[13px]",
     focus,
     VARIANTS[variant],
@@ -95,9 +95,9 @@ export function Field({ label, htmlFor, hint, children }: { label: string; htmlF
   );
 }
 
-/** A plain bordered block. The design avoids cards: prefer sections and rows. */
+/** A white card on the page. Prefer Section, which adds a title. */
 export function Card({ className, ...props }: ComponentProps<"div">) {
-  return <div className={cx("rounded-xl border border-border", className)} {...props} />;
+  return <div className={cx("rounded-[10px] border border-border bg-card", className)} {...props} />;
 }
 
 export function FormError({ message }: { message?: string | null }) {
@@ -193,7 +193,7 @@ export function Mark({ framework, size = "md", bare }: { framework: string; size
       role="img"
       aria-label={logo.title}
       title={logo.title}
-      className={cx("grid shrink-0 place-items-center border border-border bg-foreground/[0.04] text-foreground", size === "sm" ? "size-[30px] rounded-[9px]" : "size-10 rounded-[11px]")}
+      className={cx("grid shrink-0 place-items-center border border-border bg-background text-foreground", size === "sm" ? "size-[30px] rounded-md" : "size-10 rounded-lg")}
     >
       <svg viewBox="0 0 24 24" width={px} height={px} fill="currentColor" aria-hidden>
         <path d={logo.path} />

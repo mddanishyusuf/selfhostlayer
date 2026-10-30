@@ -1,6 +1,5 @@
 import { cookies } from "next/headers";
 import { CommandPalette, type PaletteItem } from "@/components/shell/palette";
-import { ServerModal } from "@/components/shell/server-modal";
 import { Sidebar, type SidebarProject } from "@/components/shell/sidebar";
 import { UpdateModal } from "@/components/shell/update-modal";
 import { agent, type SystemInfo } from "@/lib/agent";
@@ -40,6 +39,7 @@ const PAGES: PaletteItem[] = [
   { label: "Domains", href: "/domains", hint: "Page" },
   { label: "Integrations", href: "/integrations", hint: "Page" },
   { label: "Databases", href: "/databases", hint: "Page" },
+  { label: "Health", href: "/health", hint: "Page" },
   { label: "Backups", href: "/settings/backups", hint: "Page" },
   { label: "Alerts", href: "/settings/alerts", hint: "Page" },
   { label: "Settings", href: "/settings", hint: "Page" },
@@ -80,8 +80,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         theme={parseTheme((await cookies()).get(THEME_COOKIE)?.value)}
         update={update && { version: update.version }}
       />
-      <main className="min-h-dvh min-w-0 flex-1 pt-14 md:pt-0">{children}</main>
-      <ServerModal name={info?.hostname ?? "Server"} />
+      {/* Pages are a stack of cards on the page, with no line between them and the sidebar. */}
+      <main className="min-h-dvh min-w-0 flex-1 pt-14 md:pt-0">
+        <div className="page-stack grid grid-cols-[minmax(0,1fr)] content-start gap-3.5 px-4 pb-16 sm:px-6 md:pl-2 md:pr-7">{children}</div>
+      </main>
       {update && <UpdateModal current={version} release={update} />}
       <CommandPalette items={items} />
     </div>

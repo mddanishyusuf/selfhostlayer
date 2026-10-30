@@ -19,7 +19,7 @@ export const metadata = { title: "Databases" };
 
 function Instance({ slug, framework, name, detail, ok, url }: { slug: string; framework: string; name: string; detail: ReactNode; ok: boolean; url?: string }) {
   return (
-    <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-3.5 border-t border-border py-3.5 pl-4 pr-4 sm:pr-7 md:pl-[82px]">
+    <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-3.5 border-t border-border py-3.5 pl-4 pr-4 sm:pr-6 md:pl-[82px]">
       <Mark framework={framework} size="sm" />
       <div className="grid min-w-0 gap-0.5">
         <div className="flex min-w-0 items-center gap-2 text-[15px] font-semibold">
@@ -45,7 +45,7 @@ function ServerState({ up }: { up: boolean }) {
 
 function Footer({ add, note }: { add?: ReactNode; note: string }) {
   return (
-    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-border py-3 pl-4 pr-4 text-[13px] sm:pr-7 md:pl-[82px]">
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-border py-3 pl-4 pr-4 text-[13px] sm:pr-6 md:pl-[82px]">
       {add}
       <span className="ml-auto text-dim">{note}</span>
     </div>

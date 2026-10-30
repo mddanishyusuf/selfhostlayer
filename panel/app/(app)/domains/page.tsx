@@ -1,6 +1,6 @@
 import { Add01Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/icon";
-import { Dot, Empty, ListRow, Notice, PageHeader, PillLink, Tabs } from "@/components/page";
+import { CARD, Dot, Empty, ListRow, Notice, PageHeader, PillLink, Tabs } from "@/components/page";
 import { StatusText } from "@/components/status";
 import { buttonClass } from "@/components/ui";
 import { listIncidents } from "@/lib/alerts/engine";
@@ -56,7 +56,7 @@ export default async function AllDomainsPage({ searchParams }: { searchParams: P
       />
       {groups.length === 0 && <Empty>{tab === "attention" ? "Nothing needs attention. Every domain is live with a valid certificate." : "No domains yet."}</Empty>}
       {groups.length > 0 && (
-        <section className="border-b border-border">
+        <section className={CARD}>
           {groups.map(({ p, all }) => {
             // A domain that works leads; a pending one is named below, in the warning.
             const main = all.find((d) => d.role === "primary" && d.status === "active") ?? all.find((d) => d.status === "active") ?? all.find((d) => d.role === "primary") ?? all[0]!;

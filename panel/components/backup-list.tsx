@@ -45,7 +45,7 @@ export function BackupList({ backups, showApp = false, restorable = false, empty
             key={b.id}
             data-status={b.status}
             style={{ gridTemplateColumns: columns }}
-            className="flex min-h-[56px] flex-wrap items-center gap-x-3.5 gap-y-1 border-b border-border px-4 py-2.5 text-[14.5px] last:border-b-0 md:grid md:gap-x-5 md:px-7"
+            className="flex min-h-[56px] flex-wrap items-center gap-x-3.5 gap-y-1 border-b border-border px-4 py-2.5 text-[14.5px] last:border-b-0 md:grid md:gap-x-5 md:px-6"
           >
             <span>
               <StatusText status={STATUS[b.status][0]} label={STATUS[b.status][1]} pulse={b.status === "running"} />

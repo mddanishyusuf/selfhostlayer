@@ -5,7 +5,7 @@ import { cancel, rollback } from "@/app/actions/projects";
 import { LogViewer } from "@/components/deploy";
 import { SubmitButton } from "@/components/form";
 import { Icon } from "@/components/icon";
-import { Notice, PageHeader } from "@/components/page";
+import { CARD, Notice, PageHeader } from "@/components/page";
 import { DeployStatusBadge, duration, timeAgo } from "@/components/status";
 import { StatusDot, cx } from "@/components/ui";
 import { buildSlots, FINISHED, getDeployment, listDeployments, liveDeployment, queuePosition } from "@/lib/deploy";
@@ -88,11 +88,11 @@ export default async function DeploymentPage({ params }: { params: Promise<{ slu
         </Notice>
       )}
       {d.steps.length > 0 && (
-        <div className="grid grid-cols-2 border-b border-border lg:grid-cols-5">
+        <div className={cx(CARD, "grid grid-cols-2 lg:grid-cols-5")}>
           {d.steps.map((s, i) => {
             const running = !done && s.ms === null && (i === 0 || d.steps[i - 1]!.ms !== null);
             return (
-              <div key={i} className="grid gap-1.5 border-b border-r border-border px-4 py-3.5 even:border-r-0 sm:px-7 lg:border-b-0 lg:even:border-r lg:last:border-r-0">
+              <div key={i} className="grid gap-1.5 border-b border-border px-4 py-3.5 max-lg:odd:border-r sm:px-6 lg:border-b-0 lg:border-r lg:last:border-r-0">
                 <span className="flex items-center gap-2 text-[13px] text-muted">
                   <StatusDot status={s.ms !== null ? "ok" : running ? "warn" : "idle"} pulse={running} /> {STEP_LABEL[s.name]}
                 </span>

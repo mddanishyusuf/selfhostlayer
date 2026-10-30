@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { deleteCronAction, runCronAction } from "@/app/actions/crons";
 import { CronForm } from "@/components/crons";
 import { Icon } from "@/components/icon";
-import { Notice, PageHeader, SettingsRow, TableHead, TableRow } from "@/components/page";
+import { CARD, Notice, PageHeader, SettingsRow, TableHead, TableRow } from "@/components/page";
 import { timeAgo, timeIn } from "@/components/status";
 import { StatusDot, cx } from "@/components/ui";
 import { describeCron, parseSystemdTime } from "@/lib/cron";
@@ -35,7 +35,7 @@ export default async function CronsPage({ params }: { params: Promise<{ slug: st
       <PageHeader title={project.slug} crumb="Cron jobs" meta={<>systemd timers · sandboxed like the app</>} />
       {!deployed && <Notice lead="Not deployed yet">Jobs run from the live release, so they&apos;ll work once the project has been deployed.</Notice>}
       {crons.length > 0 && (
-        <section className="border-b border-border" data-testid="cron-list">
+        <section className={CARD} data-testid="cron-list">
           <TableHead columns={COLUMNS}>
             <span />
             <span>Job</span>

@@ -4,6 +4,7 @@ import { ArrowDown01Icon } from "@hugeicons/core-free-icons";
 import { useState, type ReactNode } from "react";
 import { Icon } from "./icon";
 import { Button, cx } from "./ui";
+import { CARD } from "./page";
 
 /**
  * A summary row that expands in place: a project's domains, an engine's
@@ -32,8 +33,8 @@ export function Collapsible({
 }) {
   const [open, setOpen] = useState(defaultOpen);
   return (
-    <section className="border-b border-border" data-testid={testId} data-open={open ? "true" : "false"}>
-      <div className={cx("grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-3.5 px-4 py-4 transition-colors duration-150 hover:bg-hover sm:px-7", open && "bg-hover")}>
+    <section className={CARD} data-testid={testId} data-open={open ? "true" : "false"}>
+      <div className={cx("grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-3.5 px-4 py-4 transition-colors duration-150 hover:bg-hover sm:px-6", open && "bg-hover")}>
         {lead}
         <div className="grid min-w-0 gap-0.5">
           <div className="flex min-w-0 items-center gap-2 text-[15px] font-semibold">{title}</div>

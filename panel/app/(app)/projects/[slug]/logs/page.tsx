@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AppLogs } from "@/components/deploy";
-import { Empty, PageHeader, Tabs, TableHead, TableRow } from "@/components/page";
+import { CARD, Empty, PageHeader, TableHead, TableRow, Tabs } from "@/components/page";
 import { StatusDot } from "@/components/ui";
 import { agent } from "@/lib/agent";
 import { deploymentPath, liveDeployment, listDeployments } from "@/lib/deploy";
@@ -69,9 +69,9 @@ export default async function LogsPage({ params, searchParams }: { params: Promi
       {tab === "output" &&
         (!liveDeployment(project.id) ? <Empty>Nothing is running yet. Logs appear here once the first deploy is live.</Empty> : <AppLogs slug={project.slug} />)}
       {tab === "requests" && (
-        <section className="border-b border-border" data-testid="requests">
+        <section className={CARD} data-testid="requests">
           {requests && requests.length > 0 && (
-            <p className="px-4 py-3 text-[13px] text-muted sm:px-7">
+            <p className="px-4 py-3 text-[13px] text-muted sm:px-6">
               The last {requests.length} requests{errors ? <span className="text-rose"> · {errors} server error{errors === 1 ? "" : "s"}</span> : null}, newest first.
             </p>
           )}

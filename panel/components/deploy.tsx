@@ -5,6 +5,7 @@ import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 import { importAndDeploy, type ImportState } from "@/app/actions/projects";
 import { SubmitButton } from "./form";
 import { Field, FormError, Input, NO_AUTOFILL, cx } from "./ui";
+import { CARD } from "./page";
 
 /** Import button for one repo in the list. */
 export function ImportButton({ repo, installationId }: { repo: string; installationId: number }) {
@@ -92,8 +93,8 @@ export function LogPane({ text, live, label, fileName, minHeight = "calc(100dvh 
   const segments = useMemo(() => toSegments(text), [text]);
   const btn = "h-[26px] rounded-md px-2.5 text-[12px] font-medium text-muted transition-colors duration-150 hover:bg-hover hover:text-foreground";
   return (
-    <div>
-      <div className="flex items-center gap-3 border-b border-border px-4 py-2.5 sm:px-7">
+    <div className={CARD}>
+      <div className="flex items-center gap-3 px-4 py-3 sm:px-5">
         <span className="inline-flex items-center gap-2 text-[13px] text-muted">
           <span className={cx("size-2 rounded-full", live ? "bg-teal [animation:pulse-ring_1.6s_infinite]" : "bg-dim")} />
           {label}
@@ -120,7 +121,7 @@ export function LogPane({ text, live, label, fileName, minHeight = "calc(100dvh 
           setFollow(el.scrollHeight - el.scrollTop - el.clientHeight < 40);
         }}
         style={{ height: minHeight }}
-        className="overflow-auto whitespace-pre-wrap break-words bg-code px-4 pb-6 pt-3.5 font-mono text-[12.5px] leading-[1.75] text-[#e9e5df] sm:px-7"
+        className="mx-2.5 mb-2.5 overflow-auto whitespace-pre-wrap break-words rounded-lg bg-code px-4 pb-6 pt-3.5 font-mono text-[12.5px] leading-[1.75] text-[#e9e5df] sm:px-5"
         role="log"
         aria-live="polite"
       >

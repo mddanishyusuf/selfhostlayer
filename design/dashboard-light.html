@@ -6,12 +6,11 @@
 <title>Self Host Layer · Light</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Albert+Sans:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet" />
 <style>
-/* Design study, light only: soft white cards on a warm gray page, big sentence headlines,
-   pastel stat tiles, pale bar charts, timelines with colored squares, modals with a gray
-   footer band. The sidebar sits on the page with no line between it and the main area.
-   Dummy data; Hugeicons; Geist. */
+/* Design study, light only: white cards on a warm gray page, small corners, plain section
+   titles. The sidebar sits on the page with no line between it and the main area.
+   Dummy data; Hugeicons; Albert Sans, Geist Mono for code. */
 :root {
   --page: #f3f3f1;
   --card: #ffffff;
@@ -49,7 +48,7 @@
 /* ------------------------------------------------------------------ base */
 * { box-sizing: border-box; }
 html, body { margin: 0; background: var(--page); color: var(--fg); }
-body { font: 14.5px/1.5 Geist, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; -webkit-font-smoothing: antialiased; }
+body { font: 14.5px/1.5 "Albert Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; -webkit-font-smoothing: antialiased; }
 a { color: inherit; text-decoration: none; }
 button, input, select, textarea { font: inherit; color: inherit; }
 code, .mono { font-family: "Geist Mono", ui-monospace, Menlo, monospace; font-size: 12.5px; }
@@ -69,15 +68,15 @@ svg.i { flex: none; display: block; }
 
 /* sidebar */
 .sb-top { display: flex; align-items: center; gap: 11px; padding: 2px 6px 16px; }
-.brand { width: 36px; height: 36px; border-radius: 11px; background: #fff; border: 1px solid var(--line); display: grid; place-items: center; flex: none; }
+.brand { width: 36px; height: 36px; border-radius: 8px; background: #fff; border: 1px solid var(--line); display: grid; place-items: center; flex: none; }
 .sb-top .who { display: grid; min-width: 0; line-height: 1.3; }
 .sb-top b { font-size: 14.5px; font-weight: 500; }
-.sb-top span { font-size: 12.5px; color: var(--muted); }
-.sb-search { display: flex; align-items: center; gap: 10px; width: 100%; height: 38px; padding: 0 10px 0 12px; margin-bottom: 12px; border-radius: 11px; border: 1px solid var(--line); background: #fff; color: var(--dim); cursor: pointer; text-align: left; transition: border-color .15s ease-out; }
+.sb-top span { font-size: 12.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sb-search { display: flex; align-items: center; gap: 10px; width: 100%; height: 38px; padding: 0 10px 0 12px; margin-bottom: 12px; border-radius: 8px; border: 1px solid var(--line); background: #fff; color: var(--dim); cursor: pointer; text-align: left; transition: border-color .15s ease-out; }
 .sb-search:hover { border-color: var(--line2); color: var(--muted); }
 .sb-search kbd { margin-left: auto; font: 11.5px "Geist Mono", ui-monospace, monospace; color: var(--muted); background: var(--soft2); border-radius: 6px; padding: 1px 6px; }
 .nav { flex: 1; overflow: auto; display: grid; align-content: start; gap: 2px; margin: 0 -4px; padding: 0 4px 12px; }
-.nav a { display: flex; align-items: center; gap: 11px; height: 37px; padding: 0 10px; border-radius: 11px; color: #52524d; border: 1px solid transparent; transition: background .15s ease-out, color .15s ease-out; }
+.nav a { display: flex; align-items: center; gap: 11px; height: 37px; padding: 0 10px; border-radius: 7px; color: #52524d; border: 1px solid transparent; transition: background .15s ease-out, color .15s ease-out; }
 .nav a svg { color: #8f8f8a; }
 .nav a:hover { background: rgba(0, 0, 0, .035); color: var(--fg); }
 .nav a.on { background: #fff; color: var(--fg); border-color: var(--line); box-shadow: 0 1px 2px rgba(0, 0, 0, .04); }
@@ -89,12 +88,8 @@ svg.i { flex: none; display: block; }
 .sb-proj { display: flex; align-items: center; gap: 11px; padding: 10px 10px 14px; }
 .sb-proj b { display: block; font-size: 15px; font-weight: 500; }
 .sb-proj span { display: block; font-size: 12.5px; color: var(--muted); }
-.sb-box { display: grid; gap: 9px; padding: 13px 14px; border-radius: 16px; background: #fff; border: 1px solid var(--line); cursor: pointer; text-align: left; width: 100%; transition: border-color .15s ease-out; }
-.sb-box:hover { border-color: var(--line2); }
-.sb-box .h { display: flex; align-items: center; gap: 8px; font-size: 13.5px; font-weight: 500; }
-.sb-box .h span { margin-left: auto; font-weight: 400; color: var(--dim); font-size: 12.5px; }
 .me { display: flex; align-items: center; gap: 10px; padding: 12px 6px 0; }
-.av { width: 32px; height: 32px; border-radius: 50%; flex: none; display: grid; place-items: center; font-size: 13px; font-weight: 500; color: #fff; background: linear-gradient(135deg, #8b5cf6, #3b82f6); }
+.av { width: 32px; height: 32px; border-radius: 50%; flex: none; display: grid; place-items: center; font-size: 13px; font-weight: 500; color: #fff; background: #1a1a1a; }
 .me .n { display: grid; line-height: 1.3; min-width: 0; flex: 1; }
 .me .n b { font-size: 13.5px; font-weight: 500; }
 .me .n span { font-size: 12px; color: var(--muted); }
@@ -111,7 +106,7 @@ svg.i { flex: none; display: block; }
 .round:hover { color: var(--fg); }
 
 /* cards */
-.card { background: var(--card); border: 1px solid var(--line); border-radius: 20px; min-width: 0; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; min-width: 0; }
 .card.clip { overflow: hidden; }
 .cp { padding: 22px 24px 24px; }
 .ch { display: flex; align-items: center; gap: 10px; padding: 20px 24px 6px; min-width: 0; }
@@ -119,12 +114,12 @@ svg.i { flex: none; display: block; }
 .ch p { margin: 1px 0 0; color: var(--muted); font-size: 14px; }
 .ch .acts { margin-left: auto; display: flex; gap: 8px; align-items: center; flex: none; }
 .cols2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; }
-.cols-side { display: grid; grid-template-columns: 340px minmax(0, 1fr); gap: 14px; align-items: start; }
 .eyebrow { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 14px; }
 .eyebrow svg { color: var(--muted); }
 .lede { margin: 8px 0 0; font-size: 30px; line-height: 1.18; font-weight: 500; letter-spacing: -.022em; max-width: 640px; }
 .lede span { color: var(--gray-text); }
 .lede.sm { font-size: 24px; }
+h2.title { margin: 0; font-size: 16px; font-weight: 500; line-height: 1.4; }
 
 /* rows inside a card: hairlines inset from the edges */
 .rows > .row { display: grid; align-items: center; column-gap: 16px; padding: 14px 24px; position: relative; min-width: 0; transition: background .15s ease-out; }
@@ -147,16 +142,16 @@ svg.i { flex: none; display: block; }
 .tabs .end { margin-left: auto; display: flex; align-items: center; gap: 8px; }
 
 /* buttons */
-.btn { display: inline-flex; align-items: center; justify-content: center; gap: 7px; height: 38px; padding: 0 15px; border-radius: 10px; border: 1px solid var(--line2); background: #fff; font-size: 14px; font-weight: 500; cursor: pointer; white-space: nowrap; transition: background .15s ease-out, opacity .15s ease-out; }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 7px; height: 38px; padding: 0 15px; border-radius: 7px; border: 1px solid var(--line2); background: #fff; font-size: 14px; font-weight: 500; cursor: pointer; white-space: nowrap; transition: background .15s ease-out, opacity .15s ease-out; }
 .btn:hover { background: var(--soft); }
 .btn.dark { background: #1a1a1a; border-color: #1a1a1a; color: #fff; }
 .btn.dark:hover { background: #333; }
 .btn.danger { background: var(--rose); border-color: var(--rose); color: #fff; }
 .btn.danger:hover { background: #e03455; }
-.btn.sm { height: 32px; padding: 0 12px; font-size: 13.5px; border-radius: 9px; }
+.btn.sm { height: 32px; padding: 0 12px; font-size: 13.5px; border-radius: 6px; }
 .btn:disabled { opacity: .4; cursor: not-allowed; }
 .btn svg { color: currentColor; }
-.ib { width: 34px; height: 34px; border-radius: 9px; display: grid; place-items: center; border: 0; background: transparent; color: var(--muted); cursor: pointer; flex: none; transition: background .15s ease-out, color .15s ease-out; }
+.ib { width: 34px; height: 34px; border-radius: 6px; display: grid; place-items: center; border: 0; background: transparent; color: var(--muted); cursor: pointer; flex: none; transition: background .15s ease-out, color .15s ease-out; }
 .ib:hover { background: var(--soft2); color: var(--fg); }
 .ib.box { border: 1px solid var(--line2); background: #fff; }
 .ul { text-decoration: underline; text-decoration-color: var(--line2); text-underline-offset: 5px; cursor: pointer; transition: text-decoration-color .15s ease-out; }
@@ -167,7 +162,8 @@ svg.i { flex: none; display: block; }
 .ext svg { color: var(--blue); }
 
 /* chips: rounded, white, a small colored mark */
-.chip { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 11px 0 7px; border: 1px solid var(--line); border-radius: 999px; background: #fff; font-size: 13.5px; white-space: nowrap; }
+.chip { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 11px 0 7px; border: 1px solid var(--line); border-radius: 6px; background: #fff; font-size: 13.5px; white-space: nowrap; }
+.row > .chip { justify-self: start; }
 .chip.plain { padding-left: 11px; }
 .chip.soft { background: var(--soft); }
 .chip .x { color: var(--dim); margin-left: 2px; cursor: pointer; }
@@ -182,34 +178,37 @@ svg.i { flex: none; display: block; }
 .tag.blue { background: var(--blue-tint); color: #2563c9; }
 
 /* colored squares with a white glyph (timeline icons) and soft squares (option icons) */
-.sq { width: var(--s, 30px); height: var(--s, 30px); border-radius: 9px; display: grid; place-items: center; color: #fff; flex: none; position: relative; }
+.sq { width: var(--s, 30px); height: var(--s, 30px); border-radius: 6px; display: grid; place-items: center; color: #fff; flex: none; position: relative; }
 .sq.violet { background: var(--violet); } .sq.blue { background: var(--blue); } .sq.orange { background: var(--orange); }
 .sq.green { background: var(--green); } .sq.rose { background: var(--rose); } .sq.gray { background: #75756f; }
 .sq.magenta { background: var(--magenta); }
-.ss { width: var(--s, 30px); height: var(--s, 30px); border-radius: 9px; display: grid; place-items: center; background: var(--soft2); color: #3c3c38; flex: none; }
+.ss { width: var(--s, 30px); height: var(--s, 30px); border-radius: 6px; display: grid; place-items: center; background: var(--soft2); color: #3c3c38; flex: none; }
 .ss.blue { background: var(--blue-tint); color: var(--blue); }
 .ss.violet { background: #f0ebfe; color: var(--violet); }
 .ss.green { background: #e6f8ef; color: #0e9a6b; }
 .ss.orange { background: #fef3e2; color: #c47c04; }
 .ss.rose { background: var(--rose-soft); color: var(--rose); }
 .ss.pink { background: #fbe9f2; color: var(--magenta); }
-.logo-t { width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; background: var(--soft); border: 1px solid var(--line); flex: none; }
+.logo-t { width: 40px; height: 40px; border-radius: 8px; display: grid; place-items: center; background: var(--soft); border: 1px solid var(--line); flex: none; }
 .logo-t svg { width: 20px; height: 20px; }
-.logo-t.sm { width: 32px; height: 32px; border-radius: 10px; }
+.logo-t.sm { width: 32px; height: 32px; border-radius: 7px; }
 .logo-t.sm svg { width: 17px; height: 17px; }
 
-/* pastel stat tiles */
-.tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-top: 22px; }
-.tile { border-radius: 14px; padding: 14px 18px 15px; display: grid; gap: 2px; min-width: 0; }
-.tile .k { font-size: 14px; color: #55554f; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.tile .v { font-size: 30px; line-height: 1.15; letter-spacing: -.02em; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.tile .v small { font-size: 14px; color: #6b6b66; letter-spacing: 0; margin-left: 6px; }
+/* plain stats: label over a number, split by lines */
+.tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.tile { padding: 14px 24px; display: grid; gap: 2px; min-width: 0; }
+.tile + .tile { border-left: 1px solid var(--line); }
+.tile .k { font-size: 13.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tile .v { font-size: 20px; font-weight: 500; line-height: 1.3; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.tiles.facts { grid-template-columns: repeat(5, minmax(0, 1fr)); border-bottom: 0; }
+.tile .fv { min-height: 30px; display: flex; align-items: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tile .v small { font-size: 13px; font-weight: 400; color: var(--muted); margin-left: 5px; }
 .tile.blue { background: var(--blue-soft); } .tile.violet { background: var(--violet-soft); }
 .tile.peach { background: var(--peach); } .tile.pink { background: var(--pink); } .tile.mint { background: var(--mint); }
 .tile.plain { background: var(--soft); }
 
-/* bar chart: pale bars, dotted grid, a row of event dots underneath, one dashed marker */
-.chart { display: grid; grid-template-columns: 54px minmax(0, 1fr); grid-template-rows: auto auto auto; margin-top: 26px; }
+/* bar chart: pale bars on a dashed grid */
+.chart { display: grid; grid-template-columns: 54px minmax(0, 1fr); grid-template-rows: auto auto auto; padding: 22px 24px 18px 0; }
 .yax { grid-column: 1; grid-row: 1; position: relative; font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
 .yax span { position: absolute; right: 12px; transform: translateY(-50%); }
 .ev-label { grid-column: 1; grid-row: 2; font-size: 13px; color: var(--muted); padding-top: 2px; }
@@ -218,11 +217,11 @@ svg.i { flex: none; display: block; }
 .gl { position: absolute; left: 0; right: 0; height: 0; border-top: 1px dashed #dcdcd7; }
 .gl.base { border-top: 1px solid #dcdcd7; }
 .bars { position: relative; height: 100%; display: flex; align-items: flex-end; gap: 6px; }
-.bars i { flex: 1; min-width: 2px; background: var(--barc); border-radius: 5px 5px 0 0; transition: background .15s ease-out; }
+.bars i { flex: 1; min-width: 2px; background: var(--barc); border-radius: 2px 2px 0 0; transition: background .15s ease-out; }
 .bars i:hover { background: #a9c6f4; }
 .bars.thin { gap: 5px; }
 .bars.thin i { flex: none; width: 2px; background: #d9d9d4; border-radius: 1px; margin: 0 auto; }
-.evs { display: flex; gap: 6px; height: 50px; }
+.evs { display: flex; gap: 6px; height: 0; }
 .evs > span { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; padding-top: 10px; }
 .evs b { width: 8px; height: 8px; border-radius: 50%; background: var(--magenta); }
 .evs b.rose { background: var(--rose); }
@@ -244,7 +243,7 @@ svg.i { flex: none; display: block; }
 .opts { display: grid; gap: 10px; }
 .opts.g2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .opts.g3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-.opt { position: relative; display: grid; align-content: start; gap: 4px; padding: 16px 18px 18px; border-radius: 16px; border: 1px solid var(--line); background: #fff; text-align: left; cursor: pointer; transition: border-color .15s ease-out, background .15s ease-out; min-width: 0; }
+.opt { position: relative; display: grid; align-content: start; gap: 4px; padding: 16px 18px 18px; border-radius: 8px; border: 1px solid var(--line); background: #fff; text-align: left; cursor: pointer; transition: border-color .15s ease-out, background .15s ease-out; min-width: 0; }
 .opt:hover { border-color: var(--line2); }
 .opt .ss { margin-bottom: 18px; }
 .opt b { font-weight: 500; }
@@ -256,14 +255,14 @@ svg.i { flex: none; display: block; }
 .opt.static { cursor: default; }
 
 /* dropzone and error box */
-.drop { margin-top: 18px; border: 1.5px dashed #d6d6d1; border-radius: 16px; min-height: 200px; display: grid; place-items: center; text-align: center; cursor: pointer; transition: border-color .15s ease-out, background .15s ease-out; }
+.drop { margin-top: 18px; border: 1.5px dashed #d6d6d1; border-radius: 8px; min-height: 200px; display: grid; place-items: center; text-align: center; cursor: pointer; transition: border-color .15s ease-out, background .15s ease-out; }
 .drop:hover { border-color: #b8b8b2; background: var(--soft); }
 .drop .up { width: 36px; height: 36px; border-radius: 50%; border: 1px solid var(--line2); display: grid; place-items: center; margin: 0 auto 14px; color: #3c3c38; background: #fff; }
 .drop b { font-weight: 500; display: block; }
 .drop span { color: var(--muted); }
 .drop.err { border-bottom-left-radius: 0; border-bottom-right-radius: 0; border-bottom: 0; }
-.errbox { display: flex; gap: 10px; padding: 14px 18px; border-radius: 0 0 16px 16px; background: var(--rose-soft); border: 1.5px dashed var(--rose-line); border-top: 0; color: #d42f52; font-size: 14px; line-height: 1.5; }
-.note { display: flex; align-items: center; gap: 12px; padding: 13px 18px; border-radius: 16px; background: #fff; border: 1px solid var(--line); min-width: 0; }
+.errbox { display: flex; gap: 10px; padding: 14px 18px; border-radius: 0 0 8px 8px; background: var(--rose-soft); border: 1.5px dashed var(--rose-line); border-top: 0; color: #d42f52; font-size: 14px; line-height: 1.5; }
+.note { display: flex; align-items: center; gap: 12px; padding: 13px 18px; border-radius: 10px; background: #fff; border: 1px solid var(--line); min-width: 0; }
 .note .grow { flex: 1; min-width: 0; }
 .note.gold { background: var(--gold-soft); border-color: var(--gold-line); }
 .note.rose { background: var(--rose-soft); border-color: var(--rose-line); }
@@ -274,16 +273,16 @@ svg.i { flex: none; display: block; }
 .field { display: grid; gap: 2px; }
 .field > label { font-weight: 500; }
 .field .hint { color: var(--muted); font-size: 14px; margin-bottom: 8px; }
-.input { display: flex; align-items: center; gap: 10px; height: 42px; padding: 0 14px; border: 1px solid var(--line2); border-radius: 11px; background: #fff; transition: border-color .15s ease-out, box-shadow .15s ease-out; min-width: 0; }
+.input { display: flex; align-items: center; gap: 10px; height: 42px; padding: 0 14px; border: 1px solid var(--line2); border-radius: 7px; background: #fff; transition: border-color .15s ease-out, box-shadow .15s ease-out; min-width: 0; }
 .input:focus-within { border-color: #9fbef5; box-shadow: 0 0 0 3px #e8f0fd; }
 .input input, .input select { flex: 1; min-width: 0; height: 100%; border: 0; outline: 0; background: transparent; appearance: none; }
 .input input::placeholder { color: var(--dim); }
 .input svg { color: var(--dim); }
-.input.sm { height: 36px; border-radius: 10px; }
+.input.sm { height: 36px; border-radius: 7px; }
 .input .kbd { font: 11.5px "Geist Mono", monospace; color: var(--muted); background: var(--soft2); border-radius: 6px; padding: 1px 6px; }
 .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-.switch { position: relative; width: 38px; height: 22px; border-radius: 999px; background: #dcdcd7; border: 0; cursor: pointer; flex: none; transition: background .15s ease-out; }
-.switch::after { content: ""; position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(0, 0, 0, .2); transition: transform .15s ease-out; }
+.switch { position: relative; width: 36px; height: 20px; border-radius: 5px; background: #dcdcd7; border: 0; cursor: pointer; flex: none; transition: background .15s ease-out; }
+.switch::after { content: ""; position: absolute; top: 3px; left: 3px; width: 14px; height: 14px; border-radius: 3px; background: #fff; box-shadow: 0 1px 2px rgba(0, 0, 0, .2); transition: transform .15s ease-out; }
 .switch.on { background: var(--fg); }
 .switch.on::after { transform: translateX(16px); }
 
@@ -305,7 +304,7 @@ svg.i { flex: none; display: block; }
 .tk.lg { height: 7px; border-radius: 4px; }
 
 /* projects */
-.p-row { grid-template-columns: 40px minmax(150px, 1fr) minmax(0, 1.5fr) 160px 132px 28px; }
+.p-row { grid-template-columns: 40px minmax(150px, 1fr) minmax(0, 1.5fr) 160px 150px 28px; }
 .p-row .host { display: flex; align-items: center; gap: 4px; color: var(--muted); font-size: 13.5px; }
 .commit { display: grid; gap: 2px; min-width: 0; }
 .commit .m { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -315,13 +314,21 @@ svg.i { flex: none; display: block; }
 .p-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; }
 .p-card { display: grid; gap: 14px; padding: 10px 10px 18px; transition: border-color .15s ease-out; }
 .p-card:hover { border-color: var(--line2); }
-.shot { aspect-ratio: 1200 / 630; border-radius: 13px; display: flex; align-items: flex-end; padding: 18px; color: #fff; overflow: hidden; }
+.shot { aspect-ratio: 1200 / 630; border-radius: 6px; display: flex; align-items: flex-end; padding: 18px; color: #fff; overflow: hidden; }
 .shot h4 { margin: 0; font-size: 19px; font-weight: 500; line-height: 1.2; letter-spacing: -.01em; max-width: 80%; }
 .p-card .row1 { display: flex; align-items: center; gap: 12px; padding: 0 8px; min-width: 0; }
 .p-card .commit { padding: 0 8px; }
 .toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.seg { display: inline-flex; padding: 3px; border-radius: 11px; background: var(--soft2); gap: 2px; }
-.seg button { height: 30px; min-width: 32px; padding: 0 10px; border: 0; border-radius: 8px; background: transparent; color: var(--muted); display: grid; place-items: center; cursor: pointer; transition: background .15s ease-out; }
+.toolbar .search { flex: 1; min-width: 200px; max-width: 320px; margin-left: auto; }
+.toolbar .seg button { display: flex; gap: 6px; align-items: center; }
+.seg .n { color: var(--dim); font-size: 12.5px; }
+.seg button.on .n { color: var(--muted); }
+.plist { display: grid; gap: 8px; }
+.plist > .p-row { display: grid; align-items: center; column-gap: 16px; padding: 14px 18px; transition: border-color .15s ease-out; }
+.plist > .p-row:hover { border-color: var(--line2); }
+.plist-h { padding: 4px 19px 8px; }
+.seg { display: inline-flex; padding: 3px; border-radius: 8px; background: var(--soft2); gap: 2px; }
+.seg button { height: 30px; min-width: 32px; padding: 0 10px; border: 0; border-radius: 5px; background: transparent; color: var(--muted); display: grid; place-items: center; cursor: pointer; transition: background .15s ease-out; }
 .seg button.on { background: #fff; color: var(--fg); box-shadow: 0 1px 2px rgba(0, 0, 0, .08); }
 
 /* production block */
@@ -336,7 +343,7 @@ svg.i { flex: none; display: block; }
 
 /* leaderboard (memory by app, top pages) */
 .lb > div { display: grid; grid-template-columns: 24px 32px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 9px 0; }
-.lb .rk { width: 22px; height: 22px; border-radius: 7px; background: var(--soft2); display: grid; place-items: center; font-size: 12px; color: var(--muted); }
+.lb .rk { width: 22px; height: 22px; border-radius: 5px; background: var(--soft2); display: grid; place-items: center; font-size: 12px; color: var(--muted); }
 .lb .val { text-align: right; line-height: 1.3; }
 .lb .val small { display: block; color: var(--muted); font-size: 13px; }
 .lb .cell .t { line-height: 1.3; }
@@ -350,17 +357,17 @@ svg.i { flex: none; display: block; }
 .dotg { width: 10px; height: 10px; border-radius: 50%; background: #2f8f5b; box-shadow: 0 0 0 4px #dcefe3; flex: none; }
 
 /* DNS record box */
-.dns { margin-top: 12px; padding: 14px 16px; border-radius: 14px; background: var(--gold-soft); border: 1px solid var(--gold-line); display: grid; gap: 12px; }
+.dns { margin-top: 12px; padding: 14px 16px; border-radius: 8px; background: var(--gold-soft); border: 1px solid var(--gold-line); display: grid; gap: 12px; }
 .dns-rec { display: grid; grid-template-columns: 80px 90px minmax(0, 1fr) auto; gap: 16px; align-items: end; }
 .dns-rec .k { display: block; font-size: 12.5px; color: var(--muted); margin-bottom: 2px; }
 .dns-rec code { font-size: 13.5px; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* secrets */
 .secret { display: flex; align-items: center; gap: 4px; min-width: 0; }
-.secret code { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 6px 10px; border-radius: 9px; background: var(--soft); font-size: 13px; }
+.secret code { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 6px 10px; border-radius: 6px; background: var(--soft); font-size: 13px; }
 
 /* logs: always a dark pane */
-.logs { background: #191919; color: #d8d8d4; border-radius: 16px; padding: 16px 18px; font: 12.5px/1.75 "Geist Mono", ui-monospace, monospace; white-space: pre; overflow: auto; max-height: 560px; }
+.logs { background: #191919; color: #d8d8d4; border-radius: 8px; padding: 16px 18px; font: 12.5px/1.75 "Geist Mono", ui-monospace, monospace; white-space: pre; overflow: auto; max-height: 560px; }
 .logs .t { color: #6f6f6a; margin-right: 14px; font-weight: 400; }
 .logs .h { color: #f2f2f2; font-weight: 500; }
 .logs .ok { color: #6fdc8c; } .logs .w { color: #f5c451; } .logs .e { color: #ff6b6b; } .logs .b { color: #8db7ff; }
@@ -368,7 +375,7 @@ svg.i { flex: none; display: block; }
 /* modal: white body on a gray sheet, actions in the gray band */
 .backdrop { position: fixed; inset: 0; z-index: 40; background: rgba(30, 30, 28, .28); backdrop-filter: blur(2px); display: none; }
 .backdrop.open { display: block; animation: fade .15s ease-out; }
-.modal { position: fixed; z-index: 50; top: 50%; left: 50%; transform: translate(-50%, -50%); width: min(540px, calc(100vw - 28px)); max-height: calc(100vh - 40px); overflow: auto; background: #f4f4f2; border-radius: 24px; display: none; box-shadow: 0 30px 80px rgba(0, 0, 0, .18), 0 2px 6px rgba(0, 0, 0, .06); }
+.modal { position: fixed; z-index: 50; top: 50%; left: 50%; transform: translate(-50%, -50%); width: min(540px, calc(100vw - 28px)); max-height: calc(100vh - 40px); overflow: auto; background: #f4f4f2; border-radius: 12px; display: none; box-shadow: 0 30px 80px rgba(0, 0, 0, .18), 0 2px 6px rgba(0, 0, 0, .06); }
 .modal.open { display: block; animation: pop .15s ease-out; }
 .modal.wide { width: min(640px, calc(100vw - 28px)); }
 @keyframes fade { from { opacity: 0; } }
@@ -376,34 +383,35 @@ svg.i { flex: none; display: block; }
 .m-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 18px 26px 16px; font-size: 17px; font-weight: 500; }
 .m-top .step { font-weight: 400; color: var(--muted); font-variant-numeric: tabular-nums; }
 .m-top .step b { color: var(--fg); font-weight: 500; }
-.m-body { background: #fff; border-radius: 24px; padding: 24px 26px 26px; box-shadow: 0 0 0 1px var(--line); }
+.m-body { background: #fff; border-radius: 12px; padding: 24px 26px 26px; box-shadow: 0 0 0 1px var(--line); }
 .m-body h3 { margin: 0; font-size: 18px; font-weight: 500; letter-spacing: -.01em; }
 .m-body > p, .m-body .p { margin: 8px 0 0; color: var(--muted); line-height: 1.6; }
 .m-body .x-close { float: right; margin: -6px -8px 0 0; }
 .m-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 14px 20px; }
-.danger-ic { width: 52px; height: 52px; border-radius: 50%; background: var(--rose-soft); color: var(--rose); display: grid; place-items: center; margin-bottom: 22px; }
+.danger-ic { width: 44px; height: 44px; border-radius: 8px; background: var(--rose-soft); color: var(--rose); display: grid; place-items: center; margin-bottom: 22px; }
 .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
 
 /* palette */
 .pal-sug { display: flex; gap: 8px; flex-wrap: wrap; padding: 14px 16px 12px; }
-.pal-sug button { height: 32px; padding: 0 12px; border-radius: 9px; border: 1px solid var(--line); background: #fff; color: var(--muted); cursor: pointer; }
+.pal-sug button { height: 32px; padding: 0 12px; border-radius: 6px; border: 1px solid var(--line); background: #fff; color: var(--muted); cursor: pointer; }
 .pal-sug button:hover { color: var(--fg); border-color: var(--line2); }
-.pal-in { display: flex; align-items: center; gap: 10px; padding: 0 18px; height: 56px; background: #fff; border-radius: 18px; box-shadow: 0 0 0 1px var(--blue-line), 0 0 0 4px #eaf1fd; margin: 0 8px; }
+.pal-in { display: flex; align-items: center; gap: 10px; padding: 0 18px; height: 56px; background: #fff; border-radius: 10px; box-shadow: 0 0 0 1px var(--blue-line), 0 0 0 4px #eaf1fd; margin: 0 8px; }
 .pal-in input { flex: 1; border: 0; outline: 0; font-size: 15.5px; background: transparent; }
 .pal-list { padding: 10px 8px 10px; max-height: 360px; overflow: auto; }
-.pal-list a { display: flex; align-items: center; gap: 12px; padding: 9px 12px; border-radius: 12px; }
+.pal-list a { display: flex; align-items: center; gap: 12px; padding: 9px 12px; border-radius: 7px; }
 .pal-list a.on, .pal-list a:hover { background: #fff; }
 .pal-list .grp { padding: 10px 12px 4px; font-size: 12.5px; color: var(--dim); }
 
-.toast { position: fixed; z-index: 60; bottom: 22px; left: 50%; transform: translateX(-50%); background: #1a1a1a; color: #fff; padding: 10px 16px; border-radius: 12px; font-size: 14px; display: flex; align-items: center; gap: 8px; box-shadow: 0 10px 30px rgba(0, 0, 0, .2); animation: pop2 .15s ease-out; }
+.toast { position: fixed; z-index: 60; bottom: 22px; left: 50%; transform: translateX(-50%); background: #1a1a1a; color: #fff; padding: 10px 16px; border-radius: 8px; font-size: 14px; display: flex; align-items: center; gap: 8px; box-shadow: 0 10px 30px rgba(0, 0, 0, .2); animation: pop2 .15s ease-out; }
 @keyframes pop2 { from { opacity: 0; transform: translate(-50%, 6px); } }
 
 /* ------------------------------------------------------------------ narrow screens */
 @media (max-width: 1180px) {
-  .p-row { grid-template-columns: 40px minmax(150px, 1fr) minmax(0, 1.5fr) 132px 28px; }
+  .p-row { grid-template-columns: 40px minmax(150px, 1fr) minmax(0, 1.5fr) 150px 28px; }
   .p-row .res, .colh .res { display: none; }
-  .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .cols-side { grid-template-columns: minmax(0, 1fr); }
+  .tiles, .tiles.facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .tile:nth-child(odd) { border-left: 0; }
+  .tile:nth-child(n+3) { border-top: 1px solid var(--line); }
 }
 @media (max-width: 960px) {
   .sb { position: fixed; z-index: 45; left: 0; top: 0; background: var(--page); transform: translateX(-102%); transition: transform .2s ease-out; box-shadow: 0 0 40px rgba(0, 0, 0, .12); }
@@ -420,7 +428,7 @@ svg.i { flex: none; display: block; }
 @media (max-width: 620px) {
   .ph { flex-wrap: wrap; }
   .ph .acts { margin-left: 0; width: 100%; }
-  .tabs .end .input { display: none; }
+  .toolbar .search { order: 3; max-width: none; margin-left: 0; flex-basis: 100%; }
   .p-row .cell + .cell .s { display: none; }
   .lede { font-size: 24px; }
   .tile .v { font-size: 24px; }
@@ -610,8 +618,6 @@ const cdot = (c) => c === "gold" ? `<i class="cd gold pulse"></i>` : `<i class="
 const chip = (k, label) => { const [c, l] = CHIP[k] || ["gray", k]; return `<span class="chip">${cdot(c)}${label || l}</span>`; };
 const STATE_SQ = { ready: ["green", "rocket"], building: ["orange", "zap"], failed: ["rose", "cross"], cancelled: ["gray", "minus"] };
 const tile = (c, k, v, small = "") => `<div class="tile ${c}"><span class="k">${k}</span><span class="v">${v}${small ? `<small>${small}</small>` : ""}</span></div>`;
-const eyebrow = (icon, text) => `<div class="eyebrow">${I(icon, 18)}${text}</div>`;
-const lede = (strong, rest, cls = "") => `<p class="lede ${cls}">${strong}${rest ? ` <span>${rest}</span>` : ""}</p>`;
 const commit = (d, p) => `<div class="commit"><span class="m">${esc(d.msg)}</span><span class="meta"><span>${I("branch", 14)}${p.branch}</span><span><code>${d.sha}</code></span><span>${I("clock", 14)}${ago(d.ago ?? d.deployed)}</span></span></div>`;
 const meter = (label, frac, value) => `<div class="meter">${label}<span class="tk"><i class="${frac > 0.6 ? "hot" : ""}" style="width:${Math.max(2, Math.round(frac * 100))}%"></i></span><span class="v">${value}</span></div>`;
 const srow = (title, desc, ctl) => `<div class="srow"><div><h3>${title}</h3>${desc ? `<p>${desc}</p>` : ""}</div><div class="ctl">${ctl}</div></div>`;
@@ -633,7 +639,7 @@ const VISITS = [4, 3, 5, 2, 4, 6, 8, 60, 330, 250, 130, 125, 195, 470, 380, 330,
 const DEPLOY_DOTS = { 2: 1, 5: 2, 8: 1, 11: 1, 13: 2, 16: 1, 19: 1, 22: 3, 23: 2, 24: 2, 27: 3, 28: 3 };
 
 /* bar chart: values per day, dots for events under the bars, one dashed marker */
-function chart(vals, { max, ticks, dots = {}, failed = {}, mark, evLabel = "Deployed", h = 270, labels = [0, 10, 20, 29] }) {
+function chart(vals, { max, ticks, dots = {}, failed = {}, mark, evLabel = "", h = 200, labels = [0, 10, 20, 29] }) {
   const top = max || Math.max(...vals);
   const t = ticks || [top, top / 2, 0];
   return `<div class="chart">
@@ -650,9 +656,6 @@ function chart(vals, { max, ticks, dots = {}, failed = {}, mark, evLabel = "Depl
     <div class="xax">${labels.map((i) => `<span>${DAYS[i]}</span>`).join("")}</div>
   </div>`;
 }
-function spark(n = 30, h = 110) {
-  return `<div class="bars thin" style="height:${h}px;margin-top:20px">${Array.from({ length: n }, () => `<i style="height:${20 + Math.round(rnd() * 80)}%"></i>`).join("")}</div>`;
-}
 
 /* ===================================================================== state */
 const state = { pf: "all", pq: "", view: "list", dTab: "all", aTab: "all", newStep: 1, newSrc: "github", dbPick: "postgres", revealed: {}, pal: 0 };
@@ -667,7 +670,8 @@ const NAV = [
    ["#/domains", "Domains", "globe", () => `<span class="count">${domains.length}</span>`],
    ["#/integrations", "Integrations", "blocks"],
    ["#/databases", "Databases", "database"]],
-  [["#/backups", "Backups", "backup"],
+  [["#/health", "Health", "server"],
+   ["#/backups", "Backups", "backup"],
    ["#/alerts", "Alerts", "bell", () => (incidents.length ? `<span class="badge"></span>` : "")],
    ["#/activity", "Activity", "activity"],
    ["#/settings", "Settings", "settings"]],
@@ -691,7 +695,6 @@ function sidebar(r) {
     return h === href || h.startsWith(href + "/");
   };
   const item = ([href, label, icon, extra]) => `<a href="${href}" class="${on(href) ? "on" : ""}">${I(icon, 18)}<span>${label}</span>${extra ? extra() : ""}</a>`;
-  const memF = server.memUsed / server.memTotal, diskF = server.diskUsed / server.diskTotal;
   const nav = p
     ? `<a href="#/" class="back">${I("back", 18)}<span>All projects</span></a>
        <div class="sb-proj">${slogo(p.fw, true)}<div class="tr"><b>${p.slug}</b><span class="tr">${p.domain}</span></div></div>
@@ -703,10 +706,6 @@ function sidebar(r) {
     <div class="sb-top"><span class="brand">${LOGO}</span><div class="who"><b>${server.name}</b><span>${server.spec}</span></div></div>
     <button class="sb-search" data-act="palette">${I("search", 17)}<span>Search</span><kbd>⌘K</kbd></button>
     <nav class="nav">${nav}</nav>
-    <button class="sb-box" data-act="server">
-      <span class="h"><i class="cd green" style="width:9px;height:9px;margin:0 2px"></i>Server is healthy<span>up ${server.uptime}</span></span>
-      <span class="meters">${meter("CPU", server.cpu, `${Math.round(server.cpu * 100)}%`)}${meter("RAM", memF, `${server.memUsed} GB`)}${meter("Disk", diskF, `${server.diskUsed} GB`)}</span>
-    </button>
     <div class="me"><span class="av">D</span><div class="n"><b>Danish</b><span>Owner · 2FA on</span></div><button class="ib" title="Sign out">${I("logout", 17)}</button></div>`;
 }
 const LOGO = `<svg width="20" height="20" viewBox="0 0 24 24"><rect x="3" y="3" width="4" height="12" rx="1" fill="#1a1a1a"/><rect x="3" y="17" width="12" height="4" rx="1" fill="#1a1a1a" opacity=".72"/><rect x="17" y="9" width="4" height="12" rx="1" fill="#1a1a1a" opacity=".48"/><rect x="9" y="3" width="12" height="4" rx="1" fill="#1a1a1a" opacity=".28"/></svg>`;
@@ -725,8 +724,8 @@ function projectRows(list) {
       ${commit(p, p)}
     </a>`;
   }).join("")}</div>`;
-  return (`<div class="colh p-row"><span></span><span>Project</span><span class="cm">Latest deployment</span><span class="res">Resources</span><span>Status</span><span></span></div>
-    <div class="rows">${list.map((p) => `<a class="row p-row" href="#/p/${p.slug}">
+  return (`<div class="colh p-row plist-h"><span></span><span>Project</span><span class="cm">Latest deployment</span><span class="res">Resources</span><span>Status</span><span></span></div>
+    <div class="plist">${list.map((p) => `<a class="card p-row" href="#/p/${p.slug}">
       ${slogo(p.fw)}
       <div class="cell"><span class="t tr">${p.slug}</span><span class="host tr">${p.domain}</span></div>
       <div class="cm">${commit(p, p)}</div>
@@ -746,13 +745,12 @@ views.projects = () => {
   return head("Projects", { acts: `<a class="btn dark" href="#/new">${I("plus", 16, 2)}New project</a>` }) +
     `<div class="stack">
       <div class="note gold"><i class="cd gold pulse"></i><div class="grow tr"><b style="font-weight:500">maillayer is deploying</b> <span class="muted">“${esc(b.msg)}” · <code>${b.sha}</code> · started ${b.ago} ago</span></div><a class="ul" href="#/p/maillayer/d/${b.id}">View logs</a></div>
-      <section class="card clip">
-        <div class="tabs">${[["all", "All", projects.length], ["ready", "Live", n("ready")], ["building", "Building", n("building")], ["failed", "Failed", n("failed")]].map(([k, l, c]) => `<button class="${state.pf === k ? "on" : ""}" data-act="pf" data-v="${k}">${l} <span class="n">[${c}]</span></button>`).join("")}
-          <div class="end"><label class="input sm" style="width:240px">${I("search", 16)}<input placeholder="Search projects" value="${esc(state.pq)}" oninput="state.pq=this.value.trim().toLowerCase();drawProjects()"></label>
-          <div class="seg"><button class="${state.view === "list" ? "on" : ""}" data-act="pview" data-v="list" title="List">${I("menu", 15)}</button><button class="${state.view === "grid" ? "on" : ""}" data-act="pview" data-v="grid" title="Grid">${I("grid", 15)}</button></div></div>
-        </div>
-        <div style="padding:${state.view === "grid" ? "14px" : "0"}" id="plist-wrap"><div id="plist"></div></div>
-      </section>
+      <div class="toolbar">
+        <div class="seg">${[["all", "All", projects.length], ["ready", "Live", n("ready")], ["building", "Building", n("building")], ["failed", "Failed", n("failed")]].map(([k, l, c]) => `<button class="${state.pf === k ? "on" : ""}" data-act="pf" data-v="${k}">${l}<span class="n">${c}</span></button>`).join("")}</div>
+        <label class="input sm search">${I("search", 16)}<input placeholder="Search projects" value="${esc(state.pq)}" oninput="state.pq=this.value.trim().toLowerCase();drawProjects()"></label>
+        <div class="seg"><button class="${state.view === "list" ? "on" : ""}" data-act="pview" data-v="list" title="List">${I("menu", 15)}</button><button class="${state.view === "grid" ? "on" : ""}" data-act="pview" data-v="grid" title="Grid">${I("grid", 15)}</button></div>
+      </div>
+      <div id="plist"></div>
     </div>`;
 };
 
@@ -786,24 +784,12 @@ views.overview = () => {
     ${p.status === "building" ? `<div class="note gold"><i class="cd gold pulse"></i><div class="grow tr"><b style="font-weight:500">Deploying</b> <span class="muted">“${esc(dl[0].msg)}” · started ${dl[0].ago} ago</span></div><a class="ul" href="#/p/${p.slug}/d/${dl[0].id}">View logs</a></div>` : ""}
     ${p.status === "failed" ? `<div class="note rose">${sq("rose", "cross", 26)}<div class="grow tr"><span class="t">Build failed: exit code 1</span> <span class="muted">“${esc(dl[0].msg)}”. The last good build is still live.</span></div><a class="ul" href="#/p/${p.slug}/d/${dl[0].id}">See why</a></div>` : ""}
     ${production(p)}
-    ${card(`<div class="cp">
-      ${eyebrow("chart", "The last 30 days")}
-      ${lede(`${fmt(total)} requests.`, `${dl.length + 9} deploys, ${p.static ? "all served from disk" : `${p.mem} MB of memory in use`}, nothing down.`)}
-      <div class="tiles">${tile("blue", "Requests", fmt(total))}${tile("violet", "Median response", "84", "ms")}${tile("peach", p.static ? "Bandwidth" : "Memory", p.static ? "1.8" : p.mem, p.static ? "GB" : `of ${p.memMax} MB`)}${tile("pink", "Deploys", dl.length + 9, "1 failed")}</div>
-      ${chart(req, { max: 2000, ticks: [2000, 1000, 0], dots: DEPLOY_DOTS, failed: { 26: 1 }, mark: [28, "Moved to Hetzner"] })}
-    </div>`)}
-    <div class="cols2">
-      ${card(`<div class="cp">
-        <div class="eyebrow"><span class="dotg"></span>Right now</div>
-        ${lede("12 requests a minute.", "214 in the last 30 minutes, all answered.", "sm")}
-        ${spark(34, 150)}
-      </div>`)}
-      ${card(`<div class="cp">
-        ${eyebrow("log", "Every request, as it happens")}
-        ${lede("Newest on top.", "4 paths in the last minute.", "sm")}
-        <div class="feed" style="margin-top:14px">${[["12s", "/", "200 · 34 ms · Chrome on macOS", "🇩🇪"], ["31s", "/api/collect", "204 · 3 ms · from piqo.js", "🇮🇳"], ["1m", "/pricing", "200 · 41 ms · Safari on iPhone", "🇺🇸"], ["2m", "/blog/self-hosting", "200 · 58 ms · from t.co", "🇹🇼"]].map(([a, path, sub, f]) => `<div><span class="ago">${a}</span><div style="min-width:0"><span class="t"><span>${f}</span><code style="font-size:13.5px">${path}</code></span><div class="s">${sub}</div></div><a class="ul" href="#/p/${p.slug}/logs">Logs</a></div>`).join("")}</div>
-      </div>`)}
-    </div>
+    ${card(`${ch("Requests", "Last 30 days", `<div class="seg"><button>24h</button><button>7d</button><button class="on">30d</button></div>`)}
+      <div class="tiles" style="margin-top:14px">${tile("", "Requests", fmt(total))}${tile("", "Median response", "84", "ms")}${tile("", p.static ? "Bandwidth" : "Memory", p.static ? "1.8" : p.mem, p.static ? "GB" : `of ${p.memMax} MB`)}${tile("", "Errors", "0.2%", "31 × 5xx")}</div>
+      ${chart(req, { max: 2000, ticks: [2000, 1000, 0] })}`)}
+    ${card(`${ch("Recent requests", "From Caddy's access log", `<a class="btn sm" href="#/p/${p.slug}/logs">All logs</a>`)}
+      <div class="colh" style="grid-template-columns:60px 64px minmax(0,1fr) 80px minmax(0,1fr);margin-top:6px"><span>When</span><span>Status</span><span>Path</span><span class="r">Time</span><span>Client</span></div>
+      <div class="rows">${[["12s", 200, "/", "34 ms", "Chrome on macOS"], ["31s", 204, "/api/collect", "3 ms", "piqo.js"], ["1m", 200, "/pricing", "41 ms", "Safari on iPhone"], ["2m", 404, "/wp-login.php", "2 ms", "curl/8.4"], ["2m", 200, "/blog/self-hosting", "58 ms", "from t.co"]].map(([a, st, path, ms, c]) => `<div class="row" style="grid-template-columns:60px 64px minmax(0,1fr) 80px minmax(0,1fr);padding-top:10px;padding-bottom:10px"><span class="s num">${a}</span><code style="color:${st >= 400 ? "#c47c04" : "#0e9a6b"}">${st}</code><code class="tr" style="font-size:13px">${path}</code><span class="s num r">${ms}</span><span class="s tr">${c}</span></div>`).join("")}</div>`, "clip")}
     ${card(`${ch("History", "Every deploy and rollback, newest first.", `<a class="btn sm" href="#/p/${p.slug}/deployments">All deployments</a>`)}${timeline(dl.slice(0, 5).map(depItem))}`)}
   </div>`;
 };
@@ -843,29 +829,13 @@ views.d = () => {
   const p = cur();
   const d = deployments.find((x) => String(x.id) === route().id) || deployments.find((x) => x.slug === p.slug);
   const failed = d.status === "failed", building = d.status === "building";
-  const steps = [
-    ["green", "github", "Fetched the code", `${p.repo}@${d.sha} · 1.8 MB`, "0.7s"],
-    ["green", "blocks", "Installed packages", "412 packages with npm", "17s"],
-    failed ? ["rose", "cross", "Build failed", "next build exited with code 1", "1m 31s"] : building ? ["orange", "zap", "Building", "next build", "running"] : ["green", "zap", "Built", "next build · 14 pages", "39s"],
-    ...(failed || building ? [] : [["green", "activity", "Health check passed", "/ answered on port 4001", "0.9s"], ["blue", "rocket", "Live", "Traffic switched blue → green", "2s"]]),
-  ].map(([c, icon, t, s, w]) => ({ c, icon, title: t, sub: s, when: w }));
-  return head(`Deployment #${d.id}`, { crumb: p.slug, backTo: `#/p/${p.slug}/deployments`, acts: `${!d.live && d.status === "ready" ? `<button class="btn" data-act="rollback" data-id="${d.id}">${I("undo", 16)}Roll back to this</button>` : ""}<button class="btn dark" data-act="toast" data-msg="Redeploying ${p.slug}…">${I("refresh", 16)}Redeploy</button>` }) +
-    `<div class="cols-side">
-      <div class="stack">
-        ${card(`<div class="cp">
-          ${eyebrow("rocket", building ? "Deploying now" : failed ? "This build failed" : d.live ? "Live now" : "An earlier build")}
-          ${lede(esc(d.msg), "", "sm")}
-          <div class="chips">${chip(d.status === "ready" ? (d.live ? "live" : "ready") : d.status)}<span class="chip plain">${I("branch", 14)}${p.branch}</span><span class="chip plain"><code>${d.sha}</code></span></div>
-        </div>
-        <div class="kv narrow" style="padding:0 24px 12px">
-          <div><span class="k">Started</span><span class="v">${ago(d.ago)} by ${d.author}</span></div>
-          <div><span class="k">Took</span><span class="v">${d.dur || "running"}</span></div>
-          <div><span class="k">Trigger</span><span class="v">${d.trigger === "push" ? "Push to main" : d.trigger === "manual" ? "Redeploy button" : "Rollback"}</span></div>
-          <div><span class="k">Release</span><span class="v"><code>/srv/apps/${p.slug}/releases/${d.sha}</code></span></div>
-        </div>`)}
-        ${card(`${ch("Steps")}${timeline(steps)}`)}
-      </div>
-      ${card(`${ch("Build log", building ? "Streaming" : `${d.dur} · 38 lines`, `<button class="ib box" title="Copy">${I("copy", 16)}</button><button class="ib box" title="Download">${I("download", 16)}</button>`)}<div style="padding:10px 12px 12px"><div class="logs">${LOG(p, failed, building)}</div></div>`)}
+  const [c, ic] = d.trigger === "rollback" ? ["violet", "undo"] : STATE_SQ[d.status];
+  const facts = [["Status", chip(d.status === "ready" ? (d.live ? "live" : "ready") : d.status)], ["Commit", `<span><code>${d.sha}</code> on ${p.branch}</span>`], ["Started", `${ago(d.ago)} by ${d.author}`], ["Took", d.dur || "running"], ["Trigger", d.trigger === "push" ? "Push" : d.trigger === "manual" ? "Redeploy" : "Rollback"]];
+  return head(`#${d.id}`, { crumb: `${p.slug} / Deployments`, backTo: `#/p/${p.slug}/deployments`, acts: `${!d.live && d.status === "ready" ? `<button class="btn" data-act="rollback" data-id="${d.id}">${I("undo", 16)}Roll back to this</button>` : ""}<button class="btn dark" data-act="toast" data-msg="Redeploying ${p.slug}…">${I("refresh", 16)}Redeploy</button>` }) +
+    `<div class="stack">
+      ${card(`<div class="ch" style="padding-bottom:16px">${sq(c, ic, 32)}<div style="min-width:0"><h2 class="tr">${esc(d.msg)}</h2><p class="tr">${p.repo}</p></div></div>
+        <div class="tiles facts">${facts.map(([k, v]) => `<div class="tile"><span class="k">${k}</span><span class="fv">${v}</span></div>`).join("")}</div>`, "clip")}
+      ${card(`${ch("Build log", building ? "Streaming" : `${d.dur} · ${failed ? 9 : 17} lines`, `<button class="ib box" title="Copy">${I("copy", 16)}</button><button class="ib box" title="Download">${I("download", 16)}</button>`)}<div style="padding:12px"><div class="logs" style="max-height:none;min-height:420px">${LOG(p, failed, building)}</div></div>`)}
     </div>`;
 };
 const LOG = (p, failed, building) => `<span class="t">03:12:01</span><span class="h">▸ Fetching</span> ${p.repo}@a1c9e42
@@ -914,8 +884,8 @@ function domainRow(d, withProject) {
 }
 views.domains = () => {
   const live = domains.filter((d) => d.status === "live").length;
-  return head("Domains", { acts: `<button class="btn dark" data-act="add-domain">${I("plus", 16, 2)}Add domain</button>` }) +
-    `<div class="stack">${card(`<div class="cp">${eyebrow("globe", "Every project")}${lede(`${domains.length} domains.`, `${live} live with certificates, ${domains.length - live} waiting for DNS. Certificates renew on their own.`)}</div>`)}
+  return head("Domains", { sub: `${domains.length} domains · ${domains.length - live} waiting for DNS`, acts: `<button class="btn dark" data-act="add-domain">${I("plus", 16, 2)}Add domain</button>` }) +
+    `<div class="stack">
     ${card(`<div class="rows">${projects.map((p) => {
       const ds = domains.filter((d) => d.slug === p.slug);
       const main = ds.find((d) => d.kind === "primary") || ds[0];
@@ -945,8 +915,8 @@ const DBS = [
 ];
 const engineOf = (k) => ENGINES.find((e) => e[0] === k);
 views.databases = () => head("Databases", { acts: `<button class="btn dark" data-act="add-db">${I("plus", 16, 2)}Add a database</button>` }) +
-  `<div class="stack">${card(`<div class="cp">${eyebrow("database", "Engines on this server")}${lede("4 engines, 8 databases.", "Every app has its own login and can't see the others.")}
-    <div class="opts g3" style="margin-top:22px">${ENGINES.map(([k, n, icon, c, desc, st, meta]) => `<div class="opt static">${ss(icon, c)}<b>${n}</b><p>${desc}</p><div class="foot">${chip(st)}${meta ? `<span class="s">${meta}</span>` : `<button class="btn sm" data-act="toast" data-msg="Installing MariaDB…">Install</button>`}</div></div>`).join("")}</div></div>`)}
+  `<div class="stack">${card(`${ch("Engines", "Every app gets its own login and can't see the others.")}<div class="cp" style="padding-top:12px">
+    <div class="opts g3">${ENGINES.map(([k, n, icon, c, desc, st, meta]) => `<div class="opt static">${ss(icon, c)}<b>${n}</b><p>${desc}</p><div class="foot">${chip(st)}${meta ? `<span class="s">${meta}</span>` : `<button class="btn sm" data-act="toast" data-msg="Installing MariaDB…">Install</button>`}</div></div>`).join("")}</div></div>`)}
   ${card(`${ch("Every app's databases")}<div class="rows" style="margin-top:6px">${DBS.map(([e, name, slug, meta]) => { const en = engineOf(e); return `<a class="row" style="grid-template-columns:32px minmax(0,1fr) auto auto" href="#/p/${slug}/databases">${ss(en[2], en[3], 32)}<div class="cell"><span class="t tr"><code style="font-size:13.5px">${name}</code></span><span class="s tr">${slug} · ${en[1]} · ${meta}</span></div><span class="btn sm">Browse</span><button class="ib" onclick="event.preventDefault()">${I("more", 17)}</button></a>`; }).join("")}</div>`, "clip")}</div>`;
 views.pdatabases = () => {
   const p = cur();
@@ -962,8 +932,8 @@ views.pdatabases = () => {
 views.backups = (p) => {
   const list = p ? backups.filter((b) => b.slug === p.slug) : backups;
   return head("Backups", { crumb: p?.slug, acts: `<button class="btn dark" data-act="toast" data-msg="Backing up${p ? " " + p.slug : " everything"}…">${I("backup", 16)}Back up now</button>` }) +
-    `<div class="stack">${p ? "" : card(`<div class="cp">${eyebrow("backup", "Every night at 03:00")}${lede("Last backup 8 hours ago.", "6 of 7 apps and the panel went to Cloudflare R2, 278 MB, encrypted before upload.")}
-      <div class="tiles">${tile("blue", "Stored", "1.4", "GB in R2")}${tile("violet", "Kept", "14", "nights")}${tile("peach", "Last took", "1m 08s")}${tile("pink", "Failed", "1", "blogcms")}</div></div>`)}
+    `<div class="stack">${p ? "" : card(`${ch("Last night", "Encrypted, then sent to Cloudflare R2 at 03:00.")}
+      <div class="tiles" style="margin:14px 0 0;border-bottom:0">${tile("", "Backed up", "6", "of 7 apps")}${tile("", "Size", "278", "MB")}${tile("", "Took", "1m 08s")}${tile("", "Stored in R2", "1.4", "GB · 14 nights")}</div>`, "clip")}
     ${incidents.length && !p ? `<div class="note rose">${sq("rose", "cross", 26)}<div class="grow tr"><span class="t">blogcms didn't back up last night.</span> <span class="muted">Can't reach R2: timeout after 120s.</span></div><button class="btn sm" data-act="toast" data-msg="Retrying blogcms…">Try again</button></div>` : ""}
     ${card(`${ch("Snapshots", "Restore puts the data back exactly as it was, after saving the current state.")}<div class="rows" style="margin-top:6px">${list.map((b) => `<div class="row" style="grid-template-columns:32px minmax(0,1fr) auto auto auto">${b.status === "ok" ? ss("backup", "green", 32) : sq("rose", "cross", 32)}<div class="cell"><span class="t tr">${b.slug === "panel" ? "The panel" : b.slug}</span><span class="s tr">${esc(b.what)}</span></div><span class="s num">${b.size || "–"}</span><span class="s num">${b.ago} ago</span>${b.status === "ok" ? `<button class="btn sm" data-act="toast" data-msg="Restoring ${b.slug}…">Restore</button>` : `<span class="btn sm" style="visibility:hidden">Restore</span>`}</div>`).join("") || `<div class="empty">No backups yet.</div>`}</div>`, "clip")}
     ${p ? "" : card(`${ch("Where they go")}${srow("Bucket", "Any S3-compatible storage.", `<span class="chip plain">${I("lock", 14)}r2://mvpstack-backups</span><button class="btn sm">Change</button>`)}${srow("Schedule", "When the nightly backup runs.", select(["Every night at 03:00", "Every 6 hours", "Every hour"], "Every night at 03:00"))}${srow("Keep", "How many nights to keep.", `<label class="input" style="max-width:120px"><input value="14"></label><span class="s">nights</span>`)}`)}</div>`;
@@ -1000,25 +970,22 @@ views.psettings = () => {
 
 /* ---------- Analytics (coming soon, Piqo's layout) */
 views.analytics = () => head("Analytics", { acts: `<span class="tag blue">Coming soon</span>${select(["All sites", ...projects.map((p) => p.domain)], "All sites").replace('class="input"', 'class="input sm" style="width:190px"')}` }) +
-  `<div class="stack">${card(`<div class="cp">${eyebrow("chart", "The last 30 days")}${lede("8,838 visits.", "2,875 signups across 8 sites, 423 upgrades, 20 new paying customers.")}
-    <div class="tiles">${tile("blue", "Visits", "8,838")}${tile("violet", "Signed up", "33%", "2,875")}${tile("peach", "Upgraded", "423", "5%")}${tile("pink", "Paying", "20", "10 yearly")}</div>
-    ${chart(VISITS, { max: 1000, ticks: [1000, 500, 0], dots: { 22: 3, 23: 2, 24: 2, 27: 3, 28: 3 }, mark: [21, "New home"], evLabel: "Deployed" })}</div>`)}
-  <div class="cols2">${card(`<div class="cp"><div class="eyebrow"><span class="dotg"></span>Right now</div>${lede("7 people on the sites.", "26 visits in the last 30 minutes.")}${spark(34, 190)}</div>`)}
-  ${card(`<div class="cp">${eyebrow("log", "Their path, as it happens")}${lede("Every visit, newest on top.", "7 on the sites now.")}
-    <div class="feed" style="margin-top:14px">${[["31s", "🇨🇳", "Shanghai", "phone · from t.co · 1 page"], ["1m", "🇮🇳", "Calcutta", "desktop · from t.co · 1 page"], ["1m", "🇹🇷", "Istanbul", "desktop · 2 pages"], ["2m", "🇹🇼", "Taipei", "phone · from news.ycombinator.com · 4 pages"]].map(([a, f, city, sub]) => `<div><span class="ago">${a}</span><div style="min-width:0"><span class="t">${f} ${city}</span><div class="s">${sub}</div></div><a class="ul">Journey</a></div>`).join("")}</div></div>`)}</div>
-  <div class="cols2">${card(`<div class="cp">${eyebrow("folder", "Top pages")}<div class="lb" style="margin-top:10px">${[["/", "piqo.app", "2,410", "27%"], ["/pricing", "piqo.app", "1,120", "13%"], ["/", "selfhostlayer.com", "980", "11%"], ["/blog/self-hosting", "blog.mvpstack.com", "640", "7%"], ["/", "maillayer.com", "512", "6%"]].map(([pg, site, v, sh], i) => `<div><span class="rk">${i + 1}</span>${ss("link", ["blue", "violet", "green", "orange", "pink"][i], 32)}<div class="cell"><span class="t tr">${pg}</span><span class="s tr">${site}</span></div><div class="val">${v}<small>${sh}</small></div></div>`).join("")}</div></div>`)}
-  ${card(`<div class="cp">${eyebrow("share", "Where they came from")}<div class="lb" style="margin-top:10px">${[["t.co", "X", "2,118", "24%"], ["news.ycombinator.com", "Hacker News", "1,402", "16%"], ["google.com", "Search", "1,260", "14%"], ["github.com", "GitHub", "610", "7%"], ["Direct", "No referrer", "2,940", "33%"]].map(([src, n, v, sh], i) => `<div><span class="rk">${i + 1}</span>${ss("globe", ["blue", "orange", "green", "", "violet"][i], 32)}<div class="cell"><span class="t tr">${src}</span><span class="s tr">${n}</span></div><div class="val">${v}<small>${sh}</small></div></div>`).join("")}</div></div>`)}</div></div>`;
+  `<div class="stack">${card(`${ch("Visitors", "All sites, last 30 days")}
+    <div class="tiles" style="margin-top:14px">${tile("", "Visitors", "8,838")}${tile("", "Page views", "21,406")}${tile("", "Bounce rate", "41%")}${tile("", "Visit length", "1m 52s")}</div>
+    ${chart(VISITS, { max: 1000, ticks: [1000, 500, 0] })}`)}
+  <div class="cols2">${card(`${ch("Top pages")}<div class="cp" style="padding-top:4px"><div class="lb">${[["/", "piqo.app", "2,410", "27%"], ["/pricing", "piqo.app", "1,120", "13%"], ["/", "selfhostlayer.com", "980", "11%"], ["/blog/self-hosting", "blog.mvpstack.com", "640", "7%"], ["/", "maillayer.com", "512", "6%"]].map(([pg, site, v, sh], i) => `<div><span class="rk">${i + 1}</span>${ss("link", ["blue", "violet", "green", "orange", "pink"][i], 32)}<div class="cell"><span class="t tr">${pg}</span><span class="s tr">${site}</span></div><div class="val">${v}<small>${sh}</small></div></div>`).join("")}</div></div>`)}
+  ${card(`${ch("Sources")}<div class="cp" style="padding-top:4px"><div class="lb">${[["t.co", "X", "2,118", "24%"], ["news.ycombinator.com", "Hacker News", "1,402", "16%"], ["google.com", "Search", "1,260", "14%"], ["github.com", "GitHub", "610", "7%"], ["Direct", "No referrer", "2,940", "33%"]].map(([src, n, v, sh], i) => `<div><span class="rk">${i + 1}</span>${ss("globe", ["blue", "orange", "green", "", "violet"][i], 32)}<div class="cell"><span class="t tr">${src}</span><span class="s tr">${n}</span></div><div class="val">${v}<small>${sh}</small></div></div>`).join("")}</div></div>`)}</div></div>`;
 
 /* ---------- Firewall */
-views.firewall = () => head("Firewall", { acts: `<span class="tag blue">Editing rules: coming soon</span>` }) +
-  `<div class="stack">${card(`<div class="cp">${eyebrow("shield", "ufw and fail2ban")}${lede("3 ports open.", "14 addresses banned this week after failed SSH logins. Apps only listen on 127.0.0.1.")}</div>`)}
+views.firewall = () => head("Firewall", { sub: "ufw and fail2ban", acts: `<span class="tag blue">Editing rules: coming soon</span>` }) +
+  `<div class="stack">
   <div class="cols2">${card(`${ch("Open ports", "Everything else is closed.")}<div class="rows" style="margin-top:6px">${[["22", "SSH", "Keys only, no passwords"], ["80", "HTTP", "Caddy, redirects to HTTPS"], ["443", "HTTPS", "Caddy"]].map(([port, n, s]) => `<div class="row" style="grid-template-columns:44px minmax(0,1fr) auto"><span class="ss" style="--s:44px;font:500 14px 'Geist Mono',monospace">${port}</span><div class="cell"><span class="t">${n}</span><span class="s">${s}</span></div>${chip("ready", "Allowed")}</div>`).join("")}</div>`, "clip")}
-  ${card(`${ch("Banned addresses", "fail2ban lets them back after 24 hours.")}<div class="rows" style="margin-top:6px">${[["🇳🇱", "185.220.101.47", "14 failed SSH logins", "2h"], ["🇨🇳", "61.177.172.140", "9 failed SSH logins", "5h"], ["🇷🇺", "45.141.84.12", "22 failed SSH logins", "9h"], ["🇺🇸", "167.94.138.35", "6 failed SSH logins", "1d"]].map(([f, ip, why, a]) => `<div class="row" style="grid-template-columns:24px minmax(0,1fr) auto auto"><span style="font-size:17px">${f}</span><div class="cell"><code style="font-size:13.5px">${ip}</code><span class="s">${why}</span></div><span class="s">${a} ago</span><button class="btn sm">Unban</button></div>`).join("")}</div>`, "clip")}</div></div>`;
+  ${card(`${ch("Banned addresses", "fail2ban lets them back after 24 hours.")}<div class="rows" style="margin-top:6px">${[["NL", "185.220.101.47", "14 failed SSH logins", "2h"], ["CN", "61.177.172.140", "9 failed SSH logins", "5h"], ["RU", "45.141.84.12", "22 failed SSH logins", "9h"], ["US", "167.94.138.35", "6 failed SSH logins", "1d"]].map(([f, ip, why, a]) => `<div class="row" style="grid-template-columns:32px minmax(0,1fr) auto auto"><span class="tag">${f}</span><div class="cell"><code style="font-size:13.5px">${ip}</code><span class="s">${why}</span></div><span class="s">${a} ago</span><button class="btn sm">Unban</button></div>`).join("")}</div>`, "clip")}</div></div>`;
 
 /* ---------- Integrations (coming soon) */
 views.integrations = () => head("Integrations", { acts: `<span class="tag blue">Coming soon</span>` }) +
-  `<div class="stack">${card(`<div class="cp">${eyebrow("blocks", "The marketplace")}${lede("Tools every product needs.", "Built for Self Host Layer, installed on this server in one click, with their own sandbox and backups.")}
-    <div class="opts g2" style="margin-top:22px">${integrations.map((x, i) => `<div class="opt static">${ss(x.icon, ["violet", "orange", "blue", "green", "pink", "green", "orange", "rose"][i], 34)}<b>${x.name}</b><p>${x.what}</p><div class="foot">${x.installed ? chip("running", "Installed") + `<span class="s">${x.installed}</span>` : `<button class="btn sm" disabled>Install</button>`}</div></div>`).join("")}</div></div>`)}</div>`;
+  `<div class="stack">${card(`${ch("Marketplace", "Built for Self Host Layer. Each one installs on this server with its own sandbox and backups.")}<div class="cp" style="padding-top:12px">
+    <div class="opts g2">${integrations.map((x, i) => `<div class="opt static">${ss(x.icon, ["violet", "orange", "blue", "green", "pink", "green", "orange", "rose"][i], 34)}<b>${x.name}</b><p>${x.what}</p><div class="foot">${x.installed ? chip("running", "Installed") + `<span class="s">${x.installed}</span>` : `<button class="btn sm" disabled>Install</button>`}</div></div>`).join("")}</div></div>`)}</div>`;
 
 /* ---------- Alerts */
 views.alerts = () => head("Alerts", { acts: `<button class="btn dark">${I("plus", 16, 2)}Add a channel</button>` }) +
@@ -1040,6 +1007,44 @@ views.activity = () => head("Activity", { sub: "Every privileged action, from th
     { c: "blue", icon: "database", title: "postscheduler got its own Redis", sub: "32 MB limit, password in REDIS_URL", when: "2d" },
     { c: "magenta", icon: "users", title: "Signed in from a new browser", sub: "Firefox on Ubuntu · 2.31.138.19", when: "2d" },
   ])}`, "clip");
+
+/* ---------- Health: the server and everything running on it */
+views.health = () => {
+  const memF = server.memUsed / server.memTotal, diskF = server.diskUsed / server.diskTotal;
+  const apps = projects.filter((p) => !p.static).sort((a, b) => b.mem - a.mem);
+  seed = 5;
+  const cpu24 = Array.from({ length: 48 }, (_, i) => Math.round(8 + 10 * Math.sin(i / 7) ** 2 + rnd() * 9 + (i === 39 ? 38 : 0)));
+  const mem24 = Array.from({ length: 48 }, (_, i) => Math.round(1450 + 120 * Math.sin(i / 11) + rnd() * 60));
+  const hours = (vals, max, ticks, fmtV) => `<div class="chart">
+    <div class="yax" style="height:160px">${ticks.map((v) => `<span style="top:${(1 - v / max) * 100}%">${fmtV(v)}</span>`).join("")}</div>
+    <div class="cbody"><div class="plot" style="height:160px">${ticks.map((v) => `<span class="gl${v === 0 ? " base" : ""}" style="top:${(1 - v / max) * 100}%"></span>`).join("")}
+      <div class="bars" style="gap:3px">${vals.map((v) => `<i style="height:${(v / max) * 100}%" title="${fmtV(v)}"></i>`).join("")}</div></div></div>
+    <div class="xax"><span>24h ago</span><span>18h</span><span>12h</span><span>6h</span><span>Now</span></div></div>`;
+  const services = [
+    ["Caddy", "Web server and certificates", "running", "38 MB"], ["layer-panel", "This panel", "running", "71 MB"], ["layer-agent", "Root helper", "running", "22 MB"],
+    ["Postgres 17", "3 databases", "running", "64 MB"], ["MongoDB 9.0", "1 database", "running", "140 MB"], ["Redis", "3 instances", "running", "51 MB"],
+    ["fail2ban", "SSH protection", "running", "18 MB"], ["unattended-upgrades", "Security updates, last ran 6h ago", "running", "–"],
+  ];
+  return head("Health", { sub: `${server.name} · ${server.ip}`, acts: `<a class="btn" href="#/activity">${I("activity", 16)}Activity</a>` }) + `<div class="stack">
+    <div class="note">${cdot("green")}<div class="grow tr"><span class="t">Everything is running.</span> <span class="muted">Up ${server.uptime} · ${server.spec} · last checked 20s ago</span></div></div>
+    ${card(`${ch("Server", "Right now")}
+      <div class="tiles" style="margin-top:14px;border-bottom:0">
+        <div class="tile"><span class="k">CPU</span><span class="v">${Math.round(server.cpu * 100)}%<small>2 cores</small></span><span class="tk" style="margin-top:8px"><i style="width:${server.cpu * 100}%"></i></span></div>
+        <div class="tile"><span class="k">Memory</span><span class="v">${server.memUsed}<small>of ${server.memTotal} GB</small></span><span class="tk" style="margin-top:8px"><i style="width:${memF * 100}%"></i></span></div>
+        <div class="tile"><span class="k">Disk</span><span class="v">${server.diskUsed}<small>of ${server.diskTotal} GB</small></span><span class="tk" style="margin-top:8px"><i class="${diskF > 0.75 ? "hot" : ""}" style="width:${diskF * 100}%"></i></span></div>
+        <div class="tile"><span class="k">Swap</span><span class="v">0.1<small>of 2 GB</small></span><span class="tk" style="margin-top:8px"><i style="width:5%"></i></span></div>
+      </div>`, "clip")}
+    ${card(`${ch("CPU", "Last 24 hours, every 30 minutes", `<div class="seg"><button class="on">24h</button><button>7d</button></div>`)}${hours(cpu24, 100, [100, 50, 0], (v) => v + "%")}`)}
+    ${card(`${ch("Memory", "Last 24 hours, every 30 minutes")}${hours(mem24, 3800, [3800, 1900, 0], (v) => (v / 1000).toFixed(1) + " GB")}`)}
+    ${card(`${ch("Apps", "Each one has its own memory and CPU limit.")}
+      <div class="colh" style="grid-template-columns:32px minmax(0,1fr) minmax(0,1.2fr) 70px 110px;margin-top:6px"><span></span><span>App</span><span>Memory</span><span class="r">CPU</span><span>Status</span></div>
+      <div class="rows">${apps.map((p) => `<a class="row" href="#/p/${p.slug}" style="grid-template-columns:32px minmax(0,1fr) minmax(0,1.2fr) 70px 110px;padding-top:11px;padding-bottom:11px">${slogo(p.fw, true)}<span class="t tr">${p.slug}</span>
+        <div class="meter" style="grid-template-columns:minmax(40px,1fr) 110px"><span class="tk"><i class="${p.mem / p.memMax > 0.6 ? "hot" : ""}" style="width:${(p.mem / p.memMax) * 100}%"></i></span><span class="v">${p.mem} of ${p.memMax} MB</span></div>
+        <span class="num r">${p.cpu}%</span>${chip(p.status === "failed" ? "ready" : p.status, p.status === "building" ? "Building" : "Running")}</a>`).join("")}</div>`, "clip")}
+    ${card(`${ch("Services", "What Self Host Layer runs next to your apps. Panel, agent and Caddy use 131 MB together.")}
+      <div class="rows" style="margin-top:6px">${services.map(([n, d, st, mem]) => `<div class="row" style="grid-template-columns:minmax(0,1fr) 80px 110px;padding-top:11px;padding-bottom:11px"><div class="cell"><span class="t">${n}</span><span class="s tr">${d}</span></div><span class="s num r">${mem}</span>${chip(st)}</div>`).join("")}</div>`, "clip")}
+  </div>`;
+};
 
 /* ---------- Settings */
 views.settings = () => head("Settings") + `<div class="stack">
@@ -1077,17 +1082,6 @@ function closeModal() {
   document.getElementById("backdrop").classList.remove("open");
 }
 const MODALS = {
-  server() {
-    const memF = server.memUsed / server.memTotal, diskF = server.diskUsed / server.diskTotal;
-    const apps = projects.filter((p) => !p.static).sort((a, b) => b.mem - a.mem);
-    return [`<div class="m-body"><button class="ib x-close" data-act="close">${I("x", 18)}</button>
-      ${eyebrow("server", `${server.name} · ${server.ip}`)}
-      ${lede(`${Math.round(memF * 100)}% memory in use.`, `CPU at ${Math.round(server.cpu * 100)}%, disk ${Math.round(diskF * 100)}% full, up ${server.uptime}.`, "sm")}
-      <div class="tiles" style="grid-template-columns:repeat(3,minmax(0,1fr))">${tile("blue", "CPU", Math.round(server.cpu * 100) + "%", "2 cores")}${tile("violet", "Memory", server.memUsed, `of ${server.memTotal} GB`)}${tile("peach", "Disk", server.diskUsed, `of ${server.diskTotal} GB`)}</div>
-      <div class="eyebrow" style="margin-top:24px">Memory by app</div>
-      <div class="lb" style="margin-top:4px">${apps.map((p, i) => `<div><span class="rk">${i + 1}</span>${slogo(p.fw, true)}<div class="cell"><span class="t">${p.slug}</span><span class="s">${p.cpu}% CPU</span></div><div class="val">${p.mem} MB<small>of ${p.memMax}</small></div></div>`).join("")}</div>
-    </div><div class="m-foot"><span class="s">Panel, agent and Caddy use 131 MB.</span><button class="btn" data-act="close">Close</button></div>`];
-  },
   delete(el) {
     const slug = el.dataset.slug, p = P[slug];
     const things = [...domains.filter((d) => d.slug === slug).map((d) => ["blue", d.host]), ...DBS.filter((d) => d[2] === slug).map((d) => ["violet", d[1]]), ["orange", "5 releases"], ["green", "data folder"]];

@@ -1,6 +1,6 @@
 import { Activity01Icon, Analytics01Icon, Calendar03Icon, Clock01Icon, Link01Icon, Mail01Icon, Message01Icon, PencilEdit01Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/icon";
-import { Notice, PageHeader, TableHead, TableRow, TileIcon } from "@/components/page";
+import { CARD, Notice, PageHeader, TableHead, TableRow, TileIcon } from "@/components/page";
 import { Pill } from "@/components/ui";
 import { requireUser } from "@/lib/session";
 
@@ -26,7 +26,7 @@ export default async function IntegrationsPage() {
       <Notice lead="Soon" tone="lav">
         Each one will install like your own apps: sandboxed, backed up, on its own subdomain.
       </Notice>
-      <section className="border-b border-border">
+      <section className={CARD}>
         <TableHead columns={columns}>
           <span />
           <span>App</span>

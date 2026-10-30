@@ -1,13 +1,12 @@
 import { Add01Icon, Clock01Icon, GitBranchIcon, GridViewIcon, Menu01Icon } from "@hugeicons/core-free-icons";
 import Link from "next/link";
-import { Suspense, type ReactNode } from "react";
-import { FilterBox, ServerButton } from "@/components/header-controls";
+import { Suspense } from "react";
+import { FilterBox } from "@/components/header-controls";
 import { Icon } from "@/components/icon";
-import { Empty, Notice, PageHeader, PillLink } from "@/components/page";
+import { CARD, Empty, Notice, PageHeader, PillLink, Segmented } from "@/components/page";
 import { SitePreviewFrame, SitePreviewSkeleton } from "@/components/site-preview";
 import { timeAgo } from "@/components/status";
 import { Mark, StatusDot, cx } from "@/components/ui";
-import { agent, type SystemInfo } from "@/lib/agent";
 import { frameworkLabel } from "@/lib/detect";
 import { FINISHED, listDeployments, liveDeployment, type Deployment } from "@/lib/deploy";
 import { servingConfig } from "@/lib/domains";
@@ -35,36 +34,14 @@ const FILTERS = [
 type Filter = (typeof FILTERS)[number][0];
 
 // Project, latest deployment, resources, status. Narrower screens drop resources, then the deployment.
-const COLUMNS = "grid-cols-[20px_minmax(0,1fr)_auto] md:grid-cols-[20px_minmax(150px,1fr)_minmax(0,1.4fr)_150px] xl:grid-cols-[20px_minmax(170px,1.1fr)_minmax(0,1.6fr)_160px_150px]";
-
-/** A recessed track with the chosen option raised: links, so the server filters. */
-function Segmented({ items }: { items: { href: string; label: ReactNode; title?: string; count?: number; on: boolean }[] }) {
-  return (
-    <div className="inline-flex gap-0.5 rounded-md border border-border bg-field p-0.5">
-      {items.map((it) => (
-        <Link
-          key={it.href}
-          href={it.href}
-          title={it.title}
-          aria-label={it.title}
-          aria-current={it.on ? "true" : undefined}
-          scroll={false}
-          className={cx("inline-flex h-7 items-center gap-1.5 whitespace-nowrap rounded px-2.5 text-[13px] font-medium transition-colors duration-150", it.on ? "bg-selected text-foreground" : "text-muted hover:text-foreground")}
-        >
-          {it.label}
-          {it.count !== undefined && <span className="font-mono text-[11.5px] tabular-nums text-dim">{it.count}</span>}
-        </Link>
-      ))}
-    </div>
-  );
-}
+const COLUMNS = "grid-cols-[40px_minmax(0,1fr)_auto] md:grid-cols-[40px_minmax(150px,1fr)_minmax(0,1.4fr)_150px] xl:grid-cols-[40px_minmax(170px,1.1fr)_minmax(0,1.6fr)_160px_150px]";
 
 function Meter({ label, value, fraction, hot }: { label: string; value: string; fraction: number; hot: boolean }) {
   return (
     <div className="grid grid-cols-[28px_minmax(0,1fr)_48px] items-center gap-2 text-[11.5px] text-dim">
       {label}
       <span className="h-1 overflow-hidden rounded-sm bg-track">
-        <span className={cx("block h-full", hot ? "bg-gold" : "bg-muted")} style={{ width: `${Math.max(1, Math.min(100, fraction * 100))}%` }} />
+        <span className={cx("block h-full", hot ? "bg-gold" : "bg-blue")} style={{ width: `${Math.max(1, Math.min(100, fraction * 100))}%` }} />
       </span>
       <span className="text-right font-mono tabular-nums text-muted">{value}</span>
     </div>
@@ -91,10 +68,11 @@ function Commit({ project, latest }: { project: Project; latest?: Deployment }) 
   );
 }
 
+/** The state as a small chip: a colored dot, then the word in its color. */
 function StateWord({ state }: { state: State }) {
   const s = STATE[state];
   return (
-    <span className={cx("inline-flex items-center gap-2 whitespace-nowrap text-[13.5px] font-medium", s.color)}>
+    <span className={cx("inline-flex h-7 items-center gap-2 whitespace-nowrap rounded-md border border-border bg-card px-2.5 text-[13px] font-medium", s.color)}>
       <StatusDot status={s.dot} pulse={state === "building"} /> {s.label}
     </span>
   );
@@ -107,7 +85,6 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
   const all = listProjects();
   const term = q?.trim().toLowerCase();
   const matching = term ? all.filter((p) => `${p.slug} ${p.domains.join(" ")} ${p.repoName}`.toLowerCase().includes(term)) : all;
-  const info = await agent<SystemInfo>("system.info").catch(() => null);
   const usage = latestUsage();
   const rows = matching.map((p) => {
     const latest = listDeployments(p.id, 1)[0];
@@ -138,16 +115,9 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
       <PageHeader
         title="Projects"
         actions={
-          info && (
-            <ServerButton>
-              <StatusDot status={info.caddy === "active" ? "ok" : "err"} />
-              <b className="font-semibold text-foreground">{info.hostname}</b>
-              <span className="hidden sm:inline">
-                <span className="text-dim">·</span> CPU {Math.round(((info.loadavg[0] ?? 0) / info.cpus) * 100)}% <span className="text-dim">·</span> RAM{" "}
-                {Math.round(((info.memoryMb.total - info.memoryMb.available) / info.memoryMb.total) * 100)}%
-              </span>
-            </ServerButton>
-          )
+          <PillLink href="/new" primary>
+            <Icon icon={Add01Icon} size={16} strokeWidth={2} /> New project
+          </PillLink>
         }
       />
       {deploying?.latest && (
@@ -160,22 +130,20 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
         </Notice>
       )}
       {all.length > 0 && (
-        <div className="flex flex-wrap items-center gap-2 border-b border-border px-4 py-3.5 sm:px-7">
-          <FilterBox placeholder="Search projects, domains, repos" className="min-w-full flex-1 md:min-w-[200px]" />
-          <Segmented items={FILTERS.map(([k, label]) => ({ href: href({ status: k }), label, count: k === "all" ? rows.length : rows.filter((r) => r.state === k).length, on: filter === k }))} />
+        <div className="flex flex-wrap items-center gap-2.5">
+          <Segmented items={FILTERS.map(([k, label]) => ({ href: href({ status: k }), label, count: k === "all" ? rows.length : rows.filter((r) => r.state === k).length, active: filter === k }))} />
+          <FilterBox placeholder="Search projects, domains, repos" className="order-last min-w-full flex-1 bg-card sm:order-none sm:ml-auto sm:min-w-[220px] sm:max-w-[340px]" />
           <Segmented
             items={[
-              { href: href({ view: "list" }), label: <Icon icon={Menu01Icon} size={15} />, title: "List", on: !grid },
-              { href: href({ view: "grid" }), label: <Icon icon={GridViewIcon} size={15} />, title: "Grid", on: grid },
+              { href: href({ view: "list" }), label: <Icon icon={Menu01Icon} size={15} />, title: "List", active: !grid },
+              { href: href({ view: "grid" }), label: <Icon icon={GridViewIcon} size={15} />, title: "Grid", active: grid },
             ]}
           />
-          <PillLink href="/new" primary>
-            <Icon icon={Add01Icon} size={16} strokeWidth={2} /> New project
-          </PillLink>
         </div>
       )}
 
       {all.length === 0 ? (
+        <section className={CARD}>
         <Empty
           action={
             <PillLink href="/new" primary>
@@ -186,22 +154,25 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
           <p className="text-[17px] font-semibold text-foreground">No projects yet</p>
           <p>Connect GitHub to deploy your first app. Each one runs as its own sandboxed user.</p>
         </Empty>
+        </section>
       ) : shown.length === 0 ? (
-        <Empty>{q ? `No projects match “${q}”.` : "No projects here."}</Empty>
+        <section className={CARD}>
+          <Empty>{q ? `No projects match “${q}”.` : "No projects here."}</Empty>
+        </section>
       ) : grid ? (
-        <div className="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-x-5 gap-y-7 px-4 py-5 sm:px-7" data-testid="project-list">
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-3.5" data-testid="project-list">
           {shown.map(({ p, latest, live, host, hosts, state }) => (
-            <div key={p.id} className="grid content-start gap-3">
+            <div key={p.id} className={cx(CARD, "grid content-start gap-3.5 p-2.5 pb-4")}>
               {host && (
                 <Suspense fallback={<SitePreviewSkeleton host={host} />}>
                   <SitePreviewFrame slug={p.slug} framework={p.framework} deploymentId={live?.id ?? null} url={`https://${host}`} own={hosts.length ? hosts : p.domains} />
                 </Suspense>
               )}
-              <Link href={`/projects/${p.slug}`} className="group grid gap-2.5">
+              <Link href={`/projects/${p.slug}`} className="group grid gap-2.5 px-2">
                 <div className="flex min-w-0 items-center gap-3">
-                  <Mark framework={p.framework} bare />
+                  <Mark framework={p.framework} size="sm" />
                   <div className="grid min-w-0 flex-1 gap-0.5">
-                    <b className="truncate text-[15px] font-semibold group-hover:underline">{p.slug}</b>
+                    <b className="truncate text-[15px] font-medium group-hover:underline">{p.slug}</b>
                     <span className="truncate text-[13px] text-muted">{live && host ? host : "Not live yet"}</span>
                   </div>
                   <StateWord state={state} />
@@ -212,9 +183,10 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
           ))}
         </div>
       ) : (
-        <section data-testid="project-list">
-          <div className={cx("hidden h-9 items-center gap-x-5 border-b border-border px-4 text-[12px] font-medium text-dim sm:px-7 md:grid", COLUMNS)}>
-            <span className="col-span-2">Project</span>
+        <section data-testid="project-list" className="grid gap-2">
+          <div className={cx("hidden h-6 items-center gap-x-5 px-[19px] text-[13px] text-muted md:grid", COLUMNS)}>
+            <span />
+            <span>Project</span>
             <span>Latest deployment</span>
             <span className="hidden xl:block">Resources</span>
             <span>Status</span>
@@ -226,11 +198,11 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
               <Link
                 key={p.id}
                 href={`/projects/${p.slug}`}
-                className={cx("grid items-center gap-x-5 border-b border-border px-4 py-[15px] transition-colors duration-150 hover:bg-hover sm:px-7", COLUMNS)}
+                className={cx(CARD, "grid items-center gap-x-5 px-4 py-3.5 transition-colors duration-150 hover:border-border-strong sm:px-[18px]", COLUMNS)}
               >
-                <Mark framework={p.framework} bare />
+                <Mark framework={p.framework} />
                 <div className="grid min-w-0 gap-[3px]">
-                  <b className="truncate text-[15px] font-semibold">{p.slug}</b>
+                  <b className="truncate text-[15px] font-medium">{p.slug}</b>
                   <span className={cx("truncate text-[13px]", live && host ? "text-muted" : "text-dim")}>{live && host ? host : "Not live yet"}</span>
                 </div>
                 <div className="hidden min-w-0 md:block">

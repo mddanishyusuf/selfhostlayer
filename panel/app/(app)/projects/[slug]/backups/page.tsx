@@ -4,7 +4,7 @@ import { backUpProjectAction } from "@/app/actions/backups";
 import { BackupList } from "@/components/backup-list";
 import { ImportData, RefreshWhile } from "@/components/backups";
 import { SubmitButton } from "@/components/form";
-import { Notice, PageHeader, SettingsRow } from "@/components/page";
+import { CARD, Notice, PageHeader, SettingsRow } from "@/components/page";
 import { listBackups } from "@/lib/backup/runner";
 import { getBackupSettings } from "@/lib/backup/settings";
 import { getProjectBySlug } from "@/lib/projects";
@@ -52,7 +52,7 @@ export default async function ProjectBackupsPage({ params }: { params: Promise<{
           to turn them on for every app.
         </Notice>
       )}
-      <section className="border-b border-border">
+      <section className={CARD}>
         <BackupList backups={backups} restorable empty={ready ? "No backups yet. The first one runs at the scheduled time, or press Back up now." : "No backups yet."} />
       </section>
       <SettingsRow

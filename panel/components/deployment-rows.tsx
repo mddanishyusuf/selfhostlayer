@@ -3,7 +3,7 @@ import Link from "next/link";
 import { rollback } from "@/app/actions/projects";
 import { deploymentPath, type Deployment } from "@/lib/deploy";
 import { Icon } from "./icon";
-import { Empty, TableHead, TableRow } from "./page";
+import { CARD, Empty, TableHead, TableRow } from "./page";
 import { DeployStatusBadge, timeAgo, duration } from "./status";
 import { Pill } from "./ui";
 
@@ -29,7 +29,7 @@ export function DeploymentRows({
 }) {
   const columns = `112px minmax(220px,1fr) ${showProject ? "140px " : ""}90px 80px 64px${rollbacks ? " 36px" : ""}`;
   return (
-    <section className="border-b border-border" data-testid="deployment-rows">
+    <section className={CARD} data-testid="deployment-rows">
       {head}
       <TableHead columns={columns}>
         <span>Status</span>

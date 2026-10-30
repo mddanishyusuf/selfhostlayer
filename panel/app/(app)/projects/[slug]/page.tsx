@@ -6,7 +6,7 @@ import { redeploy } from "@/app/actions/projects";
 import { DeploymentRows } from "@/components/deployment-rows";
 import { SubmitButton } from "@/components/form";
 import { Icon } from "@/components/icon";
-import { KeyValues, Notice, PageHeader, PillLink, Section, Stats } from "@/components/page";
+import { KeyValues, Notice, PageHeader, PillLink, Section, Segmented, Stats } from "@/components/page";
 import { SitePreviewFrame, SitePreviewSkeleton } from "@/components/site-preview";
 import { UsageChart } from "@/components/usage-chart";
 import { DeployStatusBadge, duration, timeAgo } from "@/components/status";
@@ -135,7 +135,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
 
       <Section title="Production">
         <div className="grid border-t border-border lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
-          <div className="border-b border-border px-4 py-5 sm:px-7 lg:border-b-0 lg:border-r">
+          <div className="border-b border-border px-4 py-5 sm:px-6 lg:border-b-0 lg:border-r">
             <Suspense fallback={<SitePreviewSkeleton host={new URL(url).host} />}>
               <SitePreviewFrame slug={project.slug} framework={project.framework} deploymentId={live?.id ?? null} url={url} own={hosts} />
             </Suspense>
@@ -199,39 +199,35 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
           title="Usage"
           description={`Sampled every minute${disk !== null ? ` · ${disk >= 1024 ? `${(disk / 1024).toFixed(1)} GB` : `${disk} MB`} on disk` : ""}`}
           aside={
-            <span className="flex gap-4 text-[13px]" role="tablist" aria-label="Time range">
-              {(["24h", "7d"] as const).map((r) => (
-                <Link key={r} href={r === "24h" ? `/projects/${project.slug}` : `/projects/${project.slug}?usage=7d`} scroll={false} aria-current={range === r ? "page" : undefined} className={range === r ? "font-semibold text-foreground" : "text-muted hover:text-foreground"}>
-                  {r === "24h" ? "24 hours" : "7 days"}
-                </Link>
-              ))}
-            </span>
+            <Segmented
+              items={(["24h", "7d"] as const).map((r) => ({ href: r === "24h" ? `/projects/${project.slug}` : `/projects/${project.slug}?usage=7d`, label: r === "24h" ? "24 hours" : "7 days", active: range === r }))}
+            />
           }
         >
-          <div className="grid gap-x-10 gap-y-6 border-t border-border px-4 py-5 sm:px-7 lg:grid-cols-2">
+          <div className="grid gap-x-10 gap-y-6 border-t border-border px-4 py-5 sm:px-6 lg:grid-cols-2">
             <UsageChart title="CPU (share of the server)" unit="%" points={usage.map((p) => ({ at: p.at, value: p.cpu }))} from={from} to={now} gapMs={range === "24h" ? 15 * 60_000 : 3 * 3_600_000} />
             <UsageChart title={`Memory (limit ${project.memoryMb} MB)`} unit="MB" points={usage.map((p) => ({ at: p.at, value: p.memoryMb }))} from={from} to={now} gapMs={range === "24h" ? 15 * 60_000 : 3 * 3_600_000} />
           </div>
           {usage.length > 0 && (
             <details className="group border-t border-border">
-              <summary className="cursor-pointer list-none px-4 py-3 text-[13px] text-muted hover:text-foreground sm:px-7">
+              <summary className="cursor-pointer list-none px-4 py-3 text-[13px] text-muted hover:text-foreground sm:px-6">
                 <span className="group-open:hidden">Show</span>
                 <span className="hidden group-open:inline">Hide</span> the numbers as a table
               </summary>
               <table className="w-full text-[13px] tabular-nums">
                 <thead>
                   <tr className="border-y border-border text-left text-dim">
-                    <th className="px-4 py-2 font-normal sm:px-7">{range === "24h" ? "Hour (UTC)" : "Day (UTC)"}</th>
+                    <th className="px-4 py-2 font-normal sm:px-6">{range === "24h" ? "Hour (UTC)" : "Day (UTC)"}</th>
                     <th className="px-4 py-2 text-right font-normal">CPU</th>
-                    <th className="px-4 py-2 text-right font-normal sm:pr-7">Memory</th>
+                    <th className="px-4 py-2 text-right font-normal sm:pr-6">Memory</th>
                   </tr>
                 </thead>
                 <tbody>
                   {tableRows(usage, range).map((r) => (
                     <tr key={r.at} className="border-b border-border last:border-b-0">
-                      <td className="px-4 py-1.5 sm:px-7">{r.label}</td>
+                      <td className="px-4 py-1.5 sm:px-6">{r.label}</td>
                       <td className="px-4 py-1.5 text-right">{r.cpu}</td>
-                      <td className="px-4 py-1.5 text-right sm:pr-7">{r.memory}</td>
+                      <td className="px-4 py-1.5 text-right sm:pr-6">{r.memory}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -247,8 +243,8 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
         liveIds={live ? [live.id] : []}
         rollbacks
         head={
-          <div className="flex items-end justify-between gap-4 px-4 pb-3.5 pt-[22px] sm:px-7">
-            <h2 className="text-[15px] font-semibold">Recent deployments</h2>
+          <div className="flex items-center justify-between gap-4 px-4 pb-3.5 pt-5 sm:px-6">
+            <h2 className="text-[15.5px] font-medium">Recent deployments</h2>
             <Link href={`/projects/${project.slug}/deployments`} className="text-[13px] text-accent hover:underline">
               View all
             </Link>

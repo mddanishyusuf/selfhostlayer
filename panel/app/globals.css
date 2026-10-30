@@ -1,14 +1,15 @@
 @import "tailwindcss";
 
-/* Design tokens: a neutral charcoal in dark (from SuperDev Pro's extension),
-   and in light the neutral grays of the homepage (selfhostlayer.com). Links
-   and focus rings use --accent; fields sit a step darker than the page. The theme
-   comes from <html data-theme="dark|light|system">, set on the server from the
-   layer-theme cookie, so pages never flash. */
+/* Design tokens: cards (--card) on a page (--background), with the sidebar on
+   the page itself. Light is a warm gray page with white cards; dark is the
+   charcoal from SuperDev Pro's extension. Links and focus rings use --accent.
+   The theme comes from <html data-theme="dark|light|system">, set on the server
+   from the layer-theme cookie, so pages never flash. */
 @theme inline {
   --font-sans: var(--font-albert-sans), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, monospace;
   --color-background: var(--background);
+  --color-card: var(--card);
   --color-sidebar: var(--sidebar);
   --color-foreground: var(--foreground);
   --color-muted: var(--muted);
@@ -42,37 +43,39 @@
 :root,
 :root[data-theme="light"] {
   color-scheme: light;
-  --background: #fafafa;
-  --sidebar: #f5f5f5;
-  --foreground: #171717;
-  --muted: #6f6f6f;
-  --dim: #9a9a9a;
-  --border: #e5e5e5;
-  --border-strong: #d4d4d4;
-  --hover: #f0f0f0;
-  --selected: #e8e8e8;
-  --pill: #dedede;
-  --track: #e5e5e5;
+  --background: #f3f3f1;
+  --sidebar: #f3f3f1;
+  --card: #ffffff;
+  --foreground: #1a1a1a;
+  --muted: #6b6b66;
+  --dim: #a3a39e;
+  --border: #ebebe7;
+  --border-strong: #dededa;
+  --hover: #f7f7f5;
+  --selected: #efefec;
+  --pill: #efefec;
+  --track: #eeeeea;
   --gold: #a16207;
   --lavender: #6e56cf;
   --coral: #ea580c;
-  --teal: #0f766e;
+  --teal: #0f8a5f;
   --blue: #2563eb;
   --rose: #dc2626;
-  --accent: #6e56cf;
+  --accent: #2563eb;
   --field: #ffffff;
   --on-rose: #ffffff;
-  --inverse: #171717;
-  --inverse-fg: #fafafa;
-  --code: #171717;
+  --inverse: #1a1a1a;
+  --inverse-fg: #ffffff;
+  --code: #1a1a1a;
   /* Chart series: checked with the dataviz validator against each surface. */
   --chart: #6e56cf;
 }
 
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --background: #1e1e1e;
-  --sidebar: #171717;
+  --background: #161616;
+  --sidebar: #161616;
+  --card: #1e1e1e;
   --foreground: #f2f2f2;
   --muted: #9c9c9c;
   --dim: #686868;
@@ -100,8 +103,9 @@
 @media (prefers-color-scheme: dark) {
   :root[data-theme="system"] {
     color-scheme: dark;
-    --background: #1e1e1e;
-    --sidebar: #171717;
+    --background: #161616;
+    --sidebar: #161616;
+    --card: #1e1e1e;
     --foreground: #f2f2f2;
     --muted: #9c9c9c;
     --dim: #686868;
@@ -155,6 +159,31 @@ body {
 
 @keyframes ping {
   75%, 100% { transform: scale(2.4); opacity: 0; }
+}
+
+/* Pages are a stack of cards (app/(app)/layout.tsx). Settings rows standing on
+   the page join into one card per run: borders overlap into a single line, and
+   only the ends of a run are rounded. A form or wrapper holding rows is a card. */
+.page-stack > [data-srow] {
+  background: var(--card);
+  border: 1px solid var(--border);
+}
+.page-stack > [data-srow] + [data-srow] {
+  margin-top: -15px;
+}
+.page-stack > [data-srow]:not([data-srow] + [data-srow]) {
+  border-top-left-radius: 10px;
+  border-top-right-radius: 10px;
+}
+.page-stack > [data-srow]:not(:has(+ [data-srow])) {
+  border-bottom-left-radius: 10px;
+  border-bottom-right-radius: 10px;
+}
+.page-stack > :not([data-srow], section):has(> [data-srow]) {
+  overflow: hidden;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
 }
 
 /* Native select styled as a pill with a caret. */

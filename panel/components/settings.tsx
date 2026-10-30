@@ -251,7 +251,7 @@ export function SettingsForm({ d, isNew, framework }: { d: SettingsDefaults; isN
         </SettingsRow>
       )}
 
-      <div className="grid gap-3 border-b border-border px-4 py-5 sm:px-7">
+      <div className="grid gap-3 border-b border-border px-4 py-5 sm:px-6">
         <FormError message={e.form} />
         {state.saved && <p className="text-right text-[13px] text-teal">Saved. The next deploy uses these settings.</p>}
         <SaveButtons isNew={isNew} />

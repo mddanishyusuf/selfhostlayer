@@ -45,9 +45,9 @@ export function DataGrid({ columns, rows, firstRow, sortLinks, sorted }: { colum
       <table className="w-max min-w-full border-collapse font-mono text-[12.5px]">
         <thead className="sticky top-0 z-[1]">
           <tr>
-            <th className="border-b border-border bg-background py-2 pl-4 pr-3 text-right font-sans text-[12px] font-medium text-dim sm:pl-7">#</th>
+            <th className="border-b border-border bg-card py-2 pl-4 pr-3 text-right font-sans text-[12px] font-medium text-dim sm:pl-6">#</th>
             {columns.map((c, i) => (
-              <th key={i} className="whitespace-nowrap border-b border-border bg-background px-3 py-2 text-left font-sans text-[12.5px] font-medium text-muted">
+              <th key={i} className="whitespace-nowrap border-b border-border bg-card px-3 py-2 text-left font-sans text-[12.5px] font-medium text-muted">
                 {sortLinks ? (
                   <Link href={sortLinks[i]!} className={cx("transition-colors duration-150 hover:text-foreground", sorted?.column === c && "text-foreground")}>
                     {c}
@@ -59,14 +59,14 @@ export function DataGrid({ columns, rows, firstRow, sortLinks, sorted }: { colum
               </th>
             ))}
             {/* Takes the spare width, so a narrow table stays at the left. */}
-            <th className="w-full border-b border-border bg-background" />
+            <th className="w-full border-b border-border bg-card" />
           </tr>
         </thead>
         <tbody>
           {rows.map((row, r) => (
             <Fragment key={r}>
               <tr onClick={() => setOpen(open === r ? null : r)} className={cx("cursor-pointer transition-colors duration-150 hover:bg-hover", open === r && "bg-selected")}>
-                <td className="border-b border-border py-1.5 pl-4 pr-3 text-right text-dim tabular-nums sm:pl-7">{firstRow + r}</td>
+                <td className="border-b border-border py-1.5 pl-4 pr-3 text-right text-dim tabular-nums sm:pl-6">{firstRow + r}</td>
                 {row.map((cell, c) => (
                   <td key={c} className={cx("max-w-[340px] truncate whitespace-nowrap border-b border-border px-3 py-1.5", typeof cell === "number" && "text-right tabular-nums")}>
                     <Value cell={cell} />
