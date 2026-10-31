@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ClicksChart } from "@/components/clicks-chart";
+import { BarChart } from "@/components/bar-chart";
 import { Notice, PageHeader, Section, Segmented, Stats } from "@/components/page";
 import { isLinks, linksApi, linksInfo, linkStats, shortDomain, type Count, type Link as ShortLink, type LinksInfo, type LinkStats, type Range } from "@/lib/links";
 import { getProjectBySlug } from "@/lib/projects";
@@ -128,7 +128,12 @@ export default async function StatsPage({ params, searchParams }: { params: Prom
             }
           >
             <div className="border-t border-border px-3.5 pt-5">
-              <ClicksChart series={stats.series} bucket={stats.bucket} />
+              <BarChart
+                points={stats.series.map((p) => ({ at: p.at, value: p.clicks, detail: `${p.visitors} visitor${p.visitors === 1 ? "" : "s"}` }))}
+                bucket={stats.bucket}
+                noun={["click", "clicks"]}
+                testId="clicks-chart"
+              />
             </div>
           </Section>
           <div className="grid gap-3.5 lg:grid-cols-2">

@@ -117,6 +117,36 @@ const FAKE: Partial<Record<ActionName, unknown>> = {
   "catalog.list": {
     apps: [
       {
+        id: "analytics",
+        name: "Analytics",
+        summary: "Cookie-free web analytics for your sites, with no data leaving the server.",
+        versions: [
+          {
+            version: "0.1.0",
+            date: "2026-10-31",
+            notes: "The first version.",
+            minPanel: null,
+            sha256: "cee8f139cfbbf8c252c95126cb7141d50daa58731acb39f761fa50f0c0ffee00",
+            supported: true,
+            manifest: {
+              id: "analytics",
+              name: "Analytics",
+              version: "0.1.0",
+              summary: "Cookie-free web analytics for your sites, with no data leaving the server.",
+              runtime: { kind: "node", node: "24", start: ["node", "--disable-warning=ExperimentalWarning", "server.js"], health: "/healthz", writable: [] },
+              memory: { default: 128, min: 64 },
+              env: { ANALYTICS_ADMIN_TOKEN: { generate: "secret" } },
+              services: ["sqlite"],
+              cron: [
+                { name: "prune", schedule: "45 3 * * *", command: "node --disable-warning=ExperimentalWarning cron.js prune" },
+                { name: "geo", schedule: "15 5 3 * *", command: "node --disable-warning=ExperimentalWarning cron.js geo" },
+              ],
+              backup: ["data"],
+            },
+          },
+        ],
+      },
+      {
         id: "links",
         name: "Links",
         summary: "Short links on your own domain, with click stats and QR codes.",

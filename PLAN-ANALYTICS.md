@@ -52,3 +52,16 @@ panel: Analytics page ──(admin token, 127.0.0.1 only)──▶ Analytics' ad
 - **Speed:** 21,742 events a second on the dev machine (64 connections), none lost; p50 2 ms. Stats over 108,000 events and 62,500 visits take about 0.8 s.
 - **Memory:** 21 MB of its own idle on Linux (RSS 67 MB with Node's shared binary). A burst of 62,500 new visitors in 5 seconds grew it to 233 MB on macOS, since open visits stay in memory for 30 minutes. If real traffic ever comes near that, the open visits kept should be capped.
 - **Tests:** 9 in `catalog/analytics/test`, and the shared parts' tests in `catalog/lib/test`.
+
+## Day 3 result (2026-10-31)
+**Done when "Screenshots in light, dark and on phones": done.** The sidebar's **Analytics** page:
+- **Not installed:** what Analytics does, and **Install** (from the catalog).
+- **No sites yet:** a domain to add, or any of your projects' domains in one click.
+- **A site:**
+  - its tabs (with 24-hour visitors) and the range: today, 24 hours, 7, 30 or 90 days;
+  - totals against the period before (visitors with the live count, visits, pageviews, bounce rate, visit time);
+  - a visitors chart (the bar chart Links' stats use, now shared);
+  - cards with tabs: pages (top, entry, exit), sources (sites, UTM source, medium, campaign), countries and devices (device, browser, OS, screen), plus custom events. Clicking a row filters the whole page by it, and each filter shows above with a × to remove it.
+  - **Setup:** the line to paste (with Copy), subdomains on or off, and Remove (type the domain).
+- **The integration's own pages:** a Dashboard item at the top of its sidebar, and its retention setting on its Settings page.
+- **Phones:** the range sits in its own row, so nothing runs past the screen.

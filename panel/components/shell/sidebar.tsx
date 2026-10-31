@@ -71,6 +71,7 @@ function globalNav(p: SidebarProps): Item[][] {
 
 /** An integration's own pages, above the ones every project has. */
 function appNav(p: SidebarProject, base: string): Item[][] {
+  if (p.app === "analytics") return [[{ href: "/analytics", label: "Dashboard", icon: ChartColumnIcon }]];
   if (p.app === "links") {
     return [
       [

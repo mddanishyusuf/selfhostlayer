@@ -1,8 +1,10 @@
 import { notFound } from "next/navigation";
+import { AnalyticsSettingsForm } from "@/components/analytics-forms";
 import { UpdateButton } from "@/components/integrations";
 import { LinksSettingsForm } from "@/components/links";
 import { DeleteProject, IntegrationSettingsForm, SettingsForm } from "@/components/settings";
 import { Notice, PageHeader, SettingsRow } from "@/components/page";
+import { analyticsApi, type AnalyticsSettings } from "@/lib/analytics";
 import { catalogApps, updateFor } from "@/lib/catalog";
 import { frameworkLabel } from "@/lib/detect";
 import { installedVersion, listDeployments } from "@/lib/deploy";
@@ -26,6 +28,7 @@ export default async function SettingsPage({ params, searchParams }: { params: P
     const name = version?.manifest?.name ?? project.slug;
     // Links keeps its own settings; they show when it's running.
     const links = isLinks(project) ? await linksApi<LinksSettings>(project, "settings").catch(() => null) : null;
+    const analytics = project.catalogApp === "analytics" ? await analyticsApi<AnalyticsSettings>(project, "settings").catch(() => null) : null;
     const app = (await catalogApps().catch(() => [])).find((a) => a.id === project.catalogApp);
     const update = updateFor(version?.version, app);
     return (
@@ -42,6 +45,7 @@ export default async function SettingsPage({ params, searchParams }: { params: P
           {update?.notes && <p className="text-[12px] text-muted">New in {update.version}: {update.notes}</p>}
         </SettingsRow>
         {links && <LinksSettingsForm slug={project.slug} domain={shortDomain(project)} settings={links} />}
+        {analytics && <AnalyticsSettingsForm keepDays={analytics.keepDays} />}
         <IntegrationSettingsForm slug={project.slug} name={name} memoryMb={project.memoryMb} min={version?.manifest?.memory.min ?? 64} />
         <DeleteProject slug={project.slug} integration={name} />
       </>
