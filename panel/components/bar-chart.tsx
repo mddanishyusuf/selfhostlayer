@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
+import { money } from "@/lib/money";
 
 const W = 600;
 const H = 140;
@@ -13,8 +14,13 @@ function niceMax(value: number): number {
   return 10 * pow;
 }
 
-const label = (at: number, bucket: "hour" | "day") =>
-  new Date(at).toLocaleString("en-GB", bucket === "hour" ? { weekday: "short", hour: "2-digit", minute: "2-digit", timeZone: "UTC" } : { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" });
+type Bucket = "minute" | "hour" | "day";
+
+const label = (at: number, bucket: Bucket) =>
+  new Date(at).toLocaleString(
+    "en-GB",
+    bucket === "minute" ? { hour: "2-digit", minute: "2-digit", timeZone: "UTC" } : bucket === "hour" ? { weekday: "short", hour: "2-digit", minute: "2-digit", timeZone: "UTC" } : { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" },
+  );
 
 export interface Bar {
   at: number;
@@ -23,17 +29,21 @@ export interface Bar {
   detail?: string;
 }
 
-const count = (n: number, noun: [string, string]) => `${n.toLocaleString("en")} ${n === 1 ? noun[0] : noun[1]}`;
+const count = (n: number, noun: [string, string], currency?: string) => (currency ? money(n, currency) : `${n.toLocaleString("en")} ${n === 1 ? noun[0] : noun[1]}`);
 
 /**
- * One number per hour or day as bars (clicks, visitors), with a 2px gap
- * between them and hairline gridlines. Hovering a bar, or the arrow keys,
- * shows its number and detail; the numbers are also a table.
+ * One number per minute, hour or day as bars (clicks, visitors, revenue in a
+ * currency's cents), with a 2px gap between them and hairline gridlines.
+ * Hovering a bar, or the arrow keys, shows its number and detail; the numbers
+ * are also a table.
  */
-export function BarChart({ points: series, bucket, noun, testId }: { points: Bar[]; bucket: "hour" | "day"; noun: [string, string]; testId?: string }) {
+export function BarChart({ points: series, bucket, noun, currency, testId }: { points: Bar[]; bucket: Bucket; noun: [string, string]; currency?: string; testId?: string }) {
   const [hover, setHover] = useState<number | null>(null);
   const box = useRef<HTMLDivElement>(null);
-  const max = niceMax(Math.max(0, ...series.map((p) => p.value)));
+  // Money: a round top in whole units of the currency.
+  const unit = currency ? 100 : 1;
+  const max = niceMax(Math.max(0, ...series.map((p) => p.value)) / unit) * unit;
+  const axis = (n: number) => (currency ? money(n, currency, true) : String(n));
   const slot = W / Math.max(1, series.length);
   const total = series.reduce((a, p) => a + p.value, 0);
   const point = hover !== null ? series[hover] : undefined;
@@ -54,7 +64,7 @@ export function BarChart({ points: series, bucket, noun, testId }: { points: Bar
       <div
         ref={box}
         role="img"
-        aria-label={`${count(total, noun)} ${bucket === "hour" ? `in the last ${series.length} hours` : `in the last ${series.length} days`}, at most ${Math.max(0, ...series.map((p) => p.value))} in one ${bucket}.`}
+        aria-label={`${count(total, noun, currency)} in the last ${series.length} ${bucket}s, at most ${count(Math.max(0, ...series.map((p) => p.value)), noun, currency)} in one ${bucket}.`}
         tabIndex={0}
         onPointerMove={pick}
         onPointerLeave={() => setHover(null)}
@@ -72,8 +82,8 @@ export function BarChart({ points: series, bucket, noun, testId }: { points: Bar
             return p.value > 0 ? <rect key={p.at} x={i * slot + 1} y={H - h} width={Math.max(1, slot - 2)} height={h} fill="var(--chart)" opacity={hover === null || hover === i ? 1 : 0.45} /> : null;
           })}
         </svg>
-        <span className="pointer-events-none absolute left-0 top-0 -translate-y-1/2 bg-card pr-1.5 text-[11px] tabular-nums text-dim">{max}</span>
-        <span className="pointer-events-none absolute left-0 top-1/2 -translate-y-1/2 bg-card pr-1.5 text-[11px] tabular-nums text-dim">{max / 2}</span>
+        <span className="pointer-events-none absolute left-0 top-0 -translate-y-1/2 bg-card pr-1.5 text-[11px] tabular-nums text-dim">{axis(max)}</span>
+        <span className="pointer-events-none absolute left-0 top-1/2 -translate-y-1/2 bg-card pr-1.5 text-[11px] tabular-nums text-dim">{axis(max / 2)}</span>
         {total === 0 && <span className="absolute inset-0 grid place-items-center text-[12px] text-dim">No {noun[1]} in this time.</span>}
         {point && (
           <span
@@ -81,7 +91,7 @@ export function BarChart({ points: series, bucket, noun, testId }: { points: Bar
             style={pct(hover!) > 60 ? { right: `${100 - pct(hover!) + 2}%` } : { left: `${pct(hover!) + 2}%` }}
           >
             <b className="text-[13px] font-semibold tabular-nums">
-              {count(point.value, noun)} {point.detail && <span className="font-normal text-muted">· {point.detail}</span>}
+              {count(point.value, noun, currency)} {point.detail && <span className="font-normal text-muted">· {point.detail}</span>}
             </b>
             <span className="text-[11.5px] text-muted">{label(point.at, bucket)} UTC</span>
           </span>
@@ -89,7 +99,7 @@ export function BarChart({ points: series, bucket, noun, testId }: { points: Bar
       </div>
       <div className="flex justify-between text-[11.5px] text-dim">
         <span>{series[0] ? label(series[0].at, bucket) : ""}</span>
-        <span>{bucket === "hour" ? "this hour" : "today"}</span>
+        <span>{bucket === "minute" ? "now" : bucket === "hour" ? "this hour" : "today"}</span>
       </div>
       <details className="group border-t border-border">
         <summary className="cursor-pointer list-none py-2.5 text-[12px] text-muted hover:text-foreground">
@@ -99,7 +109,7 @@ export function BarChart({ points: series, bucket, noun, testId }: { points: Bar
         <table className="w-full text-[13px] tabular-nums">
           <thead>
             <tr className="border-y border-border text-left text-dim">
-              <th className="py-1.5 font-normal">{bucket === "hour" ? "Hour (UTC)" : "Day (UTC)"}</th>
+              <th className="py-1.5 font-normal">{bucket === "minute" ? "Minute (UTC)" : bucket === "hour" ? "Hour (UTC)" : "Day (UTC)"}</th>
               <th className="py-1.5 text-right font-normal">{noun[1][0]!.toUpperCase() + noun[1].slice(1)}</th>
               <th className="py-1.5 text-right font-normal" />
             </tr>
@@ -108,7 +118,7 @@ export function BarChart({ points: series, bucket, noun, testId }: { points: Bar
             {[...series].reverse().map((p) => (
               <tr key={p.at} className="border-b border-border-soft last:border-b-0">
                 <td className="py-1">{label(p.at, bucket)}</td>
-                <td className="py-1 text-right">{p.value}</td>
+                <td className="py-1 text-right">{currency ? money(p.value, currency) : p.value}</td>
                 <td className="py-1 text-right text-muted">{p.detail}</td>
               </tr>
             ))}

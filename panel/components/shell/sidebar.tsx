@@ -261,8 +261,8 @@ function Nav(props: SidebarProps & { onNavigate?: () => void }) {
   );
 }
 
-/** Pages that need the width: the sidebar shrinks to its icons there. */
-const COMPACT = /^\/projects\/[^/]+\/databases\/view/;
+/** Pages that need the width, or have a sidebar of their own (a site's Analytics): the sidebar shrinks to its icons there. */
+const COMPACT = /^\/(projects\/[^/]+\/databases\/view|analytics\/[^/]+)/;
 
 /**
  * The sidebar as a column of icons, each named on hover. The last button
