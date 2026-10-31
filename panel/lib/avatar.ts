@@ -1,15 +1,15 @@
-// Each project's mark on the Projects page: a DiceBear "Planets" made from its
-// name (https://www.dicebear.com/styles/planets/, CC0), so every project has a
-// planet of its own. Drawn here as a data: URI; nothing is fetched.
+// Each project's mark on the Projects page: a DiceBear "Clay" character made
+// from its name (https://www.dicebear.com/styles/clay/, CC0), so every project
+// has one of its own. Drawn here as a data: URI; nothing is fetched.
 import { Avatar, Style } from "@dicebear/core";
-import definition from "@dicebear/styles/planets.json";
+import definition from "@dicebear/styles/clay.json";
 
 const style = new Style(definition);
 const drawn = new Map<string, string>();
 
 function draw(seed: string): string {
   let svg = drawn.get(seed);
-  // Still: a list of spinning planets would be a lot to look at.
+  // Still: a list of moving characters would be a lot to look at.
   if (!svg) drawn.set(seed, (svg = new Avatar(style, { seed, animationProbability: 0 }).toString()));
   return svg;
 }

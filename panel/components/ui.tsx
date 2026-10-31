@@ -179,7 +179,7 @@ export function Skeleton({ className }: { className?: string }) {
   );
 }
 
-/** A project's own mark on the Projects page: its planet (lib/avatar.ts), with its stack named on hover. */
+/** A project's own mark on the Projects page: its clay character (lib/avatar.ts), with its stack named on hover. */
 export function ShapeMark({ src, framework, size = "md" }: { src: string; framework: string; size?: "sm" | "md" }) {
   return <img src={src} alt="" title={stackLogo(framework).title} className={cx("shrink-0", size === "sm" ? "size-7" : "size-9")} />;
 }
