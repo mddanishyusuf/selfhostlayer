@@ -191,7 +191,13 @@ fail2ban-client status sshd
 Every project's domains, one row per project: its main domain, the project's name and how many more it has, or what needs attention. **Manage** opens that project's Domains page.
 
 ### Integrations
-Coming soon: one-click apps built for Self Host Layer (analytics, email, scheduling and more).
+Tools every product needs, built for Self Host Layer and installed in one click. Every tool comes with Self Host Layer. Each one runs like your own apps: its own Linux user and sandbox, a free URL with HTTPS, and the same pages as a project (**Manage**): Domains, Logs, Backups, Cron jobs, Environment and Settings.
+
+- **Catalog:** the tools you can install, from `catalog.json` beside the update feed (`https://get.selfhostlayer.com/catalog.json`). **Install** opens the tool's first deployment. The server downloads it from the catalog's own address only and checks it against the catalog's sha256 before unpacking anything. Then the tool's own user unpacks it with no network access. Nothing is built on your server.
+- **Installed:** each tool with its version and whether it runs. **Open** goes to its address, and **Manage** to its pages.
+- **Settings:** the memory limit, down to the least the tool needs. How it starts and runs comes with each version.
+- **Uninstall** (on its Settings page): type its name to confirm. As when deleting a project, the tool stops, and its user, files, unit, cron jobs and Caddy site are removed. Its `data/` folder is kept in `/var/lib/layer-agent/archive/` unless you say otherwise.
+- **Coming soon:** Links (short links on your own domain), analytics, email, a post scheduler, a blog, a status page, a waitlist and a feedback board.
 
 ### Databases
 - **Engines:** SQLite, PostgreSQL, Redis, MongoDB and MySQL (MariaDB), each with its version, whether it runs (PostgreSQL, MySQL and MongoDB as systemd sees their server) and how much the apps use. MongoDB has its Install button here, and Start when it's stopped, which tells you why if it can't start.

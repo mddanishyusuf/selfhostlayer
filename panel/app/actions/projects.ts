@@ -84,7 +84,7 @@ export async function saveEnvAction(_prev: EnvState, form: FormData): Promise<En
   redirect(deploymentPath(project.slug, d.id));
 }
 
-/** Deletes the project and its app on the server (data/ is archived unless asked otherwise). */
+/** Deletes the project (or uninstalls an integration) and its app on the server (data/ is archived unless asked otherwise). */
 export async function removeProject(_prev: SettingsState, form: FormData): Promise<SettingsState> {
   await requireUser();
   const project = getProjectBySlug(field(form, "slug"));
@@ -100,7 +100,7 @@ export async function removeProject(_prev: SettingsState, form: FormData): Promi
   }
   deleteProject(project.id);
   removePreview(project.slug);
-  redirect("/");
+  redirect(project.source === "catalog" ? "/integrations" : "/");
 }
 
 export async function redeploy(form: FormData): Promise<void> {

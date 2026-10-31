@@ -9,13 +9,12 @@ runtime:
   node: "24"
   start: [node, server.js]
   health: /healthz
-  writable: [data]
-memory: { default: 64, min: 32 }
+memory: { default: 64, min: 64 }
 env:
   HELLO_GREETING: { setting: greeting, default: Hello }
 services: [sqlite]
 cron:
   - name: tidy
-    schedule: "*-*-* 03:30:00"
+    schedule: "30 3 * * *"
     command: node cron.js tidy
 backup: [data]

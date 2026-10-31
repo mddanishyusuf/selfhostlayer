@@ -1,7 +1,8 @@
 // Builds a catalog app (an integration) into dist/catalog/<id>-<version>.tar.gz:
 //   node scripts/build-catalog.ts <app>
 // Reads catalog/<app>/layer.yaml and checks it with the same validator the
-// agent uses, runs the app's build (npm run build, which must fill dist/), and
+// agent uses (and its cron schedules with the panel's, which turns them into
+// timers at install), runs the app's build (npm run build, which must fill dist/), and
 // packs dist/ with layer.json (the manifest as JSON) under <id>-<version>/.
 // Prints one JSON line: the file, its sha256 and the manifest, which is what
 // its entry in catalog.json needs.
@@ -11,6 +12,7 @@ import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, write
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { parse } from "yaml";
+import { cronToCalendar } from "../panel/lib/cron.ts";
 import { parseManifest } from "../packages/protocol/src/manifest.ts";
 
 const app = process.argv[2] ?? "";
@@ -29,6 +31,13 @@ const manifest = parseManifest(parse(readFileSync(join(dir, "layer.yaml"), "utf8
 if (manifest.id !== app) throw new Error(`catalog/${app}/layer.yaml says its id is ${manifest.id}`);
 const pkg = JSON.parse(readFileSync(join(dir, "package.json"), "utf8")) as { version?: string };
 if (pkg.version !== manifest.version) throw new Error(`package.json says ${pkg.version}, layer.yaml says ${manifest.version}: keep them the same`);
+for (const c of manifest.cron) {
+  try {
+    cronToCalendar(c.schedule);
+  } catch (err) {
+    throw new Error(`cron ${c.name}: ${(err as Error).message}`);
+  }
+}
 
 execFileSync("npm", ["run", "build", "--silent"], { cwd: dir, stdio: ["ignore", "inherit", "inherit"] });
 const dist = join(dir, "dist");

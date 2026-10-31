@@ -1,8 +1,8 @@
 import { notFound } from "next/navigation";
-import { DeleteProject, SettingsForm } from "@/components/settings";
+import { DeleteProject, IntegrationSettingsForm, SettingsForm } from "@/components/settings";
 import { Notice, PageHeader } from "@/components/page";
 import { frameworkLabel } from "@/lib/detect";
-import { listDeployments } from "@/lib/deploy";
+import { installedVersion, listDeployments } from "@/lib/deploy";
 import { getProjectBySlug, projectEnv } from "@/lib/projects";
 import { requireUser } from "@/lib/session";
 
@@ -16,6 +16,18 @@ export default async function SettingsPage({ params, searchParams }: { params: P
   await requireUser();
   const project = getProjectBySlug((await params).slug);
   if (!project) notFound();
+  if (project.source === "catalog") {
+    // An integration's manifest decides how it builds and runs; its memory limit is the owner's.
+    const version = installedVersion(project.id);
+    const name = version?.manifest?.name ?? project.slug;
+    return (
+      <>
+        <PageHeader title={project.slug} crumb="Settings" meta={`${version?.commitMessage ?? name}, from the catalog`} />
+        <IntegrationSettingsForm slug={project.slug} name={name} memoryMb={project.memoryMb} min={version?.manifest?.memory.min ?? 64} />
+        <DeleteProject slug={project.slug} integration={name} />
+      </>
+    );
+  }
   const isNew = (await searchParams).new === "1" && listDeployments(project.id, 1).length === 0;
   const r = project.runtime;
 

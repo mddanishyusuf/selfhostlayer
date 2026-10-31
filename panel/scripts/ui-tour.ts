@@ -245,35 +245,38 @@ if (process.env.TOUR_GITHUB === "1") {
   console.log("  ✓ webhook with a bad signature refused (401)");
 }
 
+// On a deployment's page: waits until it ends, and fails unless it's Ready.
+const headerText = `document.querySelector("main header")?.innerText ?? ""`;
+const waitForDeploy = async (what: string) => {
+  await waitFor(`/\\b(Ready|Failed|Cancelled)\\b/.test(${headerText})`, `${what} to finish`, 15 * 60_000);
+  const header = String(await evaluate(headerText));
+  if (!header.includes("Ready")) {
+    throw new Error(`${what} didn't succeed: ${header}\n${String(await evaluate(`document.querySelector('[role=log]')?.innerText ?? ""`)).slice(-1500)}`);
+  }
+};
+/** Opens https://<host><path> until it shows the text (a new app's certificate can take a moment). */
+const visit = async (host: string, path: string, expected: string) => {
+  let text = "";
+  for (let i = 0; i < 20 && !text.includes(expected); i++) {
+    await go(`https://${host}${path}`);
+    await sleep(1500);
+    text = String(await evaluate("document.body?.innerText ?? ''").catch(() => ""));
+  }
+  if (!text.includes(expected)) throw new Error(`https://${host}${path} didn't show "${expected}" (got: ${text.slice(0, 200)})`);
+  console.log(`  ✓ https://${host}${path} shows "${expected}"`);
+};
+
 // Deploys from github.com/mddanishyusuf/selfhostlayer-examples through the UI. TOUR_DEPLOY=1,
 // TOUR_APPS_DOMAIN=<the box's appsDomain> (default "internal").
 if (process.env.TOUR_DEPLOY === "1") {
   console.log("Deploy");
   const appsDomain = process.env.TOUR_APPS_DOMAIN ?? "internal";
   await setViewport(1280, 900);
-  const headerText = `document.querySelector("main header")?.innerText ?? ""`;
-  const waitForDeploy = async (what: string) => {
-    await waitFor(`/\\b(Ready|Failed|Cancelled)\\b/.test(${headerText})`, `${what} to finish`, 15 * 60_000);
-    const header = String(await evaluate(headerText));
-    if (!header.includes("Ready")) {
-      throw new Error(`${what} didn't succeed: ${header}\n${String(await evaluate(`document.querySelector('[role=log]')?.innerText ?? ""`)).slice(-1500)}`);
-    }
-  };
   const openNewestDeployment = async () => {
     const href = String(await evaluate(`document.querySelector('main a[href*="/deployments/"]').getAttribute("href")`));
     await go(href);
     await waitForPath(href);
     return href;
-  };
-  const visit = async (host: string, path: string, expected: string) => {
-    let text = "";
-    for (let i = 0; i < 20 && !text.includes(expected); i++) {
-      await go(`https://${host}${path}`);
-      await sleep(1500);
-      text = String(await evaluate("document.body?.innerText ?? ''").catch(() => ""));
-    }
-    if (!text.includes(expected)) throw new Error(`https://${host}${path} didn't show "${expected}" (got: ${text.slice(0, 200)})`);
-    console.log(`  ✓ https://${host}${path} shows "${expected}"`);
   };
   const importFolder = async (rootDir: string) => {
     await go("/new");
@@ -838,6 +841,44 @@ if (process.env.TOUR_DEPLOY === "1") {
   const overview = String(await evaluate("document.body.innerText"));
   if (/\bvite\b/.test(overview.split("Projects")[1] ?? "")) throw new Error("vite is still listed after deleting it");
   console.log("  ✓ deleted the vite project; it's gone from the overview");
+}
+
+// TOUR_INTEGRATIONS=1: a catalog beside the release feed lists the hello app
+// (installer/test/release-feed.sh catalog). Install it from Integrations, see
+// it answer on its free URL, then uninstall it.
+if (process.env.TOUR_INTEGRATIONS === "1") {
+  console.log("Integrations");
+  const host = `hello.${process.env.TOUR_APPS_DOMAIN ?? "internal"}`;
+  const greeting = "Hello from the Self Host Layer catalog";
+  await setViewport(1280, 900);
+  await go("/integrations");
+  await waitForPath("/integrations");
+  await waitFor(`!!document.querySelector('[data-testid="install-hello"]')`, "Hello in the catalog", 30_000);
+  await screenshot("integrations");
+  await click('[data-testid="install-hello"] button[type=submit]');
+  await waitFor(`location.pathname.startsWith("/projects/hello/deployments/")`, "the install's deployment page", 60_000);
+  await waitForDeploy("installing hello");
+  await screenshot("integrations-install-log");
+  const log = String(await evaluate(`document.querySelector('[role=log]')?.innerText ?? ""`));
+  if (!log.includes("Checked its sha256 and unpacked it") || /Installing dependencies|Building/.test(log)) throw new Error(`the install didn't come checked from the catalog, without a build:\n${log.slice(-1500)}`);
+  console.log("  ✓ Install: the tarball was checked against the catalog's sha256 and unpacked, with no build");
+  await visit(host, "/", greeting);
+  await go("/integrations");
+  await waitFor(`!!document.querySelector('[data-testid="installed-hello"]')?.innerText.includes("Running")`, "Hello listed as installed and running");
+  await screenshot("integrations-installed");
+  console.log("  ✓ listed under Installed, running, with its version");
+  await go("/projects/hello/settings");
+  await waitForPath("/projects/hello/settings");
+  await click('[data-testid="uninstall"]');
+  await waitFor(`!!document.querySelector("#confirm")`, "the uninstall confirmation");
+  await evaluate(`(() => { const el = document.querySelector("#confirm"); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(el, "hello"); el.dispatchEvent(new Event("input", { bubbles: true })); return true; })()`);
+  await click('form:has(#confirm) button[type=submit]');
+  await waitForPath("/integrations");
+  await waitFor(`!document.querySelector('[data-testid="installed-hello"]') && !!document.querySelector('[data-testid="install-hello"]')`, "Hello back in the catalog, not installed");
+  await go(`https://${host}/`);
+  await sleep(2000);
+  if (String(await evaluate("document.body?.innerText ?? ''").catch(() => "")).includes(greeting)) throw new Error(`https://${host}/ still answers after the uninstall`);
+  console.log(`  ✓ Uninstall: gone from Installed, back in the catalog, and https://${host}/ no longer answers`);
 }
 
 // TOUR_PANEL_ADDRESS=<host>: move the panel there from Settings and back. On a

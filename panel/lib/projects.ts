@@ -19,6 +19,10 @@ export interface Project {
   domains: string[];
   memoryMb: number;
   autoDeploy: boolean;
+  /** github: built from a repo; catalog: an integration, installed from the catalog (no repo, no build). */
+  source: "github" | "catalog";
+  /** The catalog app's id (links), for integrations. */
+  catalogApp: string | null;
 }
 
 interface Row {
@@ -38,6 +42,8 @@ interface Row {
   domains: string;
   memory_mb: number;
   auto_deploy: number;
+  source: Project["source"];
+  catalog_app: string | null;
 }
 
 const fromRow = (r: Row): Project => ({
@@ -57,6 +63,8 @@ const fromRow = (r: Row): Project => ({
   domains: JSON.parse(r.domains) as string[],
   memoryMb: r.memory_mb,
   autoDeploy: r.auto_deploy === 1,
+  source: r.source,
+  catalogApp: r.catalog_app,
 });
 
 /** An app slug from a repo (and folder) name: lowercase, a-z0-9 and single hyphens, unique. */
@@ -70,17 +78,17 @@ export function slugFor(base: string, taken: (slug: string) => boolean): string 
 
 export const slugTaken = (slug: string) => !!db().prepare("SELECT 1 FROM projects WHERE slug = ?").get(slug);
 
-export type NewProject = Omit<Project, "id">;
+export type NewProject = Omit<Project, "id" | "source" | "catalogApp"> & Partial<Pick<Project, "source" | "catalogApp">>;
 
 export function createProject(p: NewProject): Project {
   const result = db()
     .prepare(
       `INSERT INTO projects (slug, repo_owner, repo_name, installation_id, branch, root_dir, framework, package_manager, node_version,
-         install_command, build_command, runtime, domains, memory_mb, auto_deploy, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         install_command, build_command, runtime, domains, memory_mb, auto_deploy, source, catalog_app, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .run(p.slug, p.repoOwner, p.repoName, p.installationId, p.branch, p.rootDir, p.framework, p.packageManager, p.nodeVersion,
-      p.installCommand, p.buildCommand, JSON.stringify(p.runtime), JSON.stringify(p.domains), p.memoryMb, p.autoDeploy ? 1 : 0, now());
+      p.installCommand, p.buildCommand, JSON.stringify(p.runtime), JSON.stringify(p.domains), p.memoryMb, p.autoDeploy ? 1 : 0, p.source ?? "github", p.catalogApp ?? null, now());
   return getProject(Number(result.lastInsertRowid))!;
 }
 
@@ -94,8 +102,15 @@ export function getProjectBySlug(slug: string): Project | null {
   return row ? fromRow(row) : null;
 }
 
+/** Every project, integrations included (the Projects page shows only source github). */
 export function listProjects(): Project[] {
   return (db().prepare("SELECT * FROM projects ORDER BY created_at DESC").all() as unknown as Row[]).map(fromRow);
+}
+
+/** The integration installed from this catalog app, if any (one per app for now). */
+export function integrationFor(app: string): Project | null {
+  const row = db().prepare("SELECT * FROM projects WHERE source = 'catalog' AND catalog_app = ? ORDER BY id LIMIT 1").get(app) as Row | undefined;
+  return row ? fromRow(row) : null;
 }
 
 /** Projects that deploy on pushes to this repo and branch. */
@@ -136,6 +151,15 @@ export function setProjectEnv(projectId: number, vars: Record<string, string>): 
     database.exec("ROLLBACK");
     throw err;
   }
+}
+
+/** What an integration's manifest decides (lib/catalog.ts applies it before each deploy). */
+export function updateIntegration(id: number, s: { runtime: Runtime; nodeVersion: string; memoryMb: number }): void {
+  db().prepare("UPDATE projects SET runtime = ?, node_version = ?, memory_mb = ? WHERE id = ?").run(JSON.stringify(s.runtime), s.nodeVersion, s.memoryMb, id);
+}
+
+export function setMemory(id: number, memoryMb: number): void {
+  db().prepare("UPDATE projects SET memory_mb = ? WHERE id = ?").run(memoryMb, id);
 }
 
 export function updateProjectSettings(

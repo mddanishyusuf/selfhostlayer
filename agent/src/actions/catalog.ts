@@ -7,6 +7,7 @@
 import { parseManifest, ValidationError, type AppManifest } from "@layer/protocol";
 import type { ActionTable, Context } from "../context.ts";
 import { ActionError } from "../errors.ts";
+import { meetsMinimum } from "../version.ts";
 import { readBox, type BoxFile } from "./panel.ts";
 import { assertReleaseUrl } from "./update.ts";
 
@@ -114,15 +115,16 @@ export async function catalogVersion(ctx: Context, app: string, version: string)
   return v;
 }
 
-/** The catalog for the panel: apps, versions and manifests (not where tarballs live). */
+/** The catalog for the panel: apps, versions and manifests (not where tarballs live), and which versions this server can install. */
 async function catalogList(_params: unknown, ctx: Context) {
   const { apps } = await readCatalog(ctx);
+  const version = readBox(ctx).version;
   return {
     apps: apps.map((a) => ({
       id: a.id,
       name: a.name,
       summary: a.summary,
-      versions: a.versions.map(({ tarball, ...v }) => ({ ...v, sha256: tarball.sha256 })),
+      versions: a.versions.map(({ tarball, ...v }) => ({ ...v, sha256: tarball.sha256, supported: !v.minPanel || meetsMinimum(version, v.minPanel) })),
     })),
   };
 }

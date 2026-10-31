@@ -26,3 +26,8 @@ export function isNewer(a: string, b: string): boolean {
   }
   return false;
 }
+
+/** Whether a server on `version` can take something that needs `minimum` or newer. Dev and test builds (not semver) can take anything. */
+export function meetsMinimum(version: string, minimum: string): boolean {
+  return !SEMVER.test(version) || !isNewer(minimum, version);
+}

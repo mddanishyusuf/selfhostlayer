@@ -20,11 +20,11 @@ const MANIFEST = {
   name: "Hello",
   version: "0.1.0",
   summary: "Says hello, and counts visits in SQLite.",
-  runtime: { kind: "node", node: "24", start: ["node", "server.js"], health: "/healthz", writable: ["data"] },
-  memory: { default: 64, min: 32 },
+  runtime: { kind: "node", node: "24", start: ["node", "server.js"], health: "/healthz", writable: ["cache"] },
+  memory: { default: 128, min: 64 },
   env: { HELLO_SECRET: { generate: "secret" }, HELLO_GREETING: { setting: "greeting", default: "Hello" } },
   services: ["sqlite"],
-  cron: [{ name: "tidy", schedule: "*-*-* 03:30:00", command: "node cron.js tidy" }],
+  cron: [{ name: "tidy", schedule: "30 3 * * *", command: "node cron.js tidy" }],
   backup: ["data"],
 };
 
@@ -70,17 +70,21 @@ const unpackCalls = () => env.spawner.calls.filter((c) => c[0] === SYSTEMD_RUN &
 describe("parseManifest", () => {
   it("reads a manifest, with defaults for what it leaves out", () => {
     const m = parseManifest({ ...MANIFEST, memory: undefined, cron: undefined });
-    expect(m).toMatchObject({ id: "hello", runtime: { start: ["node", "server.js"], writable: ["data"] }, memory: { default: 256, min: 64 }, cron: [] });
+    expect(m).toMatchObject({ id: "hello", runtime: { start: ["node", "server.js"], writable: ["cache"] }, memory: { default: 256, min: 64 }, cron: [] });
     expect(m.env.HELLO_GREETING).toEqual({ setting: "greeting", default: "Hello" });
   });
 
   it("refuses what would reach a unit, an env file or a path unchecked", () => {
     expect(() => parseManifest({ ...MANIFEST, env: { PORT: { value: "1" } } })).toThrow(/env.PORT: is set by Self Host Layer/);
     expect(() => parseManifest({ ...MANIFEST, runtime: { ...MANIFEST.runtime, start: ["node", "server.js; rm -rf /"] } })).toThrow(/runtime.start\[1\]/);
+    expect(() => parseManifest({ ...MANIFEST, runtime: { ...MANIFEST.runtime, start: ["bash", "start.sh"] } })).toThrow(/runtime.start\[0\]: must be node, npm or npx/);
+    expect(() => parseManifest({ ...MANIFEST, memory: { default: 64, min: 32 } })).toThrow(/memory.min/);
     expect(() => parseManifest({ ...MANIFEST, runtime: { ...MANIFEST.runtime, writable: ["../etc"] } })).toThrow(/runtime.writable\[0\]/);
     expect(() => parseManifest({ ...MANIFEST, version: "latest" })).toThrow(/version/);
     expect(() => parseManifest({ ...MANIFEST, env: { HELLO_X: { value: "a\nb" } } })).toThrow(/env.HELLO_X.value/);
     expect(() => parseManifest({ ...MANIFEST, cron: [MANIFEST.cron[0], MANIFEST.cron[0]] })).toThrow(/listed twice/);
+    expect(() => parseManifest({ ...MANIFEST, cron: [{ ...MANIFEST.cron[0], command: "node cron.js && curl x" }] })).toThrow(/cron\[0\].command/);
+    expect(() => parseManifest({ ...MANIFEST, cron: [{ ...MANIFEST.cron[0], command: "sh tidy.sh" }] })).toThrow(/cron\[0\].command/);
     expect(() => parseManifest({ ...MANIFEST, services: ["mysql"] })).toThrow(/services\[0\]/);
   });
 });
@@ -101,8 +105,14 @@ describe("the catalog", () => {
 
   it("lists apps for the panel without saying where tarballs live", async () => {
     const { apps } = (await catalogActions["catalog.list"]!.run({}, env.ctx, NO_IO)) as any;
-    expect(apps[0]).toMatchObject({ id: "hello", name: "Hello", versions: [{ version: "0.1.0", minPanel: "0.1.6", sha256: sha(TARBALL) }] });
+    expect(apps[0]).toMatchObject({ id: "hello", name: "Hello", versions: [{ version: "0.1.0", minPanel: "0.1.6", sha256: sha(TARBALL), supported: true }] });
     expect(JSON.stringify(apps)).not.toContain("hello-0.1.0.tar.gz");
+  });
+
+  it("says which versions need a newer Self Host Layer", async () => {
+    catalog = catalogOf(version({ version: "0.2.0", minPanel: "0.2.0", manifest: { ...MANIFEST, version: "0.2.0" } }), version());
+    const { apps } = (await catalogActions["catalog.list"]!.run({}, env.ctx, NO_IO)) as any;
+    expect(apps[0].versions.map((v: any) => [v.version, v.supported])).toEqual([["0.2.0", false], ["0.1.0", true]]);
   });
 });
 
@@ -132,6 +142,23 @@ describe("catalog.fetch", () => {
     expect(unpackCalls()).toEqual([]);
     expect(readdirSync(env.paths.catalogDir)).toEqual([]);
     expect(existsSync(join(releases(), "0".repeat(40)))).toBe(false);
+  });
+
+  it("reuses a release still on disk without asking the catalog, and refuses one the catalog no longer matches", async () => {
+    const release = sha(TARBALL).slice(0, 40);
+    mkdirSync(join(releases(), release), { recursive: true });
+    catalog = "not reachable as JSON";
+    expect(await fetchApp({ release })).toEqual({ slug: "hello", release, fetched: false });
+    catalog = catalogOf(version());
+    await expect(fetchApp({ release: "a".repeat(40) })).rejects.toThrow(/isn't the file this deployment was made for/);
+    await expect(fetchApp({ release: "../etc" })).rejects.toThrow(/release/);
+    expect(unpackCalls()).toEqual([]);
+  });
+
+  it("refuses a version that needs a newer Self Host Layer", async () => {
+    catalog = catalogOf(version({ minPanel: "0.2.0" }));
+    await expect(fetchApp()).rejects.toThrow(/needs Self Host Layer 0.2.0 or newer \(this server runs 0.1.6\)/);
+    expect(unpackCalls()).toEqual([]);
   });
 
   it("refuses a catalog pointing elsewhere, and versions it doesn't list", async () => {

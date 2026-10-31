@@ -2,12 +2,14 @@
 // a time anyway); each is a sequence of agent actions:
 //   fetch → install → build → (node) idle color: point, start + health check,
 //   switch Caddy, drain, stop old | (static) publish + serve → prune.
+// An integration (lib/catalog.ts) applies its version's manifest first, then
+// fetches that version from the catalog instead of GitHub, with no build.
 // Any failure leaves the live version untouched. Logs go to a file and to
 // subscribers (the deployment page streams them).
 import { EventEmitter } from "node:events";
 import { appendFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { AgentError } from "@layer/protocol";
+import { AgentError, type AppManifest } from "@layer/protocol";
 import { agent, type SystemInfo } from "./agent";
 import { config } from "./config";
 import { db, now } from "./db";
@@ -15,6 +17,7 @@ import { installationToken } from "./github";
 import { raise, resolve } from "./alerts/engine";
 import { boxConfig } from "./box";
 import { BuildQueue } from "./build-queue";
+import { applyManifest } from "./catalog";
 import { checkCertificate } from "./cert";
 import { syncCrons } from "./crons";
 import { servingConfig } from "./domains";
@@ -40,7 +43,7 @@ export interface Deployment {
   sha: string;
   commitMessage: string;
   commitAuthor: string;
-  trigger: "manual" | "push" | "rollback" | "import";
+  trigger: "manual" | "push" | "rollback" | "import" | "install";
   status: DeployStatus;
   color: "blue" | "green" | "static" | null;
   error: string | null;
@@ -48,6 +51,9 @@ export interface Deployment {
   createdAt: number;
   startedAt: number | null;
   finishedAt: number | null;
+  /** An integration's version from the catalog, and its manifest; sha is then the release (the tarball's checksum). */
+  version: string | null;
+  manifest: AppManifest | null;
 }
 
 interface Row {
@@ -64,6 +70,8 @@ interface Row {
   created_at: number;
   started_at: number | null;
   finished_at: number | null;
+  version: string | null;
+  manifest: string | null;
 }
 
 const fromRow = (r: Row): Deployment => ({
@@ -80,6 +88,8 @@ const fromRow = (r: Row): Deployment => ({
   createdAt: r.created_at,
   startedAt: r.started_at,
   finishedAt: r.finished_at,
+  version: r.version,
+  manifest: r.manifest ? (JSON.parse(r.manifest) as AppManifest) : null,
 });
 
 export function getDeployment(id: number): Deployment | null {
@@ -210,18 +220,34 @@ export function resumeDeployments(): void {
   builds.pump();
 }
 
-export function createDeployment(project: Project, trigger: Deployment["trigger"], commit: { sha: string; message: string; author: string }): Deployment {
+export function createDeployment(
+  project: Project,
+  trigger: Deployment["trigger"],
+  commit: { sha: string; message: string; author: string },
+  catalog?: { version: string; manifest: AppManifest },
+): Deployment {
   recover();
   const result = db()
-    .prepare("INSERT INTO deployments (project_id, sha, commit_message, commit_author, trigger, status, created_at) VALUES (?, ?, ?, ?, ?, 'queued', ?)")
-    .run(project.id, commit.sha, commit.message, commit.author, trigger, now());
+    .prepare("INSERT INTO deployments (project_id, sha, commit_message, commit_author, trigger, status, version, manifest, created_at) VALUES (?, ?, ?, ?, ?, 'queued', ?, ?, ?)")
+    .run(project.id, commit.sha, commit.message, commit.author, trigger, catalog?.version ?? null, catalog ? JSON.stringify(catalog.manifest) : null, now());
   const id = Number(result.lastInsertRowid);
   builds.add(id);
   return getDeployment(id)!;
 }
 
-/** Deploys the branch head (or a given commit). */
+/** An integration's version: the live deployment's, else the newest one's. */
+export function installedVersion(projectId: number): Deployment | null {
+  const d = liveDeployment(projectId) ?? listDeployments(projectId, 1)[0] ?? null;
+  return d?.version && d.manifest ? d : null;
+}
+
+/** Deploys the branch head (or a given commit); an integration deploys its installed version again. */
 export async function deployProject(project: Project, trigger: Deployment["trigger"], sha?: string): Promise<Deployment> {
+  if (project.source === "catalog") {
+    const from = installedVersion(project.id);
+    if (!from) throw new Error("This integration has no version to deploy.");
+    return createDeployment(project, trigger, { sha: from.sha, message: from.commitMessage, author: from.commitAuthor }, { version: from.version!, manifest: from.manifest! });
+  }
   const token = await repoToken(project).catch(() => undefined);
   const commit = sha ? { sha, message: "", author: "" } : await latestCommit(project.repoOwner, project.repoName, project.branch, token);
   return createDeployment(project, trigger, commit);
@@ -231,7 +257,8 @@ export async function deployProject(project: Project, trigger: Deployment["trigg
 export function rollbackTo(target: Deployment): Deployment {
   const project = getProject(target.projectId);
   if (!project) throw new Error("project not found");
-  return createDeployment(project, "rollback", { sha: target.sha, message: target.commitMessage, author: target.commitAuthor });
+  const catalog = target.version && target.manifest ? { version: target.version, manifest: target.manifest } : undefined;
+  return createDeployment(project, "rollback", { sha: target.sha, message: target.commitMessage, author: target.commitAuthor }, catalog);
 }
 
 /** A queued or running deployment of this project, if any. */
@@ -319,8 +346,10 @@ async function repoToken(project: Project): Promise<string | undefined> {
 async function run(id: number): Promise<void> {
   const d = getDeployment(id);
   if (!d || d.status !== "queued") return;
-  const p = getProject(d.projectId);
+  let p = getProject(d.projectId);
   if (!p) return finish(id, "failed", "The project was deleted.");
+  // An integration: fetched from the catalog (checked against its sha256), never built.
+  const catalog = p.source === "catalog";
 
   const steps: Step[] = [];
   let stepStart = Date.now();
@@ -349,34 +378,45 @@ async function run(id: number): Promise<void> {
     });
 
   update(id, { started_at: now() });
-  log(id, `Deploying ${p.repoOwner}/${p.repoName}@${d.sha.slice(0, 7)}${d.commitMessage ? ` "${d.commitMessage}"` : ""} (${d.trigger})\n`);
+  log(id, catalog ? `Deploying ${d.commitMessage} from the catalog (${d.trigger})\n` : `Deploying ${p.repoOwner}/${p.repoName}@${d.sha.slice(0, 7)}${d.commitMessage ? ` "${d.commitMessage}"` : ""} (${d.trigger})\n`);
   try {
+    if (catalog) {
+      if (!d.version || !d.manifest) throw new Error("This deployment doesn't say which version to install.");
+      // How it starts, its Node, env and cron jobs come from this version's manifest.
+      for (const note of await applyManifest(p, d.manifest)) log(id, note);
+      p = getProject(p.id)!;
+    }
     const freed = await freeSpaceIfLow(p.id);
     if (freed) log(id, freed);
     await agent("app.create", { slug: p.slug });
     await agent("env.write", { slug: p.slug, vars: projectEnv(p.id) });
     const node = await agent<{ installed: boolean }>("node.install", { version: p.nodeVersion });
-    log(id, `Node ${p.nodeVersion}${node.installed ? " (installed now)" : ""}, ${p.packageManager}\n`);
-    if (p.packageManager === "bun") await agent("tool.install", { tool: "bun", version: BUN_VERSION });
+    log(id, `Node ${p.nodeVersion}${node.installed ? " (installed now)" : ""}${catalog ? "" : `, ${p.packageManager}`}\n`);
+    if (!catalog && p.packageManager === "bun") await agent("tool.install", { tool: "bun", version: BUN_VERSION });
 
     setStatus("fetching", "fetch");
-    const token = await repoToken(p);
-    const fetched = await stream("source.fetch", { slug: p.slug, owner: p.repoOwner, repo: p.repoName, sha: d.sha, ...(token ? { token } : {}) });
-    // A rollback whose release is still on disk skips the build.
-    const builtBefore = !!db().prepare("SELECT 1 FROM deployments WHERE project_id = ? AND sha = ? AND status = 'ready' AND id != ?").get(p.id, d.sha, id);
-    if (d.trigger === "rollback" && builtBefore && fetched.fetched === false) {
-      log(id, "This commit's build is still on the server, so the build is skipped.\n");
+    if (catalog) {
+      const fetched = await stream("catalog.fetch", { slug: p.slug, app: p.catalogApp, version: d.version, release: d.sha });
+      log(id, fetched.fetched ? `Checked its sha256 and unpacked it (${Math.ceil(Number(fetched.bytes) / 1024)} KB) as app-${p.slug}\n` : "This version is already on the server.\n");
     } else {
-      await stream("build.run", {
-        slug: p.slug,
-        sha: d.sha,
-        nodeVersion: p.nodeVersion,
-        packageManager: p.packageManager,
-        rootDir: p.rootDir,
-        memoryMb: Math.max(1024, p.memoryMb * 2),
-        ...(p.installCommand ? { installCommand: p.installCommand } : {}),
-        ...(p.buildCommand ? { buildCommand: p.buildCommand } : {}),
-      });
+      const token = await repoToken(p);
+      const fetched = await stream("source.fetch", { slug: p.slug, owner: p.repoOwner, repo: p.repoName, sha: d.sha, ...(token ? { token } : {}) });
+      // A rollback whose release is still on disk skips the build.
+      const builtBefore = !!db().prepare("SELECT 1 FROM deployments WHERE project_id = ? AND sha = ? AND status = 'ready' AND id != ?").get(p.id, d.sha, id);
+      if (d.trigger === "rollback" && builtBefore && fetched.fetched === false) {
+        log(id, "This commit's build is still on the server, so the build is skipped.\n");
+      } else {
+        await stream("build.run", {
+          slug: p.slug,
+          sha: d.sha,
+          nodeVersion: p.nodeVersion,
+          packageManager: p.packageManager,
+          rootDir: p.rootDir,
+          memoryMb: Math.max(1024, p.memoryMb * 2),
+          ...(p.installCommand ? { installCommand: p.installCommand } : {}),
+          ...(p.buildCommand ? { buildCommand: p.buildCommand } : {}),
+        });
+      }
     }
     if (cancelRequested.has(id)) throw new AgentError("cancelled", "cancelled");
 

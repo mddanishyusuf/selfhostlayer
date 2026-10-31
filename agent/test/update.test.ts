@@ -8,7 +8,7 @@ import { parseFeed, UPDATE_UNIT, updateActions } from "../src/actions/update.ts"
 import { NO_IO } from "../src/context.ts";
 import { BIN } from "../src/exec.ts";
 import { SYSTEMD_RUN } from "../src/sandbox.ts";
-import { isNewer } from "../src/version.ts";
+import { isNewer, meetsMinimum } from "../src/version.ts";
 import { testEnv, type TestEnv } from "./helpers.ts";
 
 const TARBALL = Buffer.from("tarball bytes");
@@ -60,6 +60,16 @@ describe("parseFeed", () => {
     expect(() => parseFeed(JSON.stringify({ releases: [release({ installer: { url: `${base}/install.sh`, sha256: "abc" } })] }))).toThrow(/sha256/);
     expect(() => parseFeed(JSON.stringify({ releases: [release({ version: "../x" })] }))).toThrow(/version/);
     expect(() => parseFeed("not json")).toThrow(/isn't JSON/);
+  });
+});
+
+describe("meetsMinimum", () => {
+  it("compares releases; dev and test builds take anything", () => {
+    expect(meetsMinimum("0.1.6", "0.1.6")).toBe(true);
+    expect(meetsMinimum("0.2.0", "0.1.6")).toBe(true);
+    expect(meetsMinimum("0.1.5", "0.1.6")).toBe(false);
+    expect(meetsMinimum("0.1.6-dev.abc", "0.1.6")).toBe(false);
+    expect(meetsMinimum("dev", "9.0.0")).toBe(true);
   });
 });
 

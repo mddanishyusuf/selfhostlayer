@@ -113,6 +113,38 @@ const FAKE: Partial<Record<ActionName, unknown>> = {
   },
   "metrics.disk": { apps: { piqo: 310 } },
   "proxy.set": {},
+  // The catalog's test app, as catalog.list gives it (get.selfhostlayer.com/catalog.json).
+  "catalog.list": {
+    apps: [
+      {
+        id: "hello",
+        name: "Hello",
+        summary: "Says hello and counts visits in SQLite. A test app for the catalog.",
+        versions: [
+          {
+            version: "0.1.0",
+            date: "2026-10-31",
+            notes: "The first version.",
+            minPanel: null,
+            sha256: "24b91ac86345859a6d2eae17bcaae2463290aff6a117830924085c0a7ccc350c",
+            supported: true,
+            manifest: {
+              id: "hello",
+              name: "Hello",
+              version: "0.1.0",
+              summary: "Says hello and counts visits in SQLite. A test app for the catalog.",
+              runtime: { kind: "node", node: "24", start: ["node", "server.js"], health: "/healthz", writable: [] },
+              memory: { default: 64, min: 64 },
+              env: { HELLO_GREETING: { setting: "greeting", default: "Hello" } },
+              services: ["sqlite"],
+              cron: [{ name: "tidy", schedule: "30 3 * * *", command: "node cron.js tidy" }],
+              backup: ["data"],
+            },
+          },
+        ],
+      },
+    ],
+  },
   "requests.tail": {
     slug: "piqo",
     requests: [

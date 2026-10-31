@@ -26,9 +26,11 @@ import { ActionError } from "../errors.ts";
 import { BIN } from "../exec.ts";
 import { ensureDir, lookupUser } from "../fsutil.ts";
 import { sandboxArgs, SYSTEMD_RUN, type SandboxOptions } from "../sandbox.ts";
+import { meetsMinimum } from "../version.ts";
 import { appLayout } from "./app.ts";
 import { catalogVersion } from "./catalog.ts";
 import { download } from "./node.ts";
+import { readBox } from "./panel.ts";
 
 const MAX_SOURCE_BYTES = 500 * 2 ** 20;
 // GitHub tokens: legacy installation tokens are ghs_ + ~36 chars of
@@ -176,10 +178,18 @@ async function sourceFetch(params: Params, ctx: Context, io: CallIO) {
  */
 async function catalogFetch(params: Params, ctx: Context, io: CallIO) {
   const slug = assertSlug(params.slug);
+  const named = params.release === undefined ? null : assertFullSha(params.release, "release");
+  const { app, user } = await requireAppUser(ctx, slug);
+  // A redeploy or rollback of a release still on disk doesn't need the catalog.
+  if (named && isRealDir(join(app.releases, named))) return { slug, release: named, fetched: false };
   const want = await catalogVersion(ctx, String(params.app ?? ""), String(params.version ?? ""));
   const label = `${want.manifest.id} ${want.version}`;
-  const { app, user } = await requireAppUser(ctx, slug);
   const release = want.tarball.sha256.slice(0, 40);
+  if (named && named !== release) throw new ActionError("catalog_changed", `the catalog's ${label} isn't the file this deployment was made for, so nothing was installed`);
+  const version = readBox(ctx).version;
+  if (want.minPanel && !meetsMinimum(version, want.minPanel)) {
+    throw new ActionError("too_old", `${label} needs Self Host Layer ${want.minPanel} or newer (this server runs ${version}): update first`);
+  }
   if (isRealDir(join(app.releases, release))) return { slug, release, fetched: false };
   diskGuard(ctx);
   cancelled.delete(slug);

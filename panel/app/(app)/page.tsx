@@ -76,7 +76,8 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
   const { q, status, view } = await searchParams;
   // Warm the New project list in the background, so it opens without waiting on GitHub.
   if (getApp()) void allRepos().catch(() => {});
-  const all = listProjects();
+  // Integrations have their own page.
+  const all = listProjects().filter((p) => p.source === "github");
   const term = q?.trim().toLowerCase();
   const matching = term ? all.filter((p) => `${p.slug} ${p.domains.join(" ")} ${p.repoName}`.toLowerCase().includes(term)) : all;
   const usage = latestUsage();

@@ -15,9 +15,9 @@ export type ManifestEnv =
 
 export interface ManifestCron {
   name: string;
-  /** systemd OnCalendar, as project cron jobs (checked by systemd at install). */
+  /** A cron expression ("30 3 * * *") or a preset (@daily), as on a project's Cron jobs page; the panel turns it into a systemd timer. */
   schedule: string;
-  /** Run in the release folder, as the app's user, like a project's cron command. */
+  /** Run in the release folder, as the app's user, like a project's cron command: plain words, starting with node, npm or npx. */
   command: string;
 }
 
@@ -30,6 +30,7 @@ export interface AppManifest {
     kind: "node";
     /** A major version ("24") or an exact one ("24.13.1"). */
     node: string;
+    /** argv; the first is node, npm or npx, which run on the app's own Node. */
     start: string[];
     health: string;
     writable: string[];
@@ -47,6 +48,7 @@ const RESERVED_ENV = new Set(["PORT", "HOST", "NODE_ENV", "DATA_DIR", "PATH", "H
 const VERSION = /^\d{1,4}\.\d{1,4}\.\d{1,6}(?:-[0-9A-Za-z.-]{1,32})?$/;
 const NODE = /^\d{2}(?:\.\d{1,3}\.\d{1,3})?$/;
 const START_ARG = /^[A-Za-z0-9._/@=:,+-]{1,200}$/;
+const START_BINS = ["node", "npm", "npx"];
 const SETTING = /^[a-z][A-Za-z0-9]{0,39}$/;
 
 const isObject = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
@@ -93,10 +95,12 @@ export function parseManifest(value: unknown): AppManifest {
     return arg;
   });
   if (!start.length) throw new ValidationError("runtime.start", "must name the command that starts the app");
+  if (!START_BINS.includes(start[0]!)) throw new ValidationError("runtime.start[0]", "must be node, npm or npx (they run on the app's own Node)");
   const writable = list(runtime.writable, "runtime.writable", 10).map((p, i) => assertRelativePath(p, `runtime.writable[${i}]`));
 
   const memory = isObject(value.memory) ? value.memory : {};
-  const min = assertInt(memory.min ?? 64, "memory.min", 32, 4096);
+  // A unit's memory limit is at least 64 MB.
+  const min = assertInt(memory.min ?? 64, "memory.min", 64, 4096);
   const defaultMb = assertInt(memory.default ?? 256, "memory.default", min, 4096);
 
   const env: Record<string, ManifestEnv> = {};
@@ -120,7 +124,12 @@ export function parseManifest(value: unknown): AppManifest {
     const name = assertSlug(c.name, `cron[${i}].name`);
     if (names.has(name)) throw new ValidationError(`cron[${i}].name`, `${name} is listed twice`);
     names.add(name);
-    return { name, schedule: text(c.schedule, `cron[${i}].schedule`, 100), command: text(c.command, `cron[${i}].command`, 1000) };
+    const command = text(c.command, `cron[${i}].command`, 1000);
+    const words = command.split(/\s+/);
+    if (!START_BINS.includes(words[0]!) || !words.every((w) => START_ARG.test(w))) {
+      throw new ValidationError(`cron[${i}].command`, "must be plain words starting with node, npm or npx (no shell characters)");
+    }
+    return { name, schedule: text(c.schedule, `cron[${i}].schedule`, 100), command: words.join(" ") };
   });
 
   const backup = list(value.backup, "backup", 10).map((p, i) => assertRelativePath(p, `backup[${i}]`));

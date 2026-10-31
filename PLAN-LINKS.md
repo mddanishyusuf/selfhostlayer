@@ -25,7 +25,7 @@ panel's Links pages ──(admin token, 127.0.0.1 only)──▶ Links' admin AP
 
 ## Decisions (agreed 2026-10-31)
 1. **`source: catalog` on projects.** The deploy pipeline only changes in two places: "fetch" downloads the app from the catalog instead of a GitHub tarball, and "build" is skipped because catalog apps ship built. Integrations are listed on the Integrations page, not on Projects, but keep the project pages (Domains, Logs, Backups, Environment, Settings) under their own routes.
-2. **First-party apps live in this repo**, in `catalog/links/`, versioned on their own (Links 0.1.0 is not panel 0.1.5). `scripts/build-catalog.sh links` builds `links-<version>.tar.gz`. The publish script uploads it to `get.selfhostlayer.com/catalog/` and adds it to `catalog.json`, the same way `releases.json` works today. The agent downloads only from the configured feed's host and checks the sha256, reusing the update code (`agent/src/actions/update.ts`).
+2. **First-party apps live in this repo**, in `catalog/links/`, versioned on their own (Links 0.1.0 is not panel 0.1.5). `node scripts/build-catalog.ts links` builds `links-<version>.tar.gz`. `scripts/publish-catalog.sh links` uploads it to `get.selfhostlayer.com/catalog/` and adds it to `catalog.json`, the same way `releases.json` works today. The agent downloads only from the configured feed's host and checks the sha256, reusing the update code (`agent/src/actions/update.ts`).
 3. **The manifest: authors write `layer.yaml`, and the box only reads JSON.** It's the one place an app says what it needs; Links is its first user (format below). The catalog build checks the YAML and turns it into `layer.json` inside the tarball and into the app's entry in `catalog.json`, so the agent needs no YAML parser. The agent checks the JSON again with a validator in `packages/protocol`. `catalog.json` also carries what the Integrations page shows: name, summary, versions, sha256 and the minimum panel version.
 4. **Links is a small Node service with no framework:** `node:http` plus `node:sqlite` (built into Node 24, as the panel uses it). There are no native modules, so nothing compiles on the box. It's written in TypeScript and compiled before release. Targets are **under 40 MB of memory idle** and a redirect answered in **under 5 ms** on the box. Next.js would cost about 100 MB for what is mostly a redirect.
 5. **Managed inside the panel, not as a separate admin site.** You get one login (the panel's, with 2FA) and one design (the AgentOS look). The panel calls Links' admin API on `127.0.0.1` at the live color's port, with a token made at install. The token is encrypted in the panel's database and given to Links as an env var. Links' public side only redirects, plus an optional public API with tokens you create. A team-facing admin with single sign-on can come later, with the other apps.
@@ -65,18 +65,18 @@ summary: Short links on your own domain, with click stats and QR codes.
 runtime:
   kind: node
   node: "24"
-  start: ["node", "server.js"]
+  start: ["node", "server.js"]            # node, npm or npx first: they run on the app's own Node
   health: /healthz
-  writable: [data]
-memory: { default: 128, min: 64 }        # MB, as each project's limit
+  writable: []                           # folders in the release it writes to; DATA_DIR is always writable
+memory: { default: 128, min: 64 }        # MB, as each project's limit (at least 64)
 env:
   LINKS_ADMIN_TOKEN: { generate: secret }  # made once at install, kept across updates
   LINKS_FALLBACK_URL: { setting: fallbackUrl, default: "" }
 services: [sqlite]                       # data/links.db; PORT and DATA_DIR come from the platform
 cron:
   - name: rollup
-    schedule: "*-*-* 03:30:00"           # systemd OnCalendar, as project crons
-    command: ["node", "cron.js", "rollup"]
+    schedule: "30 3 * * *"               # cron, as on a project's Cron jobs page
+    command: node cron.js rollup         # plain words, node, npm or npx first
 backup: [data]
 ```
 
@@ -132,7 +132,7 @@ backup: [data]
   - The project source and the pipeline's skipped build.
   - `app/(app)/integrations/`: the catalog with Install and the installed apps.
   - `app/(app)/integrations/links/`: Links, Stats and Settings.
-- **Scripts:** `scripts/build-catalog.sh`; `publish-release.sh` grows a catalog mode.
+- **Scripts:** `scripts/build-catalog.ts`, and `scripts/publish-catalog.sh` beside `publish-release.sh`.
 - **Docs:** `docs/integrations.md` (how installing works, what runs where) and `docs/links.md`, plus the same on the website.
 
 ## Day by day
@@ -162,7 +162,7 @@ backup: [data]
   - the id, version, Node version (a major like `24`, or exact);
   - start arguments: plain words, no spaces or shell characters;
   - health path; writable and backup paths, relative only;
-  - memory between 32 and 4096 MB;
+  - memory between 64 and 4096 MB (64 since Day 2: a unit's limit is at least 64);
   - env (`generate: secret`, `setting` with a default, or a fixed `value`; no line breaks; names the platform sets, like `PORT` and `DATA_DIR`, refused);
   - services (`sqlite` for now); cron jobs with unique names.
 - **The catalog** (`agent/src/actions/catalog.ts`):
@@ -183,3 +183,41 @@ backup: [data]
 - **The test app** `catalog/hello/`: a Node server that greets and counts visits in SQLite, a `tidy` cron job, and a `greeting` setting. Day 2 installs it for real.
 - **Moved to Day 2:** publishing to get.selfhostlayer.com (routes in the website for `catalog.json` and `/catalog/…`, and a catalog mode in the publish script). Day 2's install is the first thing that needs the real catalog.
 
+
+## Day 2 result (2026-10-31)
+**Done when "VM: Install puts the hello app on its free URL with HTTPS; Uninstall removes its unit, user and domain": passed.** The browser tour has an Integrations section (`TOUR_INTEGRATIONS=1`, in CI). It installs Hello from the Integrations page, opens `https://hello.internal` (Caddy's local CA on test boxes), sees it listed as installed and running, and uninstalls it. CI then checks that its user, unit, Caddy site and folder are gone.
+
+- **An integration is a project with `source: catalog`.** A migration adds `source` and `catalog_app` to projects, and `version` and `manifest` to deployments. A deployment names its version, keeps that version's manifest, and uses the release name (from the tarball's checksum) as its sha. Redeploys, rollbacks, restarts for new env vars and the deployment pages work unchanged.
+- **The pipeline** applies the version's manifest before each deploy of an integration (`applyManifest`, `panel/lib/catalog.ts`):
+  - the start command, health check and writable folders;
+  - Node: the server's default when it's the major the manifest asks for, else the newest LTS of that major;
+  - memory: the owner's limit, raised to the manifest's minimum when it's lower;
+  - env: secrets made once and kept, settings added with their defaults (the owner's values stay), fixed values set;
+  - cron jobs as the manifest lists them.
+
+  Then it runs `catalog.fetch` instead of the GitHub fetch, with no install or build step.
+- **`catalog.fetch`:**
+  - A redeploy names its release, and a release still on the server is used without asking the catalog, so redeploys work while get.selfhostlayer.com is down.
+  - A version needing a newer Self Host Layer (`minPanel`) is refused; `catalog.list` says which versions this server can install. Dev and test builds (not semver) can install anything.
+- **The manifest, tightened:**
+  - The start command and cron commands begin with node, npm or npx, in plain words.
+  - Memory is at least 64 MB, a unit's floor.
+  - Cron schedules are cron expressions, as on the Cron jobs page; the build script checks them with the panel's parser.
+- **The Integrations page:**
+  - **Installed:** version, status, Open and Manage.
+  - **Catalog:** Install, or Manage once installed, or "Needs <version> or newer".
+  - **Coming soon:** Links first.
+
+  The old list's "by Piqo / maillayer" column is gone: every tool is built fresh.
+- **An integration's pages** are a project's, with "← Integrations" at the top of the sidebar; Projects doesn't list or count them.
+  - **Overview:** the version and "from the catalog" instead of the repo and branch.
+  - **Settings:** the memory limit (from the manifest's minimum) and **Uninstall** (type the name, as for Delete; `data/` is archived unless you say otherwise).
+- **Publishing:** the website serves `get.selfhostlayer.com/catalog.json` and `/catalog/<app>/<version>/<app>-<version>.tar.gz` from the shl project's data folder (`DATA_DIR/catalog`). `scripts/publish-catalog.sh <app> [--notes "…"] [--min-panel <version>]`:
+  1. builds the app from a pushed commit;
+  2. puts the version on top of the app's list (`scripts/catalog-feed.ts`, keeping the newest 10);
+  3. checks the new catalog with the agent's own `parseCatalog`, since a catalog the servers can't read would stop every install;
+  4. uploads the tarball first and the catalog last;
+  5. checks the live URL.
+- **Tests:**
+  - 5 panel unit tests (`panel/lib/catalog.test.ts`) and 5 more agent tests;
+  - `installer/test/release-feed.sh catalog <tarball>` serves a test catalog beside the test feed, for the tour.

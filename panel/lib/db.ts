@@ -223,6 +223,12 @@ const MIGRATIONS = [
   // Domains behind Cloudflare's proxy (orange cloud), and what the last DNS check found.
   `ALTER TABLE project_domains ADD COLUMN proxied INTEGER NOT NULL DEFAULT 0;
    ALTER TABLE project_domains ADD COLUMN dns_status TEXT;`,
+  // Integrations: projects whose code comes from the catalog instead of GitHub (lib/catalog.ts).
+  // Their deployments name the app's version and keep its manifest; the sha is the release (the tarball's checksum).
+  `ALTER TABLE projects ADD COLUMN source TEXT NOT NULL DEFAULT 'github';
+   ALTER TABLE projects ADD COLUMN catalog_app TEXT;
+   ALTER TABLE deployments ADD COLUMN version TEXT;
+   ALTER TABLE deployments ADD COLUMN manifest TEXT;`,
 ];
 
 function open(): DatabaseSync {

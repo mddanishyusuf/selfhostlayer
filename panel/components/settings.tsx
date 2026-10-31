@@ -3,6 +3,7 @@
 import { EyeIcon, EyeOffIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
+import { saveIntegrationSettings, type IntegrationSettingsState } from "@/app/actions/integrations";
 import { removeProject, saveEnvAction, saveSettings, type EnvState, type SettingsState } from "@/app/actions/projects";
 import { badDotEnvLines, formatDotEnv, parseDotEnv } from "@/lib/project-settings";
 import { Icon } from "./icon";
@@ -299,27 +300,52 @@ export function EnvForm({ slug, initial, isStatic, live }: { slug: string; initi
   );
 }
 
-function DeleteSubmit({ disabled, slug }: { disabled: boolean; slug: string }) {
+/** An integration's settings: what its manifest leaves to the owner (the memory limit, from the manifest's minimum up). */
+export function IntegrationSettingsForm({ slug, name, memoryMb, min }: { slug: string; name: string; memoryMb: number; min: number }) {
+  const [state, action] = useActionState(saveIntegrationSettings, {} as IntegrationSettingsState);
+  return (
+    <form action={action}>
+      <input type="hidden" name="slug" value={slug} />
+      <SettingsRow title="Resources" description={`${name} restarts if it goes over the memory limit, so it can't freeze the server. How it starts and runs comes with each version.`}>
+        <Field label="Memory limit (MB)" htmlFor="memoryMb" hint={`${min} to 16384`}>
+          <Input id="memoryMb" name="memoryMb" type="number" min={min} max={16384} defaultValue={memoryMb} className="max-w-[160px] tabular-nums" />
+          <Err msg={state.error} />
+        </Field>
+      </SettingsRow>
+      <div className="grid gap-3 border-b border-border px-3.5 py-5">
+        {state.saved && <p className="text-right text-[13px] text-teal">{state.saved}</p>}
+        <SaveButtons isNew={false} />
+      </div>
+    </form>
+  );
+}
+
+function DeleteSubmit({ disabled, slug, verb }: { disabled: boolean; slug: string; verb: "Delete" | "Uninstall" }) {
   const { pending } = useFormStatus();
   return (
     <Button type="submit" variant="danger" disabled={disabled || pending}>
-      {pending ? "Deleting…" : `Delete ${slug}`}
+      {pending ? (verb === "Delete" ? "Deleting…" : "Uninstalling…") : `${verb} ${slug}`}
     </Button>
   );
 }
 
-export function DeleteProject({ slug }: { slug: string }) {
+/** Deletes a project, or uninstalls an integration (integration: its name), after typing its name. */
+export function DeleteProject({ slug, integration }: { slug: string; integration?: string }) {
   const [state, action] = useActionState(removeProject, {} as SettingsState);
   const [open, setOpen] = useState(false);
   const [typed, setTyped] = useState("");
+  const verb = integration ? "Uninstall" : "Delete";
   return (
-    <SettingsRow title="Delete project" description="Stops the app and removes its user, files, unit and Caddy site from the server. Its data/ folder is archived on the server unless you say otherwise.">
+    <SettingsRow
+      title={integration ? `Uninstall ${integration}` : "Delete project"}
+      description={`Stops ${integration ? "it" : "the app"} and removes its user, files, unit, cron jobs and Caddy site from the server. Its data/ folder is archived on the server unless you say otherwise.`}
+    >
       <div>
-        <Button type="button" variant="secondary" size="sm" className="border-rose/60 text-rose hover:bg-rose/10" onClick={() => setOpen(true)} data-testid="delete-project">
-          Delete {slug}…
+        <Button type="button" variant="secondary" size="sm" className="border-rose/60 text-rose hover:bg-rose/10" onClick={() => setOpen(true)} data-testid={integration ? "uninstall" : "delete-project"}>
+          {verb} {slug}…
         </Button>
       </div>
-      <Modal open={open} onClose={() => setOpen(false)} title={`Delete ${slug}`} description="This can't be undone">
+      <Modal open={open} onClose={() => setOpen(false)} title={`${verb} ${slug}`} description="This can't be undone">
         <form action={action} className="grid gap-4 px-[18px] py-5">
           <input type="hidden" name="slug" value={slug} />
           <p className="text-[12px] text-muted">The app stops and its user, files, systemd unit and Caddy site are removed. Domains stop answering. Backups in your bucket are kept.</p>
@@ -334,7 +360,7 @@ export function DeleteProject({ slug }: { slug: string }) {
             <Button type="button" variant="secondary" onClick={() => setOpen(false)}>
               Cancel
             </Button>
-            <DeleteSubmit disabled={typed !== slug} slug={slug} />
+            <DeleteSubmit disabled={typed !== slug} slug={slug} verb={verb} />
           </div>
         </form>
       </Modal>

@@ -5,7 +5,7 @@ import { UpdateModal } from "@/components/shell/update-modal";
 import { agent, type SystemInfo } from "@/lib/agent";
 import { listIncidents } from "@/lib/alerts/engine";
 import { boxConfig } from "@/lib/box";
-import { listDeployments, liveDeployment } from "@/lib/deploy";
+import { installedVersion, listDeployments, liveDeployment } from "@/lib/deploy";
 import { listAllDomains, servingConfig } from "@/lib/domains";
 import { listProjects } from "@/lib/projects";
 import { requireUser } from "@/lib/session";
@@ -20,10 +20,12 @@ function sidebarProjects(): SidebarProject[] {
     const hosts = servingConfig(p.id).domains;
     // A custom domain (not the free URL) is the one to visit, once it's live.
     const host = hosts.find((h) => h !== p.domains[0]) ?? hosts[0] ?? p.domains[0];
+    const integration = p.source === "catalog";
     return {
       slug: p.slug,
-      repo: `${p.repoOwner}/${p.repoName}`,
-      branch: p.branch,
+      repo: integration ? (installedVersion(p.id)?.commitMessage ?? p.slug) : `${p.repoOwner}/${p.repoName}`,
+      branch: integration ? "from the catalog" : p.branch,
+      integration,
       status: building ? "warn" : live ? "ok" : latest?.status === "failed" ? "err" : "idle",
       isStatic: p.runtime.kind === "static",
       url: live && host ? `https://${host}` : null,

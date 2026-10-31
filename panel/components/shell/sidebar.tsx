@@ -13,8 +13,11 @@ import { openUpdateModal } from "./update-modal";
 
 export interface SidebarProject {
   slug: string;
+  /** owner/name and the branch; an integration's name and version, "from the catalog". */
   repo: string;
   branch: string;
+  /** Installed from Integrations: its pages go back there, and Projects doesn't count it. */
+  integration: boolean;
   status: "ok" | "warn" | "err" | "idle";
   isStatic: boolean;
   url: string | null;
@@ -43,14 +46,15 @@ interface Item {
 }
 
 function globalNav(p: SidebarProps): Item[][] {
+  const integrations = p.projects.filter((x) => x.integration).length;
   return [
     [
-      { href: "/", label: "Projects", icon: FolderIcon, exact: true, count: p.projects.length },
+      { href: "/", label: "Projects", icon: FolderIcon, exact: true, count: p.projects.length - integrations },
       { href: "/deployments", label: "Deployments", icon: RocketIcon, dot: p.deploying },
       { href: "/analytics", label: "Analytics", icon: ChartColumnIcon },
       { href: "/firewall", label: "Firewall", icon: ShieldIcon },
       { href: "/domains", label: "Domains", icon: GlobeIcon, count: p.domainCount },
-      { href: "/integrations", label: "Integrations", icon: PuzzleIcon },
+      { href: "/integrations", label: "Integrations", icon: PuzzleIcon, ...(integrations ? { count: integrations } : {}) },
       { href: "/databases", label: "Databases", icon: DatabaseIcon },
     ],
     [
@@ -181,11 +185,11 @@ function Nav(props: SidebarProps & { onNavigate?: () => void }) {
 
       {project && (
         <>
-          <Link href="/" onClick={props.onNavigate} className={cx(ITEM, "text-muted")}>
+          <Link href={project.integration ? "/integrations" : "/"} onClick={props.onNavigate} className={cx(ITEM, "text-muted")}>
             <span className={ICON}>
               <Icon icon={ChevronLeftIcon} />
             </span>
-            All projects
+            {project.integration ? "Integrations" : "All projects"}
           </Link>
           <div className="my-1.5 flex items-center gap-2 px-[9px] py-1.5" title={`${project.repo} · ${project.branch}`}>
             <StatusDot status={project.status} pulse={project.status === "warn"} />

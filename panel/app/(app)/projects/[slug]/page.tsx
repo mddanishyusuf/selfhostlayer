@@ -79,13 +79,15 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
   const now = Date.now();
   const from = now - (range === "24h" ? 86_400_000 : 7 * 86_400_000);
   const building = latest && !FINISHED.includes(latest.status) ? latest : null;
+  // An integration (from the catalog) has a version instead of a repo and branch.
+  const integration = project.source === "catalog";
 
   return (
     <>
       <PageHeader
         title={project.slug}
         crumb="Overview"
-        meta={`${project.repoOwner}/${project.repoName}`}
+        meta={integration ? `${live?.commitMessage ?? latest?.commitMessage ?? project.slug}, from the catalog` : `${project.repoOwner}/${project.repoName}`}
         actions={
           <>
             {live && (
@@ -164,7 +166,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
                 ),
               ],
               [
-                "Commit",
+                integration ? "Version" : "Commit",
                 live ? (
                   <span key="c">
                     <code className="font-mono text-[12.5px]">{live.sha.slice(0, 7)}</code> {live.commitMessage}
@@ -173,12 +175,14 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
                   "Nothing live yet"
                 ),
               ],
-              [
-                "Branch",
-                <span key="b">
-                  {project.branch} <span className="text-muted">· {project.autoDeploy ? "pushes deploy automatically" : "deploys only when you press Redeploy"}</span>
-                </span>,
-              ],
+              integration
+                ? ["Source", <span key="s">The Self Host Layer catalog <span className="text-muted">· checked against its sha256, no build on the server</span></span>]
+                : [
+                    "Branch",
+                    <span key="b">
+                      {project.branch} <span className="text-muted">· {project.autoDeploy ? "pushes deploy automatically" : "deploys only when you press Redeploy"}</span>
+                    </span>,
+                  ],
               [
                 "Runs as",
                 isStatic ? (
