@@ -101,7 +101,7 @@ export function Login2faForm() {
       )}
       <FormError message={state.error} />
       <SubmitButton pending="Verifying…">Verify</SubmitButton>
-      <button type="button" onClick={() => setRecovery(!recovery)} className="text-[13px] text-muted transition-colors duration-150 hover:text-foreground">
+      <button type="button" onClick={() => setRecovery(!recovery)} className="text-[12px] text-muted transition-colors duration-150 hover:text-foreground">
         {recovery ? "Use the authenticator app instead" : "Lost your phone? Use a recovery code"}
       </button>
     </form>

@@ -33,7 +33,7 @@ function Record({ record }: { record: { type: string; name: string; value: strin
 /** While a check runs: it may be the one that moves the panel. */
 function CheckingNote() {
   const { pending } = useFormStatus();
-  return pending ? <span className="text-[12.5px] text-dim">Checking. If the record is right, the move takes up to a minute.</span> : null;
+  return pending ? <span className="text-[12px] text-dim">Checking. If the record is right, the move takes up to a minute.</span> : null;
 }
 
 /**
@@ -90,11 +90,11 @@ export function MovePanelForm({ waiting, ip }: { waiting: string | null; ip: str
         <input type="hidden" name="host" value={host} />
         <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
           <StatusText status="warn" label="Waiting" pulse />
-          <span className="min-w-0 text-[13.5px] text-muted">
+          <span className="min-w-0 text-[12px] text-muted">
             to move to <code className="font-mono text-[13.5px] text-foreground">{host}</code>
           </span>
         </div>
-        <p className="text-[13.5px] text-muted">{state.waiting?.message ?? "Checking the DNS record…"}</p>
+        <p className="text-[12px] text-muted">{state.waiting?.message ?? "Checking the DNS record…"}</p>
         <Record record={{ type: "A", name: host, value: ip }} />
         <div className="flex flex-wrap items-center gap-x-2 gap-y-2">
           <SubmitButton pending="Checking…" variant="secondary" size="sm" className="w-auto">
@@ -105,7 +105,7 @@ export function MovePanelForm({ waiting, ip }: { waiting: string | null; ip: str
           </Button>
           <CheckingNote />
         </div>
-        <p className="text-[12.5px] text-dim">Checks every 15 seconds while this page is open, and moves the panel as soon as the record is right.</p>
+        <p className="text-[12px] text-dim">Checks every 15 seconds while this page is open, and moves the panel as soon as the record is right.</p>
       </form>
     );
   }

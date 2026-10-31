@@ -95,7 +95,7 @@ export function LogPane({ text, live, label, fileName, minHeight = "calc(100dvh 
   return (
     <div className={CARD}>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3 sm:px-5">
-        <span className="inline-flex items-center gap-2 text-[13px] text-muted">
+        <span className="inline-flex items-center gap-2 text-[12px] text-muted">
           <span className={cx("size-2 rounded-full", live ? "bg-ok-dot [animation:pulse-ring_1.6s_infinite]" : "bg-dim")} />
           {label}
         </span>

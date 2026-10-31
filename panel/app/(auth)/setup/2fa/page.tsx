@@ -27,7 +27,7 @@ export default async function Setup2faPage() {
           <code className="min-w-0 truncate font-mono text-[12px] tracking-wide">{grouped}</code>
           <CopyButton text={secret} />
         </div>
-        <p className="text-center text-[12.5px] text-dim">Can't scan? Enter the key above in your app by hand.</p>
+        <p className="text-center text-[12px] text-dim">Can't scan? Enter the key above in your app by hand.</p>
       </div>
       <Setup2faForm />
     </>

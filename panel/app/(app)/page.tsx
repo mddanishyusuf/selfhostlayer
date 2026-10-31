@@ -1,4 +1,4 @@
-import { Add01Icon, Clock01Icon, GitBranchIcon, GridViewIcon, Menu01Icon } from "@hugeicons/core-free-icons";
+import { ClockIcon, GitBranchIcon, LayoutGridIcon, MenuIcon, PlusIcon } from "lucide-react";
 import Link from "next/link";
 import { Suspense } from "react";
 import { FilterBox } from "@/components/header-controls";
@@ -38,10 +38,10 @@ const COLUMNS = "grid-cols-[40px_minmax(0,1fr)_auto] md:grid-cols-[40px_minmax(1
 
 function Meter({ label, value, fraction, hot }: { label: string; value: string; fraction: number; hot: boolean }) {
   return (
-    <div className="grid grid-cols-[28px_minmax(0,1fr)_52px] items-center gap-2 text-[12px] text-muted">
+    <div className="grid grid-cols-[28px_minmax(0,1fr)_52px] items-center gap-2 text-[11px] text-muted">
       {label}
-      <span className="h-1.5 overflow-hidden rounded-full bg-track">
-        <span className={cx("block h-full rounded-full", hot ? "bg-warn-dot" : "bg-blue")} style={{ width: `${Math.max(1, Math.min(100, fraction * 100))}%` }} />
+      <span className="h-1 overflow-hidden bg-track">
+        <span className={cx("block h-full", hot ? "bg-warn-dot" : "bg-accent")} style={{ width: `${Math.max(1, Math.min(100, fraction * 100))}%` }} />
       </span>
       <span className="text-right font-mono tabular-nums text-foreground">{value}</span>
     </div>
@@ -49,18 +49,18 @@ function Meter({ label, value, fraction, hot }: { label: string; value: string; 
 }
 
 function Commit({ project, latest }: { project: Project; latest?: Deployment }) {
-  if (!latest) return <span className="text-[13.5px] text-dim">No deployments yet</span>;
+  if (!latest) return <span className="text-dim">No deployments yet</span>;
   return (
-    <div className="grid min-w-0 gap-1">
-      <span className="truncate text-[14px]">{latest.commitMessage || `Commit ${latest.sha.slice(0, 7)}`}</span>
-      <span className="flex min-w-0 items-center gap-3 whitespace-nowrap text-[13px] text-muted">
+    <div className="grid min-w-0 gap-0.5">
+      <span className="truncate">{latest.commitMessage || `Commit ${latest.sha.slice(0, 7)}`}</span>
+      <span className="flex min-w-0 items-center gap-3 whitespace-nowrap text-[12px] text-muted">
         <span className="inline-flex items-center gap-1.5">
           <Icon icon={GitBranchIcon} size={14} />
           {project.branch}
         </span>
-        <code className="font-mono text-[12px]">{latest.sha.slice(0, 7)}</code>
+        <code className="font-mono text-[11.5px]">{latest.sha.slice(0, 7)}</code>
         <span className="inline-flex items-center gap-1.5">
-          <Icon icon={Clock01Icon} size={14} />
+          <Icon icon={ClockIcon} size={14} />
           {timeAgo(latest.createdAt)}
         </span>
       </span>
@@ -110,7 +110,7 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
         title="Projects"
         actions={
           <PillLink href="/new" primary>
-            <Icon icon={Add01Icon} size={16} strokeWidth={2} /> New project
+            <Icon icon={PlusIcon} size={16} strokeWidth={2} /> New project
           </PillLink>
         }
       />
@@ -126,11 +126,11 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
       {all.length > 0 && (
         <div className="flex flex-wrap items-center gap-2.5">
           <Segmented items={FILTERS.map(([k, label]) => ({ href: href({ status: k }), label, count: k === "all" ? rows.length : rows.filter((r) => r.state === k).length, active: filter === k }))} />
-          <FilterBox placeholder="Search projects, domains, repos" className="order-last min-w-full flex-1 bg-card sm:order-none sm:ml-auto sm:min-w-[220px] sm:max-w-[340px]" />
+          <FilterBox placeholder="Search projects, domains, repos" className="order-last min-w-full flex-1 sm:order-none sm:ml-auto sm:min-w-[220px] sm:max-w-[340px]" />
           <Segmented
             items={[
-              { href: href({ view: "list" }), label: <Icon icon={Menu01Icon} size={15} />, title: "List", active: !grid },
-              { href: href({ view: "grid" }), label: <Icon icon={GridViewIcon} size={15} />, title: "Grid", active: grid },
+              { href: href({ view: "list" }), label: <Icon icon={MenuIcon} size={15} />, title: "List", active: !grid },
+              { href: href({ view: "grid" }), label: <Icon icon={LayoutGridIcon} size={15} />, title: "Grid", active: grid },
             ]}
           />
         </div>
@@ -145,7 +145,7 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
             </PillLink>
           }
         >
-          <p className="text-[17px] font-semibold text-foreground">No projects yet</p>
+          <p className="text-[17px] font-bold text-foreground">No projects yet</p>
           <p>Connect GitHub to deploy your first app. Each one runs as its own sandboxed user.</p>
         </Empty>
         </section>
@@ -166,8 +166,8 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
                 <div className="flex min-w-0 items-center gap-3">
                   <Mark framework={p.framework} size="sm" />
                   <div className="grid min-w-0 flex-1 gap-0.5">
-                    <b className="truncate text-[15px] font-medium group-hover:underline">{p.slug}</b>
-                    <span className="truncate text-[13px] text-muted">{live && host ? host : "Not live yet"}</span>
+                    <b className="truncate font-bold group-hover:underline">{p.slug}</b>
+                    <span className="truncate text-[12px] text-muted">{live && host ? host : "Not live yet"}</span>
                   </div>
                   <StateWord state={state} />
                 </div>
@@ -178,7 +178,7 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
         </div>
       ) : (
         <section data-testid="project-list" className={CARD}>
-          <div className={cx("hidden h-11 items-center gap-x-5 border-b border-border px-6 text-[13px] font-medium text-dim md:grid", COLUMNS)}>
+          <div className={cx("hidden h-9 items-center gap-x-5 border-b border-border px-3.5 text-[12px] text-muted md:grid", COLUMNS)}>
             <span />
             <span>Project</span>
             <span>Latest deployment</span>
@@ -192,31 +192,31 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
               <Link
                 key={p.id}
                 href={`/projects/${p.slug}`}
-                className={cx("grid items-center gap-x-5 border-b border-border px-4 py-3.5 transition-colors duration-150 last:border-b-0 hover:bg-hover sm:px-6", COLUMNS)}
+                className={cx("grid items-center gap-x-5 border-b border-border-soft px-3.5 py-2.5 transition-colors duration-150 last:border-b-0 hover:bg-hover", COLUMNS)}
               >
                 <Mark framework={p.framework} />
                 <div className="grid min-w-0 gap-[3px]">
-                  <b className="truncate text-[15px] font-medium">{p.slug}</b>
-                  <span className={cx("truncate text-[13px]", live && host ? "text-muted" : "text-dim")}>{live && host ? host : "Not live yet"}</span>
+                  <b className="truncate font-bold">{p.slug}</b>
+                  <span className={cx("truncate text-[12px]", live && host ? "text-muted" : "text-dim")}>{live && host ? host : "Not live yet"}</span>
                 </div>
                 <div className="hidden min-w-0 md:block">
                   <Commit project={p} latest={latest} />
                 </div>
                 <div className="hidden xl:block">
                   {isStatic ? (
-                    <span className="text-[13px] text-muted">Served by Caddy</span>
+                    <span className="text-[12px] text-muted">Served by Caddy</span>
                   ) : u && live ? (
                     <div className="grid gap-[7px]">
                       <Meter label="RAM" value={u.memoryMb === null ? "—" : `${u.memoryMb} MB`} fraction={(u.memoryMb ?? 0) / p.memoryMb} hot={(u.memoryMb ?? 0) / p.memoryMb > 0.75} />
                       <Meter label="CPU" value={u.cpu === null ? "—" : `${Math.round(u.cpu)}%`} fraction={(u.cpu ?? 0) / 100} hot={(u.cpu ?? 0) > 50} />
                     </div>
                   ) : (
-                    <span className="text-[13px] text-muted">{live ? "No samples yet" : "Not running"}</span>
+                    <span className="text-[12px] text-muted">{live ? "No samples yet" : "Not running"}</span>
                   )}
                 </div>
                 <div className="grid min-w-0 justify-items-end gap-1 md:justify-items-start">
                   <StateWord state={state} />
-                  <span className="max-w-full truncate text-[12.5px] text-muted max-sm:hidden">
+                  <span className="max-w-full truncate text-[12px] text-muted max-sm:hidden">
                     {state === "failed" && live ? `Still serving ${live.sha.slice(0, 7)}` : `${frameworkLabel(p.framework)} · ${isStatic ? "static" : `Node ${p.nodeVersion}`}`}
                   </span>
                 </div>

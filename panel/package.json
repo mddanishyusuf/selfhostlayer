@@ -8,10 +8,8 @@
     "build": "next build"
   },
   "dependencies": {
-    "@hugeicons/core-free-icons": "^4.4.0",
-    "@hugeicons/react": "^1.1.10",
     "@layer/protocol": "0.0.0",
-    "geist": "^1.8.2",
+    "lucide-react": "^1.66.0",
     "next": "^16.4.3",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",

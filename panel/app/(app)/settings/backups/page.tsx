@@ -1,4 +1,4 @@
-import { DatabaseRestoreIcon, Key01Icon } from "@hugeicons/core-free-icons";
+import { DatabaseBackupIcon, KeyRoundIcon } from "lucide-react";
 import { backUpEverythingAction, confirmRecoveryKeyAction, saveScheduleAction } from "@/app/actions/backups";
 import { BackupList, formatBytes } from "@/components/backup-list";
 import { DestinationForm, RefreshWhile, TestConnectionButton } from "@/components/backups";
@@ -59,7 +59,7 @@ export default async function BackupsPage() {
       )}
 
       {settings && !settings.keyConfirmed && (
-        <SettingsRow id="recovery-key" title={<span className="flex items-center gap-2"><Icon icon={Key01Icon} size={16} /> Save your recovery key</span>} description="Backups are encrypted with this key before they leave the server. If this server is lost, you need it to restore anything. It won't be shown again.">
+        <SettingsRow id="recovery-key" title={<span className="flex items-center gap-2"><Icon icon={KeyRoundIcon} size={16} /> Save your recovery key</span>} description="Backups are encrypted with this key before they leave the server. If this server is lost, you need it to restore anything. It won't be shown again.">
           <div className="flex items-center justify-between gap-3 rounded-xl bg-warn-band px-4 py-3">
             <code className="break-all font-mono text-[13px]" data-testid="recovery-key">
               {settings.recoveryKey}
@@ -118,13 +118,13 @@ export default async function BackupsPage() {
             <SubmitButton pending="Saving…" variant="secondary" className="w-auto">
               Save
             </SubmitButton>
-            <p className="text-[12.5px] text-dim sm:col-span-3">Server time ({Intl.DateTimeFormat().resolvedOptions().timeZone}).</p>
+            <p className="text-[12px] text-dim sm:col-span-3">Server time ({Intl.DateTimeFormat().resolvedOptions().timeZone}).</p>
           </form>
         </SettingsRow>
       )}
 
       {settings?.keyConfirmed && (
-        <Section title={<span className="flex items-center gap-2"><Icon icon={DatabaseRestoreIcon} size={16} /> Recent backups</span>}>
+        <Section title={<span className="flex items-center gap-2"><Icon icon={DatabaseBackupIcon} size={16} /> Recent backups</span>}>
           <BackupList backups={backups} showApp empty="No backups yet. The first run is at the scheduled time." />
         </Section>
       )}

@@ -1,4 +1,4 @@
-import { ArrowUpRight01Icon } from "@hugeicons/core-free-icons";
+import { ArrowUpRightIcon } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
@@ -90,7 +90,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
           <>
             {live && (
               <PillLink href={url} external>
-                Visit <Icon icon={ArrowUpRight01Icon} size={14} />
+                Visit <Icon icon={ArrowUpRightIcon} size={14} />
               </PillLink>
             )}
             <form action={redeploy}>
@@ -135,7 +135,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
 
       <Section title="Production">
         <div className="grid border-t border-border lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
-          <div className="border-b border-border px-4 py-5 sm:px-6 lg:border-b-0 lg:border-r">
+          <div className="border-b border-border px-3.5 py-5 lg:border-b-0 lg:border-r">
             <Suspense fallback={<SitePreviewSkeleton host={new URL(url).host} />}>
               <SitePreviewFrame slug={project.slug} framework={project.framework} deploymentId={live?.id ?? null} url={url} own={hosts} />
             </Suspense>
@@ -204,20 +204,20 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
             />
           }
         >
-          <div className="grid gap-x-10 gap-y-6 border-t border-border px-4 py-5 sm:px-6 lg:grid-cols-2">
+          <div className="grid gap-x-10 gap-y-6 border-t border-border px-3.5 py-5 lg:grid-cols-2">
             <UsageChart title="CPU (share of the server)" unit="%" points={usage.map((p) => ({ at: p.at, value: p.cpu }))} from={from} to={now} gapMs={range === "24h" ? 15 * 60_000 : 3 * 3_600_000} />
             <UsageChart title={`Memory (limit ${project.memoryMb} MB)`} unit="MB" points={usage.map((p) => ({ at: p.at, value: p.memoryMb }))} from={from} to={now} gapMs={range === "24h" ? 15 * 60_000 : 3 * 3_600_000} />
           </div>
           {usage.length > 0 && (
             <details className="group border-t border-border">
-              <summary className="cursor-pointer list-none px-4 py-3 text-[13px] text-muted hover:text-foreground sm:px-6">
+              <summary className="cursor-pointer list-none px-3.5 py-3 text-[12px] text-muted hover:text-foreground">
                 <span className="group-open:hidden">Show</span>
                 <span className="hidden group-open:inline">Hide</span> the numbers as a table
               </summary>
               <table className="w-full text-[13px] tabular-nums">
                 <thead>
                   <tr className="border-y border-border text-left text-dim">
-                    <th className="px-4 py-2 font-normal sm:px-6">{range === "24h" ? "Hour (UTC)" : "Day (UTC)"}</th>
+                    <th className="px-3.5 py-2 font-normal">{range === "24h" ? "Hour (UTC)" : "Day (UTC)"}</th>
                     <th className="px-4 py-2 text-right font-normal">CPU</th>
                     <th className="px-4 py-2 text-right font-normal sm:pr-6">Memory</th>
                   </tr>
@@ -225,7 +225,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
                 <tbody>
                   {tableRows(usage, range).map((r) => (
                     <tr key={r.at} className="border-b border-border last:border-b-0">
-                      <td className="px-4 py-1.5 sm:px-6">{r.label}</td>
+                      <td className="px-3.5 py-1.5">{r.label}</td>
                       <td className="px-4 py-1.5 text-right">{r.cpu}</td>
                       <td className="px-4 py-1.5 text-right sm:pr-6">{r.memory}</td>
                     </tr>
@@ -243,9 +243,9 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
         liveIds={live ? [live.id] : []}
         rollbacks
         head={
-          <div className="flex items-center justify-between gap-4 px-4 pb-3.5 pt-5 sm:px-6">
-            <h2 className="text-[15.5px] font-medium">Recent deployments</h2>
-            <Link href={`/projects/${project.slug}/deployments`} className="text-[13px] text-accent hover:underline">
+          <div className="flex items-center justify-between gap-4 px-3.5 pb-2.5 pt-3.5">
+            <h2 className="text-[14px] font-bold">Recent deployments</h2>
+            <Link href={`/projects/${project.slug}/deployments`} className="text-[12px] text-accent hover:underline">
               View all
             </Link>
           </div>

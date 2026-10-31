@@ -45,13 +45,13 @@ export default async function CronRunsPage({ params }: { params: Promise<{ slug:
         {runs.length === 0 && <Empty>No runs yet. Reload after a run starts.</Empty>}
         {runs.map((r, i) => (
           <details key={r.invocation} className="group border-b border-border last:border-b-0" open={i === 0}>
-            <summary className="flex min-h-[56px] cursor-pointer list-none items-center gap-4 px-4 transition-colors duration-150 hover:bg-hover sm:px-6">
+            <summary className="flex min-h-[56px] cursor-pointer list-none items-center gap-4 px-3.5 transition-colors duration-150 hover:bg-hover">
               <StatusDot status={r.status === "success" ? "ok" : r.status === "failed" ? "err" : "warn"} pulse={r.status === "running"} />
               <span className={cx("w-28 text-[14px] font-medium", r.status === "failed" && "text-rose")}>
                 {r.status === "success" ? "Succeeded" : r.status === "failed" ? `Failed (${r.exitStatus ?? "?"})` : "Running"}
               </span>
-              <span className="flex-1 text-[13.5px] tabular-nums text-muted">{new Date(r.startedAt).toLocaleString("en-GB", { timeZone: "UTC" })} UTC</span>
-              <span className="text-[13px] tabular-nums text-muted">{r.finishedAt ? duration(Math.max(0, Date.parse(r.finishedAt) - Date.parse(r.startedAt))) : "…"}</span>
+              <span className="flex-1 text-[12px] tabular-nums text-muted">{new Date(r.startedAt).toLocaleString("en-GB", { timeZone: "UTC" })} UTC</span>
+              <span className="text-[12px] tabular-nums text-muted">{r.finishedAt ? duration(Math.max(0, Date.parse(r.finishedAt) - Date.parse(r.startedAt))) : "…"}</span>
             </summary>
             <pre className="mx-4 mb-4 max-h-80 overflow-auto whitespace-pre-wrap rounded-xl bg-code p-3.5 font-mono text-[12.5px] leading-relaxed text-[#e5e5ea] sm:mx-7">
               {r.output.length ? r.output.join("\n") : "(no output)"}

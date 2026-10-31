@@ -1,4 +1,4 @@
-import { Shield01Icon } from "@hugeicons/core-free-icons";
+import { ShieldIcon } from "lucide-react";
 import { ComingSoon, Empty, Notice, PageHeader, Section, TableHead, TableRow } from "@/components/page";
 import { Icon } from "@/components/icon";
 import { StatusText } from "@/components/status";
@@ -84,7 +84,7 @@ export default async function FirewallPage() {
           ))}
         </Section>
       )}
-      <ComingSoon icon={<Icon icon={Shield01Icon} size={20} />} title="Change rules from here">
+      <ComingSoon icon={<Icon icon={ShieldIcon} size={20} />} title="Change rules from here">
         Open or close ports, unban IPs, rate-limit an app, and restrict this panel to your IP or Tailscale.
       </ComingSoon>
     </>

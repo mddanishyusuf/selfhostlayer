@@ -1,51 +1,63 @@
 @import "tailwindcss";
 
-/* Design tokens (design/dashboard-clear.html): cards (--card) on a page
-   (--background), with the sidebar on the page itself. Neutral grays with no
-   tint: white cards on #f5f5f7 in light, #1c1c1e cards on black in dark.
-   Every text color passes WCAG AA on the surface it sits on (--dim, the
-   faintest, is 4.7:1 on the light page). Status words use --teal, --gold and
-   --rose; their dots and soft tags the brighter --ok-dot, --warn-dot and
-   --err-dot. Links and focus rings use --accent. The theme comes from
-   <html data-theme="dark|light|system">, set on the server from the
-   layer-theme cookie, so pages never flash. */
+/* Design tokens: the AgentOS design (agent-os/web/src/theme.css), decided
+   2026-10-31. Dark by default: near-black page, #111 sidebar, #1e1e1e cards
+   with #2a2a2a lines, #ececec text, #9a9a9a gray, blue (#4f74f8) for the main
+   button, toggles and focus. Light is Vercel-clean: white, #fafafa sidebar,
+   #eaeaea lines, black text. Marlin Soft SQ for text, Lucide icons, 2px
+   corners on everything. --dim (meta text) stays readable: 4.6:1 on cards in
+   dark, 4.7:1 in light. The theme comes from <html data-theme="dark|light|system">,
+   set on the server from the layer-theme cookie, so pages never flash. */
 @theme inline {
-  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
-  --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, monospace;
+  --font-sans: var(--font-marlin), ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   --color-background: var(--background);
   --color-card: var(--card);
+  --color-panel: var(--panel);
   --color-well: var(--well);
   --color-fill: var(--fill);
   --color-raised: var(--raised);
   --color-sidebar: var(--sidebar);
+  --color-sidebar-line: var(--sidebar-line);
   --color-foreground: var(--foreground);
   --color-muted: var(--muted);
   --color-dim: var(--dim);
+  --color-placeholder: var(--placeholder);
   --color-subtle: var(--hover);
   --color-hover: var(--hover);
   --color-selected: var(--selected);
   --color-pill: var(--pill);
+  --color-pill-text: var(--pill-text);
+  --color-badge: var(--badge);
+  --color-badge-text: var(--badge-text);
   --color-track: var(--track);
   --color-border: var(--border);
+  --color-border-soft: var(--border-soft);
   --color-border-strong: var(--border-strong);
   --color-accent: var(--accent);
-  --color-accent-soft: color-mix(in srgb, var(--accent) var(--tint), transparent);
+  --color-accent-soft: var(--blue-dim);
   --color-field: var(--field);
   --color-inverse: var(--inverse);
   --color-inverse-fg: var(--inverse-fg);
+  --color-icon-tile: var(--icon-tile);
+  --color-icon-tile-fg: var(--icon-tile-fg);
   --color-ok: var(--teal);
   --color-warn: var(--gold);
   --color-err: var(--rose);
-  --color-err-subtle: color-mix(in srgb, var(--err-dot) var(--tint), transparent);
+  --color-err-subtle: color-mix(in srgb, var(--red) 14%, transparent);
   --color-ok-dot: var(--ok-dot);
   --color-warn-dot: var(--warn-dot);
   --color-err-dot: var(--err-dot);
-  --color-ok-soft: color-mix(in srgb, var(--ok-dot) var(--tint), transparent);
-  --color-warn-soft: color-mix(in srgb, var(--warn-dot) var(--tint), transparent);
-  --color-err-soft: color-mix(in srgb, var(--err-dot) var(--tint), transparent);
-  /* Bands (notices, DNS records) are quieter than tags, so gold never turns olive in dark. */
-  --color-warn-band: color-mix(in srgb, var(--warn-dot) 9%, transparent);
-  --color-err-band: color-mix(in srgb, var(--err-dot) 9%, transparent);
+  --color-ok-soft: transparent;
+  --color-ok-line: var(--green-line);
+  --color-warn-soft: var(--gold-bg);
+  --color-err-soft: color-mix(in srgb, var(--red) 14%, transparent);
+  --color-danger-line: var(--danger-line);
+  /* Bands (notices, DNS records): the pills' own fills. */
+  --color-warn-band: var(--gold-bg);
+  --color-err-band: color-mix(in srgb, var(--red) 14%, transparent);
+  --color-btn-hover: var(--btn-hover);
+  --color-btn-hover-line: var(--btn-hover-line);
   --color-tile-blue: var(--tile-blue);
   --color-tile-lav: var(--tile-lav);
   --color-tile-green: var(--tile-green);
@@ -61,147 +73,198 @@
   --color-rose: var(--rose);
   --color-code: var(--code);
   --color-chart: var(--chart);
+  --color-scrim: var(--scrim);
   --shadow-raise: var(--raise);
   --shadow-pop: var(--pop);
-  --color-scrim: var(--scrim);
+  --shadow-focus: var(--focus-ring);
 }
 
 :root,
-:root[data-theme="light"] {
-  color-scheme: light;
-  --background: #f5f5f7;
-  --sidebar: #f5f5f7;
-  --card: #ffffff;
-  --well: #f5f5f7;
-  --fill: #e8e8ed;
-  --raised: #ffffff;
-  --foreground: #1d1d1f;
-  --muted: #5c5c61;
-  --dim: #6e6e73;
-  --border: #e8e8ed;
-  --border-strong: #d2d2d7;
-  --hover: #f7f7f8;
-  --selected: #e8e8ed;
-  --pill: #e8e8ed;
-  --track: #e8e8ed;
-  --gold: #8a5a00;
-  --lavender: #5856d6;
-  --coral: #c2410c;
-  --teal: #137333;
-  --blue: #007aff;
-  --rose: #c5000f;
-  --ok-dot: #34c759;
-  --warn-dot: #ff9f0a;
-  --err-dot: #ff3b30;
-  --tint: 10%;
-  --tile-blue: #007aff;
-  --tile-lav: #5856d6;
-  --tile-green: #34c759;
-  --tile-coral: #ff9500;
-  --tile-gold: #ff9f0a;
-  --tile-red: #ff3b30;
-  --accent: #0066cc;
-  --field: #ffffff;
-  --on-rose: #ffffff;
-  --inverse: #1d1d1f;
-  --inverse-fg: #ffffff;
-  --code: #161618;
-  --raise: 0 1px 3px rgba(0, 0, 0, 0.12), 0 0 0 0.5px rgba(0, 0, 0, 0.05);
-  --pop: 0 24px 70px rgba(0, 0, 0, 0.18), 0 2px 8px rgba(0, 0, 0, 0.06);
-  --scrim: rgba(0, 0, 0, 0.3);
-  /* The one chart series: 4.7:1 against the card. */
-  --chart: #0071e3;
-}
-
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --background: #000000;
-  --sidebar: #000000;
-  --card: #1c1c1e;
-  --well: #2c2c2e;
-  --fill: #2c2c2e;
-  --raised: #636366;
-  --foreground: #f5f5f7;
-  --muted: #a1a1a6;
-  --dim: #8e8e93;
-  --border: #2c2c2e;
-  --border-strong: #3a3a3c;
-  --hover: #232325;
-  --selected: #2c2c2e;
-  --field: #111112;
-  --pill: #2c2c2e;
-  --track: #3a3a3c;
-  --gold: #ffd60a;
-  --lavender: #a78bfa;
-  --coral: #ff9f0a;
-  --teal: #30d158;
-  --blue: #0a84ff;
-  --rose: #ff6961;
-  --ok-dot: #30d158;
-  --warn-dot: #ffd60a;
-  --err-dot: #ff453a;
-  --tint: 16%;
-  --tile-blue: #0a84ff;
-  --tile-lav: #5e5ce6;
-  --tile-green: #30d158;
-  --tile-coral: #ff9f0a;
-  --tile-gold: #ff9f0a;
-  --tile-red: #ff453a;
-  --accent: #2997ff;
+  --background: #0e0e0e;
+  --sidebar: #111111;
+  --sidebar-line: #222222;
+  --card: #1e1e1e;
+  --panel: #161616;
+  --well: #262626;
+  --fill: #1e1e1e;
+  --raised: #2e2e2e;
+  --foreground: #ececec;
+  --muted: #9a9a9a;
+  --dim: #868686;
+  --placeholder: #6b6b6b;
+  --border: #2a2a2a;
+  --border-soft: #222222;
+  --border-strong: #3d3d3d;
+  --hover: rgba(255, 255, 255, 0.03);
+  --selected: #262626;
+  --pill: #2e2e2e;
+  --pill-text: #9a9a9a;
+  --badge: #3b3b3b;
+  --badge-text: #e8e8e8;
+  --track: #3b3b3b;
+  --gold: #e8b45a;
+  --gold-bg: #35290f;
+  --lavender: #f27bb8;
+  --coral: #e0855c;
+  --teal: #5fdb9d;
+  --green-line: #2f6b4f;
+  --blue: #6ea0f5;
+  --blue-dim: rgba(79, 116, 248, 0.18);
+  --rose: #f27a8a;
+  --red: #ed4245;
+  --danger-line: #5a2a32;
+  --ok-dot: #3ba55d;
+  --warn-dot: #e8b45a;
+  --err-dot: #ed4245;
+  --tile-blue: #6ea0f5;
+  --tile-lav: #b58cf0;
+  --tile-green: #3ecf6e;
+  --tile-coral: #e0855c;
+  --tile-gold: #e3c24d;
+  --tile-red: #e05c8e;
+  --accent: #4f74f8;
+  --field: #191919;
   --on-rose: #000000;
-  --inverse: #f5f5f7;
-  --inverse-fg: #000000;
-  --code: #000000;
-  --raise: 0 1px 3px rgba(0, 0, 0, 0.5);
-  --pop: 0 24px 70px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.08);
-  --scrim: rgba(0, 0, 0, 0.6);
-  --chart: #2997ff;
+  --inverse: #ececec;
+  --inverse-fg: #0e0e0e;
+  --icon-tile: #ffffff;
+  --icon-tile-fg: #0e0e0e;
+  --code: #111111;
+  --btn-hover: #1e1e1e;
+  --btn-hover-line: #2a2a2a;
+  --raise: none;
+  --pop: none;
+  --focus-ring: none;
+  --scrim: rgba(0, 0, 0, 0.55);
+  --selection: rgba(79, 116, 248, 0.35);
+  --chart: #6ea0f5;
 }
 
-@media (prefers-color-scheme: dark) {
+:root[data-theme="light"] {
+  color-scheme: light;
+  --background: #ffffff;
+  --sidebar: #fafafa;
+  --sidebar-line: #eaeaea;
+  --card: #ffffff;
+  --panel: #ffffff;
+  --well: #fafafa;
+  --fill: #ffffff;
+  --raised: #ffffff;
+  --foreground: #000000;
+  --muted: #666666;
+  --dim: #737373;
+  --placeholder: #999999;
+  --border: #eaeaea;
+  --border-soft: #f2f2f2;
+  --border-strong: #d4d4d4;
+  --hover: rgba(0, 0, 0, 0.03);
+  --selected: #ebebeb;
+  --pill: #f2f2f2;
+  --pill-text: #666666;
+  --badge: #ebebeb;
+  --badge-text: #000000;
+  --track: #e0e0e0;
+  --gold: #a16207;
+  --gold-bg: #fff4d6;
+  --lavender: #cc2d76;
+  --coral: #c2410c;
+  --teal: #0f7b31;
+  --green-line: #a9dcbc;
+  --blue: #3b63f3;
+  --blue-dim: rgba(79, 116, 248, 0.09);
+  --rose: #ee0000;
+  --red: #ee0000;
+  --danger-line: #f4bcbc;
+  --ok-dot: #15803d;
+  --warn-dot: #ca8a04;
+  --err-dot: #ee0000;
+  --tile-blue: #3b63f3;
+  --tile-lav: #7c3aed;
+  --tile-green: #15803d;
+  --tile-coral: #c2410c;
+  --tile-gold: #a16207;
+  --tile-red: #ee0000;
+  --accent: #4f74f8;
+  --field: #ffffff;
+  --on-rose: #ffffff;
+  --inverse: #000000;
+  --inverse-fg: #ffffff;
+  --icon-tile: #000000;
+  --icon-tile-fg: #ffffff;
+  --code: #111111;
+  --btn-hover: #fafafa;
+  --btn-hover-line: #d4d4d4;
+  --raise: 0 1px 4px rgba(0, 0, 0, 0.1), 0 0 0 1px #eaeaea;
+  --pop: 0 8px 30px rgba(0, 0, 0, 0.12);
+  --focus-ring: 0 0 0 3px rgba(79, 116, 248, 0.12);
+  --scrim: rgba(0, 0, 0, 0.55);
+  --selection: rgba(79, 116, 248, 0.18);
+  --chart: #3b63f3;
+}
+
+@media (prefers-color-scheme: light) {
   :root[data-theme="system"] {
-    color-scheme: dark;
-    --background: #000000;
-    --sidebar: #000000;
-    --card: #1c1c1e;
-    --well: #2c2c2e;
-    --fill: #2c2c2e;
-    --raised: #636366;
-    --foreground: #f5f5f7;
-    --muted: #a1a1a6;
-    --dim: #8e8e93;
-    --border: #2c2c2e;
-    --border-strong: #3a3a3c;
-    --hover: #232325;
-    --selected: #2c2c2e;
-    --field: #111112;
-    --pill: #2c2c2e;
-    --track: #3a3a3c;
-    --gold: #ffd60a;
-    --lavender: #a78bfa;
-    --coral: #ff9f0a;
-    --teal: #30d158;
-    --blue: #0a84ff;
-    --rose: #ff6961;
-    --ok-dot: #30d158;
-    --warn-dot: #ffd60a;
-    --err-dot: #ff453a;
-    --tint: 16%;
-    --tile-blue: #0a84ff;
-    --tile-lav: #5e5ce6;
-    --tile-green: #30d158;
-    --tile-coral: #ff9f0a;
-    --tile-gold: #ff9f0a;
-    --tile-red: #ff453a;
-    --accent: #2997ff;
-    --on-rose: #000000;
-    --inverse: #f5f5f7;
-    --inverse-fg: #000000;
-    --code: #000000;
-    --raise: 0 1px 3px rgba(0, 0, 0, 0.5);
-    --pop: 0 24px 70px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.08);
-    --scrim: rgba(0, 0, 0, 0.6);
-    --chart: #2997ff;
+    color-scheme: light;
+    --background: #ffffff;
+    --sidebar: #fafafa;
+    --sidebar-line: #eaeaea;
+    --card: #ffffff;
+    --panel: #ffffff;
+    --well: #fafafa;
+    --fill: #ffffff;
+    --raised: #ffffff;
+    --foreground: #000000;
+    --muted: #666666;
+    --dim: #737373;
+    --placeholder: #999999;
+    --border: #eaeaea;
+    --border-soft: #f2f2f2;
+    --border-strong: #d4d4d4;
+    --hover: rgba(0, 0, 0, 0.03);
+    --selected: #ebebeb;
+    --pill: #f2f2f2;
+    --pill-text: #666666;
+    --badge: #ebebeb;
+    --badge-text: #000000;
+    --track: #e0e0e0;
+    --gold: #a16207;
+    --gold-bg: #fff4d6;
+    --lavender: #cc2d76;
+    --coral: #c2410c;
+    --teal: #0f7b31;
+    --green-line: #a9dcbc;
+    --blue: #3b63f3;
+    --blue-dim: rgba(79, 116, 248, 0.09);
+    --rose: #ee0000;
+    --red: #ee0000;
+    --danger-line: #f4bcbc;
+    --ok-dot: #15803d;
+    --warn-dot: #ca8a04;
+    --err-dot: #ee0000;
+    --tile-blue: #3b63f3;
+    --tile-lav: #7c3aed;
+    --tile-green: #15803d;
+    --tile-coral: #c2410c;
+    --tile-gold: #a16207;
+    --tile-red: #ee0000;
+    --accent: #4f74f8;
+    --field: #ffffff;
+    --on-rose: #ffffff;
+    --inverse: #000000;
+    --inverse-fg: #ffffff;
+    --icon-tile: #000000;
+    --icon-tile-fg: #ffffff;
+    --code: #111111;
+    --btn-hover: #fafafa;
+    --btn-hover-line: #d4d4d4;
+    --raise: 0 1px 4px rgba(0, 0, 0, 0.1), 0 0 0 1px #eaeaea;
+    --pop: 0 8px 30px rgba(0, 0, 0, 0.12);
+    --focus-ring: 0 0 0 3px rgba(79, 116, 248, 0.12);
+    --scrim: rgba(0, 0, 0, 0.55);
+    --selection: rgba(79, 116, 248, 0.18);
+    --chart: #3b63f3;
   }
 }
 
@@ -215,20 +278,18 @@ body {
   font-family: var(--font-sans);
   font-size: 14px;
   line-height: 1.5;
-}
-
-/* Light text on dark gets thin smoothing; dark text on light keeps the system's fuller strokes. */
-:root[data-theme="dark"] body {
   -webkit-font-smoothing: antialiased;
 }
-@media (prefers-color-scheme: dark) {
-  :root[data-theme="system"] body {
-    -webkit-font-smoothing: antialiased;
-  }
+
+/* Barely-rounded corners everywhere: crisp, near-square UI (as AgentOS; beats every utility). */
+*,
+*::before,
+*::after {
+  border-radius: 2px !important;
 }
 
 ::selection {
-  background: color-mix(in srgb, var(--accent) 35%, transparent);
+  background: var(--selection);
 }
 
 @keyframes shimmer {
@@ -249,23 +310,15 @@ body {
    only the ends of a run are rounded. A form or wrapper holding rows is a card. */
 .page-stack > [data-srow] {
   background: var(--card);
+  border: 1px solid var(--border);
 }
 .page-stack > [data-srow] + [data-srow] {
-  margin-top: -14px;
-}
-.page-stack > [data-srow]:not([data-srow] + [data-srow]) {
-  border-top-width: 0;
-  border-top-left-radius: 16px;
-  border-top-right-radius: 16px;
-}
-.page-stack > [data-srow]:not(:has(+ [data-srow])) {
-  border-bottom-left-radius: 16px;
-  border-bottom-right-radius: 16px;
+  margin-top: -15px;
 }
 .page-stack > :not([data-srow], section):has(> [data-srow]) {
   overflow: hidden;
   background: var(--card);
-  border-radius: 16px;
+  border: 1px solid var(--border);
 }
 
 /* Native select styled as a pill with a caret. */

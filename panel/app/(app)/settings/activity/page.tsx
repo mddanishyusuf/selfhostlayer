@@ -88,13 +88,13 @@ export default async function ActivityPage() {
         {entries.map((e) => (
           <TableRow key={e.id} columns={columns} data-action={e.action}>
             <span className="font-medium">{LABELS[e.action] ?? e.action}</span>
-            <span className="truncate font-mono text-[12.5px] text-muted">{target(e.params)}</span>
+            <span className="truncate font-mono text-[12px] text-muted">{target(e.params)}</span>
             <span>{e.ok === null ? <StatusText status="warn" label="Running" pulse /> : e.ok ? <StatusText status="ok" label="Done" /> : <span title={e.code ?? undefined}><StatusText status="err" label="Failed" /></span>}</span>
             <span className="text-right tabular-nums text-muted">{e.ms === null ? "…" : e.ms < 1000 ? `${e.ms} ms` : `${(e.ms / 1000).toFixed(1)} s`}</span>
             <span className="text-right tabular-nums text-muted" title={e.ts}>
               {timeAgo(Math.floor(Date.parse(e.ts) / 1000))}
             </span>
-            {e.ok === false && e.message && <span className="basis-full break-words text-[13px] text-muted md:col-span-full">{e.message}</span>}
+            {e.ok === false && e.message && <span className="basis-full break-words text-[12px] text-muted md:col-span-full">{e.message}</span>}
           </TableRow>
         ))}
       </section>

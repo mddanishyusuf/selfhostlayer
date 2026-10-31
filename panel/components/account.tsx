@@ -69,7 +69,7 @@ export function RecoveryCodesForm() {
         </div>
       ) : (
         <form action={action} className="grid gap-3" data-testid="recovery-codes">
-          <p className="text-[13.5px] text-muted">Each code signs you in once without your phone. Making new ones turns off the old ones.</p>
+          <p className="text-[12px] text-muted">Each code signs you in once without your phone. Making new ones turns off the old ones.</p>
           <Field label="Current password" htmlFor="recovery-password">
             <Input id="recovery-password" name="current" type="password" autoComplete="current-password" required />
           </Field>

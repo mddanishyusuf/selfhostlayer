@@ -1,4 +1,4 @@
-import { GithubIcon } from "@hugeicons/core-free-icons";
+import { GitBranchIcon } from "lucide-react";
 import Link from "next/link";
 import { PublicRepoForm } from "@/components/deploy";
 import { RepoPicker } from "@/components/github-connect";
@@ -23,7 +23,7 @@ export default async function NewProjectPage({ searchParams }: { searchParams: P
         <SettingsRow title="Your repositories" description="Creates a private GitHub App owned by you: private repositories, deploys on every push, commit statuses.">
           <div>
             <PillLink href="/github/connect" primary>
-              <Icon icon={GithubIcon} size={16} /> Connect GitHub
+              <Icon icon={GitBranchIcon} size={16} /> Connect GitHub
             </PillLink>
           </div>
         </SettingsRow>
@@ -52,7 +52,7 @@ export default async function NewProjectPage({ searchParams }: { searchParams: P
         }
       />
       {message && (
-        <div className="border-b border-border px-4 py-4 sm:px-6">
+        <div className="border-b border-border px-3.5 py-4">
           <FormError message={message} />
         </div>
       )}
@@ -73,18 +73,18 @@ export default async function NewProjectPage({ searchParams }: { searchParams: P
         <RepoPicker />
       )}
       <details className="group border-b border-border">
-        <summary className="flex h-[52px] cursor-pointer list-none items-center gap-2 px-4 text-[14px] font-medium text-muted transition-colors hover:bg-hover hover:text-foreground sm:px-6">
+        <summary className="flex h-[52px] cursor-pointer list-none items-center gap-2 px-3.5 text-[14px] font-medium text-muted transition-colors hover:bg-hover hover:text-foreground">
           <span className="w-3 text-dim group-open:hidden">+</span>
           <span className="hidden w-3 text-dim group-open:inline">−</span>
           Deploy a public repository or a monorepo folder
         </summary>
-        <div className="px-4 pb-6 pt-2 sm:px-6">
+        <div className="px-3.5 pb-6 pt-2">
           <div className="max-w-[680px]">
             <PublicRepoForm />
           </div>
         </div>
       </details>
-      <p className="px-4 py-4 text-[12.5px] text-dim sm:px-6">
+      <p className="px-3.5 py-4 text-[12px] text-dim">
         Connected through{" "}
         <Link href="/github/connect" className="text-muted hover:text-foreground hover:underline">
           {app.name}

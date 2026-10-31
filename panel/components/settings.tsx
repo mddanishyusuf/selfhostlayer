@@ -1,6 +1,6 @@
 "use client";
 
-import { Add01Icon, Delete02Icon, ViewIcon, ViewOffSlashIcon } from "@hugeicons/core-free-icons";
+import { EyeIcon, EyeOffIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { removeProject, saveEnvAction, saveSettings, type EnvState, type SettingsState } from "@/app/actions/projects";
@@ -67,7 +67,7 @@ export function EnvEditor({ initial, error }: { initial: [string, string][]; err
                 onClick={() => setRows((prev) => (prev.length > 1 ? prev.filter((_, j) => j !== i) : [{ key: "", value: "" }]))}
                 className="grid size-[38px] place-items-center rounded-lg text-muted transition-colors duration-150 hover:bg-hover hover:text-foreground"
               >
-                <Icon icon={Delete02Icon} size={16} />
+                <Icon icon={Trash2Icon} size={16} />
                 <span className="sr-only">Remove</span>
               </button>
             </div>
@@ -98,10 +98,10 @@ export function EnvEditor({ initial, error }: { initial: [string, string][]; err
         {text === null && (
           <>
             <Button type="button" variant="secondary" size="sm" onClick={() => setRows((prev) => [...prev, { key: "", value: "" }])}>
-              <Icon icon={Add01Icon} size={14} /> Add variable
+              <Icon icon={PlusIcon} size={14} /> Add variable
             </Button>
             <Button type="button" variant="ghost" size="sm" onClick={() => setReveal(!reveal)}>
-              <Icon icon={reveal ? ViewOffSlashIcon : ViewIcon} size={14} /> {reveal ? "Hide values" : "Show values"}
+              <Icon icon={reveal ? EyeOffIcon : EyeIcon} size={14} /> {reveal ? "Hide values" : "Show values"}
             </Button>
           </>
         )}
@@ -251,7 +251,7 @@ export function SettingsForm({ d, isNew, framework }: { d: SettingsDefaults; isN
         </SettingsRow>
       )}
 
-      <div className="grid gap-3 border-b border-border px-4 py-5 sm:px-6">
+      <div className="grid gap-3 border-b border-border px-3.5 py-5">
         <FormError message={e.form} />
         {state.saved && <p className="text-right text-[13px] text-teal">Saved. The next deploy uses these settings.</p>}
         <SaveButtons isNew={isNew} />
@@ -320,13 +320,13 @@ export function DeleteProject({ slug }: { slug: string }) {
         </Button>
       </div>
       <Modal open={open} onClose={() => setOpen(false)} title={`Delete ${slug}`} description="This can't be undone">
-        <form action={action} className="grid gap-4 px-6 py-5">
+        <form action={action} className="grid gap-4 px-[18px] py-5">
           <input type="hidden" name="slug" value={slug} />
-          <p className="text-[13.5px] text-muted">The app stops and its user, files, systemd unit and Caddy site are removed. Domains stop answering. Backups in your bucket are kept.</p>
+          <p className="text-[12px] text-muted">The app stops and its user, files, systemd unit and Caddy site are removed. Domains stop answering. Backups in your bucket are kept.</p>
           <Field label={`Type ${slug} to confirm`} htmlFor="confirm">
             <Input id="confirm" name="confirm" value={typed} onChange={(e) => setTyped(e.target.value)} autoComplete="off" spellCheck={false} autoFocus />
           </Field>
-          <label className="flex items-center gap-2.5 text-[13.5px] text-muted">
+          <label className="flex items-center gap-2.5 text-[12px] text-muted">
             <input name="deleteData" type="checkbox" className="size-4 accent-rose" /> Also delete data/ (no archive)
           </label>
           <FormError message={state.errors?.delete} />

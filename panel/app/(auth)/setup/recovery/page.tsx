@@ -1,4 +1,4 @@
-import { Download04Icon } from "@hugeicons/core-free-icons";
+import { DownloadIcon } from "lucide-react";
 import { redirect } from "next/navigation";
 import { finishSetup, readRecoveryFlash } from "@/app/actions/auth";
 import { AuthHeader } from "@/components/auth";
@@ -29,7 +29,7 @@ export default async function RecoveryPage() {
           download="self-host-layer-recovery-codes.txt"
           className="inline-flex h-[26px] items-center gap-1.5 rounded-md px-2 text-[12px] font-medium text-muted transition-colors duration-150 hover:bg-hover hover:text-foreground"
         >
-          <Icon icon={Download04Icon} size={14} /> Download .txt
+          <Icon icon={DownloadIcon} size={14} /> Download .txt
         </a>
         <CopyButton text={codes.join("\n")} label="Copy all" />
       </div>

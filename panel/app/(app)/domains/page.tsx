@@ -1,4 +1,4 @@
-import { Add01Icon } from "@hugeicons/core-free-icons";
+import { PlusIcon } from "lucide-react";
 import { Icon } from "@/components/icon";
 import { CARD, Dot, Empty, ListRow, Notice, PageHeader, PillLink, Tabs } from "@/components/page";
 import { StatusText } from "@/components/status";
@@ -34,7 +34,7 @@ export default async function AllDomainsPage({ searchParams }: { searchParams: P
         actions={
           projects[0] && (
             <PillLink href={`/projects/${projects[0].slug}/domains`} primary>
-              <Icon icon={Add01Icon} size={16} strokeWidth={2} /> Add domain
+              <Icon icon={PlusIcon} size={16} strokeWidth={2} /> Add domain
             </PillLink>
           )
         }
@@ -88,7 +88,7 @@ export default async function AllDomainsPage({ searchParams }: { searchParams: P
                 }
                 side={
                   <>
-                    <span className="whitespace-nowrap text-[13px] text-dim max-md:hidden">
+                    <span className="whitespace-nowrap text-[12px] text-dim max-md:hidden">
                       {all.length} domain{all.length === 1 ? "" : "s"}
                     </span>
                     <span className="max-sm:hidden">

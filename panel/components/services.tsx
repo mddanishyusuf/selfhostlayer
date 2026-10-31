@@ -1,6 +1,6 @@
 "use client";
 
-import { Add01Icon, DatabaseAddIcon, Download04Icon, PlayIcon } from "@hugeicons/core-free-icons";
+import { DatabasePlusIcon, DownloadIcon, PlayIcon, PlusIcon } from "lucide-react";
 import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { addMongodbAction, addMysqlAction, addPostgresAction, addRedisAction, installMongodbAction, removeMongodbAction, removeMysqlAction, removePostgresAction, removeRedisAction, type ServiceState } from "@/app/actions/services";
@@ -25,7 +25,7 @@ export function AddRedisForm({ slug, installed }: { slug: string; installed: boo
           ))}
         </Select>
         <SubmitButton pending={installed ? "Starting Redis…" : "Installing Redis…"} className="w-auto">
-          <Icon icon={Add01Icon} size={15} strokeWidth={2} /> Add Redis
+          <Icon icon={PlusIcon} size={15} strokeWidth={2} /> Add Redis
         </SubmitButton>
       </div>
       <FormError message={state.error} />
@@ -76,7 +76,7 @@ export function InstallMongodbForm({ slug, compact = false, start = false }: { s
       {slug && <input type="hidden" name="slug" value={slug} />}
       <div>
         <SubmitButton pending={start ? "Starting MongoDB…" : "Installing MongoDB…"} variant={compact ? "secondary" : undefined} size={compact ? "sm" : undefined} className="w-auto">
-          <Icon icon={start ? PlayIcon : Download04Icon} size={15} strokeWidth={2} /> {start ? "Start" : compact ? "Install" : "Install MongoDB on this server"}
+          <Icon icon={start ? PlayIcon : DownloadIcon} size={15} strokeWidth={2} /> {start ? "Start" : compact ? "Install" : "Install MongoDB on this server"}
         </SubmitButton>
       </div>
       <FormError message={state.error} />
@@ -85,10 +85,10 @@ export function InstallMongodbForm({ slug, compact = false, start = false }: { s
 }
 
 const ADD_DATABASE = {
-  postgres: { action: addPostgresAction, label: "Add Postgres", icon: Add01Icon, installing: "Installing PostgreSQL…" },
-  mysql: { action: addMysqlAction, label: "Add MySQL", icon: Add01Icon, installing: "Installing MariaDB…" },
+  postgres: { action: addPostgresAction, label: "Add Postgres", icon: PlusIcon, installing: "Installing PostgreSQL…" },
+  mysql: { action: addMysqlAction, label: "Add MySQL", icon: PlusIcon, installing: "Installing MariaDB…" },
   // MongoDB is installed on its own first: this only makes the project's database and user.
-  mongodb: { action: addMongodbAction, label: "Create database and user", icon: DatabaseAddIcon, installing: "Creating the database…" },
+  mongodb: { action: addMongodbAction, label: "Create database and user", icon: DatabasePlusIcon, installing: "Creating the database…" },
 } as const;
 
 export function AddDatabaseForm({ slug, kind, installed }: { slug: string; kind: DatabaseKind; installed: boolean }) {
@@ -152,17 +152,17 @@ function RemoveServiceForm({ slug, kind }: { slug: string; kind: keyof typeof RE
   const [open, setOpen] = useState(false);
   const [typed, setTyped] = useState("");
   const [state, action] = useActionState(r.action, {} as ServiceState);
-  if (state.ok) return <p className="text-[13px] text-muted">{state.ok}</p>;
+  if (state.ok) return <p className="text-[12px] text-muted">{state.ok}</p>;
   return (
     <div>
       <Button type="button" variant="ghost" size="sm" className="-ml-3" onClick={() => setOpen(true)}>
         Remove {r.label}…
       </Button>
       <Modal open={open} onClose={() => setOpen(false)} title={`Remove ${r.label}`} description={slug}>
-        <form action={action} className="grid gap-4 px-6 py-5">
+        <form action={action} className="grid gap-4 px-[18px] py-5">
           <input type="hidden" name="slug" value={slug} />
-          <p className="text-[13.5px] text-muted">{r.what}</p>
-          <label className="flex items-center gap-2.5 text-[13.5px] text-muted">
+          <p className="text-[12px] text-muted">{r.what}</p>
+          <label className="flex items-center gap-2.5 text-[12px] text-muted">
             <input type="checkbox" name="deleteData" className="size-4 accent-rose" /> {r.data}
           </label>
           <Field label={`Type ${slug} to confirm`} htmlFor={`confirm-${kind}`}>

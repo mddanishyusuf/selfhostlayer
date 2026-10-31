@@ -1,6 +1,6 @@
 "use client";
 
-import { CircleArrowUp02Icon } from "@hugeicons/core-free-icons";
+import { CircleArrowUpIcon } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import type { Release } from "@/lib/updates";
 import { Icon } from "../icon";
@@ -28,7 +28,7 @@ export function UpdateModal({ current, release }: { current: string; release: Re
       open={open}
       onClose={close}
       label="Update"
-      icon={<Icon icon={CircleArrowUp02Icon} size={22} className="text-accent" />}
+      icon={<Icon icon={CircleArrowUpIcon} size={22} className="text-accent" />}
       title="Update Self Host Layer"
       description={`${current} → ${release.version}${release.date ? ` · ${release.date}` : ""}`}
       footer={
@@ -44,18 +44,18 @@ export function UpdateModal({ current, release }: { current: string; release: Re
         )
       }
     >
-      <div className="grid gap-3 px-6 py-5" data-testid="update-modal">
+      <div className="grid gap-3 px-[18px] py-5" data-testid="update-modal">
         {run.busy ? (
           <UpdateProgress run={run} />
         ) : (
           <>
             {release.notes && (
               <div className="grid gap-1">
-                <p className="text-[13px] text-dim">What&apos;s new</p>
+                <p className="text-[12px] text-dim">What&apos;s new</p>
                 <p className="whitespace-pre-line text-[14px]">{release.notes}</p>
               </div>
             )}
-            <p className="text-[13px] text-muted">Your apps keep running. The update replaces the panel, the agent and the CLI, and the panel restarts on the way: about a minute.</p>
+            <p className="text-[12px] text-muted">Your apps keep running. The update replaces the panel, the agent and the CLI, and the panel restarts on the way: about a minute.</p>
           </>
         )}
         <FormError message={run.error} />

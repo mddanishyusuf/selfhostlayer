@@ -51,7 +51,7 @@ export function DestinationForm({ providers, saved }: { providers: ProviderInfo[
           </button>
         ))}
       </div>
-      <p className="text-[13px] text-muted">{info.hint}</p>
+      <p className="text-[12px] text-muted">{info.hint}</p>
       <div className="grid gap-4 sm:grid-cols-[1.6fr_1fr]">
         <Field label="Endpoint" htmlFor="endpoint">
           <Input id="endpoint" name="endpoint" defaultValue={saved?.endpoint} placeholder={info.endpoint} autoComplete="off" spellCheck={false} className="font-mono text-[13px]" />
@@ -127,7 +127,7 @@ export function RestoreButton({ id, slug }: { id: number; slug: string }) {
       )}
       <Modal open={open} onClose={() => setOpen(false)} title={`Restore ${slug}`} description="From this backup">
         {state.ok ? (
-          <div className="grid gap-4 px-6 py-5">
+          <div className="grid gap-4 px-[18px] py-5">
             <p className="text-[14px] text-teal">{state.ok}</p>
             <div className="flex justify-end">
               <Button type="button" variant="secondary" onClick={() => setOpen(false)}>
@@ -136,9 +136,9 @@ export function RestoreButton({ id, slug }: { id: number; slug: string }) {
             </div>
           </div>
         ) : (
-          <form action={action} className="grid gap-4 px-6 py-5">
+          <form action={action} className="grid gap-4 px-[18px] py-5">
             <input type="hidden" name="id" value={id} />
-            <p className="text-[13.5px] text-muted">
+            <p className="text-[12px] text-muted">
               The app stops, its data folder is replaced by this backup, and it starts again. The current data is kept beside it (data.before-restore-…) until the next restore.
             </p>
             <Field label={`Type ${slug} to confirm`} htmlFor={`confirm-${id}`}>
@@ -241,7 +241,7 @@ export function ImportData({ slug }: { slug: string }) {
   return (
     <div className="grid gap-3" data-testid="import-data">
       <div className="flex flex-wrap items-center gap-2">
-        <label className="inline-flex h-9 min-w-0 max-w-full cursor-pointer items-center gap-2 rounded-[10px] border border-dashed border-border-strong px-3 text-[13.5px] text-muted transition-colors duration-150 hover:border-accent hover:text-foreground">
+        <label className="inline-flex h-9 min-w-0 max-w-full cursor-pointer items-center gap-2 rounded-[10px] border border-dashed border-border-strong px-3 text-[12px] text-muted transition-colors duration-150 hover:border-accent hover:text-foreground">
           <input
             type="file"
             name="archive"
@@ -256,7 +256,7 @@ export function ImportData({ slug }: { slug: string }) {
         </Button>
       </div>
       <Modal open={open} onClose={close} title={`Import data into ${slug}`} description={file ? `${file.name} · ${fileSize(file.size)}` : undefined}>
-        <div className="grid gap-4 px-6 py-5">
+        <div className="grid gap-4 px-[18px] py-5">
           {phase === "done" ? (
             <p className="text-[14px] text-teal">{message}</p>
           ) : busy ? (
@@ -264,11 +264,11 @@ export function ImportData({ slug }: { slug: string }) {
               <div className="h-1.5 overflow-hidden rounded bg-track">
                 <div className="h-full rounded bg-lavender transition-[width] duration-150" style={{ width: `${Math.round((phase === "importing" ? 1 : progress) * 100)}%` }} />
               </div>
-              <p className="text-[13.5px] text-muted">{phase === "uploading" ? `Uploading… ${Math.round(progress * 100)}%` : "Checking the databases and importing…"}</p>
+              <p className="text-[12px] text-muted">{phase === "uploading" ? `Uploading… ${Math.round(progress * 100)}%` : "Checking the databases and importing…"}</p>
             </div>
           ) : (
             <>
-              <p className="text-[13.5px] text-muted">
+              <p className="text-[12px] text-muted">
                 The app&apos;s data folder is replaced by this archive. SQLite databases are checked first; if anything is wrong, nothing changes. The current data is kept beside it until the next import or restore.
               </p>
               <Field label={`Type ${slug} to confirm`} htmlFor="import-confirm">

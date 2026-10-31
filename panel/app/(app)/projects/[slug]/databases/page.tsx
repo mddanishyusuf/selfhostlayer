@@ -1,4 +1,4 @@
-import { Table01Icon } from "@hugeicons/core-free-icons";
+import { TableIcon } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { formatBytes } from "@/components/backup-list";
@@ -61,7 +61,7 @@ const Unreachable = () => <p className="text-[13px] text-rose">Couldn&apos;t ask
 function BrowseLink({ slug, db, label = "Browse data" }: { slug: string; db: string; label?: string }) {
   return (
     <PillLink href={`/projects/${slug}/databases/view?db=${encodeURIComponent(db)}`} size="sm">
-      <Icon icon={Table01Icon} size={14} /> {label}
+      <Icon icon={TableIcon} size={14} /> {label}
     </PillLink>
   );
 }
@@ -107,7 +107,7 @@ export default async function DatabasesPage({ params, searchParams }: { params: 
           {!status && <Unreachable />}
           {status && !redis && (
             <>
-              <p className="text-[13.5px] text-muted">
+              <p className="text-[12px] text-muted">
                 The app gets <code className="font-mono text-[12.5px]">REDIS_URL</code>. Pick how much memory it may use.
               </p>
               <AddRedisForm slug={project.slug} installed={status.installed.redis} />
@@ -115,7 +115,7 @@ export default async function DatabasesPage({ params, searchParams }: { params: 
           )}
           {redis && (
             <>
-              <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[13.5px] text-muted">
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] text-muted">
                 <StatusText status={redis.answering ? "ok" : "err"} label={redis.answering ? "Running" : redis.active ? "Not answering" : "Stopped"} />
                 <Dot />
                 <span className="tabular-nums">
@@ -154,7 +154,7 @@ export default async function DatabasesPage({ params, searchParams }: { params: 
                       </Link>
                     </span>
                   ))}
-                  <span className="text-[12.5px] text-dim">As of the last backup</span>
+                  <span className="text-[12px] text-dim">As of the last backup</span>
                 </span>
               ) : (
                 <span key="f" className="text-muted">
@@ -188,19 +188,19 @@ function DatabaseRow({ kind, slug, status }: { kind: DatabaseKind; slug: string;
       <div className="grid gap-4" data-testid={`${kind}-card`}>
         {!status && <Unreachable />}
         {status && !db && taken && (
-          <p className="text-[13.5px] text-muted">
+          <p className="text-[12px] text-muted">
             {slug} uses {DATABASES[other].label}. An app gets one SQL database, since both give it <code className="font-mono text-[12.5px]">DATABASE_URL</code>.
           </p>
         )}
         {status && !db && needsServer && (
           <>
-            <p className="text-[13.5px] text-muted">MongoDB isn&apos;t installed on this server yet. It&apos;s installed once and every project shares it, each with its own database and user.</p>
+            <p className="text-[12px] text-muted">MongoDB isn&apos;t installed on this server yet. It&apos;s installed once and every project shares it, each with its own database and user.</p>
             <InstallMongodbForm slug={slug} />
           </>
         )}
         {status && !db && !taken && !needsServer && (
           <>
-            <p className="text-[13.5px] text-muted">
+            <p className="text-[12px] text-muted">
               {d.first} The app gets <code className="font-mono text-[12.5px]">{d.env}</code>.
             </p>
             <AddDatabaseForm slug={slug} kind={kind} installed={status.installed[kind]} />
@@ -208,7 +208,7 @@ function DatabaseRow({ kind, slug, status }: { kind: DatabaseKind; slug: string;
         )}
         {db && (
           <>
-            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[13.5px] text-muted">
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] text-muted">
               <StatusText status={db.answering ? "ok" : "err"} label={db.answering ? "Running" : "Not answering"} />
               <Dot />
               <code className="font-mono text-[12.5px]">{db.database}</code>
@@ -227,7 +227,7 @@ function DatabaseRow({ kind, slug, status }: { kind: DatabaseKind; slug: string;
               <p className="text-[13px] font-medium">{d.env}</p>
               <SecretUrl url={db.url} />
               {kind === "mongodb" && (
-                <p className="text-[12.5px] text-dim">
+                <p className="text-[12px] text-dim">
                   To open it from your computer (Compass, mongosh), tunnel the port first:{" "}
                   <code className="font-mono text-[12px] text-muted">ssh -N -L 27017:127.0.0.1:27017 root@{boxConfig().publicIp}</code>, then use the same URI.
                 </p>

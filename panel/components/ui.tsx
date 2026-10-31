@@ -1,4 +1,4 @@
-import { AlertCircleIcon } from "@hugeicons/core-free-icons";
+import { CircleAlertIcon } from "lucide-react";
 import type { ComponentProps, ReactNode } from "react";
 import { Icon } from "./icon";
 import { stackLogo } from "./stack-logos";
@@ -8,14 +8,17 @@ export { cx };
 
 const focus = "outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-1 focus-visible:ring-offset-background";
 
+// As AgentOS: the main button blue and bold, the others a line with no fill, danger in red.
 const VARIANTS = {
-  primary: "border border-inverse bg-inverse text-inverse-fg hover:opacity-90",
-  secondary: "border border-border-strong bg-card text-foreground hover:bg-hover",
-  ghost: "border border-transparent text-muted hover:bg-hover hover:text-foreground",
-  danger: "border border-rose bg-rose text-on-rose hover:opacity-90",
+  primary: "border border-accent bg-accent font-bold text-white hover:brightness-110",
+  secondary: "border border-border bg-transparent text-foreground hover:border-btn-hover-line hover:bg-btn-hover",
+  ghost: "border border-transparent text-muted hover:bg-btn-hover hover:text-foreground",
+  danger: "border border-danger-line bg-transparent text-rose hover:bg-btn-hover",
 } as const;
 
-/** A button: the main one in the text color, the others outlined. size "sm" for row actions. */
+const SIZES = { sm: "h-[26px] px-[9px] text-[12px]", md: "h-[35px] px-[13px] text-[14px]" } as const;
+
+/** A button: the main one blue, the others outlined. size "sm" for row actions. */
 export function Button({
   variant = "primary",
   size = "md",
@@ -25,8 +28,8 @@ export function Button({
   return (
     <button
       className={cx(
-        "inline-flex select-none items-center justify-center gap-1.5 whitespace-nowrap font-medium transition-[background-color,opacity] duration-150 ease-out disabled:pointer-events-none disabled:opacity-50",
-        size === "sm" ? "h-8 rounded-[9px] px-3 text-[13px]" : "h-9 rounded-[10px] px-[15px] text-[14px]",
+        "inline-flex select-none items-center justify-center gap-1.5 whitespace-nowrap transition-[background-color,border-color,filter] duration-150 ease-out disabled:pointer-events-none disabled:opacity-50",
+        SIZES[size],
         focus,
         VARIANTS[variant],
         className,
@@ -38,8 +41,8 @@ export function Button({
 
 export const buttonClass = (variant: keyof typeof VARIANTS = "primary", size: "sm" | "md" = "md") =>
   cx(
-    "inline-flex select-none items-center justify-center gap-1.5 whitespace-nowrap font-medium transition-[background-color,opacity] duration-150 ease-out",
-    size === "sm" ? "h-8 rounded-[9px] px-3 text-[13px]" : "h-9 rounded-[10px] px-[15px] text-[14px]",
+    "inline-flex select-none items-center justify-center gap-1.5 whitespace-nowrap transition-[background-color,border-color,filter] duration-150 ease-out",
+    SIZES[size],
     focus,
     VARIANTS[variant],
   );
@@ -53,7 +56,7 @@ export function Input({ className, ...props }: ComponentProps<"input">) {
   return (
     <input
       className={cx(
-        "h-10 w-full rounded-[10px] border border-border-strong bg-field px-3 text-sm transition-[border-color,box-shadow] duration-150 placeholder:text-dim focus:border-accent focus:shadow-[0_0_0_3px_color-mix(in_srgb,var(--accent)_20%,transparent)]",
+        "h-[39px] w-full border border-border bg-field px-2.5 transition-[border-color,box-shadow] duration-150 placeholder:text-placeholder focus:border-accent focus:shadow-focus",
         "outline-none aria-invalid:border-rose",
         className,
       )}
@@ -75,36 +78,36 @@ export function SecretInput({ reveal = false, className, ...props }: Omit<Compon
 export function Select({ className, ...props }: ComponentProps<"select">) {
   return (
     <select
-      className={cx("select-pill h-10 w-full rounded-[10px] border border-border-strong bg-field pl-3 pr-8 text-sm outline-none focus:border-accent", className)}
+      className={cx("select-pill h-[39px] w-full border border-border bg-field pl-2.5 pr-8 outline-none focus:border-accent focus:shadow-focus", className)}
       {...props}
     />
   );
 }
 
 export function Label({ className, ...props }: ComponentProps<"label">) {
-  return <label className={cx("text-[13px] font-medium text-foreground", className)} {...props} />;
+  return <label className={cx("font-bold text-foreground", className)} {...props} />;
 }
 
 export function Field({ label, htmlFor, hint, children }: { label: string; htmlFor: string; hint?: ReactNode; children: ReactNode }) {
   return (
-    <div className="grid content-start gap-1.5">
+    <div className="grid content-start gap-[5px]">
       <Label htmlFor={htmlFor}>{label}</Label>
       {children}
-      {hint && <p className="text-[13px] text-muted">{hint}</p>}
+      {hint && <p className="text-[12px] text-muted">{hint}</p>}
     </div>
   );
 }
 
 /** A card on the page. Prefer Section, which adds a title. */
 export function Card({ className, ...props }: ComponentProps<"div">) {
-  return <div className={cx("rounded-2xl bg-card", className)} {...props} />;
+  return <div className={cx("border border-border bg-card", className)} {...props} />;
 }
 
 export function FormError({ message }: { message?: string | null }) {
   if (!message) return null;
   return (
-    <p role="alert" className="flex items-start gap-2 rounded-lg bg-err-subtle px-3 py-2 text-[13px] text-rose">
-      <Icon icon={AlertCircleIcon} size={15} className="mt-0.5" />
+    <p role="alert" className="flex items-start gap-2 bg-err-subtle px-2.5 py-2 text-[12px] text-rose">
+      <Icon icon={CircleAlertIcon} size={15} className="mt-0.5" />
       {message}
     </p>
   );
@@ -122,10 +125,10 @@ const LOGO_BARS = [
   { x: 4, y: 10.6, width: 5, height: 17.4, opacity: 0.28 },
 ];
 
-export function LogoMark() {
+export function LogoMark({ size = 22, className = "size-[30px] text-foreground" }: { size?: number; className?: string }) {
   return (
-    <span className="grid size-[30px] shrink-0 place-items-center text-foreground" aria-hidden>
-      <svg viewBox="3 3 26 26" className="size-[22px]" fill="currentColor">
+    <span className={cx("grid shrink-0 place-items-center", className)} aria-hidden>
+      <svg viewBox="3 3 26 26" width={size} height={size} fill="currentColor">
         {LOGO_BARS.map(({ opacity, ...bar }) => (
           <rect key={opacity} {...bar} rx="1.2" fillOpacity={opacity} />
         ))}
@@ -138,7 +141,7 @@ export function Logo({ withName = true }: { withName?: boolean }) {
   return (
     <span className="inline-flex items-center gap-2.5">
       <LogoMark />
-      {withName && <span className="text-[15px] font-semibold tracking-tight">Self Host Layer</span>}
+      {withName && <span className="text-[15px] font-bold">Self Host Layer</span>}
     </span>
   );
 }
@@ -153,13 +156,13 @@ export function StatusDot({ status, pulse }: { status: "ok" | "warn" | "err" | "
   );
 }
 
-/** Small rounded label: a state ("Building", "Live") or a version. */
+/** A small label, as AgentOS's pills: a state ("Building", "Live") or a version. */
 export function Pill({ children, outline, className }: { children: ReactNode; outline?: boolean; className?: string }) {
   return (
     <span
       className={cx(
-        "inline-flex h-6 items-center whitespace-nowrap rounded-[7px] px-2 text-[12.5px] font-medium",
-        outline ? "border border-border-strong text-muted" : "bg-pill text-foreground",
+        "inline-flex items-center gap-[5px] whitespace-nowrap border px-[9px] py-px text-[11px]",
+        outline ? "border-border text-muted" : "border-transparent bg-pill text-pill-text",
         className,
       )}
     >
@@ -171,15 +174,15 @@ export function Pill({ children, outline, className }: { children: ReactNode; ou
 export function Skeleton({ className }: { className?: string }) {
   return (
     <span
-      className={cx("block rounded-md bg-[linear-gradient(90deg,var(--hover)_25%,var(--selected)_50%,var(--hover)_75%)] bg-[length:200%_100%] [animation:shimmer_1.5s_linear_infinite]", className)}
+      className={cx("block bg-[linear-gradient(90deg,var(--hover)_25%,var(--selected)_50%,var(--hover)_75%)] bg-[length:200%_100%] [animation:shimmer_1.5s_linear_infinite]", className)}
     />
   );
 }
 
-/** A project's mark: the logo of its stack (its detected framework), in one color for every project. Bare in lists: no tile. */
+/** A project's mark: the logo of its stack (its detected framework) on AgentOS's project tile, white in dark and black in light. Bare in lists: no tile. */
 export function Mark({ framework, size = "md", bare }: { framework: string; size?: "sm" | "md"; bare?: boolean }) {
   const logo = stackLogo(framework);
-  const px = size === "sm" ? 15 : 19;
+  const px = size === "sm" ? 14 : 18;
   if (bare) {
     return (
       <svg role="img" aria-label={logo.title} viewBox="0 0 24 24" width={20} height={20} fill="currentColor" className="shrink-0 text-foreground">
@@ -193,7 +196,7 @@ export function Mark({ framework, size = "md", bare }: { framework: string; size
       role="img"
       aria-label={logo.title}
       title={logo.title}
-      className={cx("grid shrink-0 place-items-center bg-well text-foreground", size === "sm" ? "size-8 rounded-[9px]" : "size-10 rounded-[11px]")}
+      className={cx("grid shrink-0 place-items-center bg-icon-tile text-icon-tile-fg", size === "sm" ? "size-7" : "size-9")}
     >
       <svg viewBox="0 0 24 24" width={px} height={px} fill="currentColor" aria-hidden>
         <path d={logo.path} />

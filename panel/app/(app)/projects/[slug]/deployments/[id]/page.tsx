@@ -1,4 +1,4 @@
-import { Undo02Icon } from "@hugeicons/core-free-icons";
+import { Undo2Icon } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { cancel, rollback } from "@/app/actions/projects";
@@ -55,7 +55,7 @@ export default async function DeploymentPage({ params }: { params: Promise<{ slu
               <form action={rollback}>
                 <input type="hidden" name="deploymentId" value={d.id} />
                 <SubmitButton pending="Starting…" variant="secondary" className="w-auto">
-                  <Icon icon={Undo02Icon} size={14} /> Roll back to this
+                  <Icon icon={Undo2Icon} size={14} /> Roll back to this
                 </SubmitButton>
               </form>
             )}
@@ -92,8 +92,8 @@ export default async function DeploymentPage({ params }: { params: Promise<{ slu
           {d.steps.map((s, i) => {
             const running = !done && s.ms === null && (i === 0 || d.steps[i - 1]!.ms !== null);
             return (
-              <div key={i} className="grid gap-1.5 border-b border-border px-4 py-3.5 max-lg:odd:border-r sm:px-6 lg:border-b-0 lg:border-r lg:last:border-r-0">
-                <span className="flex items-center gap-2 text-[13px] text-muted">
+              <div key={i} className="grid gap-1.5 border-b border-border px-3.5 py-3.5 max-lg:odd:border-r lg:border-b-0 lg:border-r lg:last:border-r-0">
+                <span className="flex items-center gap-2 text-[12px] text-muted">
                   <StatusDot status={s.ms !== null ? "ok" : running ? "warn" : "idle"} pulse={running} /> {STEP_LABEL[s.name]}
                 </span>
                 <span className="text-[17px] font-semibold tabular-nums">{s.ms === null ? (running ? "…" : "—") : duration(s.ms)}</span>

@@ -1,14 +1,21 @@
 import type { Metadata, Viewport } from "next";
-import { GeistMono } from "geist/font/mono";
-import { Inter } from "next/font/google";
+import localFont from "next/font/local";
 import { cookies } from "next/headers";
 import { THEME_COOKIE, parseTheme } from "@/lib/theme";
 import "./globals.css";
 
-// Inter is fetched at build time and Geist Mono ships in the geist package:
-// both are served by the panel itself, so no font requests to anyone at runtime.
-// Inter with its optical sizes, so titles get the tighter display cut on their own.
-const inter = Inter({ subsets: ["latin"], axes: ["opsz"], variable: "--font-inter", display: "swap" });
+// Marlin Soft SQ, AgentOS's UI font: served by the panel itself from app/fonts,
+// so no font requests to anyone at runtime. Code uses the system's monospace.
+const marlin = localFont({
+  src: [
+    { path: "./fonts/MarlinSoftSQ-Regular.woff2", weight: "400" },
+    { path: "./fonts/MarlinSoftSQ-Medium.woff2", weight: "500" },
+    { path: "./fonts/MarlinSoftSQ-Bold.woff2", weight: "700" },
+    { path: "./fonts/MarlinSoftSQ-ExtraBlack.woff2", weight: "900" },
+  ],
+  variable: "--font-marlin",
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   title: { default: "Self Host Layer", template: "%s · Self Host Layer" },
@@ -17,8 +24,8 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#f5f5f7" },
-    { media: "(prefers-color-scheme: dark)", color: "#000000" },
+    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
+    { media: "(prefers-color-scheme: dark)", color: "#0e0e0e" },
   ],
 };
 
@@ -26,7 +33,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   // Set on the server from the cookie, so the first paint is already in the right theme.
   const theme = parseTheme((await cookies()).get(THEME_COOKIE)?.value);
   return (
-    <html lang="en" data-theme={theme} className={`${inter.variable} ${GeistMono.variable}`}>
+    <html lang="en" data-theme={theme} className={marlin.variable}>
       <body className="min-h-dvh">{children}</body>
     </html>
   );

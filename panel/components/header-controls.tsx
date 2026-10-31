@@ -1,6 +1,6 @@
 "use client";
 
-import { Search01Icon } from "@hugeicons/core-free-icons";
+import { SearchIcon } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { Icon } from "./icon";
@@ -17,11 +17,11 @@ export function FilterBox({ placeholder, param = "q", className }: { placeholder
   return (
     <label
       className={cx(
-        "flex h-9 min-w-0 items-center gap-2 rounded-[10px] border border-border-strong bg-field px-3 text-dim transition-[border-color,box-shadow] duration-150 focus-within:border-accent focus-within:shadow-[0_0_0_3px_color-mix(in_srgb,var(--accent)_20%,transparent)]",
+        "flex h-[35px] min-w-0 items-center gap-2 border border-border bg-field px-2.5 text-placeholder transition-[border-color,box-shadow] duration-150 focus-within:border-accent focus-within:shadow-focus",
         className,
       )}
     >
-      <Icon icon={Search01Icon} size={15} />
+      <Icon icon={SearchIcon} size={15} />
       <input
         {...NO_AUTOFILL}
         value={value}

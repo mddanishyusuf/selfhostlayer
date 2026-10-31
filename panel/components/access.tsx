@@ -32,7 +32,7 @@ export function AccessForm({ allow, you }: { allow: string[]; you: string | null
           </button>
         ))}
       </div>
-      {mode === "anyone" && <p className="text-[13.5px] text-muted">The sign-in page is open to the internet; signing in takes your password and a code from your authenticator app.</p>}
+      {mode === "anyone" && <p className="text-[12px] text-muted">The sign-in page is open to the internet; signing in takes your password and a code from your authenticator app.</p>}
       {mode === "ips" && (
         <div className="grid gap-1.5">
           <textarea
@@ -44,11 +44,11 @@ export function AccessForm({ allow, you }: { allow: string[]; you: string | null
             aria-label="Allowed addresses"
             className="w-full rounded-[10px] border border-border-strong bg-field p-3 font-mono text-[13px] outline-none placeholder:text-dim focus:border-accent"
           />
-          <p className="text-[12.5px] text-dim">One per line: an IP, or a range like 203.0.113.0/24.{you ? ` You're on ${you} now.` : ""}</p>
+          <p className="text-[12px] text-dim">One per line: an IP, or a range like 203.0.113.0/24.{you ? ` You're on ${you} now.` : ""}</p>
         </div>
       )}
       {mode === "tailscale" && (
-        <p className="text-[13.5px] text-muted">
+        <p className="text-[12px] text-muted">
           Only devices on your tailnet (100.64.0.0/10) can open the panel. Install Tailscale on this server and open the panel over it before you save.{you ? ` You're on ${you} now.` : ""}
         </p>
       )}

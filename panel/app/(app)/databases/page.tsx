@@ -54,15 +54,15 @@ function rowsOf(slug: string, s: ServiceStatus | null, files: NonNullable<Browse
 function EngineRow({ engine, title, children, chip, foot }: { engine: Engine; title: string; children: ReactNode; chip: ReactNode; foot: ReactNode }) {
   const look = ENGINE_LOOK[engine];
   return (
-    <div className="grid grid-cols-[32px_minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2 border-t border-border px-4 py-3.5 first:border-t-0 sm:px-6 md:grid-cols-[32px_minmax(0,1fr)_auto_124px]" data-testid={`engine-${engine}`}>
+    <div className="grid grid-cols-[32px_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1.5 border-t border-border-soft px-3.5 py-2.5 first:border-t-0 md:grid-cols-[32px_minmax(0,1fr)_auto_110px]" data-testid={`engine-${engine}`}>
       <TileIcon tone={look.tone} size="sm">
         <Icon icon={look.icon} size={17} />
       </TileIcon>
       <div className="grid min-w-0 gap-0.5">
-        <b className="font-medium">{title}</b>
-        <p className="text-[13.5px] text-muted">{children}</p>
+        <b className="font-bold">{title}</b>
+        <p className="text-[12px] text-muted">{children}</p>
       </div>
-      <div className="col-span-2 col-start-2 flex flex-wrap items-center gap-2.5 text-[13px] text-muted md:col-auto md:justify-end">{foot}</div>
+      <div className="col-span-2 col-start-2 flex flex-wrap items-center gap-2.5 text-[12px] text-muted md:col-auto md:justify-end">{foot}</div>
       <div className="col-start-3 row-start-1 justify-self-end md:col-auto md:row-auto md:justify-self-start">{chip}</div>
     </div>
   );
@@ -71,14 +71,14 @@ function EngineRow({ engine, title, children, chip, foot }: { engine: Engine; ti
 function DatabaseRow({ row, label }: { row: Row; label: string }) {
   const look = ENGINE_LOOK[row.engine];
   return (
-    <div className="group px-4 transition-colors duration-150 hover:bg-hover sm:px-6" data-testid="database">
-      <div className="grid grid-cols-[32px_minmax(0,1fr)_auto_auto] items-center gap-x-3.5 border-t border-border py-3.5 group-first:border-t-0">
+    <div className="group px-3.5 transition-colors duration-150 hover:bg-hover" data-testid="database">
+      <div className="grid grid-cols-[32px_minmax(0,1fr)_auto_auto] items-center gap-x-3 border-t border-border-soft py-2.5 group-first:border-t-0">
         <TileIcon tone={look.tone} size="sm">
           <Icon icon={look.icon} size={17} />
         </TileIcon>
         <Link href={`/projects/${row.slug}/databases`} className="grid min-w-0 gap-0.5">
-          <code className="truncate font-mono text-[13.5px]">{row.name}</code>
-          <span className="text-[13.5px] text-muted sm:truncate">
+          <code className="truncate font-mono text-[13px] font-bold">{row.name}</code>
+          <span className="text-[12px] text-muted sm:truncate">
             {[row.slug, label, ...row.meta].filter(Boolean).join(" · ")}
             {!row.answering && <span className="text-rose"> · not answering</span>}
           </span>

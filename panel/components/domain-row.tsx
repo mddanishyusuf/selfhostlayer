@@ -1,4 +1,4 @@
-import { ArrowUpRight01Icon, Delete02Icon, Globe02Icon, Link01Icon, SquareLock02Icon } from "@hugeicons/core-free-icons";
+import { ArrowUpRightIcon, GlobeIcon, LinkIcon, LockIcon, Trash2Icon } from "lucide-react";
 import { Suspense } from "react";
 import { removeDomainAction, verifyDomainAction } from "@/app/actions/domains";
 import { checkCertificate } from "@/lib/cert";
@@ -16,7 +16,7 @@ async function CertLine({ host, free, proxied }: { host: string; free: boolean; 
   if (cert.ok) {
     return (
       <>
-        <Icon icon={SquareLock02Icon} size={13} className="text-dim" />
+        <Icon icon={LockIcon} size={13} className="text-dim" />
         HTTPS
         <Dot />
         {cert.issuer}
@@ -76,7 +76,7 @@ export function DomainRow({ d, serverIp, removable, indent }: { d: ProjectDomain
       indent={indent}
       data-host={d.host}
       data-status={d.status}
-      lead={<RowIcon tone={pending ? "warn" : d.role === "free" ? "dim" : "blue"}>{<Icon icon={d.role === "redirect" ? Link01Icon : Globe02Icon} size={17} />}</RowIcon>}
+      lead={<RowIcon tone={pending ? "warn" : d.role === "free" ? "dim" : "blue"}>{<Icon icon={d.role === "redirect" ? LinkIcon : GlobeIcon} size={17} />}</RowIcon>}
       title={
         <>
           <span className="truncate">{d.host}</span>
@@ -88,13 +88,13 @@ export function DomainRow({ d, serverIp, removable, indent }: { d: ProjectDomain
         <>
           <span className="max-sm:hidden">{pending ? <StatusText status="warn" label="Pending" pulse /> : <StatusText status="ok" label="Live" />}</span>
           <a href={`https://${d.host}`} target="_blank" rel="noreferrer" title={`Open ${d.host}`} className="grid size-8 place-items-center rounded-lg text-muted transition-colors hover:bg-hover hover:text-foreground">
-            <Icon icon={ArrowUpRight01Icon} size={16} />
+            <Icon icon={ArrowUpRightIcon} size={16} />
           </a>
           {removable && (
             <form action={removeDomainAction}>
               <input type="hidden" name="domainId" value={d.id} />
               <button type="submit" title={d.role === "free" ? `Remove the free address: the app stops answering on ${d.host}` : `Remove ${d.host}`} className="grid size-8 place-items-center rounded-lg text-muted transition-colors hover:bg-hover hover:text-foreground">
-                <Icon icon={Delete02Icon} size={15} />
+                <Icon icon={Trash2Icon} size={15} />
                 <span className="sr-only">Remove {d.host}</span>
               </button>
             </form>
@@ -104,7 +104,7 @@ export function DomainRow({ d, serverIp, removable, indent }: { d: ProjectDomain
     >
       {behindCloudflare && (
         <div className="col-span-full mt-3.5 grid gap-3 rounded-xl bg-warn-band px-[18px] py-3.5 md:col-start-2" data-testid="cloudflare-proxy">
-          <p className="text-[13.5px] text-muted">
+          <p className="text-[12px] text-muted">
             To keep the orange cloud, in Cloudflare set <b className="font-medium text-foreground">SSL/TLS</b> to <b className="font-medium text-foreground">Full (strict)</b> and turn off{" "}
             <b className="font-medium text-foreground">Always Use HTTPS</b>: this server redirects to HTTPS itself, and its first certificate needs plain HTTP to get through. The record behind the proxy must point at{" "}
             <code className="font-mono text-[13px] text-foreground">{serverIp}</code>.
@@ -123,13 +123,13 @@ export function DomainRow({ d, serverIp, removable, indent }: { d: ProjectDomain
                 Check again
               </SubmitButton>
             </form>
-            <span className="text-[12.5px] text-dim">Or set the record to DNS only, then check again.</span>
+            <span className="text-[12px] text-dim">Or set the record to DNS only, then check again.</span>
           </div>
         </div>
       )}
       {record && (
         <div className="col-span-full mt-3.5 grid gap-3 rounded-xl bg-warn-band px-[18px] py-3.5 md:col-start-2" data-testid="dns-record">
-          <p className="text-[13.5px] text-muted">Add this record at your DNS provider. The domain goes live once public DNS points it here, so visitors never land on a broken site.</p>
+          <p className="text-[12px] text-muted">Add this record at your DNS provider. The domain goes live once public DNS points it here, so visitors never land on a broken site.</p>
           <div className="grid items-end gap-x-[18px] gap-y-2.5 sm:grid-cols-[80px_110px_minmax(0,1fr)_auto]">
             <div>
               <span className="mb-0.5 block text-[12px] text-dim">Type</span>

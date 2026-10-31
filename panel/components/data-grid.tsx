@@ -47,7 +47,7 @@ export function DataGrid({ columns, rows, firstRow, sortLinks, sorted }: { colum
           <tr>
             <th className="border-b border-border bg-card py-2 pl-4 pr-3 text-right font-sans text-[12px] font-medium text-dim sm:pl-6">#</th>
             {columns.map((c, i) => (
-              <th key={i} className="whitespace-nowrap border-b border-border bg-card px-3 py-2 text-left font-sans text-[12.5px] font-medium text-muted">
+              <th key={i} className="whitespace-nowrap border-b border-border bg-card px-3 py-2 text-left font-sans text-[12px] font-medium text-muted">
                 {sortLinks ? (
                   <Link href={sortLinks[i]!} className={cx("transition-colors duration-150 hover:text-foreground", sorted?.column === c && "text-foreground")}>
                     {c}
@@ -81,7 +81,7 @@ export function DataGrid({ columns, rows, firstRow, sortLinks, sorted }: { colum
                     <dl className="grid max-w-[960px] grid-cols-[minmax(72px,max-content)_minmax(0,1fr)] gap-x-5 gap-y-2">
                       {columns.map((c, i) => (
                         <Fragment key={i}>
-                          <dt className="font-sans text-[12.5px] text-muted">{c}</dt>
+                          <dt className="font-sans text-[12px] text-muted">{c}</dt>
                           <dd className="whitespace-pre-wrap break-all">
                             <Value cell={row[i]!} open />
                           </dd>

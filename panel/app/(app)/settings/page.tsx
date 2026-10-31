@@ -1,4 +1,4 @@
-import { CheckmarkCircle02Icon, GithubIcon } from "@hugeicons/core-free-icons";
+import { CircleCheckIcon, GitBranchIcon } from "lucide-react";
 import { dropAddressAction } from "@/app/actions/address";
 import { signOutOthersAction } from "@/app/actions/account";
 import { AccessForm } from "@/components/access";
@@ -19,7 +19,7 @@ import { requesterIp } from "@/lib/request";
 import { PANEL_MOVE, readState } from "@/lib/panel-state";
 import { listSessions, requireUser } from "@/lib/session";
 import { autoCheck, offeredUpdate, updateState } from "@/lib/updates";
-import { timeAgo } from "@/components/status";
+import { timeAgo, StatusChip } from "@/components/status";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Settings" };
@@ -68,7 +68,7 @@ export default async function ServerSettingsPage() {
                 [
                   "App",
                   <span key="a" className="inline-flex items-center gap-1.5">
-                    {app.name} <Icon icon={CheckmarkCircle02Icon} size={14} className="text-teal" />
+                    {app.name} <Icon icon={CircleCheckIcon} size={14} className="text-teal" />
                   </span>,
                 ],
                 ["Owner", app.ownerLogin],
@@ -77,7 +77,7 @@ export default async function ServerSettingsPage() {
             />
             <div className="flex flex-wrap gap-2">
               <PillLink href={app.htmlUrl} external size="sm">
-                <Icon icon={GithubIcon} size={14} /> Manage on GitHub
+                <Icon icon={GitBranchIcon} size={14} /> Manage on GitHub
               </PillLink>
               <PillLink href={`${GITHUB_WEB}/apps/${app.slug}/installations/new`} external size="sm">
                 Install on more repositories
@@ -87,7 +87,7 @@ export default async function ServerSettingsPage() {
         ) : (
           <div>
             <PillLink href="/github/connect" primary size="sm">
-              <Icon icon={GithubIcon} size={14} /> Connect GitHub
+              <Icon icon={GitBranchIcon} size={14} /> Connect GitHub
             </PillLink>
           </div>
         )}
@@ -103,7 +103,7 @@ export default async function ServerSettingsPage() {
           inset
           items={[
             ["Email", user.email],
-            ["Two-factor", <Pill key="t" className="bg-ok-soft text-teal">On</Pill>],
+            ["Two-factor", <StatusChip key="t" status="ok" label="On" />],
             ["Recovery codes", `${codesLeft} unused`],
           ]}
         />
@@ -144,7 +144,7 @@ export default async function ServerSettingsPage() {
         <RepairButton />
       </SettingsRow>
       <SettingsRow title="Remove the panel" description="Your apps keep running: they're plain systemd units and Caddy sites. Only the panel goes.">
-        <p className="text-[13.5px] text-muted">
+        <p className="text-[12px] text-muted">
           On the server, run <code className="rounded bg-hover px-1.5 py-0.5 font-mono text-[12.5px] text-foreground">sudo systemctl disable --now layer-panel layer-agent</code>. The README lists everything the installer created, if you want it all gone.
         </p>
       </SettingsRow>

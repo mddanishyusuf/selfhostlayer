@@ -95,7 +95,7 @@ export function UsageChart({
   return (
     <div className="grid gap-2" data-testid="usage-chart">
       <div className="flex items-baseline justify-between gap-3">
-        <span className="text-[13px] text-muted">{title}</span>
+        <span className="text-[12px] text-muted">{title}</span>
         <span className="text-[17px] font-semibold tabular-nums">{last ? fmt(last.value, unit) : "—"}</span>
       </div>
       <div
@@ -119,7 +119,7 @@ export function UsageChart({
         </svg>
         <span className="pointer-events-none absolute left-0 top-0 -translate-y-1/2 bg-background pr-1.5 text-[11px] tabular-nums text-dim">{fmt(max, unit)}</span>
         <span className="pointer-events-none absolute left-0 top-1/2 -translate-y-1/2 bg-background pr-1.5 text-[11px] tabular-nums text-dim">{fmt(max / 2, unit)}</span>
-        {!values.length && <span className="absolute inset-0 grid place-items-center text-center text-[13px] text-dim">No data yet: the first samples arrive within a few minutes.</span>}
+        {!values.length && <span className="absolute inset-0 grid place-items-center text-center text-[12px] text-dim">No data yet: the first samples arrive within a few minutes.</span>}
         {point && (
           <>
             <span className="pointer-events-none absolute inset-y-0 w-px bg-border-strong" style={{ left: left(point.at) }} />

@@ -108,7 +108,7 @@ export default async function HealthPage({ searchParams }: { searchParams: Promi
           />
         }
       >
-        <div className="grid gap-x-10 gap-y-6 border-t border-border px-4 py-5 sm:px-6 lg:grid-cols-2">
+        <div className="grid gap-x-10 gap-y-6 border-t border-border px-3.5 py-5 lg:grid-cols-2">
           <UsageChart title="CPU" unit="%" points={usage.map((p) => ({ at: p.at, value: p.cpu }))} from={from} to={now} gapMs={gapMs} />
           <UsageChart title="Memory" unit="MB" points={usage.map((p) => ({ at: p.at, value: p.memoryMb }))} from={from} to={now} gapMs={gapMs} />
         </div>
@@ -116,7 +116,7 @@ export default async function HealthPage({ searchParams }: { searchParams: Promi
 
       {apps.length > 0 && (
         <Section title="Apps" description="Each app runs as its own user, with its own memory limit.">
-          <div className="hidden h-10 grid-cols-[30px_minmax(0,1fr)_minmax(0,1.3fr)_64px_110px] items-center gap-x-5 border-y border-border px-6 text-[13px] text-muted md:grid">
+          <div className="hidden h-9 grid-cols-[30px_minmax(0,1fr)_minmax(0,1.3fr)_64px_110px] items-center gap-x-5 border-y border-border px-3.5 text-[12px] text-muted md:grid">
             <span />
             <span>App</span>
             <span>Memory</span>
@@ -129,7 +129,7 @@ export default async function HealthPage({ searchParams }: { searchParams: Promi
               <Link
                 key={p.slug}
                 href={`/projects/${p.slug}`}
-                className="grid grid-cols-[30px_minmax(0,1fr)_auto] items-center gap-x-5 gap-y-1 border-b border-border px-4 py-3 transition-colors duration-150 last:border-b-0 hover:bg-hover sm:px-6 md:grid-cols-[30px_minmax(0,1fr)_minmax(0,1.3fr)_64px_110px]"
+                className="grid grid-cols-[30px_minmax(0,1fr)_auto] items-center gap-x-5 gap-y-1 border-b border-border px-3.5 py-3 transition-colors duration-150 last:border-b-0 hover:bg-hover md:grid-cols-[30px_minmax(0,1fr)_minmax(0,1.3fr)_64px_110px]"
               >
                 <Mark framework={p.framework} size="sm" />
                 <span className="truncate font-medium">{p.slug}</span>
@@ -137,7 +137,7 @@ export default async function HealthPage({ searchParams }: { searchParams: Promi
                   <span className="h-1.5 flex-1 overflow-hidden rounded bg-track">
                     <span className={cx("block h-full rounded", used !== null && used / p.memoryMb >= 0.75 ? "bg-warn-dot" : "bg-blue")} style={{ width: `${used === null ? 0 : Math.max(1.5, Math.min(100, (used / p.memoryMb) * 100))}%` }} />
                   </span>
-                  <span className="w-[112px] text-right text-[13px] tabular-nums text-muted">{used === null ? "—" : `${used} of ${p.memoryMb} MB`}</span>
+                  <span className="w-[112px] text-right text-[12px] tabular-nums text-muted">{used === null ? "—" : `${used} of ${p.memoryMb} MB`}</span>
                 </span>
                 <span className="hidden text-right text-[13px] tabular-nums md:block">{u?.cpu == null ? "—" : `${u.cpu}%`}</span>
                 <span className="col-start-3 row-start-1 flex items-center gap-2 text-[13.5px] md:col-start-auto md:row-auto">

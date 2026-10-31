@@ -1,6 +1,6 @@
 "use client";
 
-import { Search01Icon } from "@hugeicons/core-free-icons";
+import { SearchIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Icon } from "../icon";
@@ -58,10 +58,10 @@ export function CommandPalette({ items }: { items: PaletteItem[] }) {
   };
   return (
     <div className="fixed inset-0 z-50" role="dialog" aria-modal="true" aria-label="Search">
-      <button type="button" aria-label="Close" className="absolute inset-0 bg-scrim backdrop-blur-[3px]" onClick={() => setOpen(false)} />
-      <div className="absolute left-1/2 top-[12vh] w-[min(600px,calc(100vw-32px))] -translate-x-1/2 overflow-hidden rounded-[20px] bg-card shadow-pop">
+      <button type="button" aria-label="Close" className="absolute inset-0 bg-scrim" onClick={() => setOpen(false)} />
+      <div className="absolute left-1/2 top-[12vh] w-[min(600px,calc(100vw-32px))] -translate-x-1/2 overflow-hidden border border-border bg-panel shadow-pop">
         <div className="flex items-center gap-3 border-b border-border px-5">
-          <Icon icon={Search01Icon} size={18} className="text-dim" />
+          <Icon icon={SearchIcon} size={18} className="text-dim" />
           <input
             {...NO_AUTOFILL}
             ref={input}
@@ -94,10 +94,10 @@ export function CommandPalette({ items }: { items: PaletteItem[] }) {
               type="button"
               onMouseEnter={() => setIndex(i)}
               onClick={() => go(m.href)}
-              className={cx("mx-1.5 flex h-[42px] w-[calc(100%-12px)] items-center gap-3 rounded-[10px] px-[14px] text-left", i === index ? "bg-well text-foreground" : "text-foreground")}
+              className={cx("mx-1.5 flex h-9 w-[calc(100%-12px)] items-center gap-3 px-[9px] text-left", i === index ? "bg-selected text-foreground" : "text-foreground")}
             >
               {m.label}
-              <small className="ml-auto text-[12.5px] text-muted">{m.hint}</small>
+              <small className="ml-auto text-[12px] text-muted">{m.hint}</small>
             </button>
           ))}
         </div>

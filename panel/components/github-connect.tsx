@@ -1,6 +1,6 @@
 "use client";
 
-import { GitBranchIcon, GithubIcon, Search01Icon } from "@hugeicons/core-free-icons";
+import { GitBranchIcon, SearchIcon } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { PickerRepo, RepoPage } from "@/lib/github-repos";
 import { ImportButton } from "./deploy";
@@ -23,7 +23,7 @@ export function GithubConnectForm({ manifest, state, githubWeb }: { manifest: st
       </Field>
       <div>
         <Button type="submit">
-          <Icon icon={GithubIcon} size={16} /> Create GitHub App
+          <Icon icon={GitBranchIcon} size={16} /> Create GitHub App
         </Button>
       </div>
     </form>
@@ -84,8 +84,8 @@ export function RepoPicker() {
   const term = query.trim();
   return (
     <section className={CARD} data-testid="repo-picker">
-      <div className="flex h-[52px] items-center gap-2.5 border-b border-border px-4 sm:px-6">
-        <Icon icon={Search01Icon} size={16} className="text-dim" />
+      <div className="flex h-[52px] items-center gap-2.5 border-b border-border px-3.5">
+        <Icon icon={SearchIcon} size={16} className="text-dim" />
         <input
           {...NO_AUTOFILL}
           value={query}
@@ -93,7 +93,7 @@ export function RepoPicker() {
           placeholder={page.total === null ? "Search repositories" : `Search ${page.total} repositories`}
           aria-label="Search repositories"
           autoFocus
-          className="h-full min-w-0 flex-1 bg-transparent text-[14.5px] outline-none placeholder:text-dim"
+          className="h-full min-w-0 flex-1 bg-transparent outline-none placeholder:text-placeholder"
         />
       </div>
       {repos.map((r) => (
@@ -101,10 +101,10 @@ export function RepoPicker() {
       ))}
       {page.loading && Array.from({ length: repos.length ? 2 : 6 }, (_, i) => <RepoSkeleton key={i} />)}
       {!page.loading && !page.error && repos.length === 0 && (
-        <p className="px-4 py-10 text-center text-muted sm:px-6">{term ? <>No repositories match “{term}”.</> : "The app can't see any repositories yet."}</p>
+        <p className="px-3.5 py-10 text-center text-muted">{term ? <>No repositories match “{term}”.</> : "The app can't see any repositories yet."}</p>
       )}
       {page.error && (
-        <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-6">
+        <div className="flex flex-wrap items-center justify-between gap-3 px-3.5 py-4">
           <FormError message={page.error} />
           <Button type="button" variant="secondary" size="sm" onClick={() => void load(query, repos.length ? (page.next ?? 0) : 0)}>
             Try again

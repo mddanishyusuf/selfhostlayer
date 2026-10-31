@@ -1,50 +1,54 @@
-// Page building blocks: each section is a card on the page (16px corners, no
-// border), with rows inside it separated by 1px lines. The layout spaces them apart.
-import { ArrowLeft01Icon } from "@hugeicons/core-free-icons";
+// Page building blocks in the AgentOS look: each section is an outlined card
+// (#1e1e1e with a #2a2a2a line in dark), 14px inside, rows split by fainter
+// lines. Corners are 2px everywhere (globals.css). The layout spaces cards apart.
+import { ChevronLeftIcon } from "lucide-react";
 import Link from "next/link";
 import type { CSSProperties, ReactNode } from "react";
 import { Icon } from "./icon";
 import { buttonClass, cx } from "./ui";
 
 /**
- * The top of every page, on the page itself: optional back arrow, a title
- * ("piqo / Deployments", the first part dimmed), quiet meta text and actions
- * on the right.
+ * The top of every page: optional back button, a title ("piqo / Deployments",
+ * the first part dimmed), quiet text under it, and actions on the right.
  */
 export function PageHeader({ title, crumb, back, meta, subtitle, actions }: { title: ReactNode; crumb?: ReactNode; back?: string; meta?: ReactNode; subtitle?: ReactNode; actions?: ReactNode }) {
   const side = meta ?? subtitle;
   return (
-    <header className="flex min-h-[60px] flex-wrap items-center gap-x-3 gap-y-2 pt-2">
-      {back && (
-        <Link href={back} aria-label="Back" className="grid size-9 shrink-0 place-items-center rounded-full bg-card text-foreground transition-colors duration-150 hover:bg-fill">
-          <Icon icon={ArrowLeft01Icon} size={17} />
-        </Link>
-      )}
-      <h1 className="min-w-0 truncate text-[24px] font-semibold tracking-[-0.022em] sm:text-[26px]">
-        {crumb ? (
-          <>
-            <span className="font-medium text-dim">{title}</span>
-            <span className="mx-1.5 font-medium text-dim">/</span>
-            {crumb}
-          </>
-        ) : (
-          title
+    <header className="flex flex-wrap items-start justify-between gap-3">
+      <div className="flex min-w-0 items-start gap-2.5">
+        {back && (
+          <Link href={back} aria-label="Back" className="mt-1 grid size-[26px] shrink-0 place-items-center border border-border text-foreground transition-colors duration-150 hover:bg-btn-hover">
+            <Icon icon={ChevronLeftIcon} size={14} />
+          </Link>
         )}
-      </h1>
-      {side && <span className="ml-auto hidden truncate whitespace-nowrap text-[14px] text-muted lg:block">{side}</span>}
-      {actions && <div className={cx("flex shrink-0 items-center gap-2", side ? "ml-auto lg:ml-2" : "ml-auto")}>{actions}</div>}
+        <div className="min-w-0">
+          <h1 className="truncate text-[24px] font-bold leading-[1.3]">
+            {crumb ? (
+              <>
+                <span className="text-dim">{title}</span>
+                <span className="mx-1.5 text-dim">/</span>
+                {crumb}
+              </>
+            ) : (
+              title
+            )}
+          </h1>
+          {side && <div className="mt-0.5 truncate text-muted">{side}</div>}
+        </div>
+      </div>
+      {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
     </header>
   );
 }
 
 const TONE = { gold: "text-gold", ok: "text-teal", err: "text-rose", lav: "text-lavender" } as const;
-const NOTICE_BG = { gold: "bg-warn-band", ok: "bg-card", err: "bg-err-band", lav: "bg-card" } as const;
+const NOTICE_BG = { gold: "bg-warn-band", ok: "border border-border bg-card", err: "bg-err-band", lav: "border border-border bg-card" } as const;
 
 /** One status line under the header: a colored lead word, then plain text. */
 export function Notice({ lead, tone = "gold", children }: { lead: ReactNode; tone?: keyof typeof TONE; children: ReactNode }) {
   return (
-    <div className={cx("rounded-[14px] px-4 py-3.5 text-[14.5px] text-muted sm:px-5", NOTICE_BG[tone])} data-testid="notice">
-      <b className={cx("mr-1.5 font-semibold", TONE[tone])}>{lead}</b>
+    <div className={cx("px-3.5 py-2.5", NOTICE_BG[tone])} data-testid="notice">
+      <b className={cx("mr-1.5 font-bold", TONE[tone])}>{lead}</b>
       {children}
     </div>
   );
@@ -55,10 +59,10 @@ export function Section({ title, description, aside, children, className }: { ti
   return (
     <section className={cx(CARD, className)}>
       {(title || aside) && (
-        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3 px-4 pb-3.5 pt-5 sm:px-6">
+        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2.5 px-3.5 pb-2.5 pt-3.5">
           <div className="grid gap-0.5">
-            {title && <h2 className="flex items-center gap-2 text-[17px] font-semibold tracking-[-0.012em]">{title}</h2>}
-            {description && <p className="text-[14px] text-muted">{description}</p>}
+            {title && <h2 className="flex items-center gap-2 text-[14px] font-bold">{title}</h2>}
+            {description && <p className="text-[12px] text-muted">{description}</p>}
           </div>
           {aside}
         </div>
@@ -68,23 +72,23 @@ export function Section({ title, description, aside, children, className }: { ti
   );
 }
 
-/** The look of a card: white on the page (#1c1c1e on black in dark), 16px corners, no border. */
-export const CARD = "min-w-0 overflow-hidden rounded-2xl bg-card";
+/** The look of a card: #1e1e1e with a #2a2a2a line in dark, white with #eaeaea in light. */
+export const CARD = "min-w-0 overflow-hidden border border-border bg-card";
 
 /** Padding for non-list content inside a Section. */
 export function SectionBody({ children, className }: { children: ReactNode; className?: string }) {
-  return <div className={cx("px-4 pb-6 sm:px-6", className)}>{children}</div>;
+  return <div className={cx("px-3.5 pb-3.5", className)}>{children}</div>;
 }
 
 /** Settings layout: what it is on the left, the controls on the right. Rows next to each other on the page join into one card (globals.css). */
 export function SettingsRow({ title, description, children, id }: { title: ReactNode; description?: ReactNode; children: ReactNode; id?: string }) {
   return (
-    <div id={id} data-srow="" className="grid grid-cols-[minmax(0,1fr)] gap-x-14 gap-y-4 border-t border-border px-4 py-6 first:border-t-0 sm:px-6 xl:grid-cols-[300px_minmax(0,1fr)]">
+    <div id={id} data-srow="" className="grid grid-cols-[minmax(0,1fr)] gap-x-10 gap-y-3 border-t border-border px-3.5 py-4 first:border-t-0 xl:grid-cols-[280px_minmax(0,1fr)]">
       <div>
-        <h3 className="text-[15px] font-medium">{title}</h3>
-        {description && <p className="mt-1 max-w-[300px] text-[13.5px] text-muted max-xl:max-w-none">{description}</p>}
+        <h3 className="font-bold">{title}</h3>
+        {description && <p className="mt-1 max-w-[280px] text-[12px] text-muted max-xl:max-w-none">{description}</p>}
       </div>
-      <div className="grid max-w-[680px] grid-cols-[minmax(0,1fr)] content-start gap-4">{children}</div>
+      <div className="grid max-w-[680px] grid-cols-[minmax(0,1fr)] content-start gap-3">{children}</div>
     </div>
   );
 }
@@ -95,13 +99,13 @@ export function KeyValues({ items, inset, flush }: { items: [ReactNode, ReactNod
     <div
       className={cx(
         "grid content-start",
-        inset ? "grid-cols-[130px_minmax(0,1fr)] border-b border-border" : "grid-cols-[110px_minmax(0,1fr)] sm:grid-cols-[160px_minmax(0,1fr)]",
+        inset ? "grid-cols-[130px_minmax(0,1fr)] border-b border-border-soft" : "grid-cols-[110px_minmax(0,1fr)] sm:grid-cols-[150px_minmax(0,1fr)]",
         !inset && !flush && "border-t border-border",
       )}
     >
       {items.map(([k, v], i) => {
         const last = i === items.length - 1;
-        const cell = cx("min-w-0 text-sm", !last && "border-b border-border", inset ? "py-[11px]" : "px-4 py-[13px] sm:px-6");
+        const cell = cx("min-w-0", !last && "border-b border-border-soft", inset ? "py-2" : "px-3.5 py-2");
         return [
           <div key={`k${i}`} className={cx(cell, "text-muted")}>
             {k}
@@ -127,13 +131,13 @@ export function Stats({ items, inset }: { items: Stat[]; inset?: boolean }) {
   return (
     <div className={cx("grid grid-cols-2", inset ? "border-y border-border" : CARD, items.length >= 5 ? "lg:grid-cols-5" : items.length === 3 ? "lg:grid-cols-3" : items.length === 2 ? "lg:grid-cols-2" : "lg:grid-cols-4")}>
       {items.map((s, i) => (
-        <div key={i} className="grid min-w-0 gap-1 border-b border-border px-4 py-4 max-lg:odd:border-r sm:px-6 lg:border-b-0 lg:border-r lg:py-[18px] lg:last:border-r-0">
-          <span className="text-[13.5px] text-muted">{s.label}</span>
-          <span className="truncate whitespace-nowrap text-[24px] font-semibold tracking-[-0.02em] tabular-nums">
+        <div key={i} className="grid min-w-0 gap-0.5 border-b border-border px-3.5 py-3 max-lg:odd:border-r lg:border-b-0 lg:border-r lg:last:border-r-0">
+          <span className="text-[12px] text-muted">{s.label}</span>
+          <span className="truncate whitespace-nowrap text-[22px] font-bold tabular-nums">
             {s.value}
-            {s.small && <small className="ml-1.5 text-[13.5px] font-medium tracking-normal text-muted">{s.small}</small>}
+            {s.small && <small className="ml-1 text-[12px] font-normal text-muted">{s.small}</small>}
           </span>
-          {s.detail && <span className="truncate text-[13px] text-muted">{s.detail}</span>}
+          {s.detail && <span className="truncate text-[12px] text-muted">{s.detail}</span>}
         </div>
       ))}
     </div>
@@ -145,10 +149,10 @@ export function Tabs({ items, className }: { items: { href: string; label: React
   return <Segmented items={items} className={className} />;
 }
 
-/** Links shown as one control: the chosen one is a raised white chip. */
+/** Links shown as one control on the field color: the chosen one a lighter tab. */
 export function Segmented({ items, className }: { items: { href: string; label: ReactNode; count?: number; active: boolean; title?: string }[]; className?: string }) {
   return (
-    <nav className={cx("inline-flex max-w-full gap-0.5 self-start justify-self-start overflow-x-auto rounded-[10px] bg-selected p-[3px]", className)} aria-label="Filter">
+    <nav className={cx("inline-flex max-w-full gap-0.5 self-start justify-self-start overflow-x-auto border border-border bg-field p-[3px]", className)} aria-label="Filter">
       {items.map((t) => (
         <Link
           key={t.href}
@@ -156,13 +160,10 @@ export function Segmented({ items, className }: { items: { href: string; label: 
           scroll={false}
           title={t.title}
           aria-current={t.active ? "page" : undefined}
-          className={cx(
-            "flex h-[30px] items-center whitespace-nowrap rounded-lg px-3 text-[13.5px] font-medium transition-colors duration-150",
-            t.active ? "bg-raised text-foreground shadow-raise" : "text-muted hover:text-foreground",
-          )}
+          className={cx("flex items-center whitespace-nowrap px-[13px] py-[5px] transition-colors duration-150", t.active ? "bg-raised text-foreground shadow-raise" : "text-muted hover:text-foreground")}
         >
           {t.label}
-          {t.count !== undefined && <span className="ml-1.5 text-[12.5px] font-normal tabular-nums text-dim">{t.count}</span>}
+          {t.count !== undefined && <span className="ml-1.5 text-[12px] tabular-nums text-dim">{t.count}</span>}
         </Link>
       ))}
     </nav>
@@ -172,7 +173,7 @@ export function Segmented({ items, className }: { items: { href: string; label: 
 /** Column labels for a list. Columns are a grid-template-columns value. */
 export function TableHead({ columns, children }: { columns: string; children: ReactNode }) {
   return (
-    <div className="hidden h-10 items-center gap-x-5 border-b border-border px-6 text-[13px] font-medium text-dim md:grid" style={{ gridTemplateColumns: columns }}>
+    <div className="hidden h-9 items-center gap-x-5 border-b border-border px-3.5 text-[12px] text-muted md:grid" style={{ gridTemplateColumns: columns }}>
       {children}
     </div>
   );
@@ -181,7 +182,7 @@ export function TableHead({ columns, children }: { columns: string; children: Re
 /** One row of a list. On phones the columns wrap instead of squeezing. */
 export function TableRow({ columns, href, highlight, children, className, ...rest }: { columns: string; href?: string; highlight?: boolean; children: ReactNode; className?: string } & Record<`data-${string}`, string | undefined>) {
   const cls = cx(
-    "relative flex min-h-[60px] flex-wrap items-center gap-x-3.5 gap-y-1.5 border-b border-border px-4 py-2.5 text-[14.5px] transition-colors duration-150 last:border-b-0 md:grid md:gap-x-5 md:px-6",
+    "relative flex min-h-[44px] flex-wrap items-center gap-x-3 gap-y-1 border-b border-border-soft px-3.5 py-2 transition-colors duration-150 last:border-b-0 md:grid md:gap-x-5",
     highlight && "bg-selected",
     href && "hover:bg-hover",
     className,
@@ -225,17 +226,17 @@ export function ListRow({
     <>
       {lead}
       <div className="grid min-w-0 gap-0.5">
-        <div className="flex min-w-0 items-center gap-2 text-[15px] font-medium">{title}</div>
-        {sub && <div className="flex min-w-0 items-center gap-1.5 truncate whitespace-nowrap text-[13.5px] text-muted">{sub}</div>}
+        <div className="flex min-w-0 items-center gap-2 font-bold">{title}</div>
+        {sub && <div className="flex min-w-0 items-center gap-1.5 truncate whitespace-nowrap text-[12px] text-muted">{sub}</div>}
       </div>
       {side ? <div className="flex items-center gap-2.5">{side}</div> : <span />}
       {children}
     </>
   );
   const cls = cx(
-    "relative grid items-center gap-x-3.5 border-t border-border py-3.5 transition-colors duration-150 [section>&:first-child]:border-t-0",
+    "relative grid items-center gap-x-3 border-t border-border-soft py-2.5 transition-colors duration-150 [section>&:first-child]:border-t-0",
     lead ? "grid-cols-[auto_minmax(0,1fr)_auto]" : "grid-cols-[minmax(0,1fr)_auto]",
-    indent ? "pl-4 pr-4 sm:pr-6 md:pl-[80px]" : "px-4 sm:px-6",
+    indent ? "px-3.5 md:pl-[60px]" : "px-3.5",
     highlight && "bg-selected",
     href && "hover:bg-hover",
     className,
@@ -251,35 +252,35 @@ export function ListRow({
   );
 }
 
-/** A square icon at the start of a row: solid with a white glyph when its color means something, gray otherwise. */
+/** A square at the start of a row, its icon in the color of what it stands for. */
 export function RowIcon({ children, tone = "dim" }: { children: ReactNode; tone?: "ok" | "warn" | "err" | "dim" | "lav" | "blue" | "coral" }) {
   const cls = {
-    ok: "bg-tile-green text-white",
-    warn: "bg-tile-gold text-white",
-    err: "bg-tile-red text-white",
-    dim: "bg-well text-foreground",
-    lav: "bg-tile-lav text-white",
-    blue: "bg-tile-blue text-white",
-    coral: "bg-tile-coral text-white",
+    ok: "text-ok-dot",
+    warn: "text-warn-dot",
+    err: "text-err-dot",
+    dim: "text-foreground",
+    lav: "text-tile-lav",
+    blue: "text-tile-blue",
+    coral: "text-tile-coral",
   }[tone];
-  return <span className={cx("grid size-9 shrink-0 place-items-center rounded-[10px]", cls)}>{children}</span>;
+  return <span className={cx("grid size-8 shrink-0 place-items-center bg-well", cls)}>{children}</span>;
 }
 
 /** The color of a square icon for engines and integrations. */
 export type TileTone = "dim" | "lav" | "blue" | "coral" | "teal" | "gold" | "rose";
 
-/** A solid colored square with a white glyph (gray for "dim"): 40px, or 32px in rows (size "sm"). */
+/** A square with its icon in a color of its own (the text color for "dim"): 36px, or 32px in rows (size "sm"). */
 export function TileIcon({ children, tone = "dim", size = "md" }: { children: ReactNode; tone?: TileTone; size?: "sm" | "md" }) {
   const cls = {
-    dim: "bg-well text-foreground",
-    lav: "bg-tile-lav text-white",
-    blue: "bg-tile-blue text-white",
-    coral: "bg-tile-coral text-white",
-    teal: "bg-tile-green text-white",
-    gold: "bg-tile-gold text-white",
-    rose: "bg-tile-red text-white",
+    dim: "text-foreground",
+    lav: "text-tile-lav",
+    blue: "text-tile-blue",
+    coral: "text-tile-coral",
+    teal: "text-tile-green",
+    gold: "text-tile-gold",
+    rose: "text-tile-red",
   }[tone];
-  return <span className={cx("grid shrink-0 place-items-center", size === "sm" ? "size-8 rounded-[9px]" : "size-10 rounded-[11px]", cls)}>{children}</span>;
+  return <span className={cx("grid shrink-0 place-items-center bg-well", size === "sm" ? "size-8" : "size-9", cls)}>{children}</span>;
 }
 
 /** Separator dot inside detail lines. */
@@ -287,7 +288,7 @@ export const Dot = () => <span className="text-dim">·</span>;
 
 export function Empty({ children, action }: { children: ReactNode; action?: ReactNode }) {
   return (
-    <div className="grid justify-items-center gap-4 px-4 py-12 text-center text-muted sm:px-6">
+    <div className="grid justify-items-center gap-3 px-3.5 py-10 text-center text-muted">
       <div>{children}</div>
       {action}
     </div>
@@ -297,16 +298,16 @@ export function Empty({ children, action }: { children: ReactNode; action?: Reac
 /** A section that isn't built yet: says what it will be. */
 export function ComingSoon({ icon, title, children }: { icon: ReactNode; title: string; children: ReactNode }) {
   return (
-    <div className={cx(CARD, "grid justify-items-center gap-3 px-6 py-16 text-center")}>
-      <span className="grid size-12 place-items-center rounded-[13px] bg-well text-foreground">{icon}</span>
-      <p className="text-[17px] font-semibold">{title}</p>
-      <div className="max-w-[460px] text-[14px] text-muted">{children}</div>
-      <span className="rounded-[7px] bg-accent-soft px-2.5 py-1 text-[12.5px] font-medium text-accent">Coming soon</span>
+    <div className={cx(CARD, "grid justify-items-center gap-2.5 px-6 py-14 text-center")}>
+      <span className="grid size-10 place-items-center bg-well text-foreground">{icon}</span>
+      <p className="text-[17px] font-bold">{title}</p>
+      <div className="max-w-[460px] text-muted">{children}</div>
+      <span className="bg-accent-soft px-[9px] py-px text-[11px] text-blue">Coming soon</span>
     </div>
   );
 }
 
-/** A link styled as a pill button. */
+/** A link styled as a button. */
 export function PillLink({ href, children, external, primary, size = "md" }: { href: string; children: ReactNode; external?: boolean; primary?: boolean; size?: "sm" | "md" }) {
   const className = buttonClass(primary ? "primary" : "secondary", size);
   return external ? (
@@ -327,7 +328,7 @@ export function PageBody({ children, className }: { children: ReactNode; classNa
 
 export function RowList({ children, className, ...props }: { children: ReactNode; className?: string } & React.HTMLAttributes<HTMLDivElement>) {
   return (
-    <div className={cx("divide-y divide-border", CARD, className)} {...props}>
+    <div className={cx("divide-y divide-border-soft", CARD, className)} {...props}>
       {children}
     </div>
   );

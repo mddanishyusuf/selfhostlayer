@@ -71,7 +71,7 @@ export default async function LogsPage({ params, searchParams }: { params: Promi
       {tab === "requests" && (
         <section className={CARD} data-testid="requests">
           {requests && requests.length > 0 && (
-            <p className="px-4 py-3 text-[13px] text-muted sm:px-6">
+            <p className="px-3.5 py-3 text-[12px] text-muted">
               The last {requests.length} requests{errors ? <span className="text-rose"> · {errors} server error{errors === 1 ? "" : "s"}</span> : null}, newest first.
             </p>
           )}
@@ -98,7 +98,7 @@ export default async function LogsPage({ params, searchParams }: { params: Promi
               </span>
               <span className="text-right tabular-nums text-muted">{r.ms} ms</span>
               <span className="text-right tabular-nums text-muted">{size(r.bytes)}</span>
-              <span className="truncate font-mono text-[12.5px] text-muted">{r.ip}</span>
+              <span className="truncate font-mono text-[12px] text-muted">{r.ip}</span>
             </TableRow>
           ))}
         </section>

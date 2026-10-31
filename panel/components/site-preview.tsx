@@ -18,7 +18,7 @@ const Card = ({ framework, title, text }: { framework: string; title: ReactNode;
   <div className="absolute inset-0 grid place-content-center justify-items-center gap-2 px-8 text-center">
     <Mark framework={framework} />
     <p className="text-[15px] font-semibold">{title}</p>
-    {text && <p className="line-clamp-2 max-w-[340px] text-[12.5px] text-muted">{text}</p>}
+    {text && <p className="line-clamp-2 max-w-[340px] text-[12px] text-muted">{text}</p>}
   </div>
 );
 

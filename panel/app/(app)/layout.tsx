@@ -80,9 +80,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         theme={parseTheme((await cookies()).get(THEME_COOKIE)?.value)}
         update={update && { version: update.version }}
       />
-      {/* Pages are a stack of cards on the page, with no line between them and the sidebar. */}
+      {/* Pages are a stack of outlined cards, 22px from the top and 28px from the sides, as in AgentOS. */}
       <main className="min-h-dvh min-w-0 flex-1 pt-14 md:pt-0">
-        <div className="page-stack grid grid-cols-[minmax(0,1fr)] content-start gap-3.5 px-4 pb-16 sm:px-6 md:pl-2 md:pr-7">{children}</div>
+        <div className="page-stack grid grid-cols-[minmax(0,1fr)] content-start gap-3.5 px-4 pb-16 pt-4 sm:px-6 md:px-7 md:pt-[22px]">{children}</div>
       </main>
       {update && <UpdateModal current={version} release={update} />}
       <CommandPalette items={items} />

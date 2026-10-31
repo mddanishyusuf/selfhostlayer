@@ -88,7 +88,7 @@ function ReleaseOffer({ current, release }: { current: string; release: Release 
       <p className="text-[13.5px]">
         <b className="font-semibold">{release.version}</b> is available{release.date ? ` (${release.date})` : ""}. You have {current}.
       </p>
-      {release.notes && <p className="whitespace-pre-line text-[13px] text-muted">{release.notes}</p>}
+      {release.notes && <p className="whitespace-pre-line text-[12px] text-muted">{release.notes}</p>}
     </div>
   );
 }
@@ -102,7 +102,7 @@ export function UpdatePanel({ current, state, offered, checked, auto }: { curren
   const upToDate = !offered && !!state && !state.error && state.current === current;
   return (
     <div className="grid gap-3" data-testid="updates" data-checked-at={state?.checkedAt ?? 0}>
-      {offered ? <ReleaseOffer current={current} release={offered} /> : upToDate && <p className="text-[13.5px] text-muted">You&apos;re on the latest version.</p>}
+      {offered ? <ReleaseOffer current={current} release={offered} /> : upToDate && <p className="text-[12px] text-muted">You&apos;re on the latest version.</p>}
       <div className="flex flex-wrap items-center gap-2">
         {offered && (
           <Button disabled={run.pending} onClick={() => run.begin(offered.version)}>
@@ -112,9 +112,9 @@ export function UpdatePanel({ current, state, offered, checked, auto }: { curren
         <Button variant="secondary" disabled={checking} onClick={() => startCheck(() => checkUpdatesAction())}>
           {checking ? "Checking…" : "Check for updates"}
         </Button>
-        <span className="text-[12.5px] text-dim">{checked ? `Checked ${checked}` : "Not checked yet"}</span>
+        <span className="text-[12px] text-dim">{checked ? `Checked ${checked}` : "Not checked yet"}</span>
       </div>
-      <label className="flex w-fit items-center gap-2 text-[13px] text-muted">
+      <label className="flex w-fit items-center gap-2 text-[12px] text-muted">
         <input type="checkbox" defaultChecked={auto} onChange={(e) => startAuto(() => setAutoCheckAction(e.target.checked))} className="size-4 accent-[var(--accent)]" />
         Check for updates every 6 hours
       </label>
@@ -137,7 +137,7 @@ export function RepairButton() {
       </div>
       {result?.error && <FormError message={result.error} />}
       {result && !result.error && (
-        <p className="text-[13.5px] text-muted">
+        <p className="text-[12px] text-muted">
           {result.restored?.length ? (
             <>
               <span className="text-teal">Put back {result.restored.length} file{result.restored.length === 1 ? "" : "s"}:</span> {result.restored.join(", ")}.

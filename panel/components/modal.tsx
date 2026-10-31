@@ -1,6 +1,6 @@
 "use client";
 
-import { Cancel01Icon } from "@hugeicons/core-free-icons";
+import { XIcon } from "lucide-react";
 import { useEffect, type ReactNode } from "react";
 import { Icon } from "./icon";
 
@@ -15,20 +15,20 @@ export function Modal({ open, onClose, icon, title, description, children, foote
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-50" role="dialog" aria-modal="true" aria-label={label ?? (typeof title === "string" ? title : undefined)}>
-      <button type="button" aria-label="Close" className="absolute inset-0 bg-scrim backdrop-blur-[3px]" onClick={onClose} />
-      <div className="absolute left-1/2 top-1/2 max-h-[calc(100dvh-48px)] w-[min(560px,calc(100vw-32px))] -translate-x-1/2 -translate-y-1/2 overflow-auto rounded-[20px] bg-card shadow-pop">
-        <div className="flex items-center gap-3 border-b border-border py-[18px] pl-6 pr-4">
+      <button type="button" aria-label="Close" className="absolute inset-0 bg-scrim" onClick={onClose} />
+      <div className="absolute left-1/2 top-1/2 max-h-[88vh] w-[min(660px,92vw)] -translate-x-1/2 -translate-y-1/2 overflow-auto border border-border bg-panel shadow-pop">
+        <div className="flex items-center gap-3 px-[18px] pb-1 pt-[18px]">
           {icon}
           <div className="grid min-w-0">
-            <h3 className="text-[18px] font-semibold tracking-[-0.012em]">{title}</h3>
-            {description && <span className="text-[13.5px] text-muted">{description}</span>}
+            <h3 className="text-[17px] font-bold">{title}</h3>
+            {description && <span className="text-[12px] text-muted">{description}</span>}
           </div>
-          <button type="button" onClick={onClose} aria-label="Close" className="ml-auto grid size-8 place-items-center rounded-lg text-muted transition-colors hover:bg-hover hover:text-foreground">
-            <Icon icon={Cancel01Icon} size={18} />
+          <button type="button" onClick={onClose} aria-label="Close" className="ml-auto grid size-[26px] place-items-center border border-border text-foreground transition-colors hover:bg-btn-hover">
+            <Icon icon={XIcon} size={13} />
           </button>
         </div>
         {children}
-        {footer && <div className="flex justify-end gap-2 border-t border-border px-6 py-4">{footer}</div>}
+        {footer && <div className="flex justify-end gap-2 border-t border-border px-[18px] py-3.5">{footer}</div>}
       </div>
     </div>
   );

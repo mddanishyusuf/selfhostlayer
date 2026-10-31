@@ -38,7 +38,7 @@ export default async function DomainsPage({ params }: { params: Promise<{ slug: 
           <DomainRow key={d.id} d={d} serverIp={box.publicIp} removable={canRemove(d)} />
         ))}
         {!domains.some((d) => d.role === "free") && (
-          <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-t border-border px-4 py-3.5 text-[13.5px] text-muted sm:px-6" data-testid="free-off">
+          <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-t border-border px-3.5 py-3.5 text-[12px] text-muted" data-testid="free-off">
             <span>
               The free address <code className="font-mono text-[13px] text-foreground">{freeHost(project.slug, box)}</code> is off.
             </span>

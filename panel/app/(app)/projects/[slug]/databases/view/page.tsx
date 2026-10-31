@@ -1,4 +1,4 @@
-import { ArrowLeft01Icon, ArrowRight01Icon, Search01Icon } from "@hugeicons/core-free-icons";
+import { ChevronLeftIcon, ChevronRightIcon, SearchIcon } from "lucide-react";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { DataGrid, QueryBox } from "@/components/data-grid";
@@ -67,7 +67,7 @@ export default async function DatabaseViewPage({ params, searchParams }: { param
           {engine === "redis" && (
             <form action={base} className="flex items-center gap-2 border-b border-border px-4 py-2.5">
               <input type="hidden" name="db" value={sp.db} />
-              <Icon icon={Search01Icon} size={15} className="text-dim" />
+              <Icon icon={SearchIcon} size={15} className="text-dim" />
               <input {...NO_AUTOFILL} name="q" defaultValue={q} placeholder="Key pattern, like session:*" aria-label="Key pattern" spellCheck={false} className="h-8 min-w-0 flex-1 bg-transparent font-mono text-[12.5px] outline-none placeholder:font-sans placeholder:text-dim" />
             </form>
           )}
@@ -92,7 +92,7 @@ export default async function DatabaseViewPage({ params, searchParams }: { param
                     {t.rows !== null && <span className="text-[12px] tabular-nums text-dim">{t.rows.toLocaleString()}</span>}
                   </Link>
                 ))}
-                {data && !tables.length && <p className="px-4 py-1.5 text-[13px] text-muted">{engine === "redis" && q ? "No keys match." : `No ${e.tables.toLowerCase()} yet.`}</p>}
+                {data && !tables.length && <p className="px-4 py-1.5 text-[12px] text-muted">{engine === "redis" && q ? "No keys match." : `No ${e.tables.toLowerCase()} yet.`}</p>}
               </nav>
               {data?.more && <p className="px-4 pb-4 text-[12px] text-dim">The first 500 keys. A pattern narrows them.</p>}
             </>
@@ -101,14 +101,14 @@ export default async function DatabaseViewPage({ params, searchParams }: { param
 
         <section className="min-w-0">
           {!picking && isSql(engine) && (
-            <form action={base} className="grid gap-2 border-b border-border px-4 py-3 sm:px-6" data-testid="db-query">
+            <form action={base} className="grid gap-2 border-b border-border px-3.5 py-3" data-testid="db-query">
               <input type="hidden" name="db" value={sp.db} />
               <QueryBox name="q" defaultValue={q} lines={q.split("\n").length > 2 ? 6 : 2} placeholder={`SELECT * FROM ${table ?? tables[0]?.name ?? "table"} LIMIT 20`} />
               <QueryActions clear={q ? href({ q: undefined, t: undefined }) : undefined} note="Read-only · one statement · 500 rows at most" />
             </form>
           )}
           {engine === "mongodb" && table && (
-            <form action={base} className="grid gap-2 border-b border-border px-4 py-3 sm:px-6" data-testid="db-query">
+            <form action={base} className="grid gap-2 border-b border-border px-3.5 py-3" data-testid="db-query">
               <input type="hidden" name="db" value={sp.db} />
               <input type="hidden" name="t" value={table} />
               <QueryBox name="q" defaultValue={q} lines={1} placeholder={'Filter, like {"status": "active"} or {"_id": {"$oid": "…"}}'} />
@@ -125,7 +125,7 @@ export default async function DatabaseViewPage({ params, searchParams }: { param
             <FilePicker files={data?.files} base={base} slug={project.slug} />
           ) : result ? (
             <>
-              <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 border-b border-border px-4 py-2.5 text-[13px] text-muted sm:px-6">
+              <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 border-b border-border px-3.5 py-2.5 text-[12px] text-muted">
                 {queried ? <b className="font-medium text-foreground">Query</b> : <code className="font-mono text-[12.5px] text-foreground">{table}</code>}
                 <span>·</span>
                 <span className="tabular-nums">
@@ -142,10 +142,10 @@ export default async function DatabaseViewPage({ params, searchParams }: { param
               {result.rows.length ? (
                 <DataGrid columns={result.columns} rows={result.rows} firstRow={queried ? 1 : from} sortLinks={sortLinks} sorted={sortable && sp.s ? { column: sp.s, desc: sp.d === "1" } : undefined} />
               ) : (
-                <p className="px-4 py-10 text-center text-[13.5px] text-muted sm:px-6">No rows.</p>
+                <p className="px-3.5 py-10 text-center text-[12px] text-muted">No rows.</p>
               )}
               {(paged || result.truncated) && (
-                <div className="flex flex-wrap items-center gap-3 border-t border-border px-4 py-2.5 text-[13px] text-muted sm:px-6">
+                <div className="flex flex-wrap items-center gap-3 border-t border-border px-3.5 py-2.5 text-[12px] text-muted">
                   {paged && result.rows.length > 0 && (
                     <span className="tabular-nums">
                       Rows {from.toLocaleString()}–{(from + result.rows.length - 1).toLocaleString()} of {result.total!.toLocaleString()}
@@ -156,12 +156,12 @@ export default async function DatabaseViewPage({ params, searchParams }: { param
                     <span className="ml-auto flex gap-2">
                       {page > 1 && (
                         <PillLink href={href({ p: String(page - 1) })} size="sm">
-                          <Icon icon={ArrowLeft01Icon} size={14} /> Previous
+                          <Icon icon={ChevronLeftIcon} size={14} /> Previous
                         </PillLink>
                       )}
                       {from + result.rows.length - 1 < result.total! && (
                         <PillLink href={href({ p: String(page + 1) })} size="sm">
-                          Next <Icon icon={ArrowRight01Icon} size={14} />
+                          Next <Icon icon={ChevronRightIcon} size={14} />
                         </PillLink>
                       )}
                     </span>
@@ -211,11 +211,11 @@ function FilePicker({ files, base, slug }: { files?: { path: string; bytes: numb
     );
   return (
     <div data-testid="db-files">
-      <p className="border-b border-border px-4 py-2.5 text-[13px] text-muted sm:px-6">SQLite databases in the data folder</p>
+      <p className="border-b border-border px-3.5 py-2.5 text-[12px] text-muted">SQLite databases in the data folder</p>
       {files.map((f) => (
-        <Link key={f.path} href={`${base}?db=${encodeURIComponent(`sqlite:${f.path}`)}`} className="flex items-center gap-3 border-b border-border px-4 py-3 transition-colors duration-150 hover:bg-hover sm:px-6">
+        <Link key={f.path} href={`${base}?db=${encodeURIComponent(`sqlite:${f.path}`)}`} className="flex items-center gap-3 border-b border-border px-3.5 py-3 transition-colors duration-150 hover:bg-hover">
           <code className="min-w-0 flex-1 truncate font-mono text-[13px]">{f.path}</code>
-          <span className="text-[12.5px] tabular-nums text-dim">{size(f.bytes)}</span>
+          <span className="text-[12px] tabular-nums text-dim">{size(f.bytes)}</span>
         </Link>
       ))}
     </div>

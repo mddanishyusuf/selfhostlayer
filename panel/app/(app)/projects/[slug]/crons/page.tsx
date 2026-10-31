@@ -1,4 +1,4 @@
-import { Delete02Icon, PlayIcon } from "@hugeicons/core-free-icons";
+import { PlayIcon, Trash2Icon } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { deleteCronAction, runCronAction } from "@/app/actions/crons";
@@ -56,7 +56,7 @@ export default async function CronsPage({ params }: { params: Promise<{ slug: st
                 <StatusDot status={dot} pulse={l?.running} />
                 <Link href={`/projects/${project.slug}/crons/${c.name}`} className="grid min-w-0 flex-1 gap-px after:absolute after:inset-0">
                   <p className="truncate font-medium">{c.name}</p>
-                  <p className="truncate text-[12.5px] text-muted">
+                  <p className="truncate text-[12px] text-muted">
                     <code className="font-mono">{c.command}</code>
                   </p>
                 </Link>
@@ -84,7 +84,7 @@ export default async function CronsPage({ params }: { params: Promise<{ slug: st
                     <input type="hidden" name="slug" value={project.slug} />
                     <input type="hidden" name="name" value={c.name} />
                     <button type="submit" title="Delete" className={iconButton}>
-                      <Icon icon={Delete02Icon} size={15} />
+                      <Icon icon={Trash2Icon} size={15} />
                       <span className="sr-only">Delete {c.name}</span>
                     </button>
                   </form>

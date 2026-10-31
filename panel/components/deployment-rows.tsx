@@ -1,4 +1,4 @@
-import { Undo02Icon } from "@hugeicons/core-free-icons";
+import { Undo2Icon } from "lucide-react";
 import Link from "next/link";
 import { rollback } from "@/app/actions/projects";
 import { deploymentPath, type Deployment } from "@/lib/deploy";
@@ -58,7 +58,7 @@ export function DeploymentRows({
                 </Link>
                 {live && <Pill outline>Live</Pill>}
               </span>
-              <span className="truncate text-[12.5px] text-muted">
+              <span className="truncate text-[12px] text-muted">
                 <code className="font-mono">{d.sha.slice(0, 7)}</code> · {d.trigger}
                 {d.error && <span className="text-rose"> · {d.error}</span>}
               </span>
@@ -72,7 +72,7 @@ export function DeploymentRows({
                 <form action={rollback} className="relative z-[1] max-md:hidden">
                   <input type="hidden" name="deploymentId" value={d.id} />
                   <button type="submit" title="Roll back to this deployment" className="grid size-8 place-items-center rounded-lg text-muted transition-colors duration-150 hover:bg-hover hover:text-foreground">
-                    <Icon icon={Undo02Icon} size={16} />
+                    <Icon icon={Undo2Icon} size={16} />
                     <span className="sr-only">Roll back to this deployment</span>
                   </button>
                 </form>

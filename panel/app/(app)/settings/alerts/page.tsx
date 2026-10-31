@@ -1,4 +1,4 @@
-import { Alert02Icon, CheckmarkCircle02Icon, Mail01Icon, Notification01Icon, TelegramIcon } from "@hugeicons/core-free-icons";
+import { BellIcon, CircleCheckIcon, MailIcon, SendIcon, TriangleAlertIcon } from "lucide-react";
 import { removeChannelAction, testChannelAction } from "@/app/actions/alerts";
 import { AddChannelForm } from "@/components/alerts";
 import { SubmitButton } from "@/components/form";
@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 export const metadata = { title: "Alerts" };
 
 const KIND_LABEL = { telegram: "Telegram", discord: "Discord", webhook: "Webhook", email: "Email" } as const;
-const KIND_ICON = { telegram: TelegramIcon, discord: Notification01Icon, webhook: Notification01Icon, email: Mail01Icon } as const;
+const KIND_ICON = { telegram: SendIcon, discord: BellIcon, webhook: BellIcon, email: MailIcon } as const;
 
 /** Where a channel sends, without showing secrets. */
 function target(c: ReturnType<typeof listChannels>[number]): string {
@@ -44,18 +44,18 @@ export default async function AlertsPage() {
 
       <Section title="Open">
         {open.length === 0 ? (
-          <ListRow lead={<RowIcon tone="ok"><Icon icon={CheckmarkCircle02Icon} size={17} /></RowIcon>} title={<span className="font-medium">Everything looks fine.</span>} sub="Nothing is broken right now." />
+          <ListRow lead={<RowIcon tone="ok"><Icon icon={CircleCheckIcon} size={17} /></RowIcon>} title={<span className="font-medium">Everything looks fine.</span>} sub="Nothing is broken right now." />
         ) : (
           open.map((i) => (
             <ListRow
               key={i.id}
               highlight
-              lead={<RowIcon tone="warn"><Icon icon={Alert02Icon} size={17} /></RowIcon>}
+              lead={<RowIcon tone="warn"><Icon icon={TriangleAlertIcon} size={17} /></RowIcon>}
               title={<span className="truncate">{i.title}</span>}
               sub={i.notifyErrors ? <span className="text-rose">Couldn&apos;t notify: {i.notifyErrors}</span> : <span className="truncate">{i.detail}</span>}
               side={
                 <>
-                  <span className="whitespace-nowrap text-[13px] text-muted">{timeAgo(i.openedAt)}</span>
+                  <span className="whitespace-nowrap text-[12px] text-muted">{timeAgo(i.openedAt)}</span>
                   {i.link && (
                     <a href={i.link} className="text-[13px] text-accent hover:underline">
                       Open
@@ -113,7 +113,7 @@ export default async function AlertsPage() {
       {resolved.length > 0 && (
         <Section title="Recently resolved">
           {resolved.map((i) => (
-            <ListRow key={i.id} lead={<span className="text-teal"><Icon icon={CheckmarkCircle02Icon} size={16} /></span>} title={<span className="truncate font-normal text-muted">{i.title}</span>} side={<span className="whitespace-nowrap text-[13px] text-dim">{timeAgo(i.resolvedAt!)}</span>} className="py-3" />
+            <ListRow key={i.id} lead={<span className="text-teal"><Icon icon={CircleCheckIcon} size={16} /></span>} title={<span className="truncate font-normal text-muted">{i.title}</span>} side={<span className="whitespace-nowrap text-[12px] text-dim">{timeAgo(i.resolvedAt!)}</span>} className="py-3" />
           ))}
         </Section>
       )}
