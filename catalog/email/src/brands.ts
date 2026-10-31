@@ -11,6 +11,7 @@ import { isEmail } from "./mime.ts";
 import { SendError, SesSender, SmtpSender, type DkimKeyFor, type Sender } from "./providers.ts";
 import type { Secrets } from "./secrets.ts";
 import { Ses } from "./ses.ts";
+import type { SmtpConfig } from "./smtp.ts";
 
 export type ProviderKind = "none" | "smtp" | "ses";
 
@@ -240,6 +241,13 @@ export class Brands {
     return new Ses({ region: b.ses.region, accessKeyId: b.ses.accessKeyId, secretAccessKey: this.#secret(id) }, { fetch: this.#env.fetch, endpoint: this.#env.awsEndpoint });
   }
 
+  /** The brand's SMTP settings with its password (SMTP brands only). */
+  smtpConfig(id: number): SmtpConfig {
+    const b = this.must(id);
+    if (b.provider !== "smtp" || !b.smtp) throw new InputError("provider", "this brand doesn't send over SMTP", 409);
+    return { host: b.smtp.host, port: b.smtp.port, security: b.smtp.security, username: b.smtp.username || undefined, password: b.smtp.username ? this.#secret(id) : undefined };
+  }
+
   /** How the brand sends, made once and kept. */
   sender(id: number): Sender {
     const cached = this.#senders.get(id);
@@ -247,7 +255,7 @@ export class Brands {
     const b = this.must(id);
     let s: Sender;
     if (b.provider === "smtp" && b.smtp) {
-      s = new SmtpSender({ host: b.smtp.host, port: b.smtp.port, security: b.smtp.security, username: b.smtp.username || undefined, password: b.smtp.username ? this.#secret(id) : undefined }, { dkim: this.#env.dkim(id), name: this.#env.hostName, ca: this.#env.smtpCa });
+      s = new SmtpSender(this.smtpConfig(id), { dkim: this.#env.dkim(id), name: this.#env.hostName, ca: this.#env.smtpCa });
     } else if (b.provider === "ses" && b.ses) {
       s = new SesSender({ region: b.ses.region, accessKeyId: b.ses.accessKeyId, secretAccessKey: this.#secret(id) }, { configurationSet: () => this.get(id)?.ses?.events?.configurationSet ?? null, fetch: this.#env.fetch, endpoint: this.#env.awsEndpoint });
     } else throw new SendError("this brand has no provider yet: set SMTP or Amazon SES in its settings", true);

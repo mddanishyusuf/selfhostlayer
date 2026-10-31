@@ -28,7 +28,9 @@ export async function bundleApp(o: { dist: string; entries: Record<string, strin
   });
   for (const name of Object.keys(o.entries)) {
     const file = `${name}.js`;
-    const outside = [...readFileSync(join(o.dist, file), "utf8").matchAll(/from\s*"([^"]+)"/g)].map((m) => m[1]!).filter((m) => !m.startsWith("node:"));
+    // Import statements only (SQL and strings may say from "…" too).
+    const src = readFileSync(join(o.dist, file), "utf8");
+    const outside = [...src.matchAll(/^(?:import|export)\s[^;]*?\bfrom\s*"([^"]+)";?$|^import\s*"([^"]+)";?$|\bimport\(\s*"([^"]+)"\s*\)/gm)].map((m) => (m[1] ?? m[2] ?? m[3])!).filter((m) => !m.startsWith("node:"));
     if (outside.length) throw new Error(`${file} imports ${[...new Set(outside)].join(", ")}`);
   }
   writeFileSync(join(o.dist, "package.json"), `${JSON.stringify({ type: "module" })}\n`);

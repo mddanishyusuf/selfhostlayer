@@ -163,7 +163,7 @@ export function buildMessage(m: Mail): Buffer {
   const lines: string[] = [];
   const add = (name: string, value: string) => lines.push(header(name, value));
   add("From", formatAddress(m.from));
-  add("To", m.to.map(formatAddress).join(", "));
+  add("To", m.to.length ? m.to.map(formatAddress).join(", ") : "undisclosed-recipients:;");
   if (m.cc?.length) add("Cc", m.cc.map(formatAddress).join(", "));
   if (m.replyTo?.length) add("Reply-To", m.replyTo.map(formatAddress).join(", "));
   add("Subject", headerText(m.subject));
