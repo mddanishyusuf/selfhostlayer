@@ -179,6 +179,9 @@ Every project's deployments in one list. A gold dot on the sidebar item means so
 ### Analytics
 Cookie-free web analytics for your sites, once Analytics is installed (the page offers **Install** until then): add a site and paste one line into its pages. A site opens with the sidebar shrunk to its icons and Analytics' own sidebar beside it: a site picker, then Overview, Realtime, Pages, Users (each visit's journey), Goals, Revenue (from Stripe, Polar or Dodo Payments, by source), Outbound and the site's Settings. See [Analytics](analytics.md).
 
+### Email
+Newsletters, transactional email and automations, once Email is installed (the page offers **Install** until then). Add a brand, set its SMTP provider or Amazon SES, verify a sending domain. A brand opens with the sidebar shrunk to its icons and Email's own sidebar beside it: a brand picker, then Overview, Campaigns, Automations, Contacts, Lists, Templates, Logs, API, Domains and Settings. See [Email](email.md).
+
 ### Firewall
 The firewall rules (`ufw status`) and fail2ban's SSH jail: who is banned now, and failures so far. Editing rules from the panel is coming.
 

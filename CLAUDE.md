@@ -173,4 +173,11 @@ The panel uses the design of our AgentOS app (`~/projects/agent-os/web/src/theme
 - **Goals:** a page with `*`, or an event.
 - **Tests:** the tour covers each page on the VM.
 
+**Email (2026-10-31, [PLAN-EMAIL.md](PLAN-EMAIL.md#result-2026-10-31)):**
+- **What it is:** `catalog/email`, newsletters, transactional email and automations for any number of brands.
+- **Sending:** through SMTP or Amazon SES (our own SMTP client, SigV4 and DKIM, no dependencies).
+- **The API:** Resend-compatible, so Resend's SDKs work with Email's address as their base URL.
+- **In the panel:** `/email/<brand>/…`, with its own sidebar and a brand picker.
+- **Tests:** 25 in the app; the tour sends a test, a campaign and an API email to an SMTP sink on the VM.
+
 **Launch-time tasks (not now):** choose the license plus CLA, make the repo public, and make `curl -fsSL https://get.selfhostlayer.com | bash` install: the root of get.selfhostlayer.com only says "isn't out yet" (`app/install.sh/route.ts` in the website), and the installer still needs `--from-tarball` (it should download the newest release from the feed).

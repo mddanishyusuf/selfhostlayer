@@ -1164,6 +1164,140 @@ if (process.env.TOUR_ANALYTICS === "1") {
   console.log("  ✓ uninstalled Analytics; its page offers Install again");
 }
 
+// TOUR_EMAIL=1: the catalog lists Email, an SMTP sink takes mail on the box at
+// 127.0.0.1:2525 and writes a line per message to TOUR_SMTP_LOG, and
+// TOUR_BOX_CMD runs a command as root on the box (bash -c …): for what a test
+// can't do itself, like a domain's DNS (marked verified there).
+if (process.env.TOUR_EMAIL === "1") {
+  console.log("Email");
+  const box = (cmd: string) => execFileSync("bash", ["-c", `${process.env.TOUR_BOX_CMD ?? "sudo bash -c"} '${cmd.replace(/'/g, `'\\''`)}'`], { encoding: "utf8" });
+  const sunk = () => box(`cat ${process.env.TOUR_SMTP_LOG ?? "/tmp/smtp-sink.log"}`);
+  const domain = `email.${process.env.TOUR_APPS_DOMAIN ?? "internal"}`;
+  /** Clicks until what it opens shows: a button does nothing until React has hydrated the page. */
+  const clickFor = async (selector: string, shown: string, what: string) => {
+    for (let i = 0; i < 20; i++) {
+      await click(selector);
+      for (let j = 0; j < 5; j++) {
+        if (await evaluate(`!!document.querySelector(${JSON.stringify(shown)})`)) return;
+        await sleep(100);
+      }
+    }
+    throw new Error(`${what} didn't open`);
+  };
+  /** Waits for React to take over an element (its fiber is on the node once hydrated). */
+  const hydrated = (selector: string, what: string) => waitFor(`Object.keys(document.querySelector(${JSON.stringify(selector)}) ?? {}).some((k) => k.startsWith("__reactFiber"))`, what, 20_000);
+  /** For React-controlled textareas, as setValue does for inputs. */
+  const setText = (selector: string, value: string) =>
+    evaluate(`(() => { const el = document.querySelector(${JSON.stringify(selector)}); Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value").set.call(el, ${JSON.stringify(value)}); el.dispatchEvent(new Event("input", { bubbles: true })); return true; })()`);
+  await setViewport(1280, 900);
+  await go("/email");
+  await waitForPath("/email");
+  await waitFor(`!!document.querySelector('[data-testid="install-email"]')`, "Install on the Email page", 30_000);
+  await click('[data-testid="install-email"] button[type=submit]');
+  await waitFor(`location.pathname.startsWith("/projects/email/deployments/")`, "Email's install", 60_000);
+  await waitForDeploy("installing Email");
+  console.log("  ✓ installed Email from the Email page");
+
+  await go("/email");
+  await waitFor(`!!document.querySelector('[data-testid="add-brand"]')`, "the first brand's form");
+  await fill("#brand-name", "Tour");
+  await fill("#brand-from", "news@tour.test");
+  await click('[data-testid="add-brand"] button[type=submit]');
+  await waitFor(`/^\\/email\\/\\d+$/.test(location.pathname) && !!document.querySelector('[data-testid="email-setup"]')`, "the new brand's Overview", 20_000);
+  const brand = String(await evaluate("location.pathname"));
+  await screenshot("email-overview");
+
+  await go(`${brand}/settings`);
+  await waitFor(`!!document.querySelector('[data-testid="provider-form"] #p-host')`, "the provider form");
+  await hydrated('[data-testid="provider-form"]', "the provider form to come alive");
+  await setValue("#p-host", "127.0.0.1");
+  await setValue("#p-port", "2525");
+  await evaluate(`(() => { const el = document.querySelector("#p-sec"); Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value").set.call(el, "none"); el.dispatchEvent(new Event("change", { bubbles: true })); return true; })()`);
+  await click('[data-testid="provider-form"] button[type=submit]');
+  await waitFor(`document.body.innerText.includes("Send a test to see it work")`, "the provider saved");
+  await fill("#t-to", "ada@tour.test");
+  await click('[data-testid="test-email"] button[type=submit]');
+  await waitFor(`document.body.innerText.includes("Sent to ada@tour.test")`, "the test email sent", 30_000);
+  if (!sunk().includes("ada@tour.test\tA test from Tour")) throw new Error(`the SMTP sink didn't get the test: ${sunk()}`);
+  await screenshot("email-settings");
+  console.log("  ✓ SMTP set up; a test email reached the server");
+
+  await go(`${brand}/domains`);
+  await waitFor(`!!document.querySelector('[data-testid="add-domain"] #d-domain')`, "the domain form");
+  await fill("#d-domain", "tour.test");
+  await click('[data-testid="add-domain"] button[type=submit]');
+  await waitFor(`(document.querySelector('[data-testid="domain"]')?.innerText ?? "").includes("_domainkey.tour.test")`, "the domain's DKIM record", 20_000);
+  // No DNS for tour.test: marked verified where Email keeps it.
+  box(`N=$(ls -d /opt/layer/node/*/bin/node | sort -V | tail -1); $N -e 'const { DatabaseSync } = require("node:sqlite"); new DatabaseSync("/srv/apps/email/data/email.db").prepare("UPDATE domains SET status = ? WHERE domain = ?").run("verified", "tour.test")'`);
+  await go(`${brand}/domains`);
+  await waitFor(`(document.querySelector('[data-testid="domain"]')?.innerText ?? "").includes("Verified")`, "the domain verified");
+  console.log("  ✓ a domain added, with its DKIM record to publish");
+
+  await go(`${brand}/lists`);
+  await waitFor(`!!document.querySelector('[data-testid="new-list"]')`, "the Lists page");
+  await clickFor('[data-testid="new-list"]', '[data-testid="list-form"] #l-name', "the new list's form");
+  await setValue("#l-name", "Newsletter");
+  await click('[data-testid="list-form"] button[type=submit]');
+  await waitFor(`(document.querySelector('[data-testid="lists"]')?.innerText ?? "").includes("Newsletter")`, "the list");
+  await go(`${brand}/contacts`);
+  await waitFor(`!!document.querySelector('[data-testid="new-contact"]')`, "the Contacts page");
+  await clickFor('[data-testid="new-contact"]', '[data-testid="contact-form"] #c-email', "the new contact's form");
+  await setValue("#c-email", "grace@tour.test");
+  await setValue("#c-name", "Grace Hopper");
+  await click('[data-testid="contact-form"] input[name=lists]');
+  await click('[data-testid="contact-form"] button[type=submit]');
+  await waitFor(`(document.querySelector('[data-testid="contacts"]')?.innerText ?? "").includes("grace@tour.test")`, "the contact");
+  console.log("  ✓ a list, and a contact in it");
+
+  await go(`${brand}/campaigns`);
+  await waitFor(`!!document.querySelector('[data-testid="new-campaign"]')`, "the Campaigns page");
+  await clickFor('[data-testid="new-campaign"]', '[data-testid="campaign-new"] #cn-name', "the new campaign's form");
+  await setValue("#cn-name", "Tour campaign");
+  await click('[data-testid="campaign-new"] input[name=lists]');
+  await click('[data-testid="campaign-new"] button[type=submit]');
+  await waitFor(`!!document.querySelector('[data-testid="campaign-editor"] #ce-subject')`, "the campaign's editor", 20_000);
+  await hydrated('[data-testid="editor-source"]', "the editor to come alive");
+  await setValue("#ce-subject", "Hello {{first_name}}");
+  await setText('[data-testid="editor-source"]', "# Hi {{first_name}}\n\nThis came from the tour.\n\n[[Visit](https://example.com/tour)]");
+  await screenshot("email-editor");
+  await clickFor('[data-testid="send-now"]', '[data-testid="send-confirm"]', "the send confirmation");
+  await click('[data-testid="send-confirm"]');
+  await waitFor(`(document.querySelector('[data-testid="campaign-status"]')?.innerText ?? "") === "Sent"`, "the campaign sent", 60_000);
+  if (!sunk().includes("grace@tour.test\tHello Grace")) throw new Error(`the SMTP sink didn't get the campaign: ${sunk()}`);
+  await screenshot("email-report");
+  console.log("  ✓ a campaign in Markdown, sent to the list and merged (Hello Grace)");
+
+  await go(`${brand}/api`);
+  await waitFor(`!!document.querySelector('[data-testid="create-key"] #k-name')`, "the API page");
+  await hydrated('[data-testid="create-key"]', "the key form to come alive");
+  await setValue("#k-name", "tour");
+  await click('[data-testid="create-key"] button[type=submit]');
+  await waitFor(`!!document.querySelector('[data-testid="new-key"] code')`, "the new key");
+  const key = String(await evaluate(`document.querySelector('[data-testid="new-key"] code').textContent`));
+  const sent = await boxRequest(`https://${domain}/emails`, { method: "POST", headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" }, body: JSON.stringify({ from: "Tour <news@tour.test>", to: "linus@tour.test", subject: "Your receipt", html: "<p>Thanks!</p>" }) });
+  if (sent.status !== 200 || !/"id"/.test(sent.body)) throw new Error(`POST /emails answered ${sent.status}: ${sent.body}`);
+  await go(`${brand}/logs`);
+  let logged = "";
+  for (let i = 0; i < 20 && !logged.includes("linus@tour.test"); i++) {
+    await sleep(500);
+    await go(`${brand}/logs`);
+    await waitForPath(`${brand}/logs`);
+    logged = String(await evaluate(`document.querySelector('[data-testid="logs"]')?.innerText ?? ""`));
+  }
+  if (!sunk().includes("linus@tour.test\tYour receipt")) throw new Error(`the SMTP sink didn't get the API's email: ${sunk()}`);
+  await screenshot("email-logs");
+  console.log("  ✓ an email through the API with a key made in the panel, in the logs and at the server");
+
+  await go("/projects/email/settings");
+  await waitForPath("/projects/email/settings");
+  await click('[data-testid="uninstall"]');
+  await waitFor(`!!document.querySelector("#confirm")`, "the uninstall confirmation");
+  await setValue("#confirm", "email");
+  await click('form:has(#confirm) button[type=submit]');
+  await waitForPath("/integrations");
+  console.log("  ✓ uninstalled Email");
+}
+
 // TOUR_PANEL_ADDRESS=<host>: move the panel there from Settings and back. On a
 // test box (apps at .internal) the DNS check is skipped; the host must reach the box.
 const newAddress = process.env.TOUR_PANEL_ADDRESS;

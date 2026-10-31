@@ -75,3 +75,45 @@
 4. **The transactional API** (Resend-compatible), templates, logs; automations.
 5. **The panel:** the Email area and its pages.
 6. **Tests, the browser tour, docs,** and the catalog entry.
+
+## Result (2026-10-31)
+
+Built as planned, as **Email 0.1.0** (`catalog/email`) and the panel's Email area.
+
+**Sending:**
+- SMTP of our own: TLS or STARTTLS, AUTH PLAIN or LOGIN, connections reused.
+- SES through SESv2 and SNS with our own Signature V4, checked against AWS's test vectors.
+- MIME and DKIM; the independent `mailauth` library verifies our signatures.
+
+**The queue:** one table, claimed atomically, a rate per brand, transient failures tried again, hard bounces suppressed.
+
+**Contacts:** CSV import and export, suppressions, a subscribe endpoint with double opt-in.
+
+**Campaigns:** merge tags, signed tracking, one-click unsubscribe, scheduling, pausing, reports, and the 5% bounce / 0.3% complaint guard.
+
+**The API:** Resend-compatible `/emails`, `/emails/batch` and `GET /emails/:id`, with keys, templates, attachments, scheduling and idempotency. Also contacts and events.
+
+**Automations:** list or event triggers; email, wait, add and remove steps.
+
+**SES's events** through SNS, with signatures checked and our topics only. A daily prune.
+
+**Tests:**
+- 25 in `catalog/email/test`: core and the whole flow on a fake SMTP server with STARTTLS.
+- 3 for the panel's Markdown.
+
+**The browser tour** (TOUR_EMAIL, with an SMTP sink on the box) passes on the VM:
+- install, a brand, SMTP and a test email;
+- a domain (marked verified on the box: there's no DNS for a test);
+- a list and a contact;
+- a Markdown campaign sent and merged;
+- an email through the API with a key made in the panel;
+- the logs;
+- uninstall, leaving nothing.
+
+**The panel's Email area:** `/email/<brand>/…` with its own sidebar, a brand picker, and Overview, Campaigns, Automations, Contacts, Lists, Templates, Logs, API, Domains and Settings. Markdown becomes the email in the panel (`lib/markdown.ts`), so the app only stores HTML.
+
+**Not in 0.1.0:**
+- a tracking domain per brand (links use Email's address);
+- bounce emails that come later over SMTP (they go to the From address's mailbox);
+- segments beyond lists;
+- A/B tests.
