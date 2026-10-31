@@ -69,7 +69,8 @@ The panel uses the design of our AgentOS app (`~/projects/agent-os/web/src/theme
   - **Project Overview:** a stats strip, then Production in two columns: the live site's preview on the left, details on the right. The preview is the image the site offers for link previews (`og:image`), fetched by the panel once per deployment (`lib/preview.ts`): no headless browser on the box. Sites without one get a card with their title.
   - **Domains (all projects):** one row per project, led by its domain (no project icon); Manage opens that project's Domains page.
   - **Integrations** (`/integrations`, 2026-10-31): Installed (each tool's version and status, Open, Manage), the Catalog with **Install**, and Coming soon. An installed tool is a project with `source: catalog` (`lib/catalog.ts`): it has a project's pages, with "← Integrations" at the top of its sidebar, and Projects doesn't list or count it. Its Settings page has its version (with **Update** when the catalog has a newer one), the memory limit and **Uninstall**. A **Links** install has its own pages at the top of its sidebar (Links, Stats, API, `components/links.tsx`) and Links' settings on its Settings page; the panel calls Links' admin API on 127.0.0.1 (`lib/links.ts`).
-- **Not built yet, shown as "Coming soon":** Analytics (Piqo's layout is in the prototype), editing firewall rules (the page lists the ufw rules and fail2ban bans), and every integration but the test app (Links is next).
+  - **Analytics** (`/analytics`, 2026-10-31): **Install** until the Analytics integration is installed; then sites (a domain, or a project's in one click), and each site's dashboard: totals against the period before with who's on now, a visitors chart, cards with tabs (pages, sources and UTM tags, countries, devices), custom events, and the line to paste. Clicking a row filters the page by it (`lib/analytics.ts`, `components/analytics-forms.tsx`).
+- **Not built yet, shown as "Coming soon":** editing firewall rules (the page lists the ufw rules and fail2ban bans), and the integrations after Links and Analytics (email, a post scheduler, a blog, a status page, a waitlist, a feedback board).
 - **Motion and feedback:** 150ms ease-out transitions, skeletons instead of spinners, a pulsing dot for anything in progress. Later: optimistic updates, toasts.
 - **Logs:** monospace on a pane that is always dark, streaming, auto-scroll that pauses when you scroll up, ANSI colors, copy and download buttons.
 - **Copy:** short and plain ("Deploying…", "Ready", "Build failed: exit code 1"). Every destructive action opens a dialog where you type the app name to confirm.
@@ -156,5 +157,13 @@ The panel uses the design of our AgentOS app (`~/projects/agent-os/web/src/theme
 - **Numbers:** 34,810 redirects a second on the dev machine; 26 MB of its own memory idle.
 - **Updates:** integrations update from the catalog (backed up first when backups are on).
 - **Tests:** the browser tour covers install, a link, a click, the API, update, restore and uninstall.
+
+**Analytics, Days 1–4 (2026-10-31, [PLAN-ANALYTICS.md](PLAN-ANALYTICS.md)):**
+- **The service:** `catalog/analytics`, cookie-free web analytics on code shared with Links (`catalog/lib`: countries, User-Agent rules, HTTP, migrations, build).
+- **The script:** sites include `/script.js` (about 1.6 KB): pageviews, pings and `window.shl.track()` events.
+- **Visits:** built as events arrive.
+- **Stats:** today to 90 days, filterable, in the sidebar's Analytics page.
+- **Numbers:** 21,742 events a second on the dev machine; 21 MB of its own memory idle.
+- **Tests:** the browser tour installs it, loads the script on a panel page and finds the visit and a custom event on the dashboard.
 
 **Launch-time tasks (not now):** choose the license plus CLA, make the repo public, and make `curl -fsSL https://get.selfhostlayer.com | bash` install: the root of get.selfhostlayer.com only says "isn't out yet" (`app/install.sh/route.ts` in the website), and the installer still needs `--from-tarball` (it should download the newest release from the feed).

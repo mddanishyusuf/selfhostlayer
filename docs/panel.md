@@ -177,7 +177,7 @@ Opens the app's live address.
 Every project's deployments in one list. A gold dot on the sidebar item means something is building.
 
 ### Analytics
-Coming soon.
+Cookie-free web analytics for your sites, once Analytics is installed (the page offers **Install** until then): add a site, paste one line into its pages, then see its visitors, pages, sources, countries and devices, filtered by anything you click. See [Analytics](analytics.md).
 
 ### Firewall
 The firewall rules (`ufw status`) and fail2ban's SSH jail: who is banned now, and failures so far. Editing rules from the panel is coming.
@@ -199,7 +199,8 @@ Tools every product needs, built for Self Host Layer and installed in one click.
 - **Uninstall** (on its Settings page): type its name to confirm. As when deleting a project, the tool stops, and its user, files, unit, cron jobs and Caddy site are removed. Its `data/` folder is kept in `/var/lib/layer-agent/archive/` unless you say otherwise.
 - **Updates:** when the catalog has a newer version, Installed and the tool's Settings page show **Update**. It backs the tool's data up first when backups are on, then starts the new version beside the old one. **Check again** reads the catalog at once (it's kept for 10 minutes).
 - **[Links](links.md)**, the first tool: short links on your own domain, with click stats and QR codes.
-- **Coming soon:** analytics, email, a post scheduler, a blog, a status page, a waitlist and a feedback board.
+- **[Analytics](analytics.md):** cookie-free web analytics for your sites, on the sidebar's Analytics page.
+- **Coming soon:** email, a post scheduler, a blog, a status page, a waitlist and a feedback board.
 
 ### Databases
 - **Engines:** SQLite, PostgreSQL, Redis, MongoDB and MySQL (MariaDB), each with its version, whether it runs (PostgreSQL, MySQL and MongoDB as systemd sees their server) and how much the apps use. MongoDB has its Install button here, and Start when it's stopped, which tells you why if it can't start.

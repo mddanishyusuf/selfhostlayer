@@ -65,3 +65,13 @@ panel: Analytics page ──(admin token, 127.0.0.1 only)──▶ Analytics' ad
   - **Setup:** the line to paste (with Copy), subdomains on or off, and Remove (type the domain).
 - **The integration's own pages:** a Dashboard item at the top of its sidebar, and its retention setting on its Settings page.
 - **Phones:** the range sits in its own row, so nothing runs past the screen.
+
+## Day 4 result (2026-10-31)
+**Done when "Tour passes in the VM": passed.** The browser tour's Analytics section (`TOUR_ANALYTICS=1`, in CI):
+1. installs Analytics from the Analytics page;
+2. adds the panel's own address as a site, and checks the line to paste;
+3. loads the script on a panel page, as a person's browser would (`navigator.webdriver` off, a desktop User-Agent), and sends a custom event;
+4. finds the pageview (`/settings`) and the event (`Tour`) on the dashboard;
+5. uninstalls Analytics, and the page offers Install again.
+
+CI builds Analytics with the other catalog apps, lists it in the test catalog, and checks that nothing is left after the uninstall. `docs/analytics.md` (and the same on the website) explains installing, the dashboard, custom events, what's counted and what isn't, and how long it's kept.

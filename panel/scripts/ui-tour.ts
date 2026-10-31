@@ -846,6 +846,9 @@ if (process.env.TOUR_DEPLOY === "1") {
   console.log("  ✓ deleted the vite project; it's gone from the overview");
 }
 
+/** What a person's browser says, for the tools that leave bots out (headless Chrome names itself). */
+const DESKTOP_UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36";
+
 /**
  * An HTTPS request from this script to an app on the box. Test boxes use
  * Caddy's local CA, so certificates aren't checked; TOUR_RESOLVE=<address>
@@ -951,7 +954,7 @@ if (process.env.TOUR_LINKS === "1") {
   console.log(`  ✓ made ${domain}/tour in the panel`);
 
   // Headless Chrome says so in its User-Agent, and Links rightly counts that as a bot: visit as a desktop browser.
-  await send("Emulation.setUserAgentOverride", { userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36" });
+  await send("Emulation.setUserAgentOverride", { userAgent: DESKTOP_UA });
   await visit(domain, "/TOUR?ref=tour", "Disallow: /");
   const landed = String(await evaluate("location.href"));
   if (!landed.endsWith("/robots.txt?ref=tour")) throw new Error(`the short link went to ${landed}`);
@@ -1055,6 +1058,66 @@ if (process.env.TOUR_LINKS === "1") {
   await waitForPath("/integrations");
   await waitFor(`!document.querySelector('[data-testid="installed-links"]') && !!document.querySelector('[data-testid="install-links"]')`, "Links back in the catalog");
   console.log("  ✓ uninstalled Links");
+}
+
+// TOUR_ANALYTICS=1: the catalog beside the release feed lists Analytics.
+// Install it from its page, add the panel's own address as a site, load the
+// script on a panel page (as a person's browser would), see the visit and a
+// custom event on the dashboard, then uninstall it.
+if (process.env.TOUR_ANALYTICS === "1") {
+  console.log("Analytics");
+  const domain = `analytics.${process.env.TOUR_APPS_DOMAIN ?? "internal"}`;
+  const panelHost = new URL(base).hostname;
+  await setViewport(1280, 900);
+  await go("/analytics");
+  await waitForPath("/analytics");
+  await waitFor(`!!document.querySelector('[data-testid="install-analytics"]')`, "Install on the Analytics page", 30_000);
+  await screenshot("analytics-install");
+  await click('[data-testid="install-analytics"] button[type=submit]');
+  await waitFor(`location.pathname.startsWith("/projects/analytics/deployments/")`, "Analytics' install", 60_000);
+  await waitForDeploy("installing Analytics");
+  console.log("  ✓ installed Analytics from the Analytics page");
+
+  await go("/analytics");
+  await waitForPath("/analytics");
+  await waitFor(`!!document.querySelector('[data-testid="add-site"]')`, "the first site's form");
+  await fill("#domain", panelHost);
+  await click('[data-testid="add-site"] button[type=submit]');
+  await waitFor(`!!document.querySelector('[data-testid="snippet"]')`, "the new site's dashboard", 20_000);
+  const code = String(await evaluate(`document.querySelector('[data-testid="snippet"] code').textContent`));
+  if (!code.includes(`https://${domain}/script.js`) || !code.includes(`data-site="${panelHost}"`)) throw new Error(`the line to paste: ${code}`);
+  console.log(`  ✓ added ${panelHost} as a site; its dashboard shows the line to paste`);
+
+  // A person's visit: no webdriver flag, a desktop User-Agent, and the script on one of the panel's pages.
+  await send("Emulation.setUserAgentOverride", { userAgent: DESKTOP_UA });
+  await send("Page.addScriptToEvaluateOnNewDocument", { source: "Object.defineProperty(navigator, 'webdriver', { get: () => false })" });
+  await go("/settings");
+  await waitForPath("/settings");
+  await evaluate(`(() => { const s = document.createElement("script"); s.src = "https://${domain}/script.js"; s.dataset.site = ${JSON.stringify(panelHost)}; document.head.appendChild(s); return true; })()`);
+  await waitFor(`!!window.shl && window.shl.track.length === 2`, "the script to load");
+  await evaluate(`window.shl.track("Tour", { step: "analytics" }), true`);
+  await sleep(1500);
+  let seen = "";
+  for (let i = 0; i < 10 && !(seen.includes("/settings") && seen.includes("Tour")); i++) {
+    await go("/analytics");
+    await waitForPath("/analytics");
+    seen = String(await evaluate(`[document.querySelector('[data-testid="top-pages"]')?.innerText ?? "", document.body.innerText].join(" ")`));
+    if (!seen.includes("Tour")) await sleep(1000);
+  }
+  if (!seen.includes("/settings") || !seen.includes("Tour")) throw new Error(`the visit isn't on the dashboard:\n${seen.slice(0, 1500)}`);
+  await screenshot("analytics-dashboard");
+  console.log("  ✓ the script's pageview (/settings) and a custom event (Tour) are on the dashboard");
+
+  await go("/projects/analytics/settings");
+  await waitForPath("/projects/analytics/settings");
+  await click('[data-testid="uninstall"]');
+  await waitFor(`!!document.querySelector("#confirm")`, "the uninstall confirmation");
+  await setValue("#confirm", "analytics");
+  await click('form:has(#confirm) button[type=submit]');
+  await waitForPath("/integrations");
+  await go("/analytics");
+  await waitFor(`!!document.querySelector('[data-testid="install-analytics"]')`, "Install again on the Analytics page");
+  console.log("  ✓ uninstalled Analytics; its page offers Install again");
 }
 
 // TOUR_PANEL_ADDRESS=<host>: move the panel there from Settings and back. On a
