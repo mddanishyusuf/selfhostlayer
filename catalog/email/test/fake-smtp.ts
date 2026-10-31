@@ -21,7 +21,7 @@ export interface FakeSmtp {
   close(): Promise<void>;
 }
 
-export async function fakeSmtp(o: { security: "starttls" | "tls" | "none"; user?: string; pass?: string; refuse?: (to: string) => string | null; dropAfter?: number } = { security: "starttls" }): Promise<FakeSmtp> {
+export async function fakeSmtp(o: { security: "starttls" | "tls" | "none"; user?: string; pass?: string; refuse?: (to: string) => string | null; dropAfter?: number; port?: number } = { security: "starttls" }): Promise<FakeSmtp> {
   const received: Received[] = [];
   const log: string[] = [];
   let connections = 0;
@@ -136,7 +136,7 @@ export async function fakeSmtp(o: { security: "starttls" | "tls" | "none"; user?
   }
 
   const server: Server = o.security === "tls" ? createTlsServer({ key: TEST_KEY, cert: TEST_CERT }, session) : createServer(session);
-  await new Promise<void>((r) => server.listen(0, "127.0.0.1", r));
+  await new Promise<void>((r) => server.listen(o.port ?? 0, "127.0.0.1", r));
   return {
     port: (server.address() as AddressInfo).port,
     received,

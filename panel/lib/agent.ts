@@ -113,9 +113,36 @@ const FAKE: Partial<Record<ActionName, unknown>> = {
   },
   "metrics.disk": { apps: { piqo: 310 } },
   "proxy.set": {},
-  // The catalog as catalog.list gives it (get.selfhostlayer.com/catalog.json): Links, and the test app.
+  // The catalog as catalog.list gives it (get.selfhostlayer.com/catalog.json): the integrations, and the test app.
   "catalog.list": {
     apps: [
+      {
+        id: "email",
+        name: "Email",
+        summary: "Newsletters, transactional email and automations on your own SMTP or Amazon SES.",
+        versions: [
+          {
+            version: "0.1.0",
+            date: "2026-10-31",
+            notes: "The first version.",
+            minPanel: null,
+            sha256: "e3a11c0de5e3a11c0de5e3a11c0de5e3a11c0de5e3a11c0de5e3a11c0de5e3a1",
+            supported: true,
+            manifest: {
+              id: "email",
+              name: "Email",
+              version: "0.1.0",
+              summary: "Newsletters, transactional email and automations on your own SMTP or Amazon SES.",
+              runtime: { kind: "node", node: "24", start: ["node", "--disable-warning=ExperimentalWarning", "server.js"], health: "/healthz", writable: [] },
+              memory: { default: 192, min: 96 },
+              env: { EMAIL_ADMIN_TOKEN: { generate: "secret" }, EMAIL_SECRET: { generate: "secret" } },
+              services: ["sqlite"],
+              cron: [{ name: "prune", schedule: "20 4 * * *", command: "node --disable-warning=ExperimentalWarning cron.js prune" }],
+              backup: ["data"],
+            },
+          },
+        ],
+      },
       {
         id: "analytics",
         name: "Analytics",

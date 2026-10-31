@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowUpRightIcon, BellIcon, BracesIcon, ChartColumnIcon, ChevronDownIcon, ChevronLeftIcon, CircleArrowUpIcon, ClockIcon, DatabaseBackupIcon, DatabaseIcon, FolderIcon, GlobeIcon, HistoryIcon, KeyRoundIcon, LayoutDashboardIcon, LinkIcon, LogOutIcon, MenuIcon, MoonIcon, PanelLeftOpenIcon, PuzzleIcon, RocketIcon, SearchIcon, ServerIcon, SettingsIcon, ShieldIcon, SquareTerminalIcon, SunIcon } from "lucide-react";
+import { ArrowUpRightIcon, BellIcon, BracesIcon, ChartColumnIcon, ChevronDownIcon, ChevronLeftIcon, CircleArrowUpIcon, ClockIcon, DatabaseBackupIcon, DatabaseIcon, FolderIcon, GlobeIcon, HistoryIcon, KeyRoundIcon, LayoutDashboardIcon, LinkIcon, LogOutIcon, MailIcon, MenuIcon, MoonIcon, PanelLeftOpenIcon, PuzzleIcon, RocketIcon, SearchIcon, ServerIcon, SettingsIcon, ShieldIcon, SquareTerminalIcon, SunIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Fragment, useEffect, useState } from "react";
@@ -54,6 +54,7 @@ function globalNav(p: SidebarProps): Item[][] {
       { href: "/", label: "Projects", icon: FolderIcon, exact: true, count: p.projects.length - integrations },
       { href: "/deployments", label: "Deployments", icon: RocketIcon, dot: p.deploying },
       { href: "/analytics", label: "Analytics", icon: ChartColumnIcon },
+      { href: "/email", label: "Email", icon: MailIcon },
       { href: "/firewall", label: "Firewall", icon: ShieldIcon },
       { href: "/domains", label: "Domains", icon: GlobeIcon, count: p.domainCount },
       { href: "/integrations", label: "Integrations", icon: PuzzleIcon, ...(integrations ? { count: integrations } : {}) },
@@ -72,6 +73,7 @@ function globalNav(p: SidebarProps): Item[][] {
 /** An integration's own pages, above the ones every project has. */
 function appNav(p: SidebarProject, base: string): Item[][] {
   if (p.app === "analytics") return [[{ href: "/analytics", label: "Dashboard", icon: ChartColumnIcon }]];
+  if (p.app === "email") return [[{ href: "/email", label: "Brands", icon: MailIcon }]];
   if (p.app === "links") {
     return [
       [
@@ -261,8 +263,8 @@ function Nav(props: SidebarProps & { onNavigate?: () => void }) {
   );
 }
 
-/** Pages that need the width, or have a sidebar of their own (a site's Analytics): the sidebar shrinks to its icons there. */
-const COMPACT = /^\/(projects\/[^/]+\/databases\/view|analytics\/[^/]+)/;
+/** Pages that need the width, or have a sidebar of their own (a site's Analytics, a brand's Email): the sidebar shrinks to its icons there. */
+const COMPACT = /^\/(projects\/[^/]+\/databases\/view|analytics\/[^/]+|email\/[^/]+)/;
 
 /**
  * The sidebar as a column of icons, each named on hover. The last button

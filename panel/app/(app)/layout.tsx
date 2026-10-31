@@ -38,6 +38,7 @@ const PAGES: PaletteItem[] = [
   { label: "Projects", href: "/", hint: "Page" },
   { label: "Deployments", href: "/deployments", hint: "Page" },
   { label: "Analytics", href: "/analytics", hint: "Page" },
+  { label: "Email", href: "/email", hint: "Page" },
   { label: "Firewall", href: "/firewall", hint: "Page" },
   { label: "Domains", href: "/domains", hint: "Page" },
   { label: "Integrations", href: "/integrations", hint: "Page" },
