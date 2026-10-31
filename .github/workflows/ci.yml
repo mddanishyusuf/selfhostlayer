@@ -95,6 +95,10 @@ jobs:
         run: sudo bash installer/test/browse-e2e.sh
       - name: importing a data folder from another server
         run: sudo bash installer/test/import-e2e.sh
+      - name: the integrations catalog (checked downloads, unpacked as the app's user)
+        run: |
+          node scripts/build-catalog.ts hello
+          sudo bash installer/test/catalog-e2e.sh dist/catalog/hello-0.1.0.tar.gz
       - name: moving the panel to another address and back
         run: |
           echo "127.0.0.1 panel2.internal" | sudo tee -a /etc/hosts

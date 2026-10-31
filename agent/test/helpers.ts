@@ -100,6 +100,7 @@ export function testEnv(): TestEnv {
     mongodbAdmin: join(root, "var", "lib", "layer-agent", "mongodb-admin.json"),
     managedDir: join(root, "var", "lib", "layer-agent", "managed"),
     updatesDir: join(root, "var", "lib", "layer-agent", "updates"),
+    catalogDir: join(root, "var", "lib", "layer-agent", "catalog"),
     stagingDir: join(root, "var", "lib", "layer-staging"),
     restoreDir: join(root, "var", "lib", "layer", "restore"),
     panelUser: null,

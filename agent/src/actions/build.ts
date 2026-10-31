@@ -5,7 +5,7 @@
 // file operation here (unpack, build, prune, cache cleanup) runs as the app
 // user in a sandboxed transient unit. Root only downloads, and the tarball
 // reaches the unpacker through stdin, never as a shared file.
-import { existsSync, lstatSync, readdirSync, readlinkSync, statfsSync } from "node:fs";
+import { createReadStream, existsSync, lstatSync, readdirSync, readlinkSync, rmSync, statfsSync, statSync } from "node:fs";
 import { basename, join } from "node:path";
 import { Readable, Transform } from "node:stream";
 import {
@@ -24,9 +24,11 @@ import {
 import type { ActionTable, CallIO, Context, Params } from "../context.ts";
 import { ActionError } from "../errors.ts";
 import { BIN } from "../exec.ts";
-import { lookupUser } from "../fsutil.ts";
+import { ensureDir, lookupUser } from "../fsutil.ts";
 import { sandboxArgs, SYSTEMD_RUN, type SandboxOptions } from "../sandbox.ts";
 import { appLayout } from "./app.ts";
+import { catalogVersion } from "./catalog.ts";
+import { download } from "./node.ts";
 
 const MAX_SOURCE_BYTES = 500 * 2 ** 20;
 // GitHub tokens: legacy installation tokens are ghs_ + ~36 chars of
@@ -162,6 +164,67 @@ async function sourceFetch(params: Params, ctx: Context, io: CallIO) {
   }
   if (!isRealDir(join(app.releases, sha))) throw new ActionError("fetch_failed", "the unpacked release is missing");
   return { slug, sha, fetched: true, bytes, ms: Date.now() - started };
+}
+
+/**
+ * A catalog app's release (an integration): root downloads the tarball into
+ * its own folder and checks it against the catalog's sha256 before anything
+ * is unpacked; then it reaches the unpacker through stdin, as a GitHub source
+ * does. Catalog apps ship built, so no build step follows. Releases are named
+ * by the checksum cut to a commit's length, so deployments, release.point and
+ * pruning treat them like GitHub releases.
+ */
+async function catalogFetch(params: Params, ctx: Context, io: CallIO) {
+  const slug = assertSlug(params.slug);
+  const want = await catalogVersion(ctx, String(params.app ?? ""), String(params.version ?? ""));
+  const label = `${want.manifest.id} ${want.version}`;
+  const { app, user } = await requireAppUser(ctx, slug);
+  const release = want.tarball.sha256.slice(0, 40);
+  if (isRealDir(join(app.releases, release))) return { slug, release, fetched: false };
+  diskGuard(ctx);
+  cancelled.delete(slug);
+  const started = Date.now();
+  ensureDir(ctx.paths.catalogDir, 0o700);
+  const file = join(ctx.paths.catalogDir, `${slug}-${release}.tar.gz`);
+  try {
+    io.emit(`::layer::step fetch\n`);
+    io.emit(`Downloading ${label}…\n`);
+    if ((await download(want.tarball.url, file)) !== want.tarball.sha256) {
+      throw new ActionError("checksum_mismatch", `${label} doesn't match the checksum in the catalog; nothing was installed`);
+    }
+    const bytes = statSync(file).size;
+    const unpack = 'rm -rf -- "$1.partial" && mkdir -- "$1.partial" && tar -xzf - -C "$1.partial" --strip-components=1 --no-same-owner && rm -rf -- "$1" && mv -- "$1.partial" "$1"';
+    const tarball = createReadStream(file);
+    // The job reports its own failure; a read error (the job ended early) must not crash the agent.
+    tarball.on("error", () => {});
+    let code: number;
+    try {
+      code = await runJob(
+        ctx,
+        io,
+        {
+          unit: jobUnits(slug).fetch,
+          user: user.name,
+          cwd: app.releases,
+          readWrite: [app.releases],
+          env: { PATH: "/usr/bin:/bin" },
+          memoryMb: 512,
+          timeoutSec: 600,
+          network: false,
+          command: ["/bin/sh", "-c", unpack, "layer-unpack", release],
+        },
+        tarball,
+      );
+    } finally {
+      tarball.destroy();
+    }
+    if (cancelled.delete(slug)) throw new ActionError("cancelled", "fetch cancelled");
+    if (code !== 0) throw new ActionError("fetch_failed", `unpacking ${label} failed (exit ${code})`);
+    if (!isRealDir(join(app.releases, release))) throw new ActionError("fetch_failed", "the unpacked release is missing");
+    return { slug, release, fetched: true, bytes, ms: Date.now() - started };
+  } finally {
+    rmSync(file, { force: true });
+  }
 }
 
 /**
@@ -414,6 +477,7 @@ export const buildActions: ActionTable = {
     run: sourceFetch,
     redact: (p) => ({ ...p, token: p.token === undefined ? undefined : "[redacted]" }),
   },
+  "catalog.fetch": { mutates: true, lock: "build", run: catalogFetch },
   "build.run": { mutates: true, lock: "build", run: buildRun },
   // No lock: it must be able to stop a build that holds the build lock.
   "build.cancel": { mutates: false, run: buildCancel },

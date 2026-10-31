@@ -1,6 +1,6 @@
 # Self Host Layer: "Vercel on your own VPS, without Docker"
 
-> Weeks 1–4 built, and the panel redesigned. Weeks 5–6 (combined) are planned in [PLAN-WEEK5.md](PLAN-WEEK5.md). Read [PLAN-WEEK4.md](PLAN-WEEK4.md) too. When you (Claude) open this folder, read this file, [PLAN-WEEK3.md](PLAN-WEEK3.md), [PLAN-WEEK2.md](PLAN-WEEK2.md), [PLAN-WEEK1.md](PLAN-WEEK1.md) and [RESEARCH.md](RESEARCH.md) before suggesting anything.
+> Weeks 1–4 built, and the panel redesigned. Weeks 5–6 (combined) are planned in [PLAN-WEEK5.md](PLAN-WEEK5.md). The marketplace starts with Links, a link shortener built from scratch: [PLAN-LINKS.md](PLAN-LINKS.md). Read [PLAN-WEEK4.md](PLAN-WEEK4.md) too. When you (Claude) open this folder, read this file, [PLAN-WEEK3.md](PLAN-WEEK3.md), [PLAN-WEEK2.md](PLAN-WEEK2.md), [PLAN-WEEK1.md](PLAN-WEEK1.md) and [RESEARCH.md](RESEARCH.md) before suggesting anything.
 >
 > **Name:** Self Host Layer. Domain **selfhostlayer.com** (owned). Repo: https://github.com/mddanishyusuf/selfhostlayer. The internal identifier is **`layer`**: CLI `layer`, Linux user `layer`, paths `/opt/layer`, `/etc/layer`, `/var/lib/layer`, units `layer-agent` / `layer-panel`, manifest `layer.yaml`.
 
@@ -114,9 +114,8 @@ The panel uses the design of our AgentOS app (`~/projects/agent-os/web/src/theme
 
 ## Business model
 - **License: deferred until the tool works (decided 2026-10-28).** The repo is private and has one author, so there's no LICENSE file (all rights reserved). Leading option: an **AGPL-3.0** core plus a **CLA** (CLA-assistant), so Pro can ship as a separate proprietary package, and an **MIT** manifest spec. **Decide before** making the repo public or accepting any outside contribution.
-- **Open-core:** free single-server panel (open source, builds trust and GitHub stars, which is how Coolify and Dokploy grew).
-- **Paid:** Pro license per panel (~$5–9/mo or a lifetime deal) for multi-server, teams/roles, S3 backups, preview deploys, migration assistant. **Paid marketplace apps** (Piqo Pro etc.; Piqo already has a self-hosted license flow at /self-hosted/licenses). Optional hosted control plane later.
-- Distribution: this doubles as a **funnel for our own products**. Every install sees analytics/email/scheduler one click away.
+- **Sold as one license (decided 2026-10-31):** Self Host Layer is sold as a license, and the license includes every tool in Integrations (links, analytics, email, scheduler, …). Tools are never sold separately. This replaces the earlier plan of a free open-core panel with paid marketplace apps and a Pro tier. Still to decide: the price and its shape (per panel, monthly or lifetime), and whether any part stays open source (see License above).
+- Distribution: every install gets the whole toolkit (analytics, email, scheduler, …) one click away, which is the reason to buy.
 
 ## Biggest risks
 1. **Weaker isolation than VMs:** native apps share the kernel. Mitigated by the Security plan above (per-app users plus systemd sandboxing). Be honest about the limit in the docs.

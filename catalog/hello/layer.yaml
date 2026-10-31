@@ -1,0 +1,21 @@
+# The catalog's test app: what Install, updates, backups and uninstall are
+# checked against before a real integration uses them.
+id: hello
+name: Hello
+version: 0.1.0
+summary: Says hello and counts visits in SQLite. A test app for the catalog.
+runtime:
+  kind: node
+  node: "24"
+  start: [node, server.js]
+  health: /healthz
+  writable: [data]
+memory: { default: 64, min: 32 }
+env:
+  HELLO_GREETING: { setting: greeting, default: Hello }
+services: [sqlite]
+cron:
+  - name: tidy
+    schedule: "*-*-* 03:30:00"
+    command: node cron.js tidy
+backup: [data]
