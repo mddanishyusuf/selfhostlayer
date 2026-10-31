@@ -1,0 +1,26 @@
+# Email: newsletters, transactional email (a Resend-compatible API) and
+# automations on your own SMTP or Amazon SES, managed from the panel's Email
+# page (PLAN-EMAIL.md).
+id: email
+name: Email
+version: 0.1.0
+summary: Newsletters, transactional email and automations on your own SMTP or Amazon SES.
+runtime:
+  kind: node
+  node: "24"
+  # node:sqlite warns that it's experimental on every start: not news worth a log line.
+  start: [node, --disable-warning=ExperimentalWarning, server.js]
+  health: /healthz
+memory: { default: 192, min: 96 }
+env:
+  # The panel's key to Email's admin API (127.0.0.1 only); provider credentials are encrypted under a key made from it.
+  EMAIL_ADMIN_TOKEN: { generate: secret }
+  # Signs the links in emails: tracking, unsubscribe and confirmation.
+  EMAIL_SECRET: { generate: secret }
+services: [sqlite]
+cron:
+  # Bodies of sent emails and old events past the keep window are deleted.
+  - name: prune
+    schedule: "20 4 * * *"
+    command: node --disable-warning=ExperimentalWarning cron.js prune
+backup: [data]

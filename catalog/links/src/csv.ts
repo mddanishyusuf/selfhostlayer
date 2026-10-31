@@ -2,12 +2,13 @@
 // by name (url, long_url, destination…; slug, keyword, back_half…), so most
 // exports work as they are. A row that can't be a link is skipped with the
 // reason, never half-imported.
+import { csvCell as cell, parseCsv } from "../../lib/csv.ts";
 import type { Link, Store } from "./store.ts";
 import { InputError } from "./validate.ts";
 
 const COLUMNS = ["slug", "target", "title", "tags", "redirect", "pass_query", "expires_at", "disabled", "clicks", "created_at"] as const;
 
-const cell = (value: string) => (/[",\n\r]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value);
+export { parseCsv };
 
 export function toCsv(links: Link[]): string {
   const rows = links.map((l) =>
@@ -16,40 +17,6 @@ export function toCsv(links: Link[]): string {
       .join(","),
   );
   return `${[COLUMNS.join(","), ...rows].join("\n")}\n`;
-}
-
-/** RFC 4180: quoted cells may hold commas, quotes ("") and line breaks. */
-export function parseCsv(text: string): string[][] {
-  const rows: string[][] = [];
-  let row: string[] = [];
-  let value = "";
-  let quoted = false;
-  const input = text.replace(/^﻿/, "");
-  for (let i = 0; i < input.length; i++) {
-    const c = input[i]!;
-    if (quoted) {
-      if (c === '"' && input[i + 1] === '"') {
-        value += '"';
-        i++;
-      } else if (c === '"') quoted = false;
-      else value += c;
-    } else if (c === '"') quoted = true;
-    else if (c === ",") {
-      row.push(value);
-      value = "";
-    } else if (c === "\n" || c === "\r") {
-      if (c === "\r" && input[i + 1] === "\n") i++;
-      row.push(value);
-      rows.push(row);
-      row = [];
-      value = "";
-    } else value += c;
-  }
-  if (value || row.length) {
-    row.push(value);
-    rows.push(row);
-  }
-  return rows.filter((r) => r.some((v) => v.trim()));
 }
 
 const NAMES: Record<string, string[]> = {

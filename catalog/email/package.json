@@ -1,0 +1,10 @@
+{
+  "name": "@layer-catalog/email",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Newsletters, transactional email and automations on your own SMTP or Amazon SES: an integration for Self Host Layer.",
+  "type": "module",
+  "scripts": {
+    "build": "node build.ts"
+  }
+}
