@@ -75,3 +75,68 @@ panel: Analytics page ──(admin token, 127.0.0.1 only)──▶ Analytics' ad
 5. uninstalls Analytics, and the page offers Install again.
 
 CI builds Analytics with the other catalog apps, lists it in the test catalog, and checks that nothing is left after the uninstall. `docs/analytics.md` (and the same on the website) explains installing, the dashboard, custom events, what's counted and what isn't, and how long it's kept.
+
+# Part 2: Analytics as its own area in the panel (asked 2026-10-31)
+
+**Goal:** with Analytics installed, opening it collapses the panel's sidebar to icons and shows Analytics' own sidebar for the chosen site, like Piqo:
+- a site selector at the top;
+- Overview (today's dashboard), Realtime, Pages, Users, Goals, Revenue, Outbound and Settings.
+
+## Decisions
+1. **Routes:** `/analytics/<site>/<section>`. `/analytics` opens the first site, or offers Install or a first site. The main sidebar collapses to its 56px icon column there, as on the database viewer; Analytics' sidebar (208px) sits beside it, and phones get both as drawers.
+2. **Realtime:** visitors in the last 5 minutes, visits by the minute over the last 30, the pages people are on, and the latest events as they come. It refreshes every 5 seconds.
+3. **Pages:** one table, searchable and sortable, with visitors, pageviews, entries, exits, bounce rate and time on page.
+4. **Users:** visits, newest first. Each row has country, device, browser, OS, source, entry and exit, pages, time, events and revenue, and opens the visit's journey: its pages, events, outbound clicks and payments, in order. Without cookies a visitor can't be followed from one day to the next, so a row is a visit. Search, and a filter by goal.
+5. **Goals:** a page (with `*` wildcards) or a custom event, each with conversions (visitors who reached it), conversion rate and revenue from those visits. Users can be filtered by a goal.
+6. **Outbound:** the script counts clicks on links to other sites (event `Outbound link`, with the URL). The page lists the destinations with visitors and clicks.
+7. **Revenue attribution (Stripe, Dodo Payments, Polar), as in Piqo but without cookies:**
+   - The script holds the visit's id in memory (`window.shl.visit`, or `await window.shl.ready`). The site passes it into its checkout's `metadata` as `shl_visit`.
+   - Analytics pulls succeeded payments every 10 minutes (and on **Sync now**) with an API key per provider, best restricted to reading payments:
+     - Stripe: completed checkout sessions, and paid invoices for renewals;
+     - Polar: paid orders;
+     - Dodo: succeeded payments.
+   - A payment with `shl_visit` is credited to that visit's source, campaign, entry page and country. A renewal goes to the customer's first payment's visit. Anything else counts as unattributed.
+   - Only amounts, currency, time and the provider's customer id are kept; no email or name.
+   - Revenue shows on Overview (total, revenue per visitor) and on its own page: by source, campaign, entry page, country, and the latest payments.
+8. **Settings, per site:**
+   - the domain, subdomains and the line to paste;
+   - the revenue providers (key, test or live, last sync and its error);
+   - removing the site.
+9. **Analytics 0.2.0** carries migration 2 (goals, revenue sources, payments). Installs update to it from Integrations.
+
+## Part 2 result (2026-10-31)
+
+Built as decided above, as **Analytics 0.2.0** and the panel's new Analytics pages.
+
+**The service** (`catalog/analytics`):
+- **Migration 2:** goals; revenue sources (each provider's key encrypted with AES-256-GCM under a key made from the admin token, its mode, last sync and error); payments (amount without tax, currency, time, customer id, the visit they're credited to); and each paying customer's first visit.
+- **The script** (2.3 KB):
+  - pageviews go by `fetch`, whose answer names the visit: `window.shl.visit`, and `window.shl.ready` (null where nothing is sent);
+  - clicks on links to other sites are the event `Outbound link`, with the address without its query string;
+  - links to `buy.stripe.com` get `client_reference_id`, and links to `checkout.dodopayments.com` get `metadata_shl_visit`, on the way out.
+- **Revenue** (`src/revenue.ts`): payments are pulled every 10 minutes (and on Sync now), from 24 hours 20 minutes before the last sync (90 days the first time), with a key checked by one small request:
+  - **Stripe:** completed checkouts (paid ones, and free trials' to tie the customer to the visit; adaptive pricing counted in the price's own currency), and paid invoices after a subscription's first.
+  - **Polar:** paid orders (net of tax), production or sandbox.
+  - **Dodo Payments:** succeeded payments, each new one read once for its tax and the amount credited in the account's currency.
+  - A payment's own `shl_visit` (or Stripe's `client_reference_id`) credits it to that visit if it's this site's; otherwise it goes to the customer's first visit. A visit that brought a payment outlives the keep window (its events don't).
+- **Reports** (`src/reports.ts`, `src/goals.ts`):
+  - the pages table (time on page from the next pageview, or the end of the visit);
+  - visits, searched and narrowed to a goal or to paying ones, and each visit's journey;
+  - realtime;
+  - outbound links;
+  - goals, matched with GLOB so `*` is the only wildcard.
+- **Tests:** 15, with Stripe, Polar and Dodo answered by a fake `fetch`.
+- **Numbers:** 21,536 events a second on the dev machine (21,742 before).
+
+**The panel:**
+- `/analytics/<domain>/…`, where the sidebar shrinks to its icons and Analytics' sidebar opens beside it (`components/analytics-nav.tsx`): a site picker (a `Dropdown` from `components/menu.tsx`), then Overview, Realtime, Pages, Users, Goals, Revenue, Outbound and Settings.
+- On phones, the picker and the pages are a row of tabs above the page.
+- `/analytics` offers Install or the first site, or opens the first site.
+- **The tour** installs Analytics 0.2.0, then checks:
+  - `window.shl.ready`;
+  - the visit on Overview, Realtime, Pages and Outbound (a click kept from leaving the page);
+  - its journey on Users;
+  - a goal that counts it;
+  - Revenue's setup and the site's Settings;
+  - nothing left after Uninstall.
+- It passes on the VM. CI takes the Analytics tarball of whatever version was built.

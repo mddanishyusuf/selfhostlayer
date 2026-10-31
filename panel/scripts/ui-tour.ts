@@ -1095,18 +1095,62 @@ if (process.env.TOUR_ANALYTICS === "1") {
   await waitForPath("/settings");
   await evaluate(`(() => { const s = document.createElement("script"); s.src = "https://${domain}/script.js"; s.dataset.site = ${JSON.stringify(panelHost)}; document.head.appendChild(s); return true; })()`);
   await waitFor(`!!window.shl && window.shl.track.length === 2`, "the script to load");
+  const visitId = String(await evaluate(`window.shl.ready`));
+  if (!/^[\w-]{12}$/.test(visitId)) throw new Error(`window.shl.ready gave ${visitId}, not a visit`);
   await evaluate(`window.shl.track("Tour", { step: "analytics" }), true`);
+  // A click on a link to another site, kept from leaving the page: the script counts it on the way.
+  await evaluate(`(() => { const a = document.createElement("a"); a.href = "https://example.com/tour"; a.addEventListener("click", (e) => e.preventDefault()); document.body.appendChild(a); a.click(); return true; })()`);
   await sleep(1500);
+  const site = `/analytics/${panelHost}`;
   let seen = "";
   for (let i = 0; i < 10 && !(seen.includes("/settings") && seen.includes("Tour")); i++) {
-    await go("/analytics");
-    await waitForPath("/analytics");
+    await go(site);
+    await waitForPath(site);
     seen = String(await evaluate(`[document.querySelector('[data-testid="top-pages"]')?.innerText ?? "", document.body.innerText].join(" ")`));
     if (!seen.includes("Tour")) await sleep(1000);
   }
   if (!seen.includes("/settings") || !seen.includes("Tour")) throw new Error(`the visit isn't on the dashboard:\n${seen.slice(0, 1500)}`);
   await screenshot("analytics-dashboard");
-  console.log("  ✓ the script's pageview (/settings) and a custom event (Tour) are on the dashboard");
+  console.log(`  ✓ the script's pageview (/settings) and a custom event (Tour) are on the dashboard; window.shl.ready named the visit`);
+
+  /** Opens one of the site's Analytics pages and waits for text in it. */
+  const section = async (path: string, selector: string, text: string, what: string) => {
+    await go(`${site}${path}`);
+    await waitForPath(`${site}${path}`);
+    await waitFor(`(document.querySelector(${JSON.stringify(selector)})?.innerText ?? "").includes(${JSON.stringify(text)})`, what, 20_000);
+  };
+  await section("/realtime", '[data-testid="realtime-feed"]', "/settings", "the visit in Realtime's feed");
+  await screenshot("analytics-realtime");
+  await section("/pages", '[data-testid="pages-table"]', "/settings", "/settings in the pages table");
+  await section("/outbound", '[data-testid="outbound"]', "example.com", "the click to example.com under Outbound");
+  console.log("  ✓ Realtime, Pages and Outbound show the visit, its page and its click out");
+
+  await go(`${site}/users?visit=${visitId}`);
+  await waitFor(`(document.querySelector('[data-testid="journey-steps"]')?.innerText ?? "").includes("Tour")`, "the visit's journey", 20_000);
+  const steps = String(await evaluate(`document.querySelector('[data-testid="journey-steps"]').innerText`));
+  if (!steps.includes("/settings") || !steps.includes("example.com")) throw new Error(`the journey: ${steps}`);
+  await screenshot("analytics-journey");
+  console.log("  ✓ Users opens the visit: its page, the Tour event and the click out, in order");
+
+  await go(`${site}/goals`);
+  await waitForPath(`${site}/goals`);
+  await click('[data-testid="new-goal"]');
+  await waitFor(`!!document.querySelector('[data-testid="goal-form"] #value')`, "the new goal's form");
+  await setValue('[data-testid="goal-form"] #value', "/settings");
+  await setValue('[data-testid="goal-form"] #name', "Opened settings");
+  await click('[data-testid="goal-form"] button[type=submit]');
+  await waitFor(`(document.querySelector('[data-testid="goals"]')?.innerText ?? "").includes("Opened settings")`, "the goal in the list", 20_000);
+  const goal = String(await evaluate(`document.querySelector('[data-testid="goal-row"]').innerText`));
+  if (!/\b1\b/.test(goal) || !goal.includes("%")) throw new Error(`the goal's numbers: ${goal}`);
+  await screenshot("analytics-goals");
+  console.log("  ✓ a goal (the page /settings) counts the visitor who reached it");
+
+  await go(`${site}/revenue`);
+  await waitFor(`!!document.querySelector('[data-testid="revenue-setup"]')`, "Revenue's setup");
+  await go(`${site}/settings`);
+  await waitFor(`!!document.querySelector('[data-testid="source-stripe"]') && !!document.querySelector('[data-testid="snippet"]')`, "the site's settings");
+  await screenshot("analytics-site-settings");
+  console.log("  ✓ Revenue offers to connect a provider; the site's Settings has the line to paste and each provider's key");
 
   await go("/projects/analytics/settings");
   await waitForPath("/projects/analytics/settings");

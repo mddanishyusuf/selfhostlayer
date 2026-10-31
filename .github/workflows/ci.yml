@@ -117,7 +117,7 @@ jobs:
         run: |
           echo "127.0.0.1 layer.internal next.internal vite.internal hello.internal links.internal analytics.internal panel2.internal next.apps2.internal" | sudo tee -a /etc/hosts
           sudo bash installer/test/release-feed.sh start dist/layer-ci.tar.gz dist/install.sh ci-tour
-          apps="dist/catalog/hello-0.1.0.tar.gz dist/catalog/links-0.1.0.tar.gz dist/catalog/analytics-0.1.0.tar.gz"
+          apps="dist/catalog/hello-0.1.0.tar.gz dist/catalog/links-0.1.0.tar.gz $(ls dist/catalog/analytics-*.tar.gz)"
           sudo bash installer/test/release-feed.sh catalog $apps
           TOUR_CATALOG_CMD="sudo bash installer/test/release-feed.sh catalog $apps dist/catalog/links-0.1.0.tar.gz=0.1.1" \
           TOUR_UPDATE=1 TOUR_DEPLOY=1 TOUR_BACKUPS=1 TOUR_REDIS=1 TOUR_POSTGRES=1 TOUR_INTEGRATIONS=1 TOUR_LINKS=1 TOUR_ANALYTICS=1 TOUR_APPS_DOMAIN=internal TOUR_PANEL_ADDRESS=panel2.internal TOUR_ACCESS=1 CHROME="$(command -v google-chrome)" \

@@ -177,7 +177,7 @@ Opens the app's live address.
 Every project's deployments in one list. A gold dot on the sidebar item means something is building.
 
 ### Analytics
-Cookie-free web analytics for your sites, once Analytics is installed (the page offers **Install** until then): add a site, paste one line into its pages, then see its visitors, pages, sources, countries and devices, filtered by anything you click. See [Analytics](analytics.md).
+Cookie-free web analytics for your sites, once Analytics is installed (the page offers **Install** until then): add a site and paste one line into its pages. A site opens with the sidebar shrunk to its icons and Analytics' own sidebar beside it: a site picker, then Overview, Realtime, Pages, Users (each visit's journey), Goals, Revenue (from Stripe, Polar or Dodo Payments, by source), Outbound and the site's Settings. See [Analytics](analytics.md).
 
 ### Firewall
 The firewall rules (`ufw status`) and fail2ban's SSH jail: who is banned now, and failures so far. Editing rules from the panel is coming.
