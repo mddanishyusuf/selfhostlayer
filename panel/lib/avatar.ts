@@ -1,15 +1,16 @@
-// Each project's mark on the Projects page: a DiceBear "Shape Grid" made from
-// its name (https://www.dicebear.com/styles/shape-grid/, CC0), so every
-// project has one of its own. Drawn here as a data: URI; nothing is fetched.
+// Each project's mark on the Projects page: a DiceBear "Planets" made from its
+// name (https://www.dicebear.com/styles/planets/, CC0), so every project has a
+// planet of its own. Drawn here as a data: URI; nothing is fetched.
 import { Avatar, Style } from "@dicebear/core";
-import definition from "@dicebear/styles/shape-grid.json";
+import definition from "@dicebear/styles/planets.json";
 
 const style = new Style(definition);
 const drawn = new Map<string, string>();
 
 function draw(seed: string): string {
   let svg = drawn.get(seed);
-  if (!svg) drawn.set(seed, (svg = new Avatar(style, { seed }).toString()));
+  // Still: a list of spinning planets would be a lot to look at.
+  if (!svg) drawn.set(seed, (svg = new Avatar(style, { seed, animationProbability: 0 }).toString()));
   return svg;
 }
 

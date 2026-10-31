@@ -79,7 +79,7 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
   if (getApp()) void allRepos().catch(() => {});
   // Integrations have their own page.
   const all = listProjects().filter((p) => p.source === "github");
-  // Each project's own shape grid, oldest first so a new project never changes an older one's.
+  // Each project's own planet, oldest first so a new project never changes an older one's.
   const marks = projectMarks(all.toSorted((a, b) => a.id - b.id).map((p) => p.slug));
   const term = q?.trim().toLowerCase();
   const matching = term ? all.filter((p) => `${p.slug} ${p.domains.join(" ")} ${p.repoName}`.toLowerCase().includes(term)) : all;
