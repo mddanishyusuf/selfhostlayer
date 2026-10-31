@@ -846,6 +846,27 @@ if (process.env.TOUR_DEPLOY === "1") {
   console.log("  ✓ deleted the vite project; it's gone from the overview");
 }
 
+/** Runs a command as root on the box (TOUR_BOX_CMD, bash -c …): for what a test can't do itself. */
+const box = (cmd: string) => execFileSync("bash", ["-c", `${process.env.TOUR_BOX_CMD ?? "sudo bash -c"} '${cmd.replace(/'/g, `'\\''`)}'`], { encoding: "utf8" });
+/** Clicks until what it opens shows: a button does nothing until React has hydrated the page. */
+const clickFor = async (selector: string, shown: string, what: string) => {
+  for (let i = 0; i < 20; i++) {
+    await click(selector);
+    for (let j = 0; j < 5; j++) {
+      if (await evaluate(`!!document.querySelector(${JSON.stringify(shown)})`)) return;
+      await sleep(100);
+    }
+  }
+  throw new Error(`${what} didn't open`);
+};
+/** Waits for React to take over an element (its fiber is on the node once hydrated). */
+const hydrated = (selector: string, what: string) => waitFor(`Object.keys(document.querySelector(${JSON.stringify(selector)}) ?? {}).some((k) => k.startsWith("__reactFiber"))`, what, 20_000);
+/** For React-controlled textareas and selects, as setValue does for inputs. */
+const setText = (selector: string, value: string) =>
+  evaluate(`(() => { const el = document.querySelector(${JSON.stringify(selector)}); Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value").set.call(el, ${JSON.stringify(value)}); el.dispatchEvent(new Event("input", { bubbles: true })); return true; })()`);
+const setSelect = (selector: string, value: string) =>
+  evaluate(`(() => { const el = document.querySelector(${JSON.stringify(selector)}); Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value").set.call(el, ${JSON.stringify(value)}); el.dispatchEvent(new Event("change", { bubbles: true })); return true; })()`);
+
 /** What a person's browser says, for the tools that leave bots out (headless Chrome names itself). */
 const DESKTOP_UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36";
 
@@ -1170,25 +1191,8 @@ if (process.env.TOUR_ANALYTICS === "1") {
 // can't do itself, like a domain's DNS (marked verified there).
 if (process.env.TOUR_EMAIL === "1") {
   console.log("Email");
-  const box = (cmd: string) => execFileSync("bash", ["-c", `${process.env.TOUR_BOX_CMD ?? "sudo bash -c"} '${cmd.replace(/'/g, `'\\''`)}'`], { encoding: "utf8" });
   const sunk = () => box(`cat ${process.env.TOUR_SMTP_LOG ?? "/tmp/smtp-sink.log"}`);
   const domain = `email.${process.env.TOUR_APPS_DOMAIN ?? "internal"}`;
-  /** Clicks until what it opens shows: a button does nothing until React has hydrated the page. */
-  const clickFor = async (selector: string, shown: string, what: string) => {
-    for (let i = 0; i < 20; i++) {
-      await click(selector);
-      for (let j = 0; j < 5; j++) {
-        if (await evaluate(`!!document.querySelector(${JSON.stringify(shown)})`)) return;
-        await sleep(100);
-      }
-    }
-    throw new Error(`${what} didn't open`);
-  };
-  /** Waits for React to take over an element (its fiber is on the node once hydrated). */
-  const hydrated = (selector: string, what: string) => waitFor(`Object.keys(document.querySelector(${JSON.stringify(selector)}) ?? {}).some((k) => k.startsWith("__reactFiber"))`, what, 20_000);
-  /** For React-controlled textareas, as setValue does for inputs. */
-  const setText = (selector: string, value: string) =>
-    evaluate(`(() => { const el = document.querySelector(${JSON.stringify(selector)}); Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value").set.call(el, ${JSON.stringify(value)}); el.dispatchEvent(new Event("input", { bubbles: true })); return true; })()`);
   await setViewport(1280, 900);
   await go("/email");
   await waitForPath("/email");
@@ -1212,7 +1216,7 @@ if (process.env.TOUR_EMAIL === "1") {
   await hydrated('[data-testid="provider-form"]', "the provider form to come alive");
   await setValue("#p-host", "127.0.0.1");
   await setValue("#p-port", "2525");
-  await evaluate(`(() => { const el = document.querySelector("#p-sec"); Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value").set.call(el, "none"); el.dispatchEvent(new Event("change", { bubbles: true })); return true; })()`);
+  await setSelect("#p-sec", "none");
   await click('[data-testid="provider-form"] button[type=submit]');
   await waitFor(`document.body.innerText.includes("Send a test to see it work")`, "the provider saved");
   await fill("#t-to", "ada@tour.test");
@@ -1296,6 +1300,126 @@ if (process.env.TOUR_EMAIL === "1") {
   await click('form:has(#confirm) button[type=submit]');
   await waitForPath("/integrations");
   console.log("  ✓ uninstalled Email");
+}
+
+// TOUR_FORMS=1: the catalog lists Forms, and a webhook sink on the box at
+// 127.0.0.1:2626 writes a line per request to TOUR_HOOK_LOG
+// (catalog/forms/test/hook-sink.ts). Install it, build a form with logic in the
+// builder, point its webhook at the sink, fill it in as a person would, and
+// find the response in the panel, the CSV and the sink (signed); then close it
+// and uninstall.
+if (process.env.TOUR_FORMS === "1") {
+  console.log("Forms");
+  const hooked = () => box(`cat ${process.env.TOUR_HOOK_LOG ?? "/tmp/hook-sink.log"}`);
+  await setViewport(1280, 900);
+  await go("/forms");
+  await waitForPath("/forms");
+  await waitFor(`!!document.querySelector('[data-testid="install-forms"]')`, "Install on the Forms page", 30_000);
+  await click('[data-testid="install-forms"] button[type=submit]');
+  await waitFor(`location.pathname.startsWith("/projects/forms/deployments/")`, "Forms' install", 60_000);
+  await waitForDeploy("installing Forms");
+  console.log("  ✓ installed Forms from the Forms page");
+
+  await go("/forms");
+  await waitFor(`!!document.querySelector('[data-testid="new-form-button"]')`, "the Forms page");
+  await clickFor('[data-testid="new-form-button"]', '[data-testid="new-form"] #nf-title', "the new form's dialog");
+  await click('[data-testid="template-contact"]');
+  await setValue("#nf-title", "Tour contact");
+  await click('[data-testid="new-form"] button[type=submit]');
+  await waitFor(`/^\\/forms\\/\\d+$/.test(location.pathname) && !!document.querySelector('[data-testid="form-builder"]')`, "the new form's builder", 20_000);
+  const formPath = String(await evaluate("location.pathname"));
+  await hydrated('[data-testid="form-builder"]', "the builder to come alive");
+  // After the last question: one choice, then a question shown only for one of its answers.
+  await evaluate(`[...document.querySelectorAll('[data-testid="builder-field"]')].at(-1).click(), true`);
+  await setSelect('[data-testid="add-kind"]', "choice");
+  await click('[data-testid="add-field"]');
+  await waitFor(`document.querySelector("#fs-type")?.value === "choice"`, "the new choice question's settings");
+  await setValue("#fs-label", "How did you hear about us?");
+  await setText("#fs-opts", "A friend\nSearch\nSomewhere else");
+  await setValue("#fs-id", "heard");
+  await setSelect('[data-testid="add-kind"]', "short_text");
+  await click('[data-testid="add-field"]');
+  await waitFor(`document.querySelector("#fs-type")?.value === "short_text" && document.querySelector("#fs-label")?.value === "Short text"`, "the new text question's settings");
+  await setValue("#fs-label", "Where, then?");
+  await setValue("#fs-id", "where");
+  await click('[data-testid="logic-toggle"]');
+  await waitFor(`!!document.querySelector('select[aria-label="Value"]')`, "the logic's answer to pick");
+  await setSelect('select[aria-label="Value"]', "Somewhere else");
+  await click('[data-testid="form-builder"] button[type=submit]');
+  await waitFor(`document.body.innerText.includes("Saved. The form's page shows it now.")`, "the form saved", 20_000);
+  const fieldsShown = String(await evaluate(`[...document.querySelectorAll('[data-testid="builder-field"]')].map((e) => e.innerText).join(" | ")`));
+  if (!fieldsShown.includes("Where, then?") || !fieldsShown.includes("shown by logic")) throw new Error(`the builder's questions: ${fieldsShown}`);
+  if (!/\/f\/[a-z0-9-]+\?preview=/.test(String(await evaluate(`document.querySelector('[data-testid="form-preview"]')?.src ?? ""`)))) throw new Error("the builder has no preview of the form");
+  await screenshot("forms-builder");
+  console.log("  ✓ built a form: the Contact template, a choice, and a question shown by logic");
+
+  await go(`${formPath}/settings`);
+  await waitFor(`!!document.querySelector('[data-testid="notify-form"] #nt-hook')`, "the notifications form");
+  await hydrated('[data-testid="notify-form"]', "the notifications form to come alive");
+  await setValue("#nt-hook", "http://127.0.0.1:2626/hook");
+  await click('[data-testid="notify-form"] button[type=submit]');
+  await waitFor(`!!document.querySelector("#nt-secret") && [...document.querySelectorAll("button")].some((b) => b.textContent.includes("Send a test to the webhook"))`, "the webhook saved", 20_000);
+  const secret = String(await evaluate(`document.querySelector("#nt-secret").value`));
+  await evaluate(`[...document.querySelectorAll("button")].find((b) => b.textContent.includes("Send a test to the webhook")).click(), true`);
+  await waitFor(`document.body.innerText.includes("Sent: it answered 200.")`, "the webhook's test", 30_000);
+  if (!hooked().includes('"test":true')) throw new Error(`the webhook sink didn't get the test: ${hooked()}`);
+  console.log("  ✓ a webhook to the sink on the box, and a test that reached it");
+
+  await go(`${formPath}/share`);
+  await waitFor(`!!document.querySelector('[data-testid="share-link"]')`, "the Share page");
+  const link = String(await evaluate(`document.querySelector('[data-testid="share-link"]').textContent`)).trim();
+  if (!/^https:\/\/forms\.[^/]+\/f\/[a-z0-9-]+$/.test(link)) throw new Error(`the form's link: ${link}`);
+  await screenshot("forms-share");
+
+  // A person, not a bot: headless Chrome names itself in its User-Agent, and Forms keeps no answers from bots.
+  await send("Emulation.setUserAgentOverride", { userAgent: DESKTOP_UA });
+  const type = (sel: string, v: string) => evaluate(`(() => { const el = document.querySelector(${JSON.stringify(sel)}); el.focus(); el.value = ${JSON.stringify(v)}; el.dispatchEvent(new Event("input", { bubbles: true })); return true; })()`);
+  await visit(link.replace(/^https:\/\//, "").split("/")[0]!, new URL(link).pathname, "Tour contact");
+  await waitFor(`!!document.querySelector("#f-name")`, "the form's questions");
+  if (await evaluate(`!!document.querySelector("#f-where")`)) throw new Error("the logic question shows before its answer");
+  await type("#f-name", "Grace Hopper");
+  await type("#f-email", "grace@tour.test");
+  await type("#f-message", "Hello from the tour");
+  await evaluate(`[...document.querySelectorAll(".choice")].find((c) => c.textContent.includes("Somewhere else")).click(), true`);
+  await waitFor(`!!document.querySelector("#f-where")`, "the logic question, once its answer is picked");
+  await type("#f-where", "At the tour");
+  await screenshot("forms-filled");
+  await sleep(2200); // faster than 2 seconds is a bot
+  await click(".nav .primary");
+  await waitFor(`!!document.querySelector(".thanks")`, "the thank-you screen", 20_000);
+  console.log(`  ✓ filled in at ${link} as a person would; the logic question showed for its answer`);
+
+  await go(`${formPath}/responses`);
+  await waitFor(`(document.querySelector('[data-testid="responses"]')?.innerText ?? "").includes("Grace Hopper")`, "the response in the panel", 20_000);
+  await click('[data-testid="response-row"]');
+  await waitFor(`(document.querySelector('[data-testid="response-detail"]')?.innerText ?? "").includes("At the tour")`, "the response opened");
+  await screenshot("forms-response");
+  const csv = String(await evaluate(`fetch(${JSON.stringify(`${formPath.replace("/forms/", "/api/forms/")}/export`)}).then((r) => r.text())`));
+  if (!csv.startsWith("submitted_at,Your name,Your email,How can we help?,How did you hear about us?,\"Where, then?\",") || !csv.includes(",Grace Hopper,grace@tour.test,Hello from the tour,Somewhere else,At the tour,")) throw new Error(`the CSV:\n${csv}`);
+  console.log("  ✓ the response is in the panel, whole, and in the CSV");
+  let hook = "";
+  for (let i = 0; i < 30 && !(hook = hooked().split("\n").find((l) => l.includes("Grace Hopper")) ?? ""); i++) await sleep(1000);
+  const [signature, body] = hook.split("\t");
+  if (!body || signature !== `sha256=${createHmac("sha256", secret).update(body).digest("hex")}`) throw new Error(`the webhook didn't get the response, signed: ${hook || hooked()}`);
+  console.log("  ✓ the webhook got the response, signed with the form's secret");
+
+  await go(`${formPath}/settings`);
+  await waitFor(`!!document.querySelector('[data-testid="form-settings"]')`, "the form's settings");
+  await hydrated('[data-testid="form-settings"]', "the settings form to come alive");
+  await click('[data-testid="form-open"]');
+  await click('[data-testid="form-settings"] button[type=submit]');
+  await waitFor(`(document.querySelector('[data-testid="form-status"]')?.innerText ?? "") === "Closed" || document.body.innerText.includes("Saved.")`, "the form closed", 20_000);
+  await visit(link.replace(/^https:\/\//, "").split("/")[0]!, new URL(link).pathname, "isn't taking answers");
+  console.log("  ✓ closed: the form's page says so");
+
+  await go("/projects/forms/settings");
+  await waitForPath("/projects/forms/settings");
+  await click('[data-testid="uninstall"]');
+  await waitFor(`!!document.querySelector("#confirm")`, "the uninstall confirmation");
+  await setValue("#confirm", "forms");
+  await click('form:has(#confirm) button[type=submit]');
+  await waitForPath("/integrations");
+  console.log("  ✓ uninstalled Forms");
 }
 
 // TOUR_PANEL_ADDRESS=<host>: move the panel there from Settings and back. On a

@@ -62,7 +62,7 @@ export function createApp(o: AppOptions): App {
   const responses = new Responses(db, o.dataDir);
   const notifier = new Notifier({ db, forms, responses, secrets, fetch: o.fetch });
   let publicUrl = getSetting(db, "publicUrl") ?? "http://127.0.0.1";
-  const ctx: AdminContext = { forms, responses, notifier, token: o.token, version: o.version, publicUrl: () => publicUrl, setPublicUrl: (u) => ((publicUrl = u), setSetting(db, "publicUrl", u)) };
+  const ctx: AdminContext = { forms, responses, notifier, token: o.token, version: o.version, publicUrl: () => publicUrl, setPublicUrl: (u) => ((publicUrl = u), setSetting(db, "publicUrl", u)), previewToken: (slug) => secrets.sign("preview", slug) };
   const geoPaths = [join(o.dataDir, "geo.bin"), join(o.releaseDir, "geo.bin")];
   let geo = loadGeo(geoPaths);
   let geoSeen = mtime(geoPaths[0]!);
@@ -149,8 +149,10 @@ export function createApp(o: AppOptions): App {
           const form = forms.bySlug(slug);
           const embed = url.searchParams.get("embed") === "1";
           if (!form) return send(res, 404, missingPage(nonce), pageHeaders(nonce));
-          if (forms.closedBecause(form, now)) return send(res, 200, closedPage(form, { embed, nonce }), pageHeaders(nonce));
-          return send(res, 200, formPage(form, { base: `/f/${slug}`, token: token(slug, now), embed, nonce }), pageHeaders(nonce));
+          // The panel's builder shows the form even while it's closed.
+          const preview = secrets.verify(url.searchParams.get("preview") ?? "", "preview", slug);
+          if (!preview && forms.closedBecause(form, now)) return send(res, 200, closedPage(form, { embed, nonce }), pageHeaders(nonce));
+          return send(res, 200, formPage(form, { base: `/f/${slug}`, token: token(slug, now), embed, nonce, preview }), pageHeaders(nonce));
         }
         if (req.method !== "POST") return send(res, 405, "", { Allow: "POST" });
         if (action === "submit") {

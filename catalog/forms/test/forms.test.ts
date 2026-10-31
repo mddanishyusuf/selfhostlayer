@@ -188,7 +188,11 @@ describe("Forms over HTTP", () => {
     expect((await admin(`forms/${form.id}`, { method: "PATCH", body: { slug: "Bad Slug" } })).status).toBe(400);
     const moved = (await admin(`forms/${form.id}`, { method: "PATCH", body: { slug: "signup", maxResponses: null, status: "closed" } })).body;
     expect(moved.slug).toBe("signup");
-    expect((await admin(`forms/${form.id}`)).body.closed).toBe("closed");
+    const shown = (await admin(`forms/${moved.id}`)).body;
+    expect(shown.closed).toBe("closed");
+    // The builder's preview shows it anyway, with a token only the admin API gives out.
+    expect(await (await fetch(`${base}/f/signup?preview=${shown.preview}`)).text()).toContain('"preview":true');
+    expect(await (await fetch(`${base}/f/signup?preview=forged${shown.preview.slice(6)}`)).text()).toContain("We're full, sorry.");
     expect((await fetch(`${base}/f/${form.slug}`)).status).toBe(404);
     expect((await admin(`forms/${form.id}`, { method: "DELETE" })).status).toBe(200);
     expect((await admin("forms")).body.forms).toEqual([]);
@@ -218,12 +222,13 @@ describe("Forms over HTTP", () => {
     ]);
     expect(mails[0].auth).toBe(`Bearer em_${"k".repeat(30)}`);
     expect(mails[0].html).toContain("Hi &lt;there&gt;");
-    // A webhook that fails is tried again later.
-    await admin(`forms/${form.id}`, { method: "PATCH", body: { notify: { webhook: "https://broken.example.com/" } } });
+    // A webhook that fails is tried again later; with no copy, replies still go to whoever answered.
+    await admin(`forms/${form.id}`, { method: "PATCH", body: { notify: { webhook: "https://broken.example.com/", receiptField: "" } } });
     const again = await load(form.slug);
     await wait(60);
     await submit(form.slug, { t: again.cfg.token, answers: { name: "Bob", email: "bob@example.com" } });
     await app.notifier.tick();
+    expect(JSON.parse(hooks.filter((h) => h.url === "https://email.example.com/emails").at(-1)!.body)).toMatchObject({ to: "owner@piqo.app", reply_to: "bob@example.com" });
     expect((await admin(`forms/${form.id}`)).body.deliveries.find((d: { kind: string }) => d.kind === "webhook")).toMatchObject({ status: "pending", attempts: 1, error: "the webhook answered 500" });
     expect(await (await fetch(`${base}/embed.js`)).text()).toContain("data-shl-form");
   });

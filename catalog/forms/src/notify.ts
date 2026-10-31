@@ -117,7 +117,9 @@ export class Notifier {
         const res = await this.#fetch(form.notify.webhook, { method: "POST", headers: { "Content-Type": "application/json", "User-Agent": "Self-Host-Layer-Forms", "X-Forms-Signature": sign(form.notify.webhookSecret, body) }, body, signal: AbortSignal.timeout(15_000) });
         if (!res.ok) throw new Error(`the webhook answered ${res.status}`);
       } else if (d.kind === "email") {
-        const replyTo = form.notify.receiptField ? answerText(r.answers[form.notify.receiptField]) : "";
+        // Replies go to whoever answered: the address their copy goes to, or else the form's first Email answer.
+        const asked = form.notify.receiptField || form.schema.fields.find((f) => f.type === "email" && r.answers[f.id])?.id;
+        const replyTo = asked ? answerText(r.answers[asked]) : "";
         await this.#email(form.notify.email, `New response to ${form.title}`, answersHtml(form, r), replyTo || undefined);
       } else {
         const to = answerText(r.answers[form.notify.receiptField]);

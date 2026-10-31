@@ -182,6 +182,9 @@ Cookie-free web analytics for your sites, once Analytics is installed (the page 
 ### Email
 Newsletters, transactional email and automations, once Email is installed (the page offers **Install** until then). Add a brand, set its SMTP provider or Amazon SES, verify a sending domain. A brand opens with the sidebar shrunk to its icons and Email's own sidebar beside it: a brand picker, then Overview, Campaigns, Automations, Contacts, Lists, Templates, Logs, API, Domains and Settings. See [Email](email.md).
 
+### Forms
+Forms and surveys, once Forms is installed (the page offers **Install** until then): every form with its responses and whether it's open, and **New form** from a template. A form opens with the sidebar shrunk to its icons and Forms' own sidebar beside it: a form picker, then Build (the questions, their logic and the design, with a preview), Share (the link, a QR code, embed codes), Responses, Insights and Settings (closing it, notifications, its address). See [Forms](forms.md).
+
 ### Firewall
 The firewall rules (`ufw status`) and fail2ban's SSH jail: who is banned now, and failures so far. Editing rules from the panel is coming.
 
@@ -203,7 +206,9 @@ Tools every product needs, built for Self Host Layer and installed in one click.
 - **Updates:** when the catalog has a newer version, Installed and the tool's Settings page show **Update**. It backs the tool's data up first when backups are on, then starts the new version beside the old one. **Check again** reads the catalog at once (it's kept for 10 minutes).
 - **[Links](links.md)**, the first tool: short links on your own domain, with click stats and QR codes.
 - **[Analytics](analytics.md):** cookie-free web analytics for your sites, on the sidebar's Analytics page.
-- **Coming soon:** email, a post scheduler, a blog, a status page, a waitlist and a feedback board.
+- **[Email](email.md):** newsletters, transactional email and automations, on the sidebar's Email page.
+- **[Forms](forms.md):** forms and surveys, on the sidebar's Forms page.
+- **Coming soon:** a post scheduler, a blog, a status page, a waitlist and a feedback board.
 
 ### Databases
 - **Engines:** SQLite, PostgreSQL, Redis, MongoDB and MySQL (MariaDB), each with its version, whether it runs (PostgreSQL, MySQL and MongoDB as systemd sees their server) and how much the apps use. MongoDB has its Install button here, and Start when it's stopped, which tells you why if it can't start.

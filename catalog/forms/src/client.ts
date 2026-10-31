@@ -22,9 +22,10 @@ export const CLIENT_JS = String.raw`(function () {
   function post(path, body) {
     return fetch(cfg.base + path, { method: "POST", headers: { "Content-Type": "application/json" }, body: body ? JSON.stringify(body) : "{}", keepalive: !body });
   }
-  post("/view").catch(function () {});
+  // The panel's preview (a signed ?preview=…) counts nothing and keeps nothing.
+  if (!cfg.preview) post("/view").catch(function () {});
   function touch() {
-    if (started) return;
+    if (started || cfg.preview) return;
     started = true;
     post("/start").catch(function () {});
   }
@@ -195,6 +196,7 @@ export const CLIENT_JS = String.raw`(function () {
       if (first) { var list = conv ? steps() : pages(); for (var i = 0; i < list.length; i++) if ((conv ? [list[i]] : list[i]).indexOf(first) >= 0) { at = i; break; } }
       return render(true);
     }
+    if (cfg.preview) { done = true; return render(true); }
     sending = true;
     render();
     var hp = document.getElementById("hp");
@@ -219,7 +221,7 @@ export const CLIENT_JS = String.raw`(function () {
     root.textContent = "";
     var card = h("main", { class: "card" + (conv ? " conv" : "") });
     if (done) {
-      card.appendChild(h("div", { class: "thanks" }, [h("div", { class: "tick", text: "✓" }), h("h1", { text: S.thanks.title || "Thanks!" }), S.thanks.message ? h("p", { class: "muted pre", text: S.thanks.message }) : null]));
+      card.appendChild(h("div", { class: "thanks" }, [h("div", { class: "tick", text: "✓" }), h("h1", { text: S.thanks.title || "Thanks!" }), S.thanks.message && !(cfg.preview && S.thanks.redirect) ? h("p", { class: "muted pre", text: S.thanks.message }) : null, cfg.preview ? h("p", { class: "muted", text: "A preview: nothing was saved." + (S.thanks.redirect ? " The form goes to " + S.thanks.redirect + " now." : "") }) : null]));
       root.appendChild(card);
       return;
     }

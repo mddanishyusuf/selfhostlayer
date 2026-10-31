@@ -28,8 +28,8 @@ ${o.description ? `<meta name="description" content="${esc(o.description.slice(0
 }
 
 /** The form, ready to fill in. */
-export function formPage(f: Form, o: { base: string; token: string; embed: boolean; nonce: string }): string {
-  const cfg = { slug: f.slug, title: f.title, base: o.base, token: o.token, schema: f.schema };
+export function formPage(f: Form, o: { base: string; token: string; embed: boolean; nonce: string; preview?: boolean }): string {
+  const cfg = { slug: f.slug, title: f.title, base: o.base, token: o.token, schema: f.schema, preview: !!o.preview };
   const body = `<div id="app"><main class="card"><h1>${esc(f.title)}</h1><noscript><p>This form needs JavaScript.</p></noscript></main></div>
 <div class="hp" aria-hidden="true"><label>Leave this empty <input id="hp" name="website" tabindex="-1" autocomplete="off"></label></div>
 <script type="application/json" id="cfg">${safeJson(cfg)}</script>

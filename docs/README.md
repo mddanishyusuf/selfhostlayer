@@ -6,6 +6,7 @@ Self Host Layer turns one Linux server into a place to deploy Node apps and stat
 - **[The panel, page by page](panel.md):** what each page does, and what happens on the server when you press its buttons.
 - **[Links](links.md):** the link shortener in Integrations: short links on your own domain, with click stats and QR codes.
 - **[Email](email.md):** newsletters, transactional email (a Resend-compatible API) and automations, through your SMTP or Amazon SES.
+- **[Forms](forms.md):** forms and surveys like Typeform or Tally, one page or one question at a time, with logic, uploads, embeds and signed webhooks.
 - **[Analytics](analytics.md):** cookie-free web analytics for your sites, on your own server, with goals and the revenue each source brings in.
 - **[The `layer` command](cli.md):** the same things from an SSH session, with the raw commands underneath.
 - **[Security model](security.md):** how apps are kept apart, what the panel can and can't do, and the honest limits.

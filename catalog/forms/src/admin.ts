@@ -20,6 +20,8 @@ export interface AdminContext {
   version: string;
   publicUrl: () => string;
   setPublicUrl: (url: string) => void;
+  /** For the builder's preview: ?preview=<this> shows the form even closed, and keeps nothing. */
+  previewToken: (slug: string) => string;
 }
 
 const digest = (s: string) => createHash("sha256").update(s).digest();
@@ -41,7 +43,14 @@ const ROUTES: [string, string, Handler][] = [
   ["PUT", "settings", async ({ ctx, body }) => (ctx.notifier.setEmail((await body()).email ?? null), { email: ctx.notifier.emailConfig() })],
   ["GET", "forms", ({ ctx }) => ({ forms: ctx.forms.list().map((f) => ({ ...f, closed: ctx.forms.closedBecause(f) })) })],
   ["POST", "forms", async ({ ctx, body }) => ctx.forms.add(await body())],
-  ["GET", "forms/:id", ({ ctx, p }) => ({ form: ctx.forms.get(id(p.id, "form")), closed: ctx.forms.closedBecause(ctx.forms.get(id(p.id, "form"))), deliveries: ctx.notifier.recent(id(p.id, "form")) })],
+  [
+    "GET",
+    "forms/:id",
+    ({ ctx, p }) => {
+      const form = ctx.forms.get(id(p.id, "form"));
+      return { form, closed: ctx.forms.closedBecause(form), deliveries: ctx.notifier.recent(form.id), preview: ctx.previewToken(form.slug) };
+    },
+  ],
   ["PATCH", "forms/:id", async ({ ctx, p, body }) => ctx.forms.update(id(p.id, "form"), await body())],
   [
     "DELETE",

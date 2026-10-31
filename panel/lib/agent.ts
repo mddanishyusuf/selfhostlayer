@@ -144,6 +144,33 @@ const FAKE: Partial<Record<ActionName, unknown>> = {
         ],
       },
       {
+        id: "forms",
+        name: "Forms",
+        summary: "Forms and surveys on your own server, one page or one question at a time.",
+        versions: [
+          {
+            version: "0.1.0",
+            date: "2026-10-31",
+            notes: "The first version.",
+            minPanel: null,
+            sha256: "f0a1f0a1f0a1f0a1f0a1f0a1f0a1f0a1f0a1f0a1f0a1f0a1f0a1f0a1f0a1f0a1",
+            supported: true,
+            manifest: {
+              id: "forms",
+              name: "Forms",
+              version: "0.1.0",
+              summary: "Forms and surveys on your own server, one page or one question at a time.",
+              runtime: { kind: "node", node: "24", start: ["node", "--disable-warning=ExperimentalWarning", "server.js"], health: "/healthz", writable: [] },
+              memory: { default: 128, min: 64 },
+              env: { FORMS_ADMIN_TOKEN: { generate: "secret" }, FORMS_SECRET: { generate: "secret" } },
+              services: ["sqlite"],
+              cron: [{ name: "geo", schedule: "40 5 3 * *", command: "node --disable-warning=ExperimentalWarning cron.js geo" }],
+              backup: ["data"],
+            },
+          },
+        ],
+      },
+      {
         id: "analytics",
         name: "Analytics",
         summary: "Cookie-free web analytics for your sites, with no data leaving the server.",
