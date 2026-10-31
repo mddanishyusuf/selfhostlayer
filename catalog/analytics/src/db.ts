@@ -48,6 +48,51 @@ export const MIGRATIONS = [
      key TEXT PRIMARY KEY,
      value TEXT NOT NULL
    );`,
+  // 2: goals; revenue pulled from payment providers (their keys, encrypted, and
+  // the payments, each credited to a visit when it can be); and each paying
+  // customer's first visit, which their later payments (renewals) go to.
+  `CREATE TABLE goals (
+     id INTEGER PRIMARY KEY,
+     site_id INTEGER NOT NULL,
+     name TEXT NOT NULL,
+     kind TEXT NOT NULL CHECK (kind IN ('page', 'event')),
+     value TEXT NOT NULL,
+     created_at INTEGER NOT NULL
+   );
+   CREATE TABLE revenue_sources (
+     site_id INTEGER NOT NULL,
+     provider TEXT NOT NULL CHECK (provider IN ('stripe', 'polar', 'dodo')),
+     api_key TEXT NOT NULL,
+     key_hint TEXT NOT NULL,
+     mode TEXT NOT NULL CHECK (mode IN ('live', 'test')),
+     synced_at INTEGER,
+     sync_error TEXT,
+     error_at INTEGER,
+     created_at INTEGER NOT NULL,
+     PRIMARY KEY (site_id, provider)
+   );
+   CREATE TABLE payments (
+     site_id INTEGER NOT NULL,
+     provider TEXT NOT NULL,
+     external_id TEXT NOT NULL,
+     at INTEGER NOT NULL,
+     amount INTEGER NOT NULL,
+     currency TEXT NOT NULL,
+     customer TEXT,
+     visit TEXT,
+     renewal INTEGER NOT NULL DEFAULT 0,
+     PRIMARY KEY (site_id, provider, external_id)
+   );
+   CREATE INDEX payments_site_at ON payments (site_id, at);
+   CREATE INDEX payments_visit ON payments (visit);
+   CREATE TABLE customers (
+     site_id INTEGER NOT NULL,
+     provider TEXT NOT NULL,
+     customer TEXT NOT NULL,
+     visit TEXT NOT NULL,
+     at INTEGER NOT NULL,
+     PRIMARY KEY (site_id, provider, customer)
+   );`,
 ];
 
 /** analytics.db, migrated. */

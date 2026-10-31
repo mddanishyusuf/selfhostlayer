@@ -1,13 +1,17 @@
-// The admin API, /_admin/…, for the panel: sites, stats, who's on now, and
-// settings. It answers only requests made on this server with the token made
-// at install (ANALYTICS_ADMIN_TOKEN); anything through Caddy, which always
-// sets X-Forwarded-For, is told it doesn't exist.
+// The admin API, /_admin/…, for the panel: sites, stats and the reports
+// behind Analytics' pages (realtime, pages, visits, outbound links, goals,
+// revenue), payment providers, and settings. It answers only requests made on
+// this server with the token made at install (ANALYTICS_ADMIN_TOKEN); anything
+// through Caddy, which always sets X-Forwarded-For, is told it doesn't exist.
 import { createHash, timingSafeEqual } from "node:crypto";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { DatabaseSync } from "node:sqlite";
 import { getSetting, setSetting } from "../../lib/db.ts";
 import { bearer, InputError, json, readJson } from "../../lib/http.ts";
-import type { Ingest } from "./ingest.ts";
+import { addGoal, getGoal, goalStats, removeGoal, updateGoal } from "./goals.ts";
+import { type Ingest, VISIT_ID } from "./ingest.ts";
+import { journey, outbound, pagesTable, realtime, visitList } from "./reports.ts";
+import { mainCurrency, type Revenue, revenueStats, revenueSummary } from "./revenue.ts";
 import type { Sites } from "./sites.ts";
 import { filtersOf, live, overview, RANGES, stats, type Range } from "./stats.ts";
 
@@ -38,6 +42,7 @@ export interface AdminContext {
   db: DatabaseSync;
   sites: Sites;
   ingest: Ingest;
+  revenue: Revenue;
   token: string;
   version: string;
   geoSource: () => string | null;
@@ -49,10 +54,16 @@ const authorized = (req: IncomingMessage, token: string) => {
   return given !== null && timingSafeEqual(digest(given), digest(token));
 };
 
-const idOf = (text: string | null | undefined): number => {
+const idOf = (text: string | null | undefined, what = "site"): number => {
   const id = Number(text);
-  if (!Number.isInteger(id) || id < 1) throw new InputError("site", "no such site", 404);
+  if (!Number.isInteger(id) || id < 1) throw new InputError(what, `no such ${what}`, 404);
   return id;
+};
+
+const rangeOf = (p: URLSearchParams, fallback: Range = "7d"): Range => {
+  const range = p.get("range") ?? fallback;
+  if (!(RANGES as readonly string[]).includes(range)) throw new InputError("range", `must be one of ${RANGES.join(", ")}`);
+  return range as Range;
 };
 
 export async function handleAdmin(req: IncomingMessage, res: ServerResponse, ctx: AdminContext, url: URL): Promise<void> {
@@ -65,6 +76,18 @@ export async function handleAdmin(req: IncomingMessage, res: ServerResponse, ctx
     if (!s) throw new InputError("site", "no such site", 404);
     return s;
   };
+  const goal = (text: string | null | undefined) => {
+    const g = getGoal(ctx.db, idOf(text, "goal"));
+    if (!g) throw new InputError("goal", "no such goal", 404);
+    return g;
+  };
+  /** The site, range and filters a report is for, once the events still in memory are written. */
+  const report = () => {
+    const s = site(p.get("site"));
+    const o = { range: rangeOf(p), filters: filtersOf(p) };
+    ctx.ingest.flush();
+    return { s, o };
+  };
   switch (`${req.method ?? "GET"} ${section ?? ""}${idText !== undefined ? "/:id" : ""}`) {
     case "GET info":
       return json(res, 200, { version: ctx.version, sites: ctx.sites.list().length, geo: ctx.geoSource(), pendingEvents: ctx.ingest.pending });
@@ -72,7 +95,8 @@ export async function handleAdmin(req: IncomingMessage, res: ServerResponse, ctx
       // Events still in memory count too.
       ctx.ingest.flush();
       const counts = overview(ctx.db);
-      return json(res, 200, { sites: ctx.sites.list().map((s) => ({ ...s, ...(counts.get(s.id) ?? { visitors: 0, live: 0 }) })) });
+      const seen = new Set((ctx.db.prepare("SELECT DISTINCT site_id id FROM sessions").all() as { id: number }[]).map((r) => r.id));
+      return json(res, 200, { sites: ctx.sites.list().map((s) => ({ ...s, ...(counts.get(s.id) ?? { visitors: 0, live: 0 }), seen: seen.has(s.id) })) });
     }
     case "POST sites":
       return json(res, 201, ctx.sites.add(await readJson(req)));
@@ -82,16 +106,71 @@ export async function handleAdmin(req: IncomingMessage, res: ServerResponse, ctx
       ctx.sites.remove(site(idText).id);
       return json(res, 200, { deleted: true });
     case "GET stats": {
-      const range = p.get("range") ?? "7d";
-      if (!(RANGES as readonly string[]).includes(range)) throw new InputError("range", `must be one of ${RANGES.join(", ")}`);
-      const s = site(p.get("site"));
-      ctx.ingest.flush();
-      return json(res, 200, { site: s, ...stats(ctx.db, s.id, { range: range as Range, filters: filtersOf(p) }) });
+      const { s, o } = report();
+      return json(res, 200, { site: s, ...stats(ctx.db, s.id, o), revenue: revenueSummary(ctx.db, s.id, o), goals: goalStats(ctx.db, s.id, o) });
     }
     case "GET live": {
       const s = site(p.get("site"));
       ctx.ingest.flush();
       return json(res, 200, live(ctx.db, s.id));
+    }
+    case "GET realtime": {
+      const s = site(p.get("site"));
+      ctx.ingest.flush();
+      return json(res, 200, realtime(ctx.db, s.id));
+    }
+    case "GET pages": {
+      const { s, o } = report();
+      return json(res, 200, { pages: pagesTable(ctx.db, s.id, { ...o, q: p.get("q") ?? undefined }) });
+    }
+    case "GET visits": {
+      const { s, o } = report();
+      const g = p.get("goal") ? goal(p.get("goal")) : null;
+      if (g && g.siteId !== s.id) throw new InputError("goal", "no such goal", 404);
+      return json(res, 200, visitList(ctx.db, s.id, { ...o, q: p.get("q") ?? undefined, goal: g, paid: p.get("paid") === "1", page: Math.floor(Number(p.get("page"))) || 1 }));
+    }
+    case "GET visits/:id": {
+      const s = site(p.get("site"));
+      if (!VISIT_ID.test(idText!)) throw new InputError("visit", "no such visit", 404);
+      ctx.ingest.flush();
+      const j = journey(ctx.db, s.id, idText!);
+      if (!j) throw new InputError("visit", "no such visit (visits are kept as long as Settings says)", 404);
+      return json(res, 200, j);
+    }
+    case "GET outbound": {
+      const { s, o } = report();
+      return json(res, 200, { links: outbound(ctx.db, s.id, o) });
+    }
+    case "GET goals": {
+      const { s, o } = report();
+      return json(res, 200, { goals: goalStats(ctx.db, s.id, o), currency: mainCurrency(ctx.db, s.id) });
+    }
+    case "POST goals": {
+      const body = await readJson(req);
+      return json(res, 201, addGoal(ctx.db, site(String(body.site ?? "")).id, body));
+    }
+    case "PATCH goals/:id":
+      return json(res, 200, updateGoal(ctx.db, goal(idText).id, await readJson(req)));
+    case "DELETE goals/:id":
+      removeGoal(ctx.db, goal(idText).id);
+      return json(res, 200, { deleted: true });
+    case "GET revenue": {
+      const { s, o } = report();
+      return json(res, 200, { ...revenueStats(ctx.db, s.id, o), sources: ctx.revenue.sources(s.id) });
+    }
+    case "GET sources":
+      return json(res, 200, { sources: ctx.revenue.sources(site(p.get("site")).id) });
+    case "PUT sources": {
+      const body = await readJson(req);
+      return json(res, 200, await ctx.revenue.setSource(site(String(body.site ?? "")).id, body));
+    }
+    case "DELETE sources":
+      ctx.revenue.removeSource(site(p.get("site")).id, p.get("provider") ?? "");
+      return json(res, 200, { deleted: true });
+    case "POST sync": {
+      const body = await readJson(req);
+      const s = site(String(body.site ?? ""));
+      return json(res, 200, { results: await ctx.revenue.syncAll(s.id), sources: ctx.revenue.sources(s.id) });
     }
     case "GET settings":
       return json(res, 200, readSettings(ctx.db));

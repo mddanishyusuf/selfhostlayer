@@ -1,5 +1,6 @@
 // Analytics as one HTTP server: /healthz, /script.js, POST /api/event (from
-// any site's pages), and the admin API (/_admin/…, this server only).
+// any site's pages), and the admin API (/_admin/…, this server only). Payments
+// are pulled from the sites' providers every 10 minutes.
 import { mkdirSync, statSync } from "node:fs";
 import { createServer, type Server } from "node:http";
 import { join } from "node:path";
@@ -9,6 +10,7 @@ import { fail, InputError, json, readBody, send } from "../../lib/http.ts";
 import { handleAdmin, type AdminContext } from "./admin.ts";
 import { openDb } from "./db.ts";
 import { Ingest } from "./ingest.ts";
+import { Revenue, type RevenueOptions, SYNC_EVERY } from "./revenue.ts";
 import { SCRIPT } from "./script.ts";
 import { Sites } from "./sites.ts";
 
@@ -21,6 +23,10 @@ export interface AppOptions {
   version: string;
   /** How often queued events are written; 0 only when written by hand (tests). */
   flushMs?: number;
+  /** Where payments are pulled from, instead of the providers (tests). */
+  providers?: Pick<RevenueOptions, "fetch" | "bases">;
+  /** false: payments are pulled only when asked (tests). */
+  syncTimer?: boolean;
 }
 
 export interface App {
@@ -28,6 +34,7 @@ export interface App {
   db: DatabaseSync;
   sites: Sites;
   ingest: Ingest;
+  revenue: Revenue;
   geo: () => Geo | null;
   close: () => Promise<void>;
 }
@@ -51,7 +58,11 @@ export function createApp(o: AppOptions): App {
   let geo = loadGeo(geoPaths);
   let geoSeen = mtime(geoPaths[0]!);
   const ingest = new Ingest(db, sites, () => geo?.geo ?? null, { flushMs: o.flushMs });
-  const ctx: AdminContext = { db, sites, ingest, token: o.token, version: o.version, geoSource: () => geo?.geo.source ?? null };
+  const revenue = new Revenue(db, { secret: o.token, flush: () => ingest.flush(), ...o.providers });
+  const ctx: AdminContext = { db, sites, ingest, revenue, token: o.token, version: o.version, geoSource: () => geo?.geo.source ?? null };
+  const syncAll = () => {
+    if (!revenue.busy) revenue.syncAll().catch((err: unknown) => console.error(`pulling payments failed: ${(err as Error).message}`));
+  };
   const timers = [
     // Sites added by the other color during a deploy.
     setInterval(() => {
@@ -69,6 +80,7 @@ export function createApp(o: AppOptions): App {
         geo = loadGeo(geoPaths) ?? geo;
       }
     }, 3_600_000),
+    ...(o.syncTimer === false ? [] : [setTimeout(syncAll, 30_000), setInterval(syncAll, SYNC_EVERY)]),
   ];
   for (const t of timers) t.unref();
 
@@ -116,10 +128,11 @@ export function createApp(o: AppOptions): App {
     db,
     sites,
     ingest,
+    revenue,
     geo: () => geo?.geo ?? null,
     close: () =>
       new Promise<void>((resolve) => {
-        for (const t of timers) clearInterval(t);
+        for (const t of timers) clearTimeout(t);
         server.close(() => resolve());
         server.closeIdleConnections();
       }).finally(() => {

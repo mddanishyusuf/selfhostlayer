@@ -111,7 +111,7 @@ export class Sites {
     if (!site) throw new InputError("id", "no such site", 404);
     this.#db.exec("BEGIN");
     try {
-      for (const table of ["events", "sessions"]) this.#db.prepare(`DELETE FROM ${table} WHERE site_id = ?`).run(id);
+      for (const table of ["events", "sessions", "goals", "revenue_sources", "payments", "customers"]) this.#db.prepare(`DELETE FROM ${table} WHERE site_id = ?`).run(id);
       this.#db.prepare("DELETE FROM sites WHERE id = ?").run(id);
       this.#db.exec("COMMIT");
     } catch (err) {

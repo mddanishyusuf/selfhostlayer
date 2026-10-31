@@ -6,7 +6,9 @@
 //
 // A visit is a visitor's events less than 30 minutes apart: open visits are
 // kept in memory, and events and visits are written every second (or 200
-// events) in one transaction, off the request path.
+// events) in one transaction, off the request path. The answer names the
+// visit, so a site can pass it into its checkout and the payment is credited
+// to it (revenue.ts).
 import { createHash, randomBytes } from "node:crypto";
 import type { IncomingMessage } from "node:http";
 import type { DatabaseSync } from "node:sqlite";
@@ -20,6 +22,8 @@ export const VISIT_GAP = 30 * 60_000;
 /** Events per minute from one visitor address to one site. */
 export const RATE_LIMIT = 300;
 const NAME = /^[\p{L}\p{N} _.:/-]{1,60}$/u;
+/** A visit's id, as the event endpoint answers it (12 base64url characters). */
+export const VISIT_ID = /^[\w-]{12}$/;
 const PROP_KEY = /^[\w.:-]{1,40}$/;
 
 export interface Visit {
@@ -68,12 +72,12 @@ export function screenOf(width: unknown): string | null {
   return w < 576 ? "Phone" : w < 992 ? "Tablet" : w < 1440 ? "Laptop" : "Desktop";
 }
 
-/** Up to 10 properties of a custom event, as text. */
+/** Up to 10 properties of a custom event, as text of up to 200 characters. */
 export function propsOf(value: unknown): string | null {
   if (typeof value !== "object" || value === null || Array.isArray(value)) return null;
   const out: Record<string, string> = {};
   for (const [k, v] of Object.entries(value).slice(0, 10)) {
-    if (PROP_KEY.test(k) && ["string", "number", "boolean"].includes(typeof v)) out[k] = String(v).slice(0, 100);
+    if (PROP_KEY.test(k) && ["string", "number", "boolean"].includes(typeof v)) out[k] = String(v).slice(0, 200);
   }
   return Object.keys(out).length ? JSON.stringify(out) : null;
 }
@@ -141,8 +145,8 @@ export class Ingest {
     }
   }
 
-  /** One event; says whether it was counted, or why not (bots are dropped quietly). */
-  record(input: Record<string, unknown>, req: IncomingMessage, now = Date.now()): { counted: boolean; reason?: string } {
+  /** One event; says whether it was counted and in which visit, or why not (bots are dropped quietly). */
+  record(input: Record<string, unknown>, req: IncomingMessage, now = Date.now()): { counted: boolean; reason?: string; visit?: string } {
     const name = typeof input.n === "string" ? input.n.trim() : "";
     if (!NAME.test(name)) throw new InputError("n", "must be pageview, ping or an event name (up to 60 letters, digits, spaces and . _ : / -)");
     const site = typeof input.s === "string" ? this.#sites.byDomain(input.s) : undefined;
@@ -164,11 +168,10 @@ export class Ingest {
     let visit = this.#open.get(key);
     const fresh = visit !== undefined && now - visit.endedAt <= VISIT_GAP;
     if (name === "ping") {
-      if (visit && fresh) {
-        visit.endedAt = now;
-        this.#dirty.set(visit.id, visit);
-      }
-      return { counted: fresh };
+      if (!visit || !fresh) return { counted: false };
+      visit.endedAt = now;
+      this.#dirty.set(visit.id, visit);
+      return { counted: true, visit: visit.id };
     }
     const path = cleanPath(url.pathname);
     if (!visit || !fresh) {
@@ -203,7 +206,7 @@ export class Ingest {
     this.#events.push({ siteId: site.id, at: now, name, path, visitor, session: visit.id, props: name === "pageview" ? null : propsOf(input.p) });
     this.#dirty.set(visit.id, visit);
     if (this.#events.length === this.#batch) setImmediate(() => this.#tryFlush());
-    return { counted: true };
+    return { counted: true, visit: visit.id };
   }
 
   get pending(): number {

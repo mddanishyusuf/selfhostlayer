@@ -15,8 +15,8 @@ const VISIT_FILTERS = { referrer: "referrer", utm_source: "utm_source", utm_medi
 export const FILTERS = ["page", ...Object.keys(VISIT_FILTERS)] as const;
 export type Filters = Partial<Record<(typeof FILTERS)[number], string>>;
 
-const HOUR = 3_600_000;
-const DAY = 86_400_000;
+export const HOUR = 3_600_000;
+export const DAY = 86_400_000;
 const TOP = 100;
 
 export interface Totals {
@@ -80,27 +80,13 @@ export function filtersOf(params: URLSearchParams): Filters {
   return out;
 }
 
-/** SQL for visits (aliased s) in a window with the filters; "" matches a field that's empty. */
-function visitWhere(siteId: number, from: number, to: number, f: Filters, column = "s.started_at"): { sql: string; args: SQLInputValue[] } {
-  const parts = ["s.site_id = ?", `${column} >= ?`, `${column} < ?`];
-  const args: SQLInputValue[] = [siteId, from, to];
-  for (const [key, column2] of Object.entries(VISIT_FILTERS) as [keyof typeof VISIT_FILTERS, string][]) {
-    const v = f[key];
-    if (v === undefined) continue;
-    parts.push(v === "" ? `s.${column2} IS NULL` : `s.${column2} = ?`);
-    if (v !== "") args.push(v);
-  }
-  if (f.page !== undefined) {
-    parts.push("EXISTS (SELECT 1 FROM events p WHERE p.session = s.id AND p.name = 'pageview' AND p.path = ?)");
-    args.push(f.page);
-  }
-  return { sql: parts.join(" AND "), args };
-}
-
-/** SQL for events (aliased e, their visit s) in a window with the filters; a page filter means that page's events. */
-function eventWhere(siteId: number, from: number, to: number, f: Filters): { sql: string; args: SQLInputValue[] } {
-  const parts = ["e.site_id = ?", "e.at >= ?", "e.at < ?"];
-  const args: SQLInputValue[] = [siteId, from, to];
+/**
+ * SQL for the filters on a visit (aliased s): its own fields ("" matches a
+ * field that's empty), and a page it saw. Every report narrows by these.
+ */
+export function visitFilters(f: Filters): { parts: string[]; args: SQLInputValue[] } {
+  const parts: string[] = [];
+  const args: SQLInputValue[] = [];
   for (const [key, column] of Object.entries(VISIT_FILTERS) as [keyof typeof VISIT_FILTERS, string][]) {
     const v = f[key];
     if (v === undefined) continue;
@@ -108,8 +94,27 @@ function eventWhere(siteId: number, from: number, to: number, f: Filters): { sql
     if (v !== "") args.push(v);
   }
   if (f.page !== undefined) {
-    parts.push("e.path = ?");
+    parts.push("EXISTS (SELECT 1 FROM events p WHERE p.session = s.id AND p.name = 'pageview' AND p.path = ?)");
     args.push(f.page);
+  }
+  return { parts, args };
+}
+
+/** SQL for visits (aliased s) in a window with the filters. */
+export function visitWhere(siteId: number, from: number, to: number, f: Filters, column = "s.started_at"): { sql: string; args: SQLInputValue[] } {
+  const v = visitFilters(f);
+  return { sql: ["s.site_id = ?", `${column} >= ?`, `${column} < ?`, ...v.parts].join(" AND "), args: [siteId, from, to, ...v.args] };
+}
+
+/** SQL for events (aliased e, their visit s) in a window with the filters; a page filter means that page's events. */
+export function eventWhere(siteId: number, from: number, to: number, f: Filters): { sql: string; args: SQLInputValue[] } {
+  const { page, ...rest } = f;
+  const v = visitFilters(rest);
+  const parts = ["e.site_id = ?", "e.at >= ?", "e.at < ?", ...v.parts];
+  const args: SQLInputValue[] = [siteId, from, to, ...v.args];
+  if (page !== undefined) {
+    parts.push("e.path = ?");
+    args.push(page);
   }
   return { sql: parts.join(" AND "), args };
 }
@@ -190,10 +195,18 @@ export function overview(db: DatabaseSync, now = Date.now()): Map<number, { visi
   return out;
 }
 
-/** Deletes events and visits older than the keep window; returns how many went. */
+/**
+ * Deletes events and visits older than the keep window; returns how many went.
+ * A visit that brought a payment is kept (its events go), so a customer's
+ * renewals still know where they came from.
+ */
 export function prune(db: DatabaseSync, keepDays: number, now = Date.now()): { events: number; visits: number } {
   const cutoff = Math.floor(now / DAY) * DAY - keepDays * DAY;
   const events = Number(db.prepare("DELETE FROM events WHERE at < ?").run(cutoff).changes);
-  const visits = Number(db.prepare("DELETE FROM sessions WHERE started_at < ?").run(cutoff).changes);
+  const visits = Number(
+    db
+      .prepare("DELETE FROM sessions WHERE started_at < ? AND id NOT IN (SELECT visit FROM payments WHERE visit IS NOT NULL) AND id NOT IN (SELECT visit FROM customers)")
+      .run(cutoff).changes,
+  );
   return { events, visits };
 }
