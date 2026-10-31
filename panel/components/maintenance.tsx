@@ -59,7 +59,7 @@ export type UpdateRun = ReturnType<typeof useUpdate>;
 /** The installer's last lines, on the always-dark log pane. */
 export function UpdateLog({ lines }: { lines: string[] }) {
   if (!lines.length) return null;
-  return <pre className="max-h-56 overflow-auto rounded-md bg-code p-3 font-mono text-[12px] leading-relaxed text-[#ece8e3]">{lines.slice(-15).join("\n")}</pre>;
+  return <pre className="max-h-56 overflow-auto rounded-xl bg-code p-3.5 font-mono text-[12px] leading-relaxed text-[#e5e5ea]">{lines.slice(-15).join("\n")}</pre>;
 }
 
 export function UpdateProgress({ run }: { run: UpdateRun }) {

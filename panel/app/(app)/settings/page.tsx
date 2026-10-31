@@ -103,11 +103,11 @@ export default async function ServerSettingsPage() {
           inset
           items={[
             ["Email", user.email],
-            ["Two-factor", <Pill key="t" className="bg-teal/18 text-teal">On</Pill>],
+            ["Two-factor", <Pill key="t" className="bg-ok-soft text-teal">On</Pill>],
             ["Recovery codes", `${codesLeft} unused`],
           ]}
         />
-        <div className="grid gap-2" data-testid="sessions">
+        <div className="grid grid-cols-[minmax(0,1fr)] gap-2" data-testid="sessions">
           <p className="text-[13px] font-medium">Signed in</p>
           {sessions.map((s, i) => (
             <div key={i} className="flex items-center justify-between gap-3 text-[13.5px]">

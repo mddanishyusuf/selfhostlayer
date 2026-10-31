@@ -5,8 +5,8 @@ import { FilterBox } from "@/components/header-controls";
 import { Icon } from "@/components/icon";
 import { CARD, Empty, Notice, PageHeader, PillLink, Segmented } from "@/components/page";
 import { SitePreviewFrame, SitePreviewSkeleton } from "@/components/site-preview";
-import { timeAgo } from "@/components/status";
-import { Mark, StatusDot, cx } from "@/components/ui";
+import { StatusChip, timeAgo } from "@/components/status";
+import { Mark, cx } from "@/components/ui";
 import { frameworkLabel } from "@/lib/detect";
 import { FINISHED, listDeployments, liveDeployment, type Deployment } from "@/lib/deploy";
 import { servingConfig } from "@/lib/domains";
@@ -19,11 +19,11 @@ export const dynamic = "force-dynamic";
 export const metadata = { title: "Projects" };
 
 type State = "live" | "building" | "failed" | "idle";
-const STATE: Record<State, { dot: "ok" | "warn" | "err" | "idle"; label: string; color: string }> = {
-  live: { dot: "ok", label: "Ready", color: "text-teal" },
-  building: { dot: "warn", label: "Building", color: "text-gold" },
-  failed: { dot: "err", label: "Build failed", color: "text-rose" },
-  idle: { dot: "idle", label: "Not deployed", color: "text-muted" },
+const STATE: Record<State, { dot: "ok" | "warn" | "err" | "idle"; label: string }> = {
+  live: { dot: "ok", label: "Ready" },
+  building: { dot: "warn", label: "Building" },
+  failed: { dot: "err", label: "Build failed" },
+  idle: { dot: "idle", label: "Not deployed" },
 };
 const FILTERS = [
   ["all", "All"],
@@ -38,12 +38,12 @@ const COLUMNS = "grid-cols-[40px_minmax(0,1fr)_auto] md:grid-cols-[40px_minmax(1
 
 function Meter({ label, value, fraction, hot }: { label: string; value: string; fraction: number; hot: boolean }) {
   return (
-    <div className="grid grid-cols-[28px_minmax(0,1fr)_48px] items-center gap-2 text-[11.5px] text-dim">
+    <div className="grid grid-cols-[28px_minmax(0,1fr)_52px] items-center gap-2 text-[12px] text-muted">
       {label}
-      <span className="h-1 overflow-hidden rounded-sm bg-track">
-        <span className={cx("block h-full", hot ? "bg-gold" : "bg-blue")} style={{ width: `${Math.max(1, Math.min(100, fraction * 100))}%` }} />
+      <span className="h-1.5 overflow-hidden rounded-full bg-track">
+        <span className={cx("block h-full rounded-full", hot ? "bg-warn-dot" : "bg-blue")} style={{ width: `${Math.max(1, Math.min(100, fraction * 100))}%` }} />
       </span>
-      <span className="text-right font-mono tabular-nums text-muted">{value}</span>
+      <span className="text-right font-mono tabular-nums text-foreground">{value}</span>
     </div>
   );
 }
@@ -52,8 +52,8 @@ function Commit({ project, latest }: { project: Project; latest?: Deployment }) 
   if (!latest) return <span className="text-[13.5px] text-dim">No deployments yet</span>;
   return (
     <div className="grid min-w-0 gap-1">
-      <span className="truncate text-[13.5px] text-foreground/85">{latest.commitMessage || `Commit ${latest.sha.slice(0, 7)}`}</span>
-      <span className="flex min-w-0 items-center gap-3 whitespace-nowrap text-[12.5px] text-dim">
+      <span className="truncate text-[14px]">{latest.commitMessage || `Commit ${latest.sha.slice(0, 7)}`}</span>
+      <span className="flex min-w-0 items-center gap-3 whitespace-nowrap text-[13px] text-muted">
         <span className="inline-flex items-center gap-1.5">
           <Icon icon={GitBranchIcon} size={14} />
           {project.branch}
@@ -68,14 +68,8 @@ function Commit({ project, latest }: { project: Project; latest?: Deployment }) 
   );
 }
 
-/** The state as a small chip: a colored dot, then the word in its color. */
 function StateWord({ state }: { state: State }) {
-  const s = STATE[state];
-  return (
-    <span className={cx("inline-flex h-7 items-center gap-2 whitespace-nowrap rounded-md border border-border bg-card px-2.5 text-[13px] font-medium", s.color)}>
-      <StatusDot status={s.dot} pulse={state === "building"} /> {s.label}
-    </span>
-  );
+  return <StatusChip status={STATE[state].dot} label={STATE[state].label} pulse={state === "building"} />;
 }
 
 export default async function ProjectsPage({ searchParams }: { searchParams: Promise<{ q?: string; status?: string; view?: string }> }) {
@@ -183,8 +177,8 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
           ))}
         </div>
       ) : (
-        <section data-testid="project-list" className="grid gap-2">
-          <div className={cx("hidden h-6 items-center gap-x-5 px-[19px] text-[13px] text-muted md:grid", COLUMNS)}>
+        <section data-testid="project-list" className={CARD}>
+          <div className={cx("hidden h-11 items-center gap-x-5 border-b border-border px-6 text-[13px] font-medium text-dim md:grid", COLUMNS)}>
             <span />
             <span>Project</span>
             <span>Latest deployment</span>
@@ -198,7 +192,7 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
               <Link
                 key={p.id}
                 href={`/projects/${p.slug}`}
-                className={cx(CARD, "grid items-center gap-x-5 px-4 py-3.5 transition-colors duration-150 hover:border-border-strong sm:px-[18px]", COLUMNS)}
+                className={cx("grid items-center gap-x-5 border-b border-border px-4 py-3.5 transition-colors duration-150 last:border-b-0 hover:bg-hover sm:px-6", COLUMNS)}
               >
                 <Mark framework={p.framework} />
                 <div className="grid min-w-0 gap-[3px]">
@@ -210,19 +204,19 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
                 </div>
                 <div className="hidden xl:block">
                   {isStatic ? (
-                    <span className="text-[12.5px] text-dim">Served by Caddy</span>
+                    <span className="text-[13px] text-muted">Served by Caddy</span>
                   ) : u && live ? (
                     <div className="grid gap-[7px]">
                       <Meter label="RAM" value={u.memoryMb === null ? "—" : `${u.memoryMb} MB`} fraction={(u.memoryMb ?? 0) / p.memoryMb} hot={(u.memoryMb ?? 0) / p.memoryMb > 0.75} />
                       <Meter label="CPU" value={u.cpu === null ? "—" : `${Math.round(u.cpu)}%`} fraction={(u.cpu ?? 0) / 100} hot={(u.cpu ?? 0) > 50} />
                     </div>
                   ) : (
-                    <span className="text-[12.5px] text-dim">{live ? "No samples yet" : "Not running"}</span>
+                    <span className="text-[13px] text-muted">{live ? "No samples yet" : "Not running"}</span>
                   )}
                 </div>
                 <div className="grid min-w-0 justify-items-end gap-1 md:justify-items-start">
                   <StateWord state={state} />
-                  <span className="max-w-full truncate text-[12px] text-dim max-sm:hidden">
+                  <span className="max-w-full truncate text-[12.5px] text-muted max-sm:hidden">
                     {state === "failed" && live ? `Still serving ${live.sha.slice(0, 7)}` : `${frameworkLabel(p.framework)} · ${isStatic ? "static" : `Node ${p.nodeVersion}`}`}
                   </span>
                 </div>

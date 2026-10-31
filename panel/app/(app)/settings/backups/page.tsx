@@ -60,7 +60,7 @@ export default async function BackupsPage() {
 
       {settings && !settings.keyConfirmed && (
         <SettingsRow id="recovery-key" title={<span className="flex items-center gap-2"><Icon icon={Key01Icon} size={16} /> Save your recovery key</span>} description="Backups are encrypted with this key before they leave the server. If this server is lost, you need it to restore anything. It won't be shown again.">
-          <div className="flex items-center justify-between gap-3 border-l-2 border-gold bg-gold/7 px-4 py-3">
+          <div className="flex items-center justify-between gap-3 rounded-xl bg-warn-band px-4 py-3">
             <code className="break-all font-mono text-[13px]" data-testid="recovery-key">
               {settings.recoveryKey}
             </code>
@@ -113,7 +113,7 @@ export default async function BackupsPage() {
             </label>
             <label className="grid gap-1.5 text-[13px] font-medium">
               Keep the last (per app)
-              <input name="keep" type="number" min={1} max={365} defaultValue={settings.keep} className="h-[38px] rounded-md border border-border bg-field px-3 text-sm tabular-nums outline-none focus:border-accent" />
+              <input name="keep" type="number" min={1} max={365} defaultValue={settings.keep} className="h-10 rounded-[10px] border border-border-strong bg-field px-3 text-sm tabular-nums outline-none focus:border-accent" />
             </label>
             <SubmitButton pending="Saving…" variant="secondary" className="w-auto">
               Save

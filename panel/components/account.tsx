@@ -58,7 +58,7 @@ export function RecoveryCodesForm() {
       {state.codes ? (
         <div className="grid gap-3" data-testid="new-recovery-codes">
           <p className="text-[13.5px] text-gold">{state.ok}</p>
-          <ul className="grid grid-cols-2 gap-x-6 gap-y-1.5 rounded-md border border-border-strong p-4 font-mono text-[13px] tabular-nums">
+          <ul className="grid grid-cols-2 gap-x-6 gap-y-1.5 rounded-[10px] border border-border-strong p-4 font-mono text-[13px] tabular-nums">
             {state.codes.map((c) => (
               <li key={c}>{c}</li>
             ))}

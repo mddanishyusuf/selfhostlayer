@@ -1,15 +1,22 @@
 @import "tailwindcss";
 
-/* Design tokens: cards (--card) on a page (--background), with the sidebar on
-   the page itself. Light is a warm gray page with white cards; dark is the
-   charcoal from SuperDev Pro's extension. Links and focus rings use --accent.
-   The theme comes from <html data-theme="dark|light|system">, set on the server
-   from the layer-theme cookie, so pages never flash. */
+/* Design tokens (design/dashboard-clear.html): cards (--card) on a page
+   (--background), with the sidebar on the page itself. Neutral grays with no
+   tint: white cards on #f5f5f7 in light, #1c1c1e cards on black in dark.
+   Every text color passes WCAG AA on the surface it sits on (--dim, the
+   faintest, is 4.7:1 on the light page). Status words use --teal, --gold and
+   --rose; their dots and soft tags the brighter --ok-dot, --warn-dot and
+   --err-dot. Links and focus rings use --accent. The theme comes from
+   <html data-theme="dark|light|system">, set on the server from the
+   layer-theme cookie, so pages never flash. */
 @theme inline {
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, monospace;
   --color-background: var(--background);
   --color-card: var(--card);
+  --color-well: var(--well);
+  --color-fill: var(--fill);
+  --color-raised: var(--raised);
   --color-sidebar: var(--sidebar);
   --color-foreground: var(--foreground);
   --color-muted: var(--muted);
@@ -22,13 +29,29 @@
   --color-border: var(--border);
   --color-border-strong: var(--border-strong);
   --color-accent: var(--accent);
+  --color-accent-soft: color-mix(in srgb, var(--accent) var(--tint), transparent);
   --color-field: var(--field);
   --color-inverse: var(--inverse);
   --color-inverse-fg: var(--inverse-fg);
   --color-ok: var(--teal);
   --color-warn: var(--gold);
   --color-err: var(--rose);
-  --color-err-subtle: color-mix(in srgb, var(--rose) 12%, transparent);
+  --color-err-subtle: color-mix(in srgb, var(--err-dot) var(--tint), transparent);
+  --color-ok-dot: var(--ok-dot);
+  --color-warn-dot: var(--warn-dot);
+  --color-err-dot: var(--err-dot);
+  --color-ok-soft: color-mix(in srgb, var(--ok-dot) var(--tint), transparent);
+  --color-warn-soft: color-mix(in srgb, var(--warn-dot) var(--tint), transparent);
+  --color-err-soft: color-mix(in srgb, var(--err-dot) var(--tint), transparent);
+  /* Bands (notices, DNS records) are quieter than tags, so gold never turns olive in dark. */
+  --color-warn-band: color-mix(in srgb, var(--warn-dot) 9%, transparent);
+  --color-err-band: color-mix(in srgb, var(--err-dot) 9%, transparent);
+  --color-tile-blue: var(--tile-blue);
+  --color-tile-lav: var(--tile-lav);
+  --color-tile-green: var(--tile-green);
+  --color-tile-coral: var(--tile-coral);
+  --color-tile-gold: var(--tile-gold);
+  --color-tile-red: var(--tile-red);
   --color-on-rose: var(--on-rose);
   --color-lavender: var(--lavender);
   --color-coral: var(--coral);
@@ -38,96 +61,147 @@
   --color-rose: var(--rose);
   --color-code: var(--code);
   --color-chart: var(--chart);
+  --shadow-raise: var(--raise);
+  --shadow-pop: var(--pop);
+  --color-scrim: var(--scrim);
 }
 
 :root,
 :root[data-theme="light"] {
   color-scheme: light;
-  --background: #f3f3f1;
-  --sidebar: #f3f3f1;
+  --background: #f5f5f7;
+  --sidebar: #f5f5f7;
   --card: #ffffff;
-  --foreground: #1a1a1a;
-  --muted: #6b6b66;
-  --dim: #a3a39e;
-  --border: #ebebe7;
-  --border-strong: #dededa;
-  --hover: #f7f7f5;
-  --selected: #efefec;
-  --pill: #efefec;
-  --track: #eeeeea;
-  --gold: #a16207;
-  --lavender: #6e56cf;
-  --coral: #ea580c;
-  --teal: #0f8a5f;
-  --blue: #2563eb;
-  --rose: #dc2626;
-  --accent: #2563eb;
+  --well: #f5f5f7;
+  --fill: #e8e8ed;
+  --raised: #ffffff;
+  --foreground: #1d1d1f;
+  --muted: #5c5c61;
+  --dim: #6e6e73;
+  --border: #e8e8ed;
+  --border-strong: #d2d2d7;
+  --hover: #f7f7f8;
+  --selected: #e8e8ed;
+  --pill: #e8e8ed;
+  --track: #e8e8ed;
+  --gold: #8a5a00;
+  --lavender: #5856d6;
+  --coral: #c2410c;
+  --teal: #137333;
+  --blue: #007aff;
+  --rose: #c5000f;
+  --ok-dot: #34c759;
+  --warn-dot: #ff9f0a;
+  --err-dot: #ff3b30;
+  --tint: 10%;
+  --tile-blue: #007aff;
+  --tile-lav: #5856d6;
+  --tile-green: #34c759;
+  --tile-coral: #ff9500;
+  --tile-gold: #ff9f0a;
+  --tile-red: #ff3b30;
+  --accent: #0066cc;
   --field: #ffffff;
   --on-rose: #ffffff;
-  --inverse: #1a1a1a;
+  --inverse: #1d1d1f;
   --inverse-fg: #ffffff;
-  --code: #1a1a1a;
-  /* Chart series: checked with the dataviz validator against each surface. */
-  --chart: #6e56cf;
+  --code: #161618;
+  --raise: 0 1px 3px rgba(0, 0, 0, 0.12), 0 0 0 0.5px rgba(0, 0, 0, 0.05);
+  --pop: 0 24px 70px rgba(0, 0, 0, 0.18), 0 2px 8px rgba(0, 0, 0, 0.06);
+  --scrim: rgba(0, 0, 0, 0.3);
+  /* The one chart series: 4.7:1 against the card. */
+  --chart: #0071e3;
 }
 
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --background: #161616;
-  --sidebar: #161616;
-  --card: #1e1e1e;
-  --foreground: #f2f2f2;
-  --muted: #9c9c9c;
-  --dim: #686868;
-  --border: #2b2b2b;
-  --border-strong: #383838;
-  --hover: #242424;
-  --selected: #2e2e2e;
-  --field: #191919;
-  --pill: #383838;
-  --track: #333333;
-  --gold: #f5c451;
+  --background: #000000;
+  --sidebar: #000000;
+  --card: #1c1c1e;
+  --well: #2c2c2e;
+  --fill: #2c2c2e;
+  --raised: #636366;
+  --foreground: #f5f5f7;
+  --muted: #a1a1a6;
+  --dim: #8e8e93;
+  --border: #2c2c2e;
+  --border-strong: #3a3a3c;
+  --hover: #232325;
+  --selected: #2c2c2e;
+  --field: #111112;
+  --pill: #2c2c2e;
+  --track: #3a3a3c;
+  --gold: #ffd60a;
   --lavender: #a78bfa;
-  --coral: #f5874a;
-  --teal: #6fdc8c;
-  --blue: #4f8ff7;
-  --rose: #ff6b6b;
-  --accent: #4f8ff7;
-  --on-rose: #141414;
-  --inverse: #f2f2f2;
-  --inverse-fg: #141414;
-  --code: #141414;
-  --chart: #9180ec;
+  --coral: #ff9f0a;
+  --teal: #30d158;
+  --blue: #0a84ff;
+  --rose: #ff6961;
+  --ok-dot: #30d158;
+  --warn-dot: #ffd60a;
+  --err-dot: #ff453a;
+  --tint: 16%;
+  --tile-blue: #0a84ff;
+  --tile-lav: #5e5ce6;
+  --tile-green: #30d158;
+  --tile-coral: #ff9f0a;
+  --tile-gold: #ff9f0a;
+  --tile-red: #ff453a;
+  --accent: #2997ff;
+  --on-rose: #000000;
+  --inverse: #f5f5f7;
+  --inverse-fg: #000000;
+  --code: #000000;
+  --raise: 0 1px 3px rgba(0, 0, 0, 0.5);
+  --pop: 0 24px 70px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.08);
+  --scrim: rgba(0, 0, 0, 0.6);
+  --chart: #2997ff;
 }
 
 @media (prefers-color-scheme: dark) {
   :root[data-theme="system"] {
     color-scheme: dark;
-    --background: #161616;
-    --sidebar: #161616;
-    --card: #1e1e1e;
-    --foreground: #f2f2f2;
-    --muted: #9c9c9c;
-    --dim: #686868;
-    --border: #2b2b2b;
-    --border-strong: #383838;
-    --hover: #242424;
-    --selected: #2e2e2e;
-    --field: #191919;
-    --pill: #383838;
-    --track: #333333;
-    --gold: #f5c451;
+    --background: #000000;
+    --sidebar: #000000;
+    --card: #1c1c1e;
+    --well: #2c2c2e;
+    --fill: #2c2c2e;
+    --raised: #636366;
+    --foreground: #f5f5f7;
+    --muted: #a1a1a6;
+    --dim: #8e8e93;
+    --border: #2c2c2e;
+    --border-strong: #3a3a3c;
+    --hover: #232325;
+    --selected: #2c2c2e;
+    --field: #111112;
+    --pill: #2c2c2e;
+    --track: #3a3a3c;
+    --gold: #ffd60a;
     --lavender: #a78bfa;
-    --coral: #f5874a;
-    --teal: #6fdc8c;
-    --blue: #4f8ff7;
-    --rose: #ff6b6b;
-    --accent: #4f8ff7;
-    --on-rose: #141414;
-    --inverse: #f2f2f2;
-    --inverse-fg: #141414;
-    --code: #141414;
-    --chart: #9180ec;
+    --coral: #ff9f0a;
+    --teal: #30d158;
+    --blue: #0a84ff;
+    --rose: #ff6961;
+    --ok-dot: #30d158;
+    --warn-dot: #ffd60a;
+    --err-dot: #ff453a;
+    --tint: 16%;
+    --tile-blue: #0a84ff;
+    --tile-lav: #5e5ce6;
+    --tile-green: #30d158;
+    --tile-coral: #ff9f0a;
+    --tile-gold: #ff9f0a;
+    --tile-red: #ff453a;
+    --accent: #2997ff;
+    --on-rose: #000000;
+    --inverse: #f5f5f7;
+    --inverse-fg: #000000;
+    --code: #000000;
+    --raise: 0 1px 3px rgba(0, 0, 0, 0.5);
+    --pop: 0 24px 70px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.08);
+    --scrim: rgba(0, 0, 0, 0.6);
+    --chart: #2997ff;
   }
 }
 
@@ -141,7 +215,16 @@ body {
   font-family: var(--font-sans);
   font-size: 14px;
   line-height: 1.5;
+}
+
+/* Light text on dark gets thin smoothing; dark text on light keeps the system's fuller strokes. */
+:root[data-theme="dark"] body {
   -webkit-font-smoothing: antialiased;
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-theme="system"] body {
+    -webkit-font-smoothing: antialiased;
+  }
 }
 
 ::selection {
@@ -162,28 +245,27 @@ body {
 }
 
 /* Pages are a stack of cards (app/(app)/layout.tsx). Settings rows standing on
-   the page join into one card per run: borders overlap into a single line, and
+   the page join into one card per run: the rows' own top lines split them, and
    only the ends of a run are rounded. A form or wrapper holding rows is a card. */
 .page-stack > [data-srow] {
   background: var(--card);
-  border: 1px solid var(--border);
 }
 .page-stack > [data-srow] + [data-srow] {
-  margin-top: -15px;
+  margin-top: -14px;
 }
 .page-stack > [data-srow]:not([data-srow] + [data-srow]) {
-  border-top-left-radius: 10px;
-  border-top-right-radius: 10px;
+  border-top-width: 0;
+  border-top-left-radius: 16px;
+  border-top-right-radius: 16px;
 }
 .page-stack > [data-srow]:not(:has(+ [data-srow])) {
-  border-bottom-left-radius: 10px;
-  border-bottom-right-radius: 10px;
+  border-bottom-left-radius: 16px;
+  border-bottom-right-radius: 16px;
 }
 .page-stack > :not([data-srow], section):has(> [data-srow]) {
   overflow: hidden;
   background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: 16px;
 }
 
 /* Native select styled as a pill with a caret. */

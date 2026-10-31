@@ -116,7 +116,7 @@ export function QueryBox({ name, defaultValue, placeholder, lines }: { name: str
           e.currentTarget.form?.requestSubmit();
         }
       }}
-      className="w-full resize-y rounded-md border border-border bg-field px-3 py-2.5 font-mono text-[13px] leading-relaxed outline-none transition-[border-color] duration-150 placeholder:text-dim focus:border-accent"
+      className="w-full resize-y rounded-[10px] border border-border-strong bg-field px-3 py-2.5 font-mono text-[13px] leading-relaxed outline-none transition-[border-color] duration-150 placeholder:text-dim focus:border-accent"
     />
   );
 }

@@ -71,7 +71,7 @@ export function AddChannelForm() {
               <Input id="port" name="port" inputMode="numeric" defaultValue="587" className="font-mono text-[13px]" />
             </Field>
             <Field label="Security" htmlFor="security">
-              <select id="security" name="security" defaultValue="starttls" className="h-9 rounded-md border border-border bg-background px-2 text-sm">
+              <select id="security" name="security" defaultValue="starttls" className="h-10 rounded-[10px] border border-border-strong bg-field px-2 text-sm">
                 <option value="starttls">STARTTLS (587)</option>
                 <option value="tls">TLS (465)</option>
               </select>

@@ -76,7 +76,7 @@ export function DomainRow({ d, serverIp, removable, indent }: { d: ProjectDomain
       indent={indent}
       data-host={d.host}
       data-status={d.status}
-      lead={<RowIcon tone={pending ? "warn" : d.role === "free" ? "dim" : "ok"}>{<Icon icon={d.role === "redirect" ? Link01Icon : Globe02Icon} size={17} />}</RowIcon>}
+      lead={<RowIcon tone={pending ? "warn" : d.role === "free" ? "dim" : "blue"}>{<Icon icon={d.role === "redirect" ? Link01Icon : Globe02Icon} size={17} />}</RowIcon>}
       title={
         <>
           <span className="truncate">{d.host}</span>
@@ -103,7 +103,7 @@ export function DomainRow({ d, serverIp, removable, indent }: { d: ProjectDomain
       }
     >
       {behindCloudflare && (
-        <div className="col-span-full mt-3.5 grid gap-3 border-l-2 border-gold bg-gold/7 px-[18px] py-3.5 md:col-start-2" data-testid="cloudflare-proxy">
+        <div className="col-span-full mt-3.5 grid gap-3 rounded-xl bg-warn-band px-[18px] py-3.5 md:col-start-2" data-testid="cloudflare-proxy">
           <p className="text-[13.5px] text-muted">
             To keep the orange cloud, in Cloudflare set <b className="font-medium text-foreground">SSL/TLS</b> to <b className="font-medium text-foreground">Full (strict)</b> and turn off{" "}
             <b className="font-medium text-foreground">Always Use HTTPS</b>: this server redirects to HTTPS itself, and its first certificate needs plain HTTP to get through. The record behind the proxy must point at{" "}
@@ -128,7 +128,7 @@ export function DomainRow({ d, serverIp, removable, indent }: { d: ProjectDomain
         </div>
       )}
       {record && (
-        <div className="col-span-full mt-3.5 grid gap-3 border-l-2 border-gold bg-gold/7 px-[18px] py-3.5 md:col-start-2" data-testid="dns-record">
+        <div className="col-span-full mt-3.5 grid gap-3 rounded-xl bg-warn-band px-[18px] py-3.5 md:col-start-2" data-testid="dns-record">
           <p className="text-[13.5px] text-muted">Add this record at your DNS provider. The domain goes live once public DNS points it here, so visitors never land on a broken site.</p>
           <div className="grid items-end gap-x-[18px] gap-y-2.5 sm:grid-cols-[80px_110px_minmax(0,1fr)_auto]">
             <div>

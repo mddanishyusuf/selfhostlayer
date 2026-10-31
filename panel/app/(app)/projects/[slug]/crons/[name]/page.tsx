@@ -53,7 +53,7 @@ export default async function CronRunsPage({ params }: { params: Promise<{ slug:
               <span className="flex-1 text-[13.5px] tabular-nums text-muted">{new Date(r.startedAt).toLocaleString("en-GB", { timeZone: "UTC" })} UTC</span>
               <span className="text-[13px] tabular-nums text-muted">{r.finishedAt ? duration(Math.max(0, Date.parse(r.finishedAt) - Date.parse(r.startedAt))) : "…"}</span>
             </summary>
-            <pre className="mx-4 mb-4 max-h-80 overflow-auto whitespace-pre-wrap rounded-lg border border-border bg-code p-3.5 font-mono text-[12.5px] leading-relaxed text-[#ece8e3] sm:mx-7">
+            <pre className="mx-4 mb-4 max-h-80 overflow-auto whitespace-pre-wrap rounded-xl bg-code p-3.5 font-mono text-[12.5px] leading-relaxed text-[#e5e5ea] sm:mx-7">
               {r.output.length ? r.output.join("\n") : "(no output)"}
             </pre>
           </details>

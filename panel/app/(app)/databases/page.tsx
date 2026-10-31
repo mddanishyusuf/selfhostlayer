@@ -50,22 +50,20 @@ function rowsOf(slug: string, s: ServiceStatus | null, files: NonNullable<Browse
   return rows;
 }
 
-/** An engine in the Engines card: what it is, whether it runs, and how much of it the apps use. */
-function EngineTile({ engine, title, children, chip, foot }: { engine: Engine; title: string; children: ReactNode; chip: ReactNode; foot: ReactNode }) {
+/** An engine in the Engines card: what it is, how much of it the apps use, and whether it runs. On phones the usage goes under the name. */
+function EngineRow({ engine, title, children, chip, foot }: { engine: Engine; title: string; children: ReactNode; chip: ReactNode; foot: ReactNode }) {
   const look = ENGINE_LOOK[engine];
   return (
-    <div className="grid content-start gap-1 rounded-lg border border-border bg-card px-[18px] pb-[18px] pt-4" data-testid={`engine-${engine}`}>
-      <span className="mb-3.5">
-        <TileIcon tone={look.tone} size="sm">
-          <Icon icon={look.icon} size={17} />
-        </TileIcon>
-      </span>
-      <b className="font-medium">{title}</b>
-      <p className="text-[14px] leading-normal text-muted">{children}</p>
-      <div className="mt-3 flex flex-wrap items-center gap-2.5 text-[13px] text-muted">
-        {chip}
-        {foot}
+    <div className="grid grid-cols-[32px_minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2 border-t border-border px-4 py-3.5 first:border-t-0 sm:px-6 md:grid-cols-[32px_minmax(0,1fr)_auto_124px]" data-testid={`engine-${engine}`}>
+      <TileIcon tone={look.tone} size="sm">
+        <Icon icon={look.icon} size={17} />
+      </TileIcon>
+      <div className="grid min-w-0 gap-0.5">
+        <b className="font-medium">{title}</b>
+        <p className="text-[13.5px] text-muted">{children}</p>
       </div>
+      <div className="col-span-2 col-start-2 flex flex-wrap items-center gap-2.5 text-[13px] text-muted md:col-auto md:justify-end">{foot}</div>
+      <div className="col-start-3 row-start-1 justify-self-end md:col-auto md:row-auto md:justify-self-start">{chip}</div>
     </div>
   );
 }
@@ -149,32 +147,32 @@ export default async function DatabasesOverviewPage({ searchParams }: { searchPa
       )}
 
       <Section title="Engines" description="Every app gets its own login and can't see the others.">
-        <div className="grid gap-2.5 px-4 pb-5 sm:px-6 md:grid-cols-2 xl:grid-cols-3">
-          <EngineTile engine="sqlite" title="SQLite" chip={<StatusChip status="ok" label="Built in" />} foot={plural(of("sqlite").length, "file")}>
+        <div className="pb-1.5">
+          <EngineRow engine="sqlite" title="SQLite" chip={<StatusChip status="ok" label="Built in" />} foot={plural(of("sqlite").length, "file")}>
             Files in each app&apos;s data folder, backed up with their -wal and -shm.
-          </EngineTile>
-          <EngineTile engine="postgres" title={label("postgres")} chip={serverChip(installed.postgres, running.postgres)} foot={installed.postgres ? usage(sum(known.map((s) => s.postgres?.sizeMb ?? null)), of("postgres").length) : later}>
+          </EngineRow>
+          <EngineRow engine="postgres" title={label("postgres")} chip={serverChip(installed.postgres, running.postgres)} foot={installed.postgres ? usage(sum(known.map((s) => s.postgres?.sizeMb ?? null)), of("postgres").length) : later}>
             One server, a role and database per app.
-          </EngineTile>
-          <EngineTile
+          </EngineRow>
+          <EngineRow
             engine="redis"
             title={label("redis")}
             chip={!installed.redis ? <StatusChip status="idle" label="Not installed" /> : redisRows.some((r) => !r.answering) ? <StatusChip status="err" label="Not answering" /> : <StatusChip status={redisRows.length ? "ok" : "idle"} label={redisRows.length ? "Running" : "Installed"} />}
             foot={installed.redis ? plural(redisRows.length, "app") : later}
           >
             One Redis per app, with its own password and memory cap.
-          </EngineTile>
-          <EngineTile
+          </EngineRow>
+          <EngineRow
             engine="mongodb"
             title={label("mongodb")}
             chip={serverChip(installed.mongodb, running.mongodb)}
             foot={!installed.mongodb ? <InstallMongodbForm compact /> : !running.mongodb ? <InstallMongodbForm compact start /> : usage(sum(known.map((s) => s.mongodb?.sizeMb ?? null)), of("mongodb").length)}
           >
             One shared server, a user per app that sees only its own database.
-          </EngineTile>
-          <EngineTile engine="mysql" title="MySQL (MariaDB)" chip={serverChip(installed.mysql, running.mysql)} foot={installed.mysql ? usage(sum(known.map((s) => s.mysql?.sizeMb ?? null)), of("mysql").length) : later}>
+          </EngineRow>
+          <EngineRow engine="mysql" title="MySQL (MariaDB)" chip={serverChip(installed.mysql, running.mysql)} foot={installed.mysql ? usage(sum(known.map((s) => s.mysql?.sizeMb ?? null)), of("mysql").length) : later}>
             One server, a user and database per app.
-          </EngineTile>
+          </EngineRow>
         </div>
       </Section>
 

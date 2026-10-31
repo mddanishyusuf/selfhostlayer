@@ -72,7 +72,7 @@ export function CodeInput({ name = "code", autoFocus = true }: { name?: string; 
             if (e.key === "ArrowLeft" && i > 0) refs.current[i - 1]?.focus();
             if (e.key === "ArrowRight" && i < 5) refs.current[i + 1]?.focus();
           }}
-          className="h-12 w-full min-w-0 rounded-md border border-border bg-background text-center font-mono text-lg tabular-nums transition-colors duration-150 outline-none hover:border-border-strong focus:border-muted focus-visible:ring-2 focus-visible:ring-accent/50"
+          className="h-12 w-full min-w-0 rounded-[10px] border border-border-strong bg-field text-center font-mono text-lg tabular-nums transition-colors duration-150 outline-none hover:border-border-strong focus:border-muted focus-visible:ring-2 focus-visible:ring-accent/50"
         />
       ))}
     </div>

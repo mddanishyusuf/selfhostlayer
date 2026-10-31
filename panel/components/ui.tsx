@@ -15,7 +15,7 @@ const VARIANTS = {
   danger: "border border-rose bg-rose text-on-rose hover:opacity-90",
 } as const;
 
-/** A pill button. size "sm" for row actions. */
+/** A button: the main one in the text color, the others outlined. size "sm" for row actions. */
 export function Button({
   variant = "primary",
   size = "md",
@@ -25,8 +25,8 @@ export function Button({
   return (
     <button
       className={cx(
-        "inline-flex select-none items-center justify-center gap-1.5 whitespace-nowrap rounded-md font-medium transition-[background-color,opacity] duration-150 ease-out disabled:pointer-events-none disabled:opacity-50",
-        size === "sm" ? "h-7 px-3 text-[12.5px]" : "h-[34px] px-3.5 text-[13px]",
+        "inline-flex select-none items-center justify-center gap-1.5 whitespace-nowrap font-medium transition-[background-color,opacity] duration-150 ease-out disabled:pointer-events-none disabled:opacity-50",
+        size === "sm" ? "h-8 rounded-[9px] px-3 text-[13px]" : "h-9 rounded-[10px] px-[15px] text-[14px]",
         focus,
         VARIANTS[variant],
         className,
@@ -38,8 +38,8 @@ export function Button({
 
 export const buttonClass = (variant: keyof typeof VARIANTS = "primary", size: "sm" | "md" = "md") =>
   cx(
-    "inline-flex select-none items-center justify-center gap-1.5 whitespace-nowrap rounded-md font-medium transition-[background-color,opacity] duration-150 ease-out",
-    size === "sm" ? "h-7 px-3 text-[12.5px]" : "h-[34px] px-3.5 text-[13px]",
+    "inline-flex select-none items-center justify-center gap-1.5 whitespace-nowrap font-medium transition-[background-color,opacity] duration-150 ease-out",
+    size === "sm" ? "h-8 rounded-[9px] px-3 text-[13px]" : "h-9 rounded-[10px] px-[15px] text-[14px]",
     focus,
     VARIANTS[variant],
   );
@@ -53,7 +53,7 @@ export function Input({ className, ...props }: ComponentProps<"input">) {
   return (
     <input
       className={cx(
-        "h-[38px] w-full rounded-md border border-border bg-field px-3 text-sm transition-[border-color,box-shadow] duration-150 placeholder:text-dim focus:border-accent focus:shadow-[0_0_0_3px_color-mix(in_srgb,var(--accent)_20%,transparent)]",
+        "h-10 w-full rounded-[10px] border border-border-strong bg-field px-3 text-sm transition-[border-color,box-shadow] duration-150 placeholder:text-dim focus:border-accent focus:shadow-[0_0_0_3px_color-mix(in_srgb,var(--accent)_20%,transparent)]",
         "outline-none aria-invalid:border-rose",
         className,
       )}
@@ -75,7 +75,7 @@ export function SecretInput({ reveal = false, className, ...props }: Omit<Compon
 export function Select({ className, ...props }: ComponentProps<"select">) {
   return (
     <select
-      className={cx("select-pill h-[38px] w-full rounded-md border border-border bg-field pl-3 pr-8 text-sm outline-none focus:border-accent", className)}
+      className={cx("select-pill h-10 w-full rounded-[10px] border border-border-strong bg-field pl-3 pr-8 text-sm outline-none focus:border-accent", className)}
       {...props}
     />
   );
@@ -90,14 +90,14 @@ export function Field({ label, htmlFor, hint, children }: { label: string; htmlF
     <div className="grid content-start gap-1.5">
       <Label htmlFor={htmlFor}>{label}</Label>
       {children}
-      {hint && <p className="text-[12.5px] text-dim">{hint}</p>}
+      {hint && <p className="text-[13px] text-muted">{hint}</p>}
     </div>
   );
 }
 
-/** A white card on the page. Prefer Section, which adds a title. */
+/** A card on the page. Prefer Section, which adds a title. */
 export function Card({ className, ...props }: ComponentProps<"div">) {
-  return <div className={cx("rounded-[10px] border border-border bg-card", className)} {...props} />;
+  return <div className={cx("rounded-2xl bg-card", className)} {...props} />;
 }
 
 export function FormError({ message }: { message?: string | null }) {
@@ -144,10 +144,10 @@ export function Logo({ withName = true }: { withName?: boolean }) {
 }
 
 export function StatusDot({ status, pulse }: { status: "ok" | "warn" | "err" | "idle"; pulse?: boolean }) {
-  const color = { ok: "bg-teal", warn: "bg-gold", err: "bg-rose", idle: "bg-dim" }[status];
+  const color = { ok: "bg-ok-dot", warn: "bg-warn-dot", err: "bg-err-dot", idle: "bg-dim" }[status];
   return (
     <span
-      className={cx("inline-block size-2 shrink-0 rounded-full", color, pulse && "shadow-[0_0_0_0_color-mix(in_srgb,var(--gold)_60%,transparent)] [animation:pulse-ring_1.6s_infinite]")}
+      className={cx("inline-block size-2 shrink-0 rounded-full", color, pulse && "shadow-[0_0_0_0_color-mix(in_srgb,var(--warn-dot)_60%,transparent)] [animation:pulse-ring_1.6s_infinite]")}
       aria-hidden
     />
   );
@@ -158,7 +158,7 @@ export function Pill({ children, outline, className }: { children: ReactNode; ou
   return (
     <span
       className={cx(
-        "inline-flex h-[22px] items-center whitespace-nowrap rounded-md px-2 text-[12px] font-medium",
+        "inline-flex h-6 items-center whitespace-nowrap rounded-[7px] px-2 text-[12.5px] font-medium",
         outline ? "border border-border-strong text-muted" : "bg-pill text-foreground",
         className,
       )}
@@ -193,7 +193,7 @@ export function Mark({ framework, size = "md", bare }: { framework: string; size
       role="img"
       aria-label={logo.title}
       title={logo.title}
-      className={cx("grid shrink-0 place-items-center border border-border bg-background text-foreground", size === "sm" ? "size-[30px] rounded-md" : "size-10 rounded-lg")}
+      className={cx("grid shrink-0 place-items-center bg-well text-foreground", size === "sm" ? "size-8 rounded-[9px]" : "size-10 rounded-[11px]")}
     >
       <svg viewBox="0 0 24 24" width={px} height={px} fill="currentColor" aria-hidden>
         <path d={logo.path} />

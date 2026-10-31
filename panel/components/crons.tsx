@@ -42,7 +42,7 @@ export function CronForm({ slug, nodeVersion }: { slug: string; nodeVersion: str
             type="button"
             onClick={() => setSchedule(value)}
             className={cx(
-              "h-7 rounded-md border px-2.5 text-[12.5px] font-medium transition-colors duration-150",
+              "h-8 rounded-[9px] border px-3 text-[13px] font-medium transition-colors duration-150",
               schedule === value ? "border-border-strong bg-selected text-foreground" : "border-border text-muted hover:bg-hover hover:text-foreground",
             )}
           >

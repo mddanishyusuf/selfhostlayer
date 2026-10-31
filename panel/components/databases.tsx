@@ -57,8 +57,8 @@ export function AddDatabaseDialog({ options }: { options: AddOption[] }) {
                 disabled={disabled}
                 onClick={() => setKind(o.kind)}
                 className={cx(
-                  "relative grid content-start gap-1 rounded-lg border px-4 pb-4 pt-3.5 text-left transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-55",
-                  on ? "border-accent bg-accent/8" : "border-border bg-card enabled:hover:border-border-strong",
+                  "relative grid content-start gap-1 rounded-xl border px-4 pb-4 pt-3.5 text-left transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-55",
+                  on ? "border-accent bg-accent/[0.05] shadow-[inset_0_0_0_1px_var(--accent)]" : "border-border-strong bg-card enabled:hover:border-dim",
                 )}
               >
                 <span className="mb-2.5">
@@ -66,9 +66,9 @@ export function AddDatabaseDialog({ options }: { options: AddOption[] }) {
                     <Icon icon={look.icon} size={17} />
                   </TileIcon>
                 </span>
-                <b className="font-medium">{KINDS[o.kind].name}</b>
+                <b className="font-semibold">{KINDS[o.kind].name}</b>
                 <span className="text-[13px] leading-normal text-muted">{KINDS[o.kind].what}</span>
-                {why && <span className="text-[12.5px] text-dim">{why}</span>}
+                {why && <span className="text-[12.5px] text-muted">{why}</span>}
                 <span className={cx("absolute right-3.5 top-3.5 grid size-[18px] place-items-center rounded-full border-[1.5px]", on ? "border-accent bg-accent text-white" : "border-border-strong")}>
                   {on && <Icon icon={Tick02Icon} size={11} strokeWidth={3} />}
                 </span>
@@ -152,7 +152,7 @@ export function DatabaseMenu({ slug, url }: { slug: string; url?: string }) {
       document.removeEventListener("keydown", key);
     };
   }, [open]);
-  const item = "flex h-9 w-full items-center rounded-md px-2.5 text-left text-[13.5px] transition-colors hover:bg-hover";
+  const item = "flex h-9 w-full items-center rounded-lg px-2.5 text-left text-[13.5px] transition-colors hover:bg-well";
   return (
     <div ref={ref} className="relative">
       <button
@@ -161,12 +161,12 @@ export function DatabaseMenu({ slug, url }: { slug: string; url?: string }) {
         aria-haspopup="menu"
         aria-expanded={open}
         onClick={() => setOpen(!open)}
-        className="grid size-8 place-items-center rounded-lg text-muted transition-colors hover:bg-hover hover:text-foreground"
+        className="grid size-8 place-items-center rounded-lg text-muted transition-colors hover:bg-well hover:text-foreground"
       >
         <Icon icon={MoreHorizontalIcon} size={18} />
       </button>
       {open && (
-        <div role="menu" className="absolute right-0 top-9 z-20 grid min-w-[230px] gap-0.5 rounded-lg border border-border bg-card p-1 shadow-[0_10px_30px_rgba(0,0,0,0.12)]">
+        <div role="menu" className="absolute right-0 top-9 z-20 grid min-w-[230px] gap-0.5 rounded-xl border border-border bg-card p-1 shadow-pop">
           {url && (
             <button
               type="button"

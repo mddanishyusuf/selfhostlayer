@@ -10,7 +10,7 @@ import { Button, FormError, Input } from "./ui";
 /** The DNS record to create before moving. */
 function Record({ record }: { record: { type: string; name: string; value: string } }) {
   return (
-    <div className="grid gap-2 border-l-2 border-gold bg-gold/7 px-4 py-3" data-testid="address-record">
+    <div className="grid gap-2 rounded-xl bg-warn-band px-4 py-3" data-testid="address-record">
       <div className="grid items-end gap-x-4 gap-y-2 sm:grid-cols-[60px_minmax(0,1fr)_minmax(0,1fr)_auto]">
         <div>
           <span className="mb-0.5 block text-[12px] text-dim">Type</span>

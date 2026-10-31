@@ -94,9 +94,9 @@ export function LogPane({ text, live, label, fileName, minHeight = "calc(100dvh 
   const btn = "h-[26px] rounded-md px-2.5 text-[12px] font-medium text-muted transition-colors duration-150 hover:bg-hover hover:text-foreground";
   return (
     <div className={CARD}>
-      <div className="flex items-center gap-3 px-4 py-3 sm:px-5">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3 sm:px-5">
         <span className="inline-flex items-center gap-2 text-[13px] text-muted">
-          <span className={cx("size-2 rounded-full", live ? "bg-teal [animation:pulse-ring_1.6s_infinite]" : "bg-dim")} />
+          <span className={cx("size-2 rounded-full", live ? "bg-ok-dot [animation:pulse-ring_1.6s_infinite]" : "bg-dim")} />
           {label}
         </span>
         <div className="ml-auto flex items-center gap-1">
@@ -121,7 +121,7 @@ export function LogPane({ text, live, label, fileName, minHeight = "calc(100dvh 
           setFollow(el.scrollHeight - el.scrollTop - el.clientHeight < 40);
         }}
         style={{ height: minHeight }}
-        className="mx-2.5 mb-2.5 overflow-auto whitespace-pre-wrap break-words rounded-lg bg-code px-4 pb-6 pt-3.5 font-mono text-[12.5px] leading-[1.75] text-[#e9e5df] sm:px-5"
+        className="mx-2.5 mb-2.5 overflow-auto whitespace-pre-wrap break-words rounded-xl bg-code px-4 pb-6 pt-3.5 font-mono text-[12.5px] leading-[1.75] text-[#e5e5ea] sm:px-5"
         role="log"
         aria-live="polite"
       >

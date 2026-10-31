@@ -128,7 +128,7 @@ export function UsageChart({
               style={{ left: left(point.at), top: `${(y(point.value) / H) * 100}%` }}
             />
             <span
-              className="pointer-events-none absolute top-1 z-10 grid whitespace-nowrap rounded-md border border-border-strong bg-background px-2.5 py-1.5 shadow-[0_4px_16px_rgba(0,0,0,0.25)]"
+              className="pointer-events-none absolute top-1 z-10 grid whitespace-nowrap rounded-[10px] border border-border bg-card px-2.5 py-1.5 shadow-pop"
               style={x(point.at) > W * 0.6 ? { right: `${100 - (x(point.at) / W) * 100 + 2}%` } : { left: `${(x(point.at) / W) * 100 + 2}%` }}
             >
               <b className="text-[13px] font-semibold tabular-nums">{fmt(point.value, unit)}</b>

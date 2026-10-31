@@ -51,11 +51,11 @@ export function timeIn(ms: number): string {
 
 export const duration = (ms: number | null) => (ms === null ? "…" : ms < 60_000 ? `${(ms / 1000).toFixed(ms < 10_000 ? 1 : 0)}s` : `${Math.floor(ms / 60_000)}m ${Math.round((ms % 60_000) / 1000)}s`);
 
-/** A state as a small chip: a colored dot, then the word in its color. */
+/** A state as a soft tag: a colored dot, then the word in the darker shade. */
 export function StatusChip({ status, label, pulse }: { status: "ok" | "warn" | "err" | "idle"; label: string; pulse?: boolean }) {
-  const color = { ok: "text-teal", warn: "text-gold", err: "text-rose", idle: "text-muted" }[status];
+  const look = { ok: "bg-ok-soft text-teal", warn: "bg-warn-soft text-gold", err: "bg-err-soft text-rose", idle: "bg-well text-muted" }[status];
   return (
-    <span className={cx("inline-flex h-7 items-center gap-2 whitespace-nowrap rounded-md border border-border bg-card px-2.5 text-[13px] font-medium", color)}>
+    <span className={cx("inline-flex h-[26px] items-center gap-[7px] whitespace-nowrap rounded-lg px-2.5 text-[13px] font-medium", look)}>
       <StatusDot status={status} pulse={pulse} /> {label}
     </span>
   );

@@ -20,7 +20,7 @@ function uptime(seconds: number): string {
 
 /** How full something is: gold from 75%, rose from 90%. */
 function Meter({ value }: { value: number }) {
-  const color = value >= 0.9 ? "bg-rose" : value >= 0.75 ? "bg-gold" : "bg-blue";
+  const color = value >= 0.9 ? "bg-err-dot" : value >= 0.75 ? "bg-warn-dot" : "bg-blue";
   return (
     <span className="mt-1.5 block h-1.5 overflow-hidden rounded bg-track" role="meter" aria-valuenow={Math.round(value * 100)} aria-valuemin={0} aria-valuemax={100}>
       <span className={cx("block h-full rounded", color)} style={{ width: `${Math.min(100, Math.max(1.5, value * 100))}%` }} />
@@ -135,12 +135,12 @@ export default async function HealthPage({ searchParams }: { searchParams: Promi
                 <span className="truncate font-medium">{p.slug}</span>
                 <span className="col-span-full flex items-center gap-3 md:col-span-1">
                   <span className="h-1.5 flex-1 overflow-hidden rounded bg-track">
-                    <span className={cx("block h-full rounded", used !== null && used / p.memoryMb >= 0.75 ? "bg-gold" : "bg-blue")} style={{ width: `${used === null ? 0 : Math.max(1.5, Math.min(100, (used / p.memoryMb) * 100))}%` }} />
+                    <span className={cx("block h-full rounded", used !== null && used / p.memoryMb >= 0.75 ? "bg-warn-dot" : "bg-blue")} style={{ width: `${used === null ? 0 : Math.max(1.5, Math.min(100, (used / p.memoryMb) * 100))}%` }} />
                   </span>
                   <span className="w-[112px] text-right text-[13px] tabular-nums text-muted">{used === null ? "—" : `${used} of ${p.memoryMb} MB`}</span>
                 </span>
                 <span className="hidden text-right text-[13px] tabular-nums md:block">{u?.cpu == null ? "—" : `${u.cpu}%`}</span>
-                <span className="row-start-1 flex items-center gap-2 text-[13.5px] md:row-auto" style={{ gridColumn: "auto" }}>
+                <span className="col-start-3 row-start-1 flex items-center gap-2 text-[13.5px] md:col-start-auto md:row-auto">
                   <StatusDot status={building ? "warn" : live ? "ok" : "idle"} pulse={building} />
                   {building ? "Building" : live ? "Running" : "Not running"}
                 </span>
