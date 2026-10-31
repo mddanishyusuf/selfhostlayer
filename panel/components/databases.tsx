@@ -1,12 +1,13 @@
 "use client";
 
-import { CheckIcon, EllipsisIcon, PlusIcon } from "lucide-react";
+import { CheckIcon, PlusIcon } from "lucide-react";
 import Link from "next/link";
-import { useActionState, useEffect, useRef, useState } from "react";
+import { useActionState, useState } from "react";
 import { addMongodbAction, addMysqlAction, addPostgresAction, addRedisAction, type ServiceState } from "@/app/actions/services";
 import { ENGINE_LOOK } from "./engines";
 import { SubmitButton } from "./form";
 import { Icon } from "./icon";
+import { MENU_ITEM, MoreMenu } from "./menu";
 import { Modal } from "./modal";
 import { TileIcon } from "./page";
 import { Button, FormError, Select, cx } from "./ui";
@@ -136,56 +137,36 @@ function AddForm({ option, onCancel }: { option: AddOption; onCancel: () => void
   );
 }
 
+function CopyUrlItem({ url, close }: { url: string; close: () => void }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <button
+      type="button"
+      role="menuitem"
+      className={MENU_ITEM}
+      onClick={async () => {
+        await navigator.clipboard.writeText(url);
+        setCopied(true);
+        setTimeout(close, 700);
+      }}
+    >
+      {copied ? "Copied" : "Copy connection URL"}
+    </button>
+  );
+}
+
 /** A database row's "…": copy its connection URL, or open its app's Databases page. */
 export function DatabaseMenu({ slug, url }: { slug: string; url?: string }) {
-  const [open, setOpen] = useState(false);
-  const [copied, setCopied] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (!open) return;
-    const away = (e: MouseEvent) => !ref.current?.contains(e.target as Node) && setOpen(false);
-    const key = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
-    document.addEventListener("mousedown", away);
-    document.addEventListener("keydown", key);
-    return () => {
-      document.removeEventListener("mousedown", away);
-      document.removeEventListener("keydown", key);
-    };
-  }, [open]);
-  const item = "flex w-full items-center px-[9px] py-1.5 text-left transition-colors hover:bg-selected";
   return (
-    <div ref={ref} className="relative">
-      <button
-        type="button"
-        aria-label={`More for ${slug}`}
-        aria-haspopup="menu"
-        aria-expanded={open}
-        onClick={() => setOpen(!open)}
-        className="grid size-8 place-items-center rounded-lg text-muted transition-colors hover:bg-well hover:text-foreground"
-      >
-        <Icon icon={EllipsisIcon} size={18} />
-      </button>
-      {open && (
-        <div role="menu" className="absolute right-0 top-9 z-20 grid min-w-[230px] gap-px border border-border bg-card p-1 shadow-pop">
-          {url && (
-            <button
-              type="button"
-              role="menuitem"
-              className={item}
-              onClick={async () => {
-                await navigator.clipboard.writeText(url);
-                setCopied(true);
-                setTimeout(() => setOpen(false), 700);
-              }}
-            >
-              {copied ? "Copied" : "Copy connection URL"}
-            </button>
-          )}
-          <Link role="menuitem" href={`/projects/${slug}/databases`} className={item}>
+    <MoreMenu label={`More for ${slug}`} width={230} iconSize={18} buttonClassName="grid size-8 place-items-center rounded-lg text-muted transition-colors hover:bg-well hover:text-foreground">
+      {(close) => (
+        <>
+          {url && <CopyUrlItem url={url} close={close} />}
+          <Link role="menuitem" href={`/projects/${slug}/databases`} className={MENU_ITEM} onClick={close}>
             Open {slug}&apos;s databases
           </Link>
-        </div>
+        </>
       )}
-    </div>
+    </MoreMenu>
   );
 }

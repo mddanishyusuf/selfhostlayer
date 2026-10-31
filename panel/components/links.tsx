@@ -1,14 +1,15 @@
 "use client";
 
-import { ChartColumnIcon, EllipsisIcon, LockIcon, PencilIcon, PlusIcon, QrCodeIcon } from "lucide-react";
+import { ChartColumnIcon, LockIcon, PencilIcon, PlusIcon, QrCodeIcon } from "lucide-react";
 import Link from "next/link";
-import { useActionState, useEffect, useRef, useState } from "react";
+import { useActionState, useEffect, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { renderSVG } from "uqr";
 import { createApiToken, deleteLink, importLinks, revokeApiToken, saveLink, saveLinksSettings, setLinkDisabled, type ImportState, type LinkFormState, type LinksSettingsState, type QuickState, type TokenState } from "@/app/actions/links";
 import type { LinksSettings, Link as ShortLink, Redirect } from "@/lib/links";
 import { CopyButton, SubmitButton } from "./form";
 import { Icon } from "./icon";
+import { MENU_ITEM, MoreMenu } from "./menu";
 import { Modal } from "./modal";
 import { SettingsRow } from "./page";
 import { Button, Field, FormError, Input, SecretInput, Select, cx } from "./ui";
@@ -207,51 +208,36 @@ function DeleteLinkDialog({ slug, link, onClose }: { slug: string; link: ShortLi
 /** A row's buttons: QR code, edit, and a menu (stats, turn off or on, delete). */
 export function LinkActions({ slug, domain, link, defaultRedirect }: { slug: string; domain: string; link: ShortLink; defaultRedirect: Redirect }) {
   const [open, setOpen] = useState<"qr" | "edit" | "delete" | null>(null);
-  const [menu, setMenu] = useState(false);
   const [toggleState, toggle] = useActionState(setLinkDisabled, {} as QuickState);
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (!menu) return;
-    const away = (e: MouseEvent) => !ref.current?.contains(e.target as Node) && setMenu(false);
-    const key = (e: KeyboardEvent) => e.key === "Escape" && setMenu(false);
-    document.addEventListener("mousedown", away);
-    document.addEventListener("keydown", key);
-    return () => {
-      document.removeEventListener("mousedown", away);
-      document.removeEventListener("keydown", key);
-    };
-  }, [menu]);
   const iconButton = "grid size-[26px] place-items-center border border-border text-muted transition-colors hover:bg-btn-hover hover:text-foreground";
-  const item = "flex w-full items-center gap-2 px-[9px] py-1.5 text-left transition-colors hover:bg-selected";
   return (
-    <div ref={ref} className="relative flex items-center justify-end gap-1.5">
+    <div className="relative flex items-center justify-end gap-1.5">
       <button type="button" className={iconButton} aria-label={`QR code for /${link.slug}`} title="QR code" onClick={() => setOpen("qr")}>
         <Icon icon={QrCodeIcon} size={14} />
       </button>
       <button type="button" className={iconButton} aria-label={`Edit /${link.slug}`} title="Edit" onClick={() => setOpen("edit")} data-testid={`edit-${link.slug}`}>
         <Icon icon={PencilIcon} size={13} />
       </button>
-      <button type="button" className={iconButton} aria-label={`More for /${link.slug}`} aria-haspopup="menu" aria-expanded={menu} onClick={() => setMenu(!menu)}>
-        <Icon icon={EllipsisIcon} size={15} />
-      </button>
-      {menu && (
-        <div role="menu" className="absolute right-0 top-8 z-20 grid min-w-[190px] gap-px border border-border bg-card p-1 shadow-pop">
-          <Link role="menuitem" className={item} href={`/projects/${slug}/stats?link=${link.id}`}>
-            <Icon icon={ChartColumnIcon} size={14} /> Stats
-          </Link>
-          <form action={toggle}>
-            <input type="hidden" name="slug" value={slug} />
-            <input type="hidden" name="id" value={link.id} />
-            <input type="hidden" name="disabled" value={String(!link.disabled)} />
-            <button type="submit" role="menuitem" className={item} onClick={() => setTimeout(() => setMenu(false), 0)}>
-              {link.disabled ? "Turn on" : "Turn off"}
+      <MoreMenu label={`More for /${link.slug}`} buttonClassName={iconButton}>
+        {(close) => (
+          <>
+            <Link role="menuitem" className={MENU_ITEM} href={`/projects/${slug}/stats?link=${link.id}`} onClick={close}>
+              <Icon icon={ChartColumnIcon} size={14} /> Stats
+            </Link>
+            <form action={toggle}>
+              <input type="hidden" name="slug" value={slug} />
+              <input type="hidden" name="id" value={link.id} />
+              <input type="hidden" name="disabled" value={String(!link.disabled)} />
+              <button type="submit" role="menuitem" className={MENU_ITEM} onClick={() => setTimeout(close, 0)}>
+                {link.disabled ? "Turn on" : "Turn off"}
+              </button>
+            </form>
+            <button type="button" role="menuitem" className={cx(MENU_ITEM, "text-rose")} onClick={() => (close(), setOpen("delete"))}>
+              Delete…
             </button>
-          </form>
-          <button type="button" role="menuitem" className={cx(item, "text-rose")} onClick={() => (setMenu(false), setOpen("delete"))}>
-            Delete…
-          </button>
-        </div>
-      )}
+          </>
+        )}
+      </MoreMenu>
       {toggleState.error && <span className="absolute right-0 top-8 z-10 bg-card px-2 text-[12px] text-rose">{toggleState.error}</span>}
       {open === "qr" && <QrDialog url={`https://${domain}/${link.slug}`} name={link.slug} onClose={() => setOpen(null)} />}
       {open === "edit" && <LinkDialog slug={slug} domain={domain} link={link} defaultRedirect={defaultRedirect} onClose={() => setOpen(null)} />}
