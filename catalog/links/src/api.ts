@@ -4,8 +4,8 @@
 // with a token made in the panel (Authorization: Bearer lk_…), each token
 // limited to 120 requests a minute.
 import type { IncomingMessage, ServerResponse } from "node:http";
+import { bearer, json, readJson } from "../../lib/http.ts";
 import type { AdminContext } from "./admin.ts";
-import { bearer, json, readJson } from "./http.ts";
 import { toPublic, type Link } from "./store.ts";
 import { useToken } from "./tokens.ts";
 import { InputError } from "./validate.ts";

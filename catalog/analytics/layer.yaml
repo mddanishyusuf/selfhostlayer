@@ -1,0 +1,27 @@
+# Analytics: cookie-free web analytics for your sites, managed from the
+# panel's Analytics page (PLAN-ANALYTICS.md).
+id: analytics
+name: Analytics
+version: 0.1.0
+summary: Cookie-free web analytics for your sites, with no data leaving the server.
+runtime:
+  kind: node
+  node: "24"
+  # node:sqlite warns that it's experimental on every start: not news worth a log line.
+  start: [node, --disable-warning=ExperimentalWarning, server.js]
+  health: /healthz
+memory: { default: 128, min: 64 }
+env:
+  # The panel's key to Analytics' admin API (127.0.0.1 only).
+  ANALYTICS_ADMIN_TOKEN: { generate: secret }
+services: [sqlite]
+cron:
+  # Events and visits past the keep window (365 days by default) are deleted.
+  - name: prune
+    schedule: "45 3 * * *"
+    command: node --disable-warning=ExperimentalWarning cron.js prune
+  # DB-IP's newest country list, a few days into each month.
+  - name: geo
+    schedule: "15 5 3 * *"
+    command: node --disable-warning=ExperimentalWarning cron.js geo
+backup: [data]

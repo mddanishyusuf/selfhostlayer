@@ -8,10 +8,10 @@
 import { createHash, randomBytes } from "node:crypto";
 import type { IncomingMessage } from "node:http";
 import type { DatabaseSync } from "node:sqlite";
+import { clientIp, type Geo } from "../../lib/geo.ts";
+import { readAgent, referrerHost } from "../../lib/ua.ts";
 import { getSetting, setSetting } from "./db.ts";
-import { clientIp, type Geo } from "./geo.ts";
 import type { Link, Store } from "./store.ts";
-import { readAgent, referrerHost } from "./ua.ts";
 
 export interface Click {
   linkId: number;

@@ -5,8 +5,8 @@
 import { createHash, timingSafeEqual } from "node:crypto";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { DatabaseSync } from "node:sqlite";
+import { bearer, json, readBody, readJson, send } from "../../lib/http.ts";
 import { importCsv, toCsv } from "./csv.ts";
-import { bearer, json, readBody, readJson, send } from "./http.ts";
 import type { PublicContext } from "./redirect.ts";
 import type { Settings } from "./settings.ts";
 import { RANGES, stats, type Range } from "./stats.ts";

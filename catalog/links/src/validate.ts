@@ -1,16 +1,9 @@
 // What a link may be: its slug, where it goes, its redirect type, tags. The
 // admin API, the public API and CSV import all check input here.
 import { isIP } from "node:net";
+import { InputError } from "../../lib/http.ts";
 
-export class InputError extends Error {
-  readonly field: string;
-  readonly status: number;
-  constructor(field: string, message: string, status = 400) {
-    super(message);
-    this.field = field;
-    this.status = status;
-  }
-}
+export { InputError };
 
 export const REDIRECTS = [301, 302, 307, 308] as const;
 export type Redirect = (typeof REDIRECTS)[number];

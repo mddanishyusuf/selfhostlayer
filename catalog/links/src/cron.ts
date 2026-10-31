@@ -3,8 +3,8 @@
 //   rollup  raw clicks past the keep window become daily totals (daily)
 //   geo     the newest country list from DB-IP (monthly)
 import { join } from "node:path";
+import { updateGeo } from "../../lib/geo-update.ts";
 import { openDb } from "./db.ts";
-import { updateGeo } from "./geo-update.ts";
 import { readSettings } from "./settings.ts";
 import { rollup } from "./stats.ts";
 

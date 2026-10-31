@@ -1,6 +1,17 @@
-// Small helpers for node:http: answers, bodies with a size limit, bearer tokens.
+// Small helpers for node:http, shared by the catalog apps: answers, bodies
+// with a size limit, bearer tokens, and InputError (a field and a message,
+// answered with its status).
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { InputError } from "./validate.ts";
+
+export class InputError extends Error {
+  readonly field: string;
+  readonly status: number;
+  constructor(field: string, message: string, status = 400) {
+    super(message);
+    this.field = field;
+    this.status = status;
+  }
+}
 
 const BASE_HEADERS = { "X-Content-Type-Options": "nosniff" };
 

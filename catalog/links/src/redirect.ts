@@ -7,10 +7,10 @@
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { DatabaseSync } from "node:sqlite";
+import { clientIp } from "../../lib/geo.ts";
+import { html, readBody, send } from "../../lib/http.ts";
 import type { Clicks } from "./clicks.ts";
 import { getSetting, setSetting } from "./db.ts";
-import { clientIp } from "./geo.ts";
-import { html, readBody, send } from "./http.ts";
 import { gonePage, homePage, notFoundPage, passwordPage } from "./pages.ts";
 import type { Settings } from "./settings.ts";
 import { passwordMatches, type Link, type Store } from "./store.ts";
