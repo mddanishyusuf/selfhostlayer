@@ -8,6 +8,8 @@
     "build": "next build"
   },
   "dependencies": {
+    "@dicebear/core": "^10.7.0",
+    "@dicebear/styles": "^10.6.0",
     "@layer/protocol": "0.0.0",
     "lucide-react": "^1.66.0",
     "next": "^16.4.3",

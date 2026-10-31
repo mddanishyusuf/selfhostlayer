@@ -7,6 +7,16 @@
   resolved "https://registry.yarnpkg.com/@alloc/quick-lru/-/quick-lru-5.3.0.tgz#9073d52ad3cebbedd0d8c9f3e65aa5527fabd1e0"
   integrity sha512-U4+70Pc5ZS9osnCBCE5Jha/ciHM+Yp+CNMNC/7HvYbNRk1Ldd+f7qO65W5qfhu/TCv+/ozljlXXe9Nj8419DMA==
 
+"@dicebear/core@^10.7.0":
+  version "10.7.0"
+  resolved "https://registry.yarnpkg.com/@dicebear/core/-/core-10.7.0.tgz#abb30c82f809ffc56d9aa8b1f936cf294a01224f"
+  integrity sha512-JUOzKOd8RUByJJo8ZL+C7YE/pvEsWewfpbWUmR8OIQZWv/PvUQHnohdevySC3icyyxe6EIU/8B/rQgA42us1QA==
+
+"@dicebear/styles@^10.6.0":
+  version "10.6.0"
+  resolved "https://registry.yarnpkg.com/@dicebear/styles/-/styles-10.6.0.tgz#55cec7fc58aae8f086c534ad1703be11bd762e8e"
+  integrity sha512-KhxbEVI+z8TaenX58+ZhIRFBt7adggu/F+8g6ZYLu43H2/lgLuWA3Kg8vHBrCVWdfTTTt1p2wUhQomIkkypTuQ==
+
 "@emnapi/core@^1.11.1":
   version "1.11.3"
   resolved "https://registry.yarnpkg.com/@emnapi/core/-/core-1.11.3.tgz#5e95348a42cd1e06f0b9aa380cd74091daa4d520"
