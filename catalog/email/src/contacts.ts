@@ -10,7 +10,7 @@ import { InputError } from "../../lib/http.ts";
 import { text } from "./brands.ts";
 import { tx } from "./db.ts";
 import { isEmail } from "./mime.ts";
-import { newId } from "./secrets.ts";
+import { newId } from "../../lib/secrets.ts";
 
 export type ContactStatus = "subscribed" | "unconfirmed" | "unsubscribed" | "bounced" | "complained";
 export const STATUSES: ContactStatus[] = ["subscribed", "unconfirmed", "unsubscribed", "bounced", "complained"];

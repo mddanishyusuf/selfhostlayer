@@ -16,7 +16,7 @@ import type { Domains } from "./domains.ts";
 import { buildMessage, domainOf, parseAddress, parseAddresses, type Address, type Attachment } from "./mime.ts";
 import { SendError } from "./providers.ts";
 import { contactVars, renderMarketing, type Vars } from "./render.ts";
-import type { Secrets } from "./secrets.ts";
+import type { Secrets } from "../../lib/secrets.ts";
 
 export type Kind = "campaign" | "transactional" | "automation" | "test" | "confirm";
 

@@ -14,7 +14,7 @@ import type { Contacts } from "./contacts.ts";
 import type { Domains } from "./domains.ts";
 import type { Mailer } from "./mailer.ts";
 import { escapeHtml } from "./render.ts";
-import type { Secrets } from "./secrets.ts";
+import type { Secrets } from "../../lib/secrets.ts";
 import { verifySns, type SnsMessage } from "./ses.ts";
 
 export interface PublicContext {

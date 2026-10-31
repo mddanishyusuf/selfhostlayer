@@ -11,7 +11,7 @@ import { InputError } from "../../lib/http.ts";
 import type { Brands } from "./brands.ts";
 import { dkimRecord, newKeyPair } from "./dkim.ts";
 import { domainOf } from "./mime.ts";
-import type { Secrets } from "./secrets.ts";
+import type { Secrets } from "../../lib/secrets.ts";
 
 export interface DnsRecord {
   purpose: "DKIM" | "SPF" | "DMARC";

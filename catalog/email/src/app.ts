@@ -17,7 +17,7 @@ import { getSetting, openDb, setSetting } from "./db.ts";
 import { Domains, type Dns } from "./domains.ts";
 import { Mailer } from "./mailer.ts";
 import { handlePublic, type PublicContext } from "./public.ts";
-import { Secrets } from "./secrets.ts";
+import { Secrets } from "../../lib/secrets.ts";
 import { Templates } from "./templates.ts";
 
 export interface AppOptions {
@@ -55,7 +55,7 @@ export interface App {
 export function createApp(o: AppOptions): App {
   mkdirSync(o.dataDir, { recursive: true });
   const db = openDb(join(o.dataDir, "email.db"));
-  const secrets = new Secrets(o.token, o.secret);
+  const secrets = new Secrets(o.token, o.secret, "email");
   let publicUrl = getSetting(db, "publicUrl") ?? "http://127.0.0.1";
   const setPublicUrl = (url: string) => {
     publicUrl = url;

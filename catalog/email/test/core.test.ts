@@ -6,12 +6,12 @@ import { dkimSign, dkimVerify, newKeyPair, relaxedBody } from "../src/dkim.ts";
 import { Domains, type Dns } from "../src/domains.ts";
 import { buildMessage, checkHeaders, parseAddress, parseAddresses, quotedPrintable } from "../src/mime.ts";
 import { SendError, SmtpSender } from "../src/providers.ts";
-import { Secrets } from "../src/secrets.ts";
+import { Secrets } from "../../lib/secrets.ts";
 import { Ses, signV4, snsSignedText, verifySns, type SnsMessage } from "../src/ses.ts";
 import { fakeSmtp, type FakeSmtp } from "./fake-smtp.ts";
 import { TEST_CERT, TEST_KEY } from "./fixtures.ts";
 
-const secrets = new Secrets("a".repeat(64), "b".repeat(64));
+const secrets = new Secrets("a".repeat(64), "b".repeat(64), "email");
 
 describe("messages", () => {
   it("parse addresses, with names, and refuse what isn't one", () => {

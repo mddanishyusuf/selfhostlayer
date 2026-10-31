@@ -1,16 +1,17 @@
-// Secrets at rest, and signed links. Provider credentials and DKIM keys are
-// encrypted (AES-256-GCM) under a key made from the admin token, so the
-// database alone (a backup, the panel's database viewer) doesn't give them
-// away. Links in emails (tracking, unsubscribe, confirmation) carry an HMAC
-// made with EMAIL_SECRET, so nobody can make one for a message they didn't get.
+// Secrets at rest, and signed links, for the catalog apps. Keys and passwords
+// are encrypted (AES-256-GCM) under a key made from the app's admin token, so
+// the database alone (a backup, the panel's database viewer) doesn't give them
+// away. Links an app hands out (an email's unsubscribe link, a form's start
+// time) carry an HMAC made with its other secret, so nobody can make one.
 import { createCipheriv, createDecipheriv, createHmac, hkdfSync, randomBytes, timingSafeEqual } from "node:crypto";
 
 export class Secrets {
   readonly #key: Buffer;
   readonly #links: string;
 
-  constructor(adminToken: string, linkSecret: string) {
-    this.#key = Buffer.from(hkdfSync("sha256", adminToken, "", "email: secrets at rest", 32));
+  /** purpose: the app's id, so each app's key is its own (email, forms). */
+  constructor(adminToken: string, linkSecret: string, purpose: string) {
+    this.#key = Buffer.from(hkdfSync("sha256", adminToken, "", `${purpose}: secrets at rest`, 32));
     this.#links = linkSecret;
   }
 

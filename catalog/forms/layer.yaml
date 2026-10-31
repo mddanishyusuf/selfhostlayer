@@ -1,0 +1,25 @@
+# Forms: forms and surveys people fill in on your own address, one page or one
+# question at a time, managed from the panel's Forms page (PLAN-FORMS.md).
+id: forms
+name: Forms
+version: 0.1.0
+summary: Forms and surveys on your own server, one page or one question at a time.
+runtime:
+  kind: node
+  node: "24"
+  # node:sqlite warns that it's experimental on every start: not news worth a log line.
+  start: [node, --disable-warning=ExperimentalWarning, server.js]
+  health: /healthz
+memory: { default: 128, min: 64 }
+env:
+  # The panel's key to Forms' admin API (127.0.0.1 only); secrets at rest are encrypted under a key made from it.
+  FORMS_ADMIN_TOKEN: { generate: secret }
+  # Signs each page's start time, so a bot can't skip the page.
+  FORMS_SECRET: { generate: secret }
+services: [sqlite]
+cron:
+  # DB-IP's newest country list, a few days into each month.
+  - name: geo
+    schedule: "40 5 3 * *"
+    command: node --disable-warning=ExperimentalWarning cron.js geo
+backup: [data]

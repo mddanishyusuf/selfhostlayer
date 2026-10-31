@@ -9,7 +9,7 @@ import { InputError } from "../../lib/http.ts";
 import { tx } from "./db.ts";
 import { isEmail } from "./mime.ts";
 import { SendError, SesSender, SmtpSender, type DkimKeyFor, type Sender } from "./providers.ts";
-import type { Secrets } from "./secrets.ts";
+import type { Secrets } from "../../lib/secrets.ts";
 import { Ses } from "./ses.ts";
 import type { SmtpConfig } from "./smtp.ts";
 
