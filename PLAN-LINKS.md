@@ -257,3 +257,35 @@ backup: [data]
   - Settings (home, missing, default redirect, keep days) live in Links' database, not env vars, so they change without a restart. The manifest's only env var is `LINKS_ADMIN_TOKEN`.
 - **Tests:** 33 in `catalog/links/test`, on the parts and on a running server.
 - **Found on the way:** `agent/test/static.test.ts` failed 2 runs in 10. Two static publishes of the same commit in the same millisecond shared a folder, and a failed one deleted the live copy. Folder names now end in random characters; 0 failures in 40 runs.
+
+## Days 5–7 result (2026-10-31)
+**Day 5, done when "Browser tour: create a link in the panel, open it, see the click counted": passed. Day 6, done when "API e2e: create, list, edit and delete links with a token; a revoked token is refused": passed. Day 7, done when "VM e2e: install → make links → back up → update to 0.1.1 → restore → uninstall, no link lost": passed.** The browser tour's Links section (`TOUR_LINKS=1`, in CI) does all three:
+1. installs Links from the catalog;
+2. makes `links.internal/tour` in the panel, opens it in capitals and sees `?ref=tour` passed on;
+3. sees the click counted in the list and the stats;
+4. makes a token in the panel, and with it creates, lists, changes and deletes a link through the public API; once the token is revoked, it's refused;
+5. once `TOUR_CATALOG_CMD` adds Links 0.1.1 to the catalog: **Check again**, **Update to 0.1.1**, a backup first, the new version beside the old one, and the clicks kept;
+6. restores the backup from before the update: the old link is back, and one made after the update is gone;
+7. uninstalls Links. CI then checks that its user, unit, Caddy site and folder are gone.
+
+- **Links' pages in the panel**, above the project pages in its sidebar:
+  - **Links:** search, tags, sort, pages of 50. **New link** and **Edit** open one dialog: target, short part, title, tags, redirect, query string, password, expiry, turned off. Each row has Copy, a QR code (SVG, or a 1024px PNG; white behind the code in both themes), turn off or on, and delete (type the slug). The click count opens that link's stats. Phones show `/slug`.
+  - **Stats:** 24 hours, 7 or 30 days; people or with bots; every link or one. Totals, a bar chart by hour or day (hover, arrow keys, and a table), top links, referrers, countries with flags, devices, browsers, operating systems, and DB-IP's credit.
+  - **API:** tokens (shown once, revoked with a click), how to call it with curl, CSV export and import (skipped lines with the reason).
+  - **Settings:** Links' own settings (home, missing, default redirect, days to keep clicks) above the memory limit and Uninstall.
+  - The panel calls Links' admin API on 127.0.0.1 at the live color's port (from `unit.status`) with the token from the project's env. It refuses links to the panel's own address.
+- **Updates for every integration:**
+  - The Integrations page and the app's Settings show **Update to …** when the catalog has a newer version this server can install. **Check again** reads the catalog at once; it's otherwise kept 10 minutes.
+  - An update (trigger `update`) backs the app up first when backups are on; a failed backup stops it. Then it applies the new manifest, fetches, and deploys blue/green.
+- **Version order** (`isNewer`, `meetsMinimum`) moved to `packages/protocol`, shared by the agent, the panel and the publish scripts.
+- **The test feed:** `release-feed.sh catalog` takes several tarballs, and `<tarball>=<version>` to list one again as another version, for update tests.
+- **Found by the tour:**
+  - Headless Chrome names itself in its User-Agent, so Links counted the tour's click as a bot. That's right for Links; the tour now visits as desktop Chrome.
+  - Node printed "SQLite is an experimental feature" at every start and cron run. Links now starts with `--disable-warning=ExperimentalWarning`.
+  - The rollup sometimes moved no clicks (1 test run in 5). It grouped by `at / ?` with the day length bound as a parameter, which node:sqlite binds as a float, so the "day" it rebuilt could start a hair after the clicks it held. The day length is now written into the SQL; 0 failures in 30 runs.
+  - The deployment page's log showed its start twice after the stream reconnected (during a long `npm ci`, say). Each connection's first message should replace the log, but the page read that flag after it had changed. It now reads it first.
+- **Docs:** `docs/links.md`, updates in `docs/panel.md`, and Integrations and Links pages on the website.
+- **Changes from the plan:**
+  - Links' pages are under its project (`/projects/<slug>/links`, `/stats`, `/api`), not `/integrations/links`, so they share the project's sidebar.
+  - QR codes are drawn in the browser with `uqr`.
+- **Publishing:** `scripts/publish-catalog.sh --remove <app>` takes an app out of the catalog.

@@ -82,3 +82,4 @@ export type Response =
 export function isActionName(value: unknown): value is ActionName {
   return ACTIONS.includes(value as ActionName);
 }
+export * from "./version.ts";

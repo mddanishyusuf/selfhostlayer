@@ -1,7 +1,8 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { createIntegration, releaseOf } from "@/lib/catalog";
+import { catalogApps, createIntegration, releaseOf, updateFor } from "@/lib/catalog";
 import { activeDeployment, createDeployment, deploymentPath, deployProject, installedVersion } from "@/lib/deploy";
 import { getProjectBySlug, setMemory } from "@/lib/projects";
 import { requireUser } from "@/lib/session";
@@ -48,4 +49,31 @@ export async function saveIntegrationSettings(_prev: IntegrationSettingsState, f
     return { error: err instanceof Error ? err.message : "Couldn't start the deployment." };
   }
   redirect(path);
+}
+
+/** Updates an integration to the newest version the catalog has for this server; the page follows the deployment. */
+export async function updateIntegration(_prev: InstallState, form: FormData): Promise<InstallState> {
+  await requireUser();
+  const project = getProjectBySlug(String(form.get("slug") ?? ""));
+  if (!project || project.source !== "catalog") redirect("/integrations");
+  let path: string;
+  try {
+    if (activeDeployment(project.id)) return { error: "A deployment is running. Wait for it first." };
+    const app = (await catalogApps({ fresh: true })).find((a) => a.id === project.catalogApp);
+    const version = updateFor(installedVersion(project.id)?.version, app);
+    if (!version) return { error: "It's already the newest version this server can install." };
+    const m = version.manifest;
+    const d = createDeployment(project, "update", { sha: releaseOf(version), message: `${m.name} ${m.version}`, author: "" }, { version: m.version, manifest: m });
+    path = deploymentPath(project.slug, d.id);
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "Couldn't start the update." };
+  }
+  redirect(path);
+}
+
+/** Reads the catalog again now (it's kept for 10 minutes). */
+export async function refreshCatalog(): Promise<void> {
+  await requireUser();
+  await catalogApps({ fresh: true }).catch(() => {});
+  revalidatePath("/integrations");
 }

@@ -122,7 +122,8 @@ export function stats(db: DatabaseSync, store: Store, o: { range: Range; linkId?
  */
 export function rollup(db: DatabaseSync, keepDays: number, now = Date.now()): { days: number; clicks: number } {
   const cutoff = Math.floor(now / DAY) * DAY - (keepDays - 1) * DAY;
-  const days = (db.prepare("SELECT DISTINCT at / ? d FROM clicks WHERE at < ? ORDER BY d").all(DAY, cutoff) as { d: number }[]).map((r) => r.d);
+  // The day length is written into the SQL: bound, it's a float, and at / DAY wouldn't be whole days.
+  const days = (db.prepare(`SELECT DISTINCT at / ${DAY} d FROM clicks WHERE at < ? ORDER BY d`).all(cutoff) as { d: number }[]).map((r) => r.d);
   let moved = 0;
   for (const d of days) {
     const from = d * DAY;

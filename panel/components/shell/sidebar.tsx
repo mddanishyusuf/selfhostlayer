@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowUpRightIcon, BellIcon, ChartColumnIcon, ChevronDownIcon, ChevronLeftIcon, CircleArrowUpIcon, ClockIcon, DatabaseBackupIcon, DatabaseIcon, FolderIcon, GlobeIcon, HistoryIcon, KeyRoundIcon, LayoutDashboardIcon, LogOutIcon, MenuIcon, MoonIcon, PanelLeftOpenIcon, PuzzleIcon, RocketIcon, SearchIcon, ServerIcon, SettingsIcon, ShieldIcon, SquareTerminalIcon, SunIcon } from "lucide-react";
+import { ArrowUpRightIcon, BellIcon, BracesIcon, ChartColumnIcon, ChevronDownIcon, ChevronLeftIcon, CircleArrowUpIcon, ClockIcon, DatabaseBackupIcon, DatabaseIcon, FolderIcon, GlobeIcon, HistoryIcon, KeyRoundIcon, LayoutDashboardIcon, LinkIcon, LogOutIcon, MenuIcon, MoonIcon, PanelLeftOpenIcon, PuzzleIcon, RocketIcon, SearchIcon, ServerIcon, SettingsIcon, ShieldIcon, SquareTerminalIcon, SunIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Fragment, useEffect, useState } from "react";
@@ -18,6 +18,8 @@ export interface SidebarProject {
   branch: string;
   /** Installed from Integrations: its pages go back there, and Projects doesn't count it. */
   integration: boolean;
+  /** The catalog app (links), whose own pages come first. */
+  app: string | null;
   status: "ok" | "warn" | "err" | "idle";
   isStatic: boolean;
   url: string | null;
@@ -67,9 +69,24 @@ function globalNav(p: SidebarProps): Item[][] {
   ];
 }
 
+/** An integration's own pages, above the ones every project has. */
+function appNav(p: SidebarProject, base: string): Item[][] {
+  if (p.app === "links") {
+    return [
+      [
+        { href: `${base}/links`, label: "Links", icon: LinkIcon },
+        { href: `${base}/stats`, label: "Stats", icon: ChartColumnIcon },
+        { href: `${base}/api`, label: "API", icon: BracesIcon },
+      ],
+    ];
+  }
+  return [];
+}
+
 function projectNav(p: SidebarProject): Item[][] {
   const base = `/projects/${p.slug}`;
   return [
+    ...appNav(p, base),
     [
       { href: base, label: "Overview", icon: LayoutDashboardIcon, exact: true },
       { href: `${base}/deployments`, label: "Deployments", icon: RocketIcon },

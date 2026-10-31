@@ -87,7 +87,7 @@ describe("applyManifest", () => {
     const project = integrationFor("hello")!;
     setProjectEnv(project.id, { HELLO_GREETING: "Hi", MINE: "1" });
     setMemory(project.id, 64);
-    const hello = (await catalogApps())[0]!.versions[0]!.manifest;
+    const hello = (await catalogApps()).find((a) => a.id === "hello")!.versions[0]!.manifest;
     const next: AppManifest = {
       ...hello,
       version: "0.2.0",

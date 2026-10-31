@@ -197,7 +197,9 @@ Tools every product needs, built for Self Host Layer and installed in one click.
 - **Installed:** each tool with its version and whether it runs. **Open** goes to its address, and **Manage** to its pages.
 - **Settings:** the memory limit, down to the least the tool needs. How it starts and runs comes with each version.
 - **Uninstall** (on its Settings page): type its name to confirm. As when deleting a project, the tool stops, and its user, files, unit, cron jobs and Caddy site are removed. Its `data/` folder is kept in `/var/lib/layer-agent/archive/` unless you say otherwise.
-- **Coming soon:** Links (short links on your own domain), analytics, email, a post scheduler, a blog, a status page, a waitlist and a feedback board.
+- **Updates:** when the catalog has a newer version, Installed and the tool's Settings page show **Update**. It backs the tool's data up first when backups are on, then starts the new version beside the old one. **Check again** reads the catalog at once (it's kept for 10 minutes).
+- **[Links](links.md)**, the first tool: short links on your own domain, with click stats and QR codes.
+- **Coming soon:** analytics, email, a post scheduler, a blog, a status page, a waitlist and a feedback board.
 
 ### Databases
 - **Engines:** SQLite, PostgreSQL, Redis, MongoDB and MySQL (MariaDB), each with its version, whether it runs (PostgreSQL, MySQL and MongoDB as systemd sees their server) and how much the apps use. MongoDB has its Install button here, and Start when it's stopped, which tells you why if it can't start.

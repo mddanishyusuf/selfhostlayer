@@ -4,7 +4,7 @@
 // starts, its Node, the env vars it needs and its cron jobs; everything else
 // (its user and sandbox, domains, backups, logs) is a project's.
 import { randomBytes } from "node:crypto";
-import type { AppManifest } from "@layer/protocol";
+import { isNewer, type AppManifest } from "@layer/protocol";
 import { agent } from "./agent";
 import { boxConfig, freeHost } from "./box";
 import { saveCron, validateCron } from "./crons";
@@ -45,6 +45,12 @@ export async function catalogApps({ fresh = false } = {}): Promise<CatalogApp[]>
   const { apps } = await agent<{ apps: CatalogApp[] }>("catalog.list");
   cache = { at: Date.now(), apps };
   return apps;
+}
+
+/** The newest version this server can install, when it's newer than the installed one. */
+export function updateFor(installed: string | null | undefined, app: CatalogApp | undefined): CatalogVersion | null {
+  const newest = app?.versions.find((v) => v.supported);
+  return installed && newest && isNewer(newest.version, installed) ? newest : null;
 }
 
 /** A version's release on the server: the first 40 characters of its tarball's sha256 (as a commit names a GitHub release). */

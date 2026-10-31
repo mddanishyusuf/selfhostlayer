@@ -6,7 +6,9 @@
 # top of that app's list in the catalog. Every panel's Integrations page offers
 # it the next time it reads the catalog.
 #   LAYER_RELEASE_HOST=root@<server> scripts/publish-catalog.sh <app> [--notes "…"] [--min-panel <version>]
+#   LAYER_RELEASE_HOST=root@<server> scripts/publish-catalog.sh --remove <app>
 # --min-panel: the oldest Self Host Layer that can install this version.
+# --remove takes an app out of the catalog (servers that have it keep running it).
 # SC2029: the ssh commands name paths on the server, filled in here on purpose.
 # shellcheck disable=SC2029
 set -euo pipefail
@@ -20,6 +22,20 @@ dir="/srv/apps/$site/data/catalog"
 
 die() { echo "publish-catalog: $*" >&2; exit 1; }
 sum() { if command -v sha256sum >/dev/null; then sha256sum "$1" | cut -d' ' -f1; else shasum -a 256 "$1" | cut -d' ' -f1; fi; }
+
+if [[ "${1:-}" == --remove ]]; then
+  app="${2:-}"
+  [[ "$app" =~ ^[a-z][a-z0-9-]{0,30}$ ]] || die "usage: publish-catalog.sh --remove <app>"
+  echo "Taking $app out of the catalog on $host"
+  current="$(ssh "$host" "cat '$dir/catalog.json' 2>/dev/null || echo '{\"apps\":[]}'")"
+  mkdir -p "$root/dist/catalog"
+  node "$root/scripts/catalog-feed.ts" remove "$app" <<<"$current" >"$root/dist/catalog/catalog.json"
+  scp -q "$root/dist/catalog/catalog.json" "$host:$dir/catalog.json.new"
+  ssh "$host" "chown 'app-$site:app-$site' '$dir/catalog.json.new' && chmod 644 '$dir/catalog.json.new' && mv -f '$dir/catalog.json.new' '$dir/catalog.json' && rm -rf '$dir/$app'"
+  listed="$(curl -fsS --max-time 20 "$catalog_url" 2>/dev/null | node "$root/scripts/catalog-feed.ts" versions "$app" 2>/dev/null || true)"
+  if [[ -n "$listed" ]]; then echo "! $catalog_url still lists $app" >&2; else echo "✓ $catalog_url no longer lists $app"; fi
+  exit 0
+fi
 
 app="${1:-}"
 [[ "$app" =~ ^[a-z][a-z0-9-]{0,30}$ && -f "$root/catalog/$app/layer.yaml" ]] || die "usage: publish-catalog.sh <app, a folder in catalog/> [--notes \"…\"] [--min-panel <version>]"

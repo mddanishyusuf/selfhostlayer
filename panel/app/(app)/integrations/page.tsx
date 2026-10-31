@@ -1,11 +1,11 @@
 import { ActivityIcon, ArrowUpRightIcon, CalendarIcon, ChartColumnIcon, ClockIcon, HandIcon, LinkIcon, MailIcon, MessageSquareIcon, PencilIcon, PuzzleIcon } from "lucide-react";
 import Link from "next/link";
 import { Icon, type IconSvgElement } from "@/components/icon";
-import { InstallButton } from "@/components/integrations";
+import { CheckCatalogButton, InstallButton, UpdateButton } from "@/components/integrations";
 import { Empty, Notice, PageHeader, PillLink, Section, TableHead, TableRow, TileIcon, type TileTone } from "@/components/page";
 import { StatusChip, timeAgo } from "@/components/status";
 import { Pill } from "@/components/ui";
-import { catalogApps, type CatalogApp } from "@/lib/catalog";
+import { catalogApps, updateFor, type CatalogApp } from "@/lib/catalog";
 import { FINISHED, installedVersion, listDeployments, liveDeployment } from "@/lib/deploy";
 import { servingConfig } from "@/lib/domains";
 import { integrationFor, listProjects, type Project } from "@/lib/projects";
@@ -52,8 +52,9 @@ const INSTALLED = "44px minmax(200px,1fr) 150px 110px auto";
 const CATALOG = "44px minmax(220px,1fr) 150px auto";
 const PLANNED_COLUMNS = "44px minmax(220px,1fr) auto";
 
-function InstalledRow({ project }: { project: Project }) {
+function InstalledRow({ project, app }: { project: Project; app: CatalogApp | undefined }) {
   const version = installedVersion(project.id);
+  const update = updateFor(version?.version, app);
   const latest = listDeployments(project.id, 1)[0];
   const live = liveDeployment(project.id);
   const hosts = servingConfig(project.id).domains;
@@ -83,7 +84,8 @@ function InstalledRow({ project }: { project: Project }) {
       <span className="max-md:ml-auto">
         <StatusChip status={status.dot} label={status.label} pulse={!!busy} />
       </span>
-      <span className="flex justify-end gap-2 max-md:w-full">
+      <span className="flex flex-wrap justify-end gap-2 max-md:w-full">
+        {update && !busy && <UpdateButton slug={project.slug} version={update.version} />}
         {live && host && (
           <PillLink href={`https://${host}`} external size="sm">
             Open <Icon icon={ArrowUpRightIcon} size={13} />
@@ -158,12 +160,12 @@ export default async function IntegrationsPage() {
               <span />
             </TableHead>
             {installed.map((p) => (
-              <InstalledRow key={p.id} project={p} />
+              <InstalledRow key={p.id} project={p} app={apps.find((a) => a.id === p.catalogApp)} />
             ))}
           </div>
         </Section>
       )}
-      <Section title="Catalog" description="Every tool comes with Self Host Layer. Each runs as its own sandboxed app on this server.">
+      <Section title="Catalog" description="Every tool comes with Self Host Layer. Each runs as its own sandboxed app on this server." aside={<CheckCatalogButton />}>
         <div className="border-t border-border">
           {apps.length ? (
             <>

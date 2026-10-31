@@ -26,6 +26,7 @@ function sidebarProjects(): SidebarProject[] {
       repo: integration ? (installedVersion(p.id)?.commitMessage ?? p.slug) : `${p.repoOwner}/${p.repoName}`,
       branch: integration ? "from the catalog" : p.branch,
       integration,
+      app: p.catalogApp,
       status: building ? "warn" : live ? "ok" : latest?.status === "failed" ? "err" : "idle",
       isStatic: p.runtime.kind === "static",
       url: live && host ? `https://${host}` : null,

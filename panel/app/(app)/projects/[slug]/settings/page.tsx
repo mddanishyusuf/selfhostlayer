@@ -1,8 +1,12 @@
 import { notFound } from "next/navigation";
+import { UpdateButton } from "@/components/integrations";
+import { LinksSettingsForm } from "@/components/links";
 import { DeleteProject, IntegrationSettingsForm, SettingsForm } from "@/components/settings";
-import { Notice, PageHeader } from "@/components/page";
+import { Notice, PageHeader, SettingsRow } from "@/components/page";
+import { catalogApps, updateFor } from "@/lib/catalog";
 import { frameworkLabel } from "@/lib/detect";
 import { installedVersion, listDeployments } from "@/lib/deploy";
+import { isLinks, linksApi, shortDomain, type LinksSettings } from "@/lib/links";
 import { getProjectBySlug, projectEnv } from "@/lib/projects";
 import { requireUser } from "@/lib/session";
 
@@ -20,9 +24,24 @@ export default async function SettingsPage({ params, searchParams }: { params: P
     // An integration's manifest decides how it builds and runs; its memory limit is the owner's.
     const version = installedVersion(project.id);
     const name = version?.manifest?.name ?? project.slug;
+    // Links keeps its own settings; they show when it's running.
+    const links = isLinks(project) ? await linksApi<LinksSettings>(project, "settings").catch(() => null) : null;
+    const app = (await catalogApps().catch(() => [])).find((a) => a.id === project.catalogApp);
+    const update = updateFor(version?.version, app);
     return (
       <>
         <PageHeader title={project.slug} crumb="Settings" meta={`${version?.commitMessage ?? name}, from the catalog`} />
+        <SettingsRow title="Version" description="Updates come from the Self Host Layer catalog. An update backs the data up first when backups are on, and starts beside the old version, so nothing goes down.">
+          <div className="flex flex-wrap items-center justify-between gap-3" data-testid="integration-version">
+            <span>
+              {version?.commitMessage ?? name}
+              {!update && <span className="text-muted"> · the newest</span>}
+            </span>
+            {update && <UpdateButton slug={project.slug} version={update.version} size="md" />}
+          </div>
+          {update?.notes && <p className="text-[12px] text-muted">New in {update.version}: {update.notes}</p>}
+        </SettingsRow>
+        {links && <LinksSettingsForm slug={project.slug} domain={shortDomain(project)} settings={links} />}
         <IntegrationSettingsForm slug={project.slug} name={name} memoryMb={project.memoryMb} min={version?.manifest?.memory.min ?? 64} />
         <DeleteProject slug={project.slug} integration={name} />
       </>

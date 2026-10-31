@@ -5,11 +5,12 @@
 //        app stay), checked as every server will check it. build.json is what
 //        scripts/build-catalog.ts printed. Fails unless the version is new and
 //        newer than the app's newest.
+//   node scripts/catalog-feed.ts remove <app>        the catalog without that app
 //   node scripts/catalog-feed.ts versions <app>      the app's versions it lists, one a line
 //   node scripts/catalog-feed.ts has <app> <version> fails unless it lists that version
 import { readFileSync } from "node:fs";
 import { parseCatalog } from "../agent/src/actions/catalog.ts";
-import { isNewer } from "../agent/src/version.ts";
+import { isNewer } from "../packages/protocol/src/version.ts";
 
 const KEEP = 10;
 
@@ -57,10 +58,13 @@ if (command === "add" && args.length === 5) {
     fail(`the servers couldn't read this catalog: ${(err as Error).message}`);
   }
   console.log(text);
+} else if (command === "remove" && args.length === 1) {
+  if (!catalog.apps.some((a) => a.id === args[0])) fail(`the catalog doesn't list ${args[0]}`);
+  console.log(JSON.stringify({ apps: catalog.apps.filter((a) => a.id !== args[0]) }, null, 2));
 } else if (command === "versions" && args.length === 1) {
   for (const v of versionsOf(args[0]!)) console.log(v.version);
 } else if (command === "has" && args.length === 2) {
   if (!versionsOf(args[0]!).some((v) => v.version === args[1])) fail(`the catalog doesn't list ${args[0]} ${args[1]}`);
 } else {
-  fail("usage: catalog-feed.ts add <build.json> <tarball-url> <catalog-url> <notes> <min-panel> | versions <app> | has <app> <version>");
+  fail("usage: catalog-feed.ts add <build.json> <tarball-url> <catalog-url> <notes> <min-panel> | remove <app> | versions <app> | has <app> <version>");
 }

@@ -113,9 +113,39 @@ const FAKE: Partial<Record<ActionName, unknown>> = {
   },
   "metrics.disk": { apps: { piqo: 310 } },
   "proxy.set": {},
-  // The catalog's test app, as catalog.list gives it (get.selfhostlayer.com/catalog.json).
+  // The catalog as catalog.list gives it (get.selfhostlayer.com/catalog.json): Links, and the test app.
   "catalog.list": {
     apps: [
+      {
+        id: "links",
+        name: "Links",
+        summary: "Short links on your own domain, with click stats and QR codes.",
+        versions: [
+          {
+            version: "0.1.0",
+            date: "2026-10-31",
+            notes: "The first version.",
+            minPanel: null,
+            sha256: "ac4db1ed35f17b1d36126168c1e680f19b2b28c24daced6eba73f6458532c04a",
+            supported: true,
+            manifest: {
+              id: "links",
+              name: "Links",
+              version: "0.1.0",
+              summary: "Short links on your own domain, with click stats and QR codes.",
+              runtime: { kind: "node", node: "24", start: ["node", "--disable-warning=ExperimentalWarning", "server.js"], health: "/healthz", writable: [] },
+              memory: { default: 128, min: 64 },
+              env: { LINKS_ADMIN_TOKEN: { generate: "secret" } },
+              services: ["sqlite"],
+              cron: [
+                { name: "rollup", schedule: "30 3 * * *", command: "node --disable-warning=ExperimentalWarning cron.js rollup" },
+                { name: "geo", schedule: "0 5 3 * *", command: "node --disable-warning=ExperimentalWarning cron.js geo" },
+              ],
+              backup: ["data"],
+            },
+          },
+        ],
+      },
       {
         id: "hello",
         name: "Hello",

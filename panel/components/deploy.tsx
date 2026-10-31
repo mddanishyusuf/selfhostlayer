@@ -165,8 +165,10 @@ export function LogViewer({ deploymentId, initialStatus }: { deploymentId: numbe
       source.addEventListener("log", (e) => {
         alive();
         const text = JSON.parse((e as MessageEvent).data) as string;
-        setLog((prev) => (first ? text : prev + text));
+        // Read now: React runs the updater later, after `first` has changed.
+        const replace = first;
         first = false;
+        setLog((prev) => (replace ? text : prev + text));
       });
       source.addEventListener("status", (e) => {
         alive();

@@ -5,11 +5,13 @@
 //   node panel/scripts/ui-tour.ts <base-url> <setup-token> <out-dir>
 //
 // Needs Google Chrome. Uses the DevTools protocol over Node's built-in WebSocket.
-import { execFileSync, spawn } from "node:child_process";
+import { execFileSync, execSync, spawn } from "node:child_process";
+import { lookup as dnsLookup } from "node:dns";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createHmac, randomUUID } from "node:crypto";
+import { request as httpsRequest } from "node:https";
 import { DatabaseSync } from "node:sqlite";
 import { currentCounter, totpAt } from "../lib/totp.ts";
 
@@ -118,6 +120,9 @@ async function setViewport(width: number, height: number, dark = false) {
 const fill = (selector: string, value: string) =>
   evaluate(`(() => { const el = document.querySelector(${JSON.stringify(selector)}); el.value = ${JSON.stringify(value)}; return true; })()`);
 const click = (selector: string) => evaluate(`document.querySelector(${JSON.stringify(selector)}).click(), true`);
+/** For React-controlled inputs: set through the native setter, so React sees the change. */
+const setValue = (selector: string, value: string) =>
+  evaluate(`(() => { const el = document.querySelector(${JSON.stringify(selector)}); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(el, ${JSON.stringify(value)}); el.dispatchEvent(new Event("input", { bubbles: true })); return true; })()`);
 async function typeCode(code: string) {
   await evaluate(`document.querySelector('input[aria-label="Digit 1"]').focus(), true`);
   await send("Input.insertText", { text: code });
@@ -364,8 +369,6 @@ if (process.env.TOUR_DEPLOY === "1") {
   console.log("Crons");
   await go("/projects/next/crons");
   await waitForPath("/projects/next/crons");
-  const setValue = (selector: string, value: string) =>
-    evaluate(`(() => { const el = document.querySelector(${JSON.stringify(selector)}); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(el, ${JSON.stringify(value)}); el.dispatchEvent(new Event("input", { bubbles: true })); return true; })()`);
   await fill("#name", "greet");
   await setValue("#schedule", "*/30 * * * *");
   await fill("#command", "node -e console.log(process.env.GREETING)");
@@ -843,6 +846,37 @@ if (process.env.TOUR_DEPLOY === "1") {
   console.log("  ✓ deleted the vite project; it's gone from the overview");
 }
 
+/**
+ * An HTTPS request from this script to an app on the box. Test boxes use
+ * Caddy's local CA, so certificates aren't checked; TOUR_RESOLVE=<address>
+ * stands in for *.internal names this machine can't resolve.
+ */
+function boxRequest(url: string, init: { method?: string; headers?: Record<string, string>; body?: string } = {}): Promise<{ status: number; body: string; location?: string }> {
+  return new Promise((done, fail) => {
+    const req = httpsRequest(
+      new URL(url),
+      {
+        method: init.method ?? "GET",
+        headers: init.headers,
+        rejectUnauthorized: false,
+        lookup: (host: string, opts: { all?: boolean }, cb: (...args: any[]) => void) => {
+          const ip = process.env.TOUR_RESOLVE;
+          if (!ip || !host.endsWith(".internal")) return dnsLookup(host, opts as never, cb);
+          return opts.all ? cb(null, [{ address: ip, family: 4 }]) : cb(null, ip, 4);
+        },
+      } as never,
+      (res) => {
+        let body = "";
+        res.setEncoding("utf8");
+        res.on("data", (c: string) => (body += c));
+        res.on("end", () => done({ status: res.statusCode ?? 0, body, location: res.headers.location }));
+      },
+    );
+    req.on("error", fail);
+    req.end(init.body);
+  });
+}
+
 // TOUR_INTEGRATIONS=1: a catalog beside the release feed lists the hello app
 // (installer/test/release-feed.sh catalog). Install it from Integrations, see
 // it answer on its free URL, then uninstall it.
@@ -879,6 +913,148 @@ if (process.env.TOUR_INTEGRATIONS === "1") {
   await sleep(2000);
   if (String(await evaluate("document.body?.innerText ?? ''").catch(() => "")).includes(greeting)) throw new Error(`https://${host}/ still answers after the uninstall`);
   console.log(`  ✓ Uninstall: gone from Installed, back in the catalog, and https://${host}/ no longer answers`);
+}
+
+// TOUR_LINKS=1: the catalog beside the release feed lists Links. Install it, make
+// a link in the panel, open it and see the click counted, use the public API
+// with a token made in the panel, then (with TOUR_CATALOG_CMD, which adds a
+// newer Links to the catalog) update it, restore the backup taken before the
+// update (with TOUR_BACKUPS), and uninstall it. No link may be lost.
+if (process.env.TOUR_LINKS === "1") {
+  console.log("Links");
+  const domain = `links.${process.env.TOUR_APPS_DOMAIN ?? "internal"}`;
+  await setViewport(1280, 900);
+  await go("/integrations");
+  await waitForPath("/integrations");
+  await waitFor(`!!document.querySelector('[data-testid="install-links"]')`, "Links in the catalog", 30_000);
+  await click('[data-testid="install-links"] button[type=submit]');
+  await waitFor(`location.pathname.startsWith("/projects/links/deployments/")`, "Links' install", 60_000);
+  await waitForDeploy("installing Links");
+  console.log("  ✓ installed Links from the catalog");
+
+  const linksPage = async () => {
+    await go("/projects/links/links");
+    await waitForPath("/projects/links/links");
+    await waitFor(`!!document.querySelector('[data-testid="links-list"]')`, "the links list");
+  };
+  const clicksOf = (slug: string) => evaluate(`Number(document.querySelector('[data-testid="link-${slug}"] a[title="Its stats"]')?.textContent.replace(/,/g, "") ?? -1)`) as Promise<number>;
+  await linksPage();
+  await click('[data-testid="new-link"]');
+  await waitFor(`!!document.querySelector('[data-testid="link-form"]')`, "the link dialog");
+  // Its own robots.txt: a target the tour can open without the internet.
+  await fill("#target", `https://${domain}/robots.txt`);
+  await fill("#path", "Tour");
+  await fill("#title", "From the tour");
+  await click('[data-testid="link-form"] button[type=submit]');
+  await waitFor(`!!document.querySelector('[data-testid="link-tour"]') && !document.querySelector('[data-testid="link-form"]')`, "the new link in the list", 20_000);
+  await screenshot("links-list");
+  console.log(`  ✓ made ${domain}/tour in the panel`);
+
+  // Headless Chrome says so in its User-Agent, and Links rightly counts that as a bot: visit as a desktop browser.
+  await send("Emulation.setUserAgentOverride", { userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36" });
+  await visit(domain, "/TOUR?ref=tour", "Disallow: /");
+  const landed = String(await evaluate("location.href"));
+  if (!landed.endsWith("/robots.txt?ref=tour")) throw new Error(`the short link went to ${landed}`);
+  console.log("  ✓ the short link (in capitals) redirects, passing ?ref=tour on");
+  let clicks = -1;
+  for (let i = 0; i < 15 && clicks < 1; i++) {
+    await sleep(1000);
+    await linksPage();
+    clicks = await clicksOf("tour");
+  }
+  if (clicks < 1) throw new Error("the click wasn't counted");
+  await go("/projects/links/stats?range=24h");
+  await waitForPath("/projects/links/stats");
+  await waitFor(`!!document.querySelector('[data-testid="clicks-chart"]') && document.body.innerText.includes("/tour")`, "the stats with /tour");
+  await screenshot("links-stats");
+  console.log(`  ✓ the click is counted in the list (${clicks}) and the stats`);
+
+  await go("/projects/links/api");
+  await waitForPath("/projects/links/api");
+  await fill('[data-testid="new-token"] input[name="name"]', "tour");
+  await click('[data-testid="new-token"] button[type=submit]');
+  await waitFor(`!!document.querySelector('[data-testid="token-once"] code')`, "the new token, shown once");
+  const token = String(await evaluate(`document.querySelector('[data-testid="token-once"] code').textContent`)).trim();
+  const api = (method: string, path = "", body?: unknown) =>
+    boxRequest(`https://${domain}/api/v1/links${path}`, { method, headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body: body === undefined ? undefined : JSON.stringify(body) });
+  const made = await api("POST", "", { slug: "from-api", target: `https://${domain}/robots.txt`, tags: ["api"] });
+  if (made.status !== 201 || !made.body.includes(`"shortUrl":"https://${domain}/from-api"`)) throw new Error(`API create: ${made.status} ${made.body}`);
+  const listed = await api("GET", "?q=from-api");
+  if (!listed.body.includes('"total":1')) throw new Error(`API list: ${listed.body}`);
+  const changed = await api("PATCH", "/from-api", { title: "Changed" });
+  if (!changed.body.includes('"title":"Changed"')) throw new Error(`API update: ${changed.body}`);
+  if ((await api("DELETE", "/from-api")).status !== 200 || (await api("GET", "/from-api")).status !== 404) throw new Error("API delete didn't delete");
+  await go("/projects/links/api");
+  await waitForPath("/projects/links/api");
+  // Revoke asks first; a real dialog would block the page (and this script).
+  await evaluate("window.confirm = () => true, true");
+  await evaluate(`[...document.querySelectorAll('[data-testid="tokens"] button')].find((b) => b.textContent === "Revoke").click(), true`);
+  let refused = 0;
+  for (let i = 0; i < 10 && refused !== 401; i++) {
+    await sleep(500);
+    refused = (await api("GET")).status;
+  }
+  if (refused !== 401) throw new Error(`a revoked token still works (${refused})`);
+  console.log("  ✓ the API with a token from the panel: made, listed, changed and deleted a link; the revoked token is refused");
+
+  if (process.env.TOUR_CATALOG_CMD) {
+    execSync(process.env.TOUR_CATALOG_CMD, { stdio: "inherit" });
+    await go("/integrations");
+    await waitForPath("/integrations");
+    await click('[data-testid="check-catalog"] button');
+    await waitFor(`!!document.querySelector('[data-testid="update-links"]')`, "the Update button for Links", 30_000);
+    const offered = String(await evaluate(`document.querySelector('[data-testid="update-links"]').innerText`));
+    await screenshot("links-update");
+    await click('[data-testid="update-links"] button[type=submit]');
+    await waitFor(`location.pathname.startsWith("/projects/links/deployments/")`, "the update's deployment", 60_000);
+    await waitForDeploy("updating Links");
+    const log = String(await evaluate(`document.querySelector('[role=log]')?.innerText ?? ""`));
+    if (process.env.TOUR_BACKUPS === "1" && !log.includes("Backed up")) throw new Error(`no backup before the update:\n${log.slice(-1500)}`);
+    await linksPage();
+    const after = await clicksOf("tour");
+    if (after < clicks) throw new Error(`after the update /tour has ${after} clicks, before ${clicks}`);
+    await go("/projects/links/settings");
+    await waitFor(`!!document.querySelector('[data-testid="integration-version"]')?.innerText.includes("the newest")`, "the new version in Settings");
+    console.log(`  ✓ ${offered.trim()}: ${process.env.TOUR_BACKUPS === "1" ? "backed up first, then " : ""}deployed beside the old one; /tour kept its ${after} clicks`);
+
+    if (process.env.TOUR_BACKUPS === "1") {
+      // A link made after the update, then the backup from before it restored: the old links stay, the new one goes.
+      await linksPage();
+      await click('[data-testid="new-link"]');
+      await waitFor(`!!document.querySelector('[data-testid="link-form"]')`, "the link dialog");
+      await fill("#target", `https://${domain}/robots.txt`);
+      await fill("#path", "after-update");
+      await click('[data-testid="link-form"] button[type=submit]');
+      await waitFor(`!!document.querySelector('[data-testid="link-after-update"]')`, "the second link");
+      await go("/projects/links/backups");
+      await waitForPath("/projects/links/backups");
+      await evaluate(`[...document.querySelectorAll('[data-testid="backup-list"] button')].find((b) => b.textContent === "Restore").click(), true`);
+      await waitFor(`!!document.querySelector('input[name="confirm"]')`, "restore confirmation");
+      await setValue('input[name="confirm"]', "links");
+      await waitFor(`!document.querySelector('form:has(input[name="confirm"]) button[type=submit]').disabled`, "the restore button to enable");
+      await click('form:has(input[name="confirm"]) button[type=submit]');
+      await waitFor(`document.body.innerText.includes("Restored.") || !!document.querySelector('form:has(input[name="confirm"]) [role=alert]')`, "the restore", 180_000);
+      if (!String(await evaluate("document.body.innerText")).includes("Restored.")) throw new Error("the restore failed");
+      let back = false;
+      for (let i = 0; i < 15 && !back; i++) {
+        await sleep(1000);
+        await linksPage();
+        back = !!(await evaluate(`!!document.querySelector('[data-testid="link-tour"]') && !document.querySelector('[data-testid="link-after-update"]')`));
+      }
+      if (!back) throw new Error("after the restore the links aren't the backup's");
+      console.log("  ✓ restored the backup from before the update: /tour is there, the link made after it is gone");
+    }
+  }
+
+  await go("/projects/links/settings");
+  await waitForPath("/projects/links/settings");
+  await click('[data-testid="uninstall"]');
+  await waitFor(`!!document.querySelector("#confirm")`, "the uninstall confirmation");
+  await setValue("#confirm", "links");
+  await click('form:has(#confirm) button[type=submit]');
+  await waitForPath("/integrations");
+  await waitFor(`!document.querySelector('[data-testid="installed-links"]') && !!document.querySelector('[data-testid="install-links"]')`, "Links back in the catalog");
+  console.log("  ✓ uninstalled Links");
 }
 
 // TOUR_PANEL_ADDRESS=<host>: move the panel there from Settings and back. On a

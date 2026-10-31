@@ -6,7 +6,7 @@
 //                                                        the feed with this release on top (the newest 10 stay)
 //   node scripts/release-feed.ts versions                the versions it lists, one a line
 import { readFileSync } from "node:fs";
-import { isNewer } from "../agent/src/version.ts";
+import { isNewer } from "../packages/protocol/src/version.ts";
 
 const KEEP = 10;
 

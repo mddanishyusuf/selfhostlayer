@@ -17,6 +17,8 @@ import { installationToken } from "./github";
 import { raise, resolve } from "./alerts/engine";
 import { boxConfig } from "./box";
 import { BuildQueue } from "./build-queue";
+import { getBackupSettings } from "./backup/settings";
+import { backUpProject } from "./backup/runner";
 import { applyManifest } from "./catalog";
 import { checkCertificate } from "./cert";
 import { syncCrons } from "./crons";
@@ -43,7 +45,7 @@ export interface Deployment {
   sha: string;
   commitMessage: string;
   commitAuthor: string;
-  trigger: "manual" | "push" | "rollback" | "import" | "install";
+  trigger: "manual" | "push" | "rollback" | "import" | "install" | "update";
   status: DeployStatus;
   color: "blue" | "green" | "static" | null;
   error: string | null;
@@ -343,6 +345,18 @@ async function repoToken(project: Project): Promise<string | undefined> {
   return token;
 }
 
+/** Backs the app up to the bucket before an update, when backups are set up; a failed backup stops the update. */
+async function backUpBeforeUpdate(id: number, p: Project): Promise<void> {
+  if (!getBackupSettings()?.keyConfirmed) {
+    log(id, "Backups aren't set up (Backups in the sidebar), so there's no copy of the data from before this update.\n");
+    return;
+  }
+  log(id, "Backing up its data before the update…\n");
+  const backup = await backUpProject(p, "manual");
+  if (backup.status !== "ok") throw new Error(`The backup before the update failed (${backup.error ?? "no reason given"}), so nothing was changed.`);
+  log(id, `Backed up (${((backup.bytes ?? 0) / 1024 / 1024).toFixed(1)} MB). Its Backups page can restore it.\n`);
+}
+
 async function run(id: number): Promise<void> {
   const d = getDeployment(id);
   if (!d || d.status !== "queued") return;
@@ -382,6 +396,8 @@ async function run(id: number): Promise<void> {
   try {
     if (catalog) {
       if (!d.version || !d.manifest) throw new Error("This deployment doesn't say which version to install.");
+      // A new version may change its data (Links migrates its database at start): back it up first.
+      if (d.trigger === "update") await backUpBeforeUpdate(id, p);
       // How it starts, its Node, env and cron jobs come from this version's manifest.
       for (const note of await applyManifest(p, d.manifest)) log(id, note);
       p = getProject(p.id)!;
