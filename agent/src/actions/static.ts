@@ -51,8 +51,9 @@ async function staticPublish(params: Params, ctx: Context, io: CallIO) {
   ensureDir(siteDir, 0o751, { uid: process.getuid?.() ?? 0, gid });
   // A new folder for every publish, even of the same commit (a redeploy after
   // an env change): the live folder is never touched until `current` switches,
-  // so a failed publish can't take the site down.
-  const name = `${sha}-${Date.now().toString(36)}`;
+  // so a failed publish can't take the site down. The random tail keeps two
+  // publishes in the same millisecond from sharing (and deleting) one folder.
+  const name = `${sha}-${Date.now().toString(36)}${randomBytes(2).toString("hex")}`;
   const dest = join(siteDir, name);
   ensureDir(dest, 0o2750, { uid: user.uid, gid });
 

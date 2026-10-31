@@ -222,3 +222,38 @@ backup: [data]
   - 5 panel unit tests (`panel/lib/catalog.test.ts`) and 5 more agent tests;
   - `installer/test/release-feed.sh catalog <tarball>` serves a test catalog beside the test feed, for the tour.
 - **Published:** hello 0.1.0 is in the live catalog (`https://get.selfhostlayer.com/catalog.json`, `minPanel` 0.1.6, sha256 `7159d969…`), published with `scripts/publish-catalog.sh`. The dev VM, pointed at the live catalog, listed it and fetched it into a scratch app: checksum matched, files owned by the app's user. It's a test app: take it out of `catalog.json` on the server when Links is published, or before releasing a panel with Integrations, if it shouldn't show there.
+
+## Days 3–4 result (2026-10-31)
+**Day 3, done when "Unit tests pass; under 40 MB idle; 10,000 redirects a second on the dev machine": passed. Day 4, done when "Tests with recorded User-Agents, referrers and addresses": passed.** The service is `catalog/links/`, with no dependencies: esbuild bundles it into `server.js` and `cron.js` (51 KB and 12 KB), and the tarball is 1.4 MB with the country table.
+
+- **Speed:**
+  - 34,810 redirects a second on the dev machine (64 connections, the load generator on the same machine), p50 1.6 ms, p99 5.5 ms;
+  - 24,642 a second on the 2-vCPU test VM, p50 0.8 ms; a single redirect 0.4–4 ms.
+  - No errors, and every click was counted.
+- **Memory:** a fresh Links on Linux, idle with the country table loaded, holds 26 MB of its own (RssAnon). Its RSS is 72 MB; the rest is Node's binary mapped from disk, shared by every app on the same Node.
+- **Redirects:**
+  - 302 by default, 301/307/308 per link (those two cached a day by browsers, so a changed target still takes over);
+  - the query string passed on (the visitor's values win); slugs in any case;
+  - unknown slugs answer 404 or go to the `missing` setting; turned-off or expired links answer 410; the bare domain goes to `home`;
+  - `/favicon.ico` answers 204 and isn't a click (the cause of Hello's double count); HEAD isn't a click either.
+- **Password links:** scrypt hashes; a correct password sets a signed cookie for that link only, which stops working when the password changes; 10 tries per address and link every 10 minutes.
+- **Clicks:**
+  - queued and written every second or every 100, in one transaction; each link's count is kept in memory;
+  - visitors are a hash of address and User-Agent under a salt that changes daily; no address or cookie is stored;
+  - device, browser, OS and bots (crawlers, chat apps' link previews, monitors, HTTP libraries) come from Links' own short User-Agent rules.
+- **Countries:** DB-IP's IP to Country Lite (CC BY 4.0), turned at build time into a 4.8 MB table (range starts and codes) searched in memory. Behind Cloudflare, `CF-Connecting-IP` counts only when the request came from Cloudflare's own ranges.
+- **Stats** for 24 hours, 7 days or 30 days: totals, a series, top links, referrers, countries, devices, browsers, OSes, bots apart.
+- **Cron jobs:**
+  - `rollup`, daily: raw clicks past `keepDays` (90 by default) become per-link daily totals with their breakdowns, which stats still count;
+  - `geo`, monthly: DB-IP's newest list to `data/geo.bin`, picked up within an hour.
+- **The admin API** (`/_admin/…`): links, tags, stats, settings, tokens, CSV export and import. It answers only on the server, with the install's token; through Caddy it answers 404.
+- **The public API** (`/api/v1/links`, with tokens made in the panel, 120 requests a minute each) was planned for Day 6 and is done here, since it shares the admin API's code.
+- **Deploys and updates:**
+  - Blue and green, briefly running at once during a deploy, see each other's changes within a second (SQLite's `data_version`).
+  - Migrations are numbered and recorded; a database from a newer Links is refused, so a rolled-back version never runs on a schema it doesn't know.
+- **Changes from the plan:**
+  - No dependencies: Links' own bot and User-Agent rules instead of isbot.
+  - The panel draws QR codes; it already has `uqr`.
+  - Settings (home, missing, default redirect, keep days) live in Links' database, not env vars, so they change without a restart. The manifest's only env var is `LINKS_ADMIN_TOKEN`.
+- **Tests:** 33 in `catalog/links/test`, on the parts and on a running server.
+- **Found on the way:** `agent/test/static.test.ts` failed 2 runs in 10. Two static publishes of the same commit in the same millisecond shared a folder, and a failed one deleted the live copy. Folder names now end in random characters; 0 failures in 40 runs.
