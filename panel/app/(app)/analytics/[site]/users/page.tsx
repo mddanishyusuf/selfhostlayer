@@ -139,6 +139,8 @@ export default async function UsersPage({ params, searchParams }: { params: Prom
   const ctx = await siteFor((await params).site);
   if (!ctx) return null;
   const { project, site } = ctx;
+  // An older Analytics has no such report yet: the layout offers its update.
+  if (ctx.outdated) return <PageHeader title={site.domain} crumb="Users" />;
   const sp = await searchParams;
   const path = `/analytics/${site.domain}/users`;
   const q = sp.q?.trim() ?? "";

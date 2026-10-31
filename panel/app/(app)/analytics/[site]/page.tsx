@@ -29,12 +29,14 @@ export default async function OverviewPage({ params, searchParams }: { params: P
     items.map(([value, label], i) => ({ label, href: hrefWith(path, sp, { [key]: i === 0 ? null : value }), active: (sp[key] ?? items[0]![0]) === value }));
   const t = stats?.total;
   const p = stats?.previous;
-  const rev = stats?.revenue;
+  // Analytics before 0.2.0 sends no revenue, goals or "seen".
+  const rev = stats?.revenue ?? null;
+  const goals = stats?.goals ?? [];
 
   return (
     <>
       <PageHeader title={site.domain} meta="Overview" />
-      {!site.seen && (
+      {site.seen === false && (
         <Section title="Waiting for the first visit" description={`Paste this into every page of ${site.domain}, before </head>. Visits show up within a second.`}>
           <div className="grid gap-2.5 border-t border-border px-3.5 py-3.5">
             <Snippet code={snippet(project, site.domain)} />
@@ -120,13 +122,13 @@ export default async function OverviewPage({ params, searchParams }: { params: P
               <Breakdown title="Devices" tabs={tab("devices", DEVICE_TABS)} rows={stats.devices} countLabel="Visits" filterHref={filterHref("device")} name={capital} />
             )}
           </div>
-          {(stats.events.length > 0 || stats.goals.length > 0) && (
+          {(stats.events.length > 0 || goals.length > 0) && (
             <div className="grid gap-3.5 lg:grid-cols-2">
               {stats.events.length > 0 && <Breakdown title="Events" rows={stats.events} countLabel="Times" />}
-              {stats.goals.length > 0 && (
+              {goals.length > 0 && (
                 <Breakdown
                   title="Goals"
-                  rows={stats.goals.map((g) => ({ name: g.name, visitors: g.visitors, count: Math.round(g.rate * 1000) / 10 }))}
+                  rows={goals.map((g) => ({ name: g.name, visitors: g.visitors, count: Math.round(g.rate * 1000) / 10 }))}
                   countLabel="Rate %"
                   more={{ href: hrefWith(`${path}/goals`, sp, { pages: null, sources: null, devices: null }), label: "All goals" }}
                 />

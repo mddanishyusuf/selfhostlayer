@@ -2,10 +2,12 @@
 // 127.0.0.1 at the live color's port, with the token made at install
 // (ANALYTICS_ADMIN_TOKEN, kept encrypted with the project's env). The API never
 // answers through Caddy, so only this server reads the numbers.
+import { isNewer } from "@layer/protocol";
 import { redirect } from "next/navigation";
 import { cache } from "react";
 import { agent } from "./agent";
 import { config } from "./config";
+import { installedVersion } from "./deploy";
 import { servingConfig } from "./domains";
 import { integrationFor, listProjects, projectEnv, type Project } from "./projects";
 
@@ -20,8 +22,8 @@ export interface Site {
   /** Visitors in the last 24 hours, and in the last 5 minutes. */
   visitors: number;
   live: number;
-  /** Whether a visit was ever counted (until then its Overview shows the line to paste). */
-  seen: boolean;
+  /** Whether a visit was ever counted (until then its Overview shows the line to paste); not sent before Analytics 0.2.0. */
+  seen?: boolean;
 }
 
 export type Range = "today" | "24h" | "7d" | "30d" | "90d";
@@ -71,9 +73,9 @@ export interface SiteStats {
   os: Row[];
   screens: Row[];
   events: Row[];
-  /** In the site's main currency; null until a payment came in. */
-  revenue: { currency: string; total: RevenueTotals; previous: RevenueTotals } | null;
-  goals: Goal[];
+  /** In the site's main currency; null until a payment came in. Not sent before Analytics 0.2.0, nor goals. */
+  revenue?: { currency: string; total: RevenueTotals; previous: RevenueTotals } | null;
+  goals?: Goal[];
 }
 
 export interface RevenueTotals {
@@ -266,19 +268,29 @@ export const listSites = async (p: Project) => (await analyticsApi<{ sites: Site
 /** The sites, once per request: the Analytics sidebar and the page both need them. */
 export const sitesOnce = cache(listSites);
 
+/** The oldest Analytics the site pages work with: Realtime, Pages, Users, Goals, Revenue and Outbound came in 0.2.0. */
+export const REPORTS_SINCE = "0.2.0";
+
+/** The installed Analytics' version when it's older than the site pages need (the panel can be updated before it). */
+export function outdatedAnalytics(p: Project): string | null {
+  const version = installedVersion(p.id)?.version;
+  return version && isNewer(REPORTS_SINCE, version) ? version : null;
+}
+
 /**
  * The Analytics install and the site a page is for (from its URL), or null
  * when Analytics can't be reached (the layout says why). Anything else goes
- * back to /analytics.
+ * back to /analytics. `outdated`: the installed version, when it's older than
+ * the pages need (the layout offers the update).
  */
-export async function siteFor(param: string): Promise<{ project: Project; site: Site; sites: Site[] } | null> {
+export async function siteFor(param: string): Promise<{ project: Project; site: Site; sites: Site[]; outdated: string | null } | null> {
   const project = analyticsInstall();
   if (!project) redirect("/analytics");
   const sites = await sitesOnce(project).catch(() => null);
   if (!sites) return null;
   const site = sites.find((s) => s.domain === decodeURIComponent(param));
   if (!site) redirect("/analytics");
-  return { project, site, sites };
+  return { project, site, sites, outdated: outdatedAnalytics(project) };
 }
 
 type Filters = Partial<Record<Filter, string>>;

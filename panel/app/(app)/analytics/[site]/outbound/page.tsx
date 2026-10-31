@@ -13,6 +13,8 @@ export default async function OutboundPage({ params, searchParams }: { params: P
   const ctx = await siteFor((await params).site);
   if (!ctx) return null;
   const { project, site } = ctx;
+  // An older Analytics has no such report yet: the layout offers its update.
+  if (ctx.outdated) return <PageHeader title={site.domain} crumb="Outbound" />;
   const sp = await searchParams;
   const path = `/analytics/${site.domain}/outbound`;
   let links: { url: string; visitors: number; clicks: number }[] = [];

@@ -49,6 +49,8 @@ export default async function RevenuePage({ params, searchParams }: { params: Pr
   const ctx = await siteFor((await params).site);
   if (!ctx) return null;
   const { project, site } = ctx;
+  // An older Analytics has no such report yet: the layout offers its update.
+  if (ctx.outdated) return <PageHeader title={site.domain} crumb="Revenue" />;
   const sp = await searchParams;
   const path = `/analytics/${site.domain}/revenue`;
   const settings = `/analytics/${site.domain}/settings#revenue`;
