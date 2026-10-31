@@ -221,3 +221,4 @@ backup: [data]
 - **Tests:**
   - 5 panel unit tests (`panel/lib/catalog.test.ts`) and 5 more agent tests;
   - `installer/test/release-feed.sh catalog <tarball>` serves a test catalog beside the test feed, for the tour.
+- **Published:** hello 0.1.0 is in the live catalog (`https://get.selfhostlayer.com/catalog.json`, `minPanel` 0.1.6, sha256 `7159d969…`), published with `scripts/publish-catalog.sh`. The dev VM, pointed at the live catalog, listed it and fetched it into a scratch app: checksum matched, files owned by the app's user. It's a test app: take it out of `catalog.json` on the server when Links is published, or before releasing a panel with Integrations, if it shouldn't show there.
