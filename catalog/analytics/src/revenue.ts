@@ -502,23 +502,24 @@ export class Revenue {
     }
   }
 
+  /** That a site takes this provider's webhooks (before anything of the request is read). */
+  expects(siteId: number, provider: string): void {
+    if (!WEBHOOKS.includes(provider as Provider)) throw new InputError("provider", "sends no webhooks here", 404);
+    if (!this.#row(siteId, provider as Provider)) throw new InputError("provider", "isn't connected to this site", 404);
+  }
+
   /**
    * A webhook from Creem or Lemon Squeezy: checked against the signing secret
-   * kept for the site, then its payment kept. Until the first one comes in, a
-   * wrong signature is noted on the source (a secret pasted wrong is the
-   * likely reason nothing comes); after that, it's someone else's request.
+   * kept for the site, then its payment kept. One with another signature
+   * changes nothing (anyone can send one), so the source keeps waiting.
    */
   receive(siteId: number, provider: string, raw: Buffer, signature: string | undefined): Received {
-    if (!WEBHOOKS.includes(provider as Provider)) throw new InputError("provider", "sends no webhooks here", 404);
+    this.expects(siteId, provider);
     const p = provider as Provider;
-    const src = this.#row(siteId, p);
-    if (!src) throw new InputError("provider", "isn't connected to this site", 404);
+    const src = this.#row(siteId, p)!;
     const want = Buffer.from(createHmac("sha256", this.#open(src.api_key)).update(raw).digest("hex"));
     const given = Buffer.from((signature ?? "").trim().toLowerCase());
-    if (given.length !== want.length || !timingSafeEqual(given, want)) {
-      if (src.synced_at === null) this.#db.prepare("UPDATE revenue_sources SET sync_error = ?, error_at = ? WHERE site_id = ? AND provider = ?").run("A webhook came signed with another secret: check the signing secret.", Date.now(), siteId, p);
-      throw new InputError("signature", "doesn't match the signing secret", 401);
-    }
+    if (given.length !== want.length || !timingSafeEqual(given, want)) throw new InputError("signature", "doesn't match the signing secret", 401);
     let body: Json;
     try {
       body = JSON.parse(raw.toString("utf8")) as Json;

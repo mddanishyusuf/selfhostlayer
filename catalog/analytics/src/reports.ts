@@ -29,27 +29,29 @@ export function pagesTable(db: DatabaseSync, siteId: number, o: { range: Range; 
   // A page filter picks the row; every page's numbers come from all of its views.
   const { page, ...f } = o.filters ?? {};
   const ev = eventWhere(siteId, from, to, f);
+  // The page filter, the search, the order and the limit all in SQL: a site with a great many
+  // paths (or someone sending made-up ones) never has them all in memory at once.
+  const q = o.q?.trim();
+  const pick = [page === undefined ? "" : "AND path = ?", q ? "AND path LIKE ? ESCAPE '\\'" : ""].join(" ");
   const views = db
     .prepare(
       `WITH v AS (
          SELECT e.path, e.visitor, coalesce(lead(e.at) OVER (PARTITION BY e.session ORDER BY e.at), s.ended_at) - e.at spent
          FROM events e JOIN sessions s ON s.id = e.session WHERE ${ev.sql} AND e.name = 'pageview'
        )
-       SELECT path, count(DISTINCT visitor) visitors, count(*) pageviews, avg(spent) time FROM v GROUP BY path`,
+       SELECT path, count(DISTINCT visitor) visitors, count(*) pageviews, avg(spent) time FROM v WHERE 1 ${pick}
+       GROUP BY path ORDER BY visitors DESC, pageviews DESC, path LIMIT ${PAGES_MAX}`,
     )
-    .all(...ev.args) as { path: string; visitors: number; pageviews: number; time: number }[];
+    .all(...ev.args, ...(page === undefined ? [] : [page]), ...(q ? [like(q)] : [])) as { path: string; visitors: number; pageviews: number; time: number }[];
+  if (!views.length) return [];
   const vi = visitWhere(siteId, from, to, f);
-  const entries = new Map((db.prepare(`SELECT s.entry path, count(*) n, sum(s.pageviews = 1 AND s.events = 0) bounces FROM sessions s WHERE ${vi.sql} GROUP BY s.entry`).all(...vi.args) as { path: string; n: number; bounces: number }[]).map((r) => [r.path, r]));
-  const exits = new Map((db.prepare(`SELECT s.exit path, count(*) n FROM sessions s WHERE ${vi.sql} GROUP BY s.exit`).all(...vi.args) as { path: string; n: number }[]).map((r) => [r.path, r.n]));
-  const q = o.q?.trim().toLowerCase();
-  return views
-    .filter((v) => (page === undefined || v.path === page) && (!q || v.path.toLowerCase().includes(q)))
-    .map((v) => {
-      const e = entries.get(v.path);
-      return { path: v.path, visitors: v.visitors, pageviews: v.pageviews, entries: e?.n ?? 0, exits: exits.get(v.path) ?? 0, bounceRate: e?.n ? e.bounces / e.n : 0, time: Math.round(v.time ?? 0) };
-    })
-    .sort((a, b) => b.visitors - a.visitors || b.pageviews - a.pageviews || a.path.localeCompare(b.path))
-    .slice(0, PAGES_MAX);
+  const paths = JSON.stringify(views.map((v) => v.path));
+  const entries = new Map((db.prepare(`SELECT s.entry path, count(*) n, sum(s.pageviews = 1 AND s.events = 0) bounces FROM sessions s WHERE ${vi.sql} AND s.entry IN (SELECT value FROM json_each(?)) GROUP BY s.entry`).all(...vi.args, paths) as { path: string; n: number; bounces: number }[]).map((r) => [r.path, r]));
+  const exits = new Map((db.prepare(`SELECT s.exit path, count(*) n FROM sessions s WHERE ${vi.sql} AND s.exit IN (SELECT value FROM json_each(?)) GROUP BY s.exit`).all(...vi.args, paths) as { path: string; n: number }[]).map((r) => [r.path, r.n]));
+  return views.map((v) => {
+    const e = entries.get(v.path);
+    return { path: v.path, visitors: v.visitors, pageviews: v.pageviews, entries: e?.n ?? 0, exits: exits.get(v.path) ?? 0, bounceRate: e?.n ? e.bounces / e.n : 0, time: Math.round(v.time ?? 0) };
+  });
 }
 
 export interface VisitRow {

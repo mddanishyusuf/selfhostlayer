@@ -15,7 +15,7 @@ The **Links** page lists your links, with search, tags and sorting by date, clic
 - **New link:** where it goes, and the short part (`go.example.com/launch`). Leave the short part empty for 7 random letters and digits. Short links ignore case: `Launch` and `launch` are the same link.
 - **Title and tags:** for you; visitors never see them. Tags filter the list.
 - **Redirect:** 302 (the default) counts every click, because browsers don't keep it. 301 and 308 are kept by browsers for a day, so repeat visits from the same browser aren't counted. 307 and 308 keep the request's method.
-- **Query string:** `?ref=newsletter` on the short link is added to the target, unless you turn that off for the link.
+- **Query string:** `?ref=newsletter` on the short link is added to the target, unless you turn that off for the link. Parameters the target already has keep the target's values, so nobody can swap your referral code by sharing the short link with their own.
 - **Password:** visitors type it before they're sent on. A correct password is remembered by that browser for 30 days, for that link only. Changing the password asks again.
 - **Expires:** after that time, the link shows "not active" instead of redirecting.
 - **Turn off:** the link shows "not active" until you turn it back on.

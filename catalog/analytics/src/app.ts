@@ -108,7 +108,9 @@ export function createApp(o: AppOptions): App {
     const m = /^\/webhooks\/([a-z]{1,20})\/(\d{1,9})$/.exec(url.pathname);
     if (!m) return json(res, 404, { error: "not found" });
     const [, provider, site] = m as unknown as [string, string, string];
-    const raw = await readBody(req, 1024 * 1024);
+    // Nothing is read for a provider or site that takes no webhooks; a payment's body is a few KB.
+    revenue.expects(Number(site), provider);
+    const raw = await readBody(req, 64 * 1024);
     const header = SIGNATURE_HEADERS[provider];
     const r = revenue.receive(Number(site), provider, raw, header ? [req.headers[header]].flat()[0] : undefined);
     json(res, 200, { received: true, added: r.added });
@@ -137,6 +139,8 @@ export function createApp(o: AppOptions): App {
     });
   });
   server.keepAliveTimeout = 65_000;
+  // A request gets 30 seconds to arrive whole: slow senders can't hold connections open for minutes.
+  server.requestTimeout = 30_000;
 
   return {
     server,

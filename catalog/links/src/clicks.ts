@@ -9,6 +9,7 @@ import { createHash, randomBytes } from "node:crypto";
 import type { IncomingMessage } from "node:http";
 import type { DatabaseSync } from "node:sqlite";
 import { clientIp, type Geo } from "../../lib/geo.ts";
+import { Limiter } from "../../lib/limit.ts";
 import { readAgent, referrerHost } from "../../lib/ua.ts";
 import { getSetting, setSetting } from "./db.ts";
 import type { Link, Store } from "./store.ts";
@@ -32,6 +33,7 @@ export class Clicks {
   readonly #store: Store;
   readonly #geo: () => Geo | null;
   readonly #batch: number;
+  readonly #repeats = new Limiter(10, 60_000);
   #queue: Click[] = [];
   #salt: { day: string; value: string } | null = null;
   #timer: NodeJS.Timeout | null = null;
@@ -79,6 +81,8 @@ export class Clicks {
       bot: agent.bot,
       visitor: createHash("sha256").update(`${this.#saltFor(now)}|${ip ?? ""}|${ua ?? ""}`).digest("hex").slice(0, 16),
     };
+    // A visitor clicking over and over is still sent on, but counts at most ten times a minute.
+    if (this.#repeats.hit(`${link.id}|${click.visitor}`, now)) return click;
     this.#queue.push(click);
     if (this.#queue.length === this.#batch) setImmediate(() => this.#tryFlush());
     return click;

@@ -2,7 +2,7 @@
 // at start, changed here by the APIs, and reloaded when another process
 // changes the database (the other color during a deploy, or a cron job),
 // which SQLite's data_version tells within a second.
-import { randomBytes, randomInt, scryptSync, timingSafeEqual } from "node:crypto";
+import { randomBytes, randomInt, scrypt, scryptSync, timingSafeEqual } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
 import type { Settings } from "./settings.ts";
 import { checkExpiry, checkPassword, checkRedirect, checkSlug, checkTags, checkTarget, checkTitle, InputError, RESERVED, type Redirect } from "./validate.ts";
@@ -90,11 +90,12 @@ export function hashPassword(password: string): string {
   return `scrypt$16384$${salt.toString("base64url")}$${hash.toString("base64url")}`;
 }
 
-export function passwordMatches(stored: string, password: string): boolean {
+/** Checked off the event loop (scrypt takes ~30 ms): a guess never holds up other visitors' redirects. */
+export async function passwordMatches(stored: string, password: string): Promise<boolean> {
   const [scheme, n, salt, hash] = stored.split("$");
   if (scheme !== "scrypt" || !n || !salt || !hash) return false;
   const want = Buffer.from(hash, "base64url");
-  const got = scryptSync(password, Buffer.from(salt, "base64url"), want.length, { N: Number(n), r: 8, p: 1 });
+  const got = await new Promise<Buffer>((resolve, reject) => scrypt(password.slice(0, 1024), Buffer.from(salt, "base64url"), want.length, { N: Number(n), r: 8, p: 1 }, (err, key) => (err ? reject(err) : resolve(key))));
   return timingSafeEqual(want, got);
 }
 

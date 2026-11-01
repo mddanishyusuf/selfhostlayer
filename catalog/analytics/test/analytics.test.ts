@@ -567,15 +567,15 @@ describe("revenue", () => {
     const now = Date.now() - 3_600_000;
     const checkout = { id: "evt_1", eventType: "checkout.completed", created_at: now, object: { object: "checkout", mode: "prod", metadata: { shl_visit: visits.c }, customer: { id: "cust_1" }, order: { id: "ord_1", customer: "cust_1", amount: 1000, currency: "USD", tax_amount: 100, amount_paid: 1100, status: "paid", type: "recurring", transaction: "tran_1", created_at: new Date(now).toISOString() } } };
     const paid = (id: string) => ({ id: `evt_${id}`, eventType: "subscription.paid", created_at: now, object: { object: "subscription", mode: "prod", customer: { id: "cust_1" }, metadata: {}, last_transaction: { id, amount: 1000, amount_paid: 1100, currency: "USD", tax_amount: 100, status: "paid", created_at: now } } });
-    // Before the first webhook, another secret is noted on the source; once they come, someone else's request isn't.
+    // Another signature is refused and changes nothing on the source (anyone can send one).
     const errorOf = async () => (await (await admin(`sources?site=${siteId}`)).json()).sources[0].error;
     expect((await hook("creem", paid("tran_0"), "whsec_pasted_wrong")).status).toBe(401);
-    expect(await errorOf()).toMatch(/another secret/);
+    expect(await errorOf()).toBeNull();
+    // Nothing is read for a provider that sends no webhooks, or a site without the provider.
+    expect((await fetch(`${base}/webhooks/stripe/${siteId}`, { method: "POST", body: "{}" })).status).toBe(404);
+    expect((await fetch(`${base}/webhooks/creem/${siteId + 5}`, { method: "POST", body: "{}" })).status).toBe(404);
     // The first payment comes as a subscription payment too, maybe before its checkout.
     await hook("creem", paid("tran_1"), secret);
-    expect(await errorOf()).toBeNull();
-    expect((await hook("creem", paid("tran_8"), "forged")).status).toBe(401);
-    expect(await errorOf()).toBeNull();
     await hook("creem", checkout, secret);
     await hook("creem", paid("tran_1"), secret);
     await hook("creem", paid("tran_2"), secret);

@@ -1,7 +1,17 @@
 // CSV for the catalog apps' imports and exports (RFC 4180).
 
-/** A cell as CSV writes it: quoted when it holds a comma, a quote or a line break. */
-export const csvCell = (value: string) => (/[",\n\r]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value);
+/**
+ * A cell as CSV writes it: quoted when it holds a comma, a quote or a line
+ * break. One that starts like a formula (=, +, -, @, a tab or a carriage
+ * return) gets a ' first, so a spreadsheet shows it rather than running it.
+ */
+export function csvCell(value: string): string {
+  const safe = /^[=+\-@\t\r]/.test(value) ? `'${value}` : value;
+  return /[",\n\r]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe;
+}
+
+/** A cell read back: the ' that csvCell put before a formula-like value comes off. */
+export const csvValue = (cell: string) => (/^'[=+\-@\t\r]/.test(cell) ? cell.slice(1) : cell);
 
 /** RFC 4180: quoted cells may hold commas, quotes ("") and line breaks. Blank rows are dropped. */
 export function parseCsv(text: string): string[][] {

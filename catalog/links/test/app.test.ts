@@ -22,11 +22,11 @@ const create = async (body: Record<string, unknown>) => {
 };
 
 describe("redirects", () => {
-  it("sends a click on, with the visitor's query string, whatever the case of the slug", async () => {
+  it("sends a click on, with the visitor's query string (the target's own parameters kept), whatever the case of the slug", async () => {
     await create({ slug: "Launch", target: "https://example.com/post?ref=links" });
     const res = await visit("/LAUNCH?utm_source=x&ref=mine");
     expect(res.status).toBe(302);
-    expect(res.headers.get("location")).toBe("https://example.com/post?ref=mine&utm_source=x");
+    expect(res.headers.get("location")).toBe("https://example.com/post?ref=links&utm_source=x");
     expect(res.headers.get("cache-control")).toBe("no-store");
     await create({ slug: "plain", target: "https://example.com/", passQuery: false, redirect: 301 });
     const plain = await visit("/plain?x=1");

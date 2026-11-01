@@ -15,12 +15,19 @@ import type { DatabaseSync } from "node:sqlite";
 import { getSetting, setSetting } from "../../lib/db.ts";
 import { clientIp, type Geo } from "../../lib/geo.ts";
 import { InputError } from "../../lib/http.ts";
+import { Limiter, limitKey } from "../../lib/limit.ts";
 import { readAgent } from "../../lib/ua.ts";
 import type { Site, Sites } from "./sites.ts";
 
 export const VISIT_GAP = 30 * 60_000;
-/** Events per minute from one visitor address to one site. */
+/** Events per minute from one visitor address (an IPv6 /64) to one site. */
 export const RATE_LIMIT = 300;
+/** Events per minute to one site from everywhere: past it, the rest are turned away. */
+export const SITE_LIMIT = 12_000;
+/** Visits in memory at once (they're written as they change; this only bounds a flood). */
+export const OPEN_MAX = 50_000;
+/** Events kept for the next write when one fails (a full disk, say). */
+const QUEUE_MAX = 100_000;
 const NAME = /^[\p{L}\p{N} _.:/-]{1,60}$/u;
 /** A visit's id, as the event endpoint answers it (12 base64url characters). */
 export const VISIT_ID = /^[\w-]{12}$/;
@@ -61,8 +68,10 @@ export const utcDay = (ms: number) => new Date(ms).toISOString().slice(0, 10);
 
 /** The path as counted: no query string or hash, no trailing slash (but /), at most 500 characters. */
 export function cleanPath(pathname: string): string {
-  const p = pathname.length > 1 ? pathname.replace(/\/+$/, "") : pathname;
-  return (p || "/").slice(0, 500);
+  // By hand: a regex for trailing slashes takes quadratic time on a long run of them.
+  let end = pathname.length;
+  while (end > 1 && pathname[end - 1] === "/") end--;
+  return (pathname.slice(0, end) || "/").slice(0, 500);
 }
 
 /** A screen width in four sizes, as layouts tend to break. */
@@ -72,12 +81,25 @@ export function screenOf(width: unknown): string | null {
   return w < 576 ? "Phone" : w < 992 ? "Tablet" : w < 1440 ? "Laptop" : "Desktop";
 }
 
-/** Up to 10 properties of a custom event, as text of up to 200 characters. */
-export function propsOf(value: unknown): string | null {
+/**
+ * Up to 10 properties of a custom event, as text of up to 200 characters. An
+ * outbound click's url is kept only as an http(s) address (its origin and
+ * path), as the panel shows it as a link.
+ */
+export function propsOf(value: unknown, name = ""): string | null {
   if (typeof value !== "object" || value === null || Array.isArray(value)) return null;
   const out: Record<string, string> = {};
   for (const [k, v] of Object.entries(value).slice(0, 10)) {
     if (PROP_KEY.test(k) && ["string", "number", "boolean"].includes(typeof v)) out[k] = String(v).slice(0, 200);
+  }
+  if (name === "Outbound link" && out.url !== undefined) {
+    try {
+      const u = new URL(out.url);
+      if (u.protocol !== "https:" && u.protocol !== "http:") throw new Error();
+      out.url = `${u.origin}${u.pathname}`.slice(0, 200);
+    } catch {
+      delete out.url;
+    }
   }
   return Object.keys(out).length ? JSON.stringify(out) : null;
 }
@@ -93,7 +115,8 @@ export class Ingest {
   #events: QueuedEvent[] = [];
   #dirty = new Map<string, Visit>();
   #salt: { day: string; value: string } | null = null;
-  #limits = new Map<string, { n: number; reset: number }>();
+  readonly #fromAddress = new Limiter(RATE_LIMIT, 60_000);
+  readonly #toSite = new Limiter(SITE_LIMIT, 60_000, 10_000);
   #timers: NodeJS.Timeout[] = [];
 
   constructor(db: DatabaseSync, sites: Sites, geo: () => Geo | null, opts: { flushMs?: number; batch?: number } = {}) {
@@ -125,16 +148,6 @@ export class Ingest {
     return this.#salt.value;
   }
 
-  #limited(key: string, now: number): boolean {
-    const w = this.#limits.get(key);
-    if (!w || w.reset <= now) {
-      if (this.#limits.size > 50_000) this.#limits.clear();
-      this.#limits.set(key, { n: 1, reset: now + 60_000 });
-      return false;
-    }
-    return ++w.n > RATE_LIMIT;
-  }
-
   #referrer(value: unknown, site: Site): string | null {
     if (typeof value !== "string" || !value) return null;
     try {
@@ -158,11 +171,23 @@ export class Ingest {
       throw new InputError("u", "must be the page's address");
     }
     if ((url.protocol !== "https:" && url.protocol !== "http:") || !this.#sites.owns(site, url.hostname)) throw new InputError("u", `the page isn't on ${site.domain}`, 403);
+    // A browser says which page sent it: another site's pages can't count as this one's.
+    const origin = req.headers.origin;
+    if (typeof origin === "string" && origin !== "null") {
+      let from = "";
+      try {
+        from = new URL(origin).hostname;
+      } catch {
+        // not an origin: refused below
+      }
+      if (!from || !this.#sites.owns(site, from)) throw new InputError("origin", `isn't on ${site.domain}`, 403);
+    }
     const ua = req.headers["user-agent"];
     const agent = readAgent(ua);
     if (agent.bot) return { counted: false, reason: "bot" };
     const ip = clientIp(req);
-    if (this.#limited(`${ip}|${site.id}`, now)) throw new InputError("rate", `over ${RATE_LIMIT} events a minute`, 429);
+    if (this.#fromAddress.hit(`${limitKey(ip)}|${site.id}`, now)) throw new InputError("rate", `over ${RATE_LIMIT} events a minute`, 429);
+    if (this.#toSite.hit(String(site.id), now)) throw new InputError("rate", `${site.domain} is over ${SITE_LIMIT} events a minute`, 429);
     const visitor = createHash("sha256").update(`${this.#saltFor(now)}|${site.id}|${ip ?? ""}|${ua ?? ""}`).digest("hex").slice(0, 16);
     const key = `${site.id}:${visitor}`;
     let visit = this.#open.get(key);
@@ -171,10 +196,13 @@ export class Ingest {
       if (!visit || !fresh) return { counted: false };
       visit.endedAt = now;
       this.#dirty.set(visit.id, visit);
-      return { counted: true, visit: visit.id };
+      // No visit id: a ping's answer shouldn't say whether this browser has a visit open.
+      return { counted: true };
     }
     const path = cleanPath(url.pathname);
     if (!visit || !fresh) {
+      if (this.#open.size >= OPEN_MAX) this.prune(now);
+      if (this.#open.size >= OPEN_MAX) throw new InputError("rate", "too many visits at once", 429);
       const q = url.searchParams;
       visit = {
         id: randomBytes(9).toString("base64url"),
@@ -203,7 +231,7 @@ export class Ingest {
       visit.pageviews++;
       visit.exit = path;
     } else visit.events++;
-    this.#events.push({ siteId: site.id, at: now, name, path, visitor, session: visit.id, props: name === "pageview" ? null : propsOf(input.p) });
+    this.#events.push({ siteId: site.id, at: now, name, path, visitor, session: visit.id, props: name === "pageview" ? null : propsOf(input.p, name) });
     this.#dirty.set(visit.id, visit);
     if (this.#events.length === this.#batch) setImmediate(() => this.#tryFlush());
     return { counted: true, visit: visit.id };
@@ -235,7 +263,8 @@ export class Ingest {
       this.#db.exec("COMMIT");
     } catch (err) {
       this.#db.exec("ROLLBACK");
-      this.#events = [...events, ...this.#events];
+      // Kept for the next try, the newest at most: a write that keeps failing mustn't fill the memory.
+      this.#events = [...events, ...this.#events].slice(-QUEUE_MAX);
       for (const v of visits) if (!this.#dirty.has(v.id)) this.#dirty.set(v.id, v);
       throw err;
     }

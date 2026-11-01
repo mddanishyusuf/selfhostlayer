@@ -2,7 +2,7 @@
 // by name (url, long_url, destination…; slug, keyword, back_half…), so most
 // exports work as they are. A row that can't be a link is skipped with the
 // reason, never half-imported.
-import { csvCell as cell, parseCsv } from "../../lib/csv.ts";
+import { csvCell as cell, csvValue, parseCsv } from "../../lib/csv.ts";
 import type { Link, Store } from "./store.ts";
 import { InputError } from "./validate.ts";
 
@@ -44,7 +44,7 @@ export function importCsv(store: Store, text: string): { created: number; skippe
   rows.forEach((row, i) => {
     const get = (field: string) => {
       const at = index[field] ?? -1;
-      const v = at >= 0 ? row[at]?.trim() : undefined;
+      const v = at >= 0 ? csvValue(row[at]?.trim() ?? "") : undefined;
       return v === "" ? undefined : v;
     };
     try {

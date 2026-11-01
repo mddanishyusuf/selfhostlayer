@@ -2,7 +2,7 @@
 # managed from the panel (PLAN-LINKS.md).
 id: links
 name: Links
-version: 0.1.0
+version: 0.1.1
 summary: Short links on your own domain, with click stats and QR codes.
 runtime:
   kind: node

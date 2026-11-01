@@ -17,6 +17,15 @@ describe("User-Agents and referrers", () => {
     ["facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)", { bot: true }],
     ["WhatsApp/2.23.20.0", { bot: true }],
     ["curl/8.7.1", { bot: true }],
+    // In-app browsers are people; the same apps' link-preview crawlers aren't.
+    ["Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 [LinkedInApp]/9.30.1", { bot: false, device: "mobile" }],
+    ["Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 Twitter for iPhone/10.50", { bot: false }],
+    ["Mozilla/5.0 (Linux; Android 14; Pixel 8 Build/AP2A; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/126.0 Mobile Safari/537.36 Telegram-Android/11.0", { bot: false }],
+    ["Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 [Pinterest/iOS]", { bot: false }],
+    ["LinkedInBot/1.0 (compatible; Mozilla/5.0; Apache-HttpClient +http://www.linkedin.com)", { bot: true }],
+    ["Twitterbot/1.0", { bot: true }],
+    ["TelegramBot (like TwitterBot)", { bot: true }],
+    ["Pinterest/0.2 (+http://www.pinterest.com/bot.html)", { bot: true }],
     ["", { bot: true, device: "other" }],
   ];
   it.each(cases)("%s", (ua, want) => expect(readAgent(ua)).toMatchObject(want));

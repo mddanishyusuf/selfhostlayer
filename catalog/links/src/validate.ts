@@ -28,11 +28,32 @@ function privateIPv4(ip: string): boolean {
   return a === 0 || a === 10 || a === 127 || (a === 100 && b >= 64 && b <= 127) || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) || a >= 224;
 }
 
+/** An IPv6 address as its eight groups (numbers), with :: filled in and a dotted IPv4 tail read. */
+function groupsOf(ip: string): number[] {
+  let text = ip.toLowerCase();
+  const dotted = /(\d+)\.(\d+)\.(\d+)\.(\d+)$/.exec(text);
+  if (dotted) {
+    const [a, b, c, d] = dotted.slice(1).map(Number) as [number, number, number, number];
+    text = `${text.slice(0, dotted.index)}${((a << 8) | b).toString(16)}:${((c << 8) | d).toString(16)}`;
+  }
+  const [head, tail] = text.includes("::") ? text.split("::") : [text, undefined];
+  const h = head ? head.split(":") : [];
+  const t = tail ? tail.split(":") : [];
+  return [...h, ...Array(8 - h.length - t.length).fill("0"), ...t].map((g) => parseInt(g || "0", 16));
+}
+
+/**
+ * Loopback, unspecified, unique-local, link-local and multicast; and an IPv4
+ * address carried in IPv6 (::a.b.c.d, ::ffff:a.b.c.d, NAT64's 64:ff9b::/96,
+ * 6to4's 2002::/16), judged as the IPv4 address it is.
+ */
 function privateIPv6(ip: string): boolean {
-  const lower = ip.toLowerCase();
-  const mapped = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/.exec(lower);
-  if (mapped) return privateIPv4(mapped[1]!);
-  return lower === "::" || lower === "::1" || /^f[cd]/.test(lower) || /^fe[89ab]/.test(lower) || lower.startsWith("ff");
+  const g = groupsOf(ip);
+  const v4 = (hi: number, lo: number) => `${hi >> 8}.${hi & 255}.${lo >> 8}.${lo & 255}`;
+  if (g.slice(0, 5).every((x) => x === 0) && (g[5] === 0 || g[5] === 0xffff)) return g[5] === 0 && g[6] === 0 && g[7]! <= 1 ? true : privateIPv4(v4(g[6]!, g[7]!));
+  if (g[0] === 0x64 && g[1] === 0xff9b && g.slice(2, 6).every((x) => x === 0)) return privateIPv4(v4(g[6]!, g[7]!));
+  if (g[0] === 0x2002) return privateIPv4(v4(g[1]!, g[2]!));
+  return (g[0]! & 0xfe00) === 0xfc00 || (g[0]! & 0xffc0) === 0xfe80 || (g[0]! & 0xff00) === 0xff00;
 }
 
 /** A target: an http or https URL to a public address (no localhost, private addresses or credentials). */

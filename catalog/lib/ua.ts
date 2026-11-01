@@ -10,9 +10,11 @@ export interface Agent {
 }
 
 // Crawlers, link previews (chat apps fetch a link when it's pasted), monitors
-// and HTTP libraries. "cubot" is a phone maker, not a bot.
+// and HTTP libraries. "cubot" is a phone maker, not a bot. LinkedIn, X,
+// Telegram and Pinterest aren't named: their apps' own browsers say so, and
+// their crawlers (LinkedInBot, Twitterbot, TelegramBot, Pinterestbot) are bots anyway.
 const BOT =
-  /bot\b|bot\/|crawl|spider|slurp|scrap|archiv|preview|monitor|uptime|pingdom|statuscake|check|scan|validator|lighthouse|pagespeed|headless|phantom|puppeteer|playwright|selenium|curl|wget|httpie|python|java\/|go-http|okhttp|axios|node-fetch|undici|libwww|perl|ruby|php\/|facebookexternalhit|facebot|whatsapp|telegram|discord|slack|skype|twitter|linkedin|embedly|pinterest|vkshare|quora|redditbot|bingpreview|yandex|baidu|duckduck|petal|semrush|ahrefs|mj12|dotbot|bytespider|gptbot|claude|perplexity|cohere|ccbot|applebot|google-inspectiontool|feedfetcher|rss|feed/i;
+  /bot\b|bot\/|crawl|spider|slurp|scrap|archiv|preview|monitor|uptime|pingdom|statuscake|check|scan|validator|lighthouse|pagespeed|headless|phantom|puppeteer|playwright|selenium|curl|wget|httpie|python|java\/|go-http|okhttp|axios|node-fetch|undici|libwww|perl|ruby|php\/|facebookexternalhit|facebot|whatsapp|discord|slack|skype|embedly|vkshare|quora|redditbot|bingpreview|yandex|baidu|duckduck|petal|semrush|ahrefs|mj12|dotbot|bytespider|gptbot|claude|perplexity|cohere|ccbot|applebot|google-inspectiontool|feedfetcher|rss|feed/i;
 
 const BROWSERS: [RegExp, string][] = [
   [/Instagram/, "Instagram"],
@@ -36,7 +38,8 @@ const SYSTEMS: [RegExp, string][] = [
 ];
 
 export function readAgent(ua: string | undefined): Agent {
-  const text = ua ?? "";
+  // Real ones are under 300 characters; a longer one only makes the rules slow (some backtrack).
+  const text = (ua ?? "").slice(0, 512);
   const bot = !text.trim() || (BOT.test(text) && !/cubot/i.test(text));
   const browser = BROWSERS.find(([re]) => re.test(text))?.[1] ?? "Other";
   const os = SYSTEMS.find(([re]) => re.test(text))?.[1] ?? "Other";
