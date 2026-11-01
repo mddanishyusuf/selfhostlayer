@@ -198,7 +198,7 @@ The panel uses the design of our AgentOS app (`~/projects/agent-os/web/src/theme
   - Links: password guessing is limited; private IPv6 targets are refused.
   - Email: signup forms never change an existing contact, and confirm links need a click.
   - Forms: files are streamed to disk (a 25 MB response took more than Forms' memory limit), and copies to respondents leave out what was typed.
-- **Not published yet:** panel 0.1.15, Links 0.1.1, Analytics 0.3.1, Email 0.1.2, Forms 0.1.1.
+- **Published the same day:** panel 0.1.15; Links 0.1.1, Analytics 0.3.1, Email 0.1.2 and Forms 0.1.1 in the catalog; the website's docs.
 - **Left open:** MongoDB's first-user race (it fails closed), and signing the release feed.
 
 **Launch-time tasks (not now):** choose the license plus CLA, make the repo public, and make `curl -fsSL https://get.selfhostlayer.com | bash` install: the root of get.selfhostlayer.com only says "isn't out yet" (`app/install.sh/route.ts` in the website), and the installer still needs `--from-tarball` (it should download the newest release from the feed).
