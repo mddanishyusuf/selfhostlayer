@@ -1,16 +1,19 @@
-// Each project's mark on the Projects page: a DiceBear "Clay" character made
-// from its name (https://www.dicebear.com/styles/clay/, CC0), so every project
-// has one of its own. Drawn here as a data: URI; nothing is fetched.
+// Each project's mark on the Projects page: a DiceBear "Slice" made from its
+// name (https://www.dicebear.com/styles/slice/, CC0), so every project has one
+// of its own. In greys: darker slices on a light tile, which light mode
+// inverts (--mark-filter), as AgentOS's project tile is white in dark and
+// black in light. Drawn here as a data: URI; nothing is fetched.
 import { Avatar, Style } from "@dicebear/core";
-import definition from "@dicebear/styles/clay.json";
+import definition from "@dicebear/styles/slice.json";
 
 const style = new Style(definition);
+/** The tile a little lighter or darker, and slices dark enough to read on it. */
+const GREYS = { backgroundColor: ["f4f4f4", "ececec", "e4e4e4"], bodyColor: ["262626", "333333", "404040", "4d4d4d", "5c5c5c", "6b6b6b"] };
 const drawn = new Map<string, string>();
 
 function draw(seed: string): string {
   let svg = drawn.get(seed);
-  // Still: a list of moving characters would be a lot to look at.
-  if (!svg) drawn.set(seed, (svg = new Avatar(style, { seed, animationProbability: 0 }).toString()));
+  if (!svg) drawn.set(seed, (svg = new Avatar(style, { seed, ...GREYS }).toString()));
   return svg;
 }
 

@@ -202,9 +202,9 @@ export function Skeleton({ className }: { className?: string }) {
   );
 }
 
-/** A project's own mark on the Projects page: its clay character (lib/avatar.ts), with its stack named on hover. */
+/** A project's own mark on the Projects page: its greyscale slice (lib/avatar.ts), inverted in light mode, with its stack named on hover. */
 export function ShapeMark({ src, framework, size = "md" }: { src: string; framework: string; size?: "sm" | "md" }) {
-  return <img src={src} alt="" title={stackLogo(framework).title} className={cx("shrink-0", size === "sm" ? "size-7" : "size-9")} />;
+  return <img src={src} alt="" title={stackLogo(framework).title} className={cx("shrink-0 [filter:var(--mark-filter)]", size === "sm" ? "size-7" : "size-9")} />;
 }
 
 /** A project's mark: the logo of its stack (its detected framework) on AgentOS's project tile, white in dark and black in light. Bare in lists: no tile. */
