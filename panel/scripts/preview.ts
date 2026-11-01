@@ -5,7 +5,7 @@
 //   1. LAYER_DEV_DIR=/tmp/layer-preview LAYER_DEV_DIST=.next-preview LAYER_FAKE_AGENT=1 npx next dev -p 3100
 //   2. node scripts/preview.ts /tmp/layer-preview <out-dir> / /deployments /projects/piqo@light /domains@phone
 //
-// A path can end in @light, @phone, @guest, @<width>x<height> and/or @click:<css selector>.
+// PREVIEW_SCALE=2 takes retina shots. A path can end in @light, @phone, @guest, @<width>x<height> @click:<css selector> and/or @clip:x,y,w,h.
 import { spawn } from "node:child_process";
 import { createHash, randomBytes } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -157,7 +157,7 @@ for (const spec of paths) {
   // @guest: signed out, for the login and setup pages.
   if (opts.includes("guest")) await send("Network.deleteCookies", { name: "layer_session", domain: "localhost" });
   else await send("Network.setCookie", { name: "layer_session", value: token, domain: "localhost", path: "/" });
-  await send("Emulation.setDeviceMetricsOverride", { width: w, height: h, deviceScaleFactor: 1, mobile: phone });
+  await send("Emulation.setDeviceMetricsOverride", { width: w, height: h, deviceScaleFactor: Number(process.env.PREVIEW_SCALE ?? 1), mobile: phone });
   await send("Page.navigate", { url: new URL(path!, base).href });
   await new Promise<void>((r) => {
     const check = (m: string) => (m === "Page.loadEventFired" ? r() : waiters.push(check));
@@ -171,8 +171,10 @@ for (const spec of paths) {
   }
   // The dev server's own badge isn't part of the panel.
   await send("Runtime.evaluate", { expression: `document.querySelector("nextjs-portal")?.remove()` });
-  const { data } = await send("Page.captureScreenshot", { format: "png" });
-  const name = spec.replace(/^\//, "").replace(/@click:.*/, "@click").replace(/[^a-z0-9@-]+/gi, "_") || "home";
+  // @clip:x,y,w,h keeps only that part of the page.
+  const clip = opts.find((o) => o.startsWith("clip:"))?.slice(5).split(",").map(Number);
+  const { data } = await send("Page.captureScreenshot", { format: "png", ...(clip ? { clip: { x: clip[0], y: clip[1], width: clip[2], height: clip[3], scale: 1 } } : {}) });
+  const name = spec.replace(/^\//, "").replace(/@click:[^@]*/, "@click").replace(/@clip:[^@]*/, "").replace(/[^a-z0-9@-]+/gi, "_") || "home";
   writeFileSync(join(outDir, `${name}.png`), Buffer.from(data, "base64"));
   console.log(`${spec} → ${name}.png`);
 }
