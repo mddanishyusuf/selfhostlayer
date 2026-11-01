@@ -6,11 +6,13 @@ import { Icon } from "@/components/icon";
 import { CARD, Empty, Notice, PageHeader } from "@/components/page";
 import { cx } from "@/components/ui";
 import { brandFor, domainsOf, type Domain } from "@/lib/email";
+import { requireUser } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Domains" };
 
 export default async function DomainsPage({ params }: { params: Promise<{ brand: string }> }) {
+  await requireUser();
   const ctx = await brandFor((await params).brand);
   if (!ctx) return null;
   const { project, brand } = ctx;

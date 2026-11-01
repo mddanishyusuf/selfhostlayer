@@ -5,6 +5,7 @@ import { Icon } from "@/components/icon";
 import { CARD, Empty, Notice, PageHeader } from "@/components/page";
 import { NO_AUTOFILL, cx } from "@/components/ui";
 import { pagesOf, siteFor, type PageRow } from "@/lib/analytics";
+import { requireUser } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Pages" };
@@ -21,6 +22,7 @@ const GRID = "minmax(0,1fr) repeat(6, 76px)";
 const PAGE = 100;
 
 export default async function PagesPage({ params, searchParams }: { params: Promise<{ site: string }>; searchParams: Promise<Search & { q?: string; sort?: string; more?: string }> }) {
+  await requireUser();
   const ctx = await siteFor((await params).site);
   if (!ctx) return null;
   const { project, site } = ctx;

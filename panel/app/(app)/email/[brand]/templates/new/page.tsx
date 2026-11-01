@@ -1,11 +1,13 @@
 import { TemplateEditor } from "@/components/email-forms";
 import { PageHeader } from "@/components/page";
 import { brandFor } from "@/lib/email";
+import { requireUser } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "New template" };
 
 export default async function NewTemplatePage({ params }: { params: Promise<{ brand: string }> }) {
+  await requireUser();
   const ctx = await brandFor((await params).brand);
   if (!ctx) return null;
   return (

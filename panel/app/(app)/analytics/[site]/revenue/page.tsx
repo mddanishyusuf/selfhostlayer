@@ -9,6 +9,7 @@ import { Pill } from "@/components/ui";
 import { PROVIDERS, revenueOf, siteFor, type Revenue, type RevenueRow } from "@/lib/analytics";
 import { money } from "@/lib/money";
 import { GUIDES } from "@/lib/revenue-guides";
+import { requireUser } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Revenue" };
@@ -47,6 +48,7 @@ function RevenueCard({ title, tabs, rows, currency, name, filterHref }: { title:
 }
 
 export default async function RevenuePage({ params, searchParams }: { params: Promise<{ site: string }>; searchParams: Promise<Search & { by?: string }> }) {
+  await requireUser();
   const ctx = await siteFor((await params).site);
   if (!ctx) return null;
   const { project, site } = ctx;

@@ -5,11 +5,13 @@ import { CARD, KeyValues, Notice, PageHeader, Section, Stats } from "@/component
 import { RefreshEvery } from "@/components/refresh";
 import { brandFor, campaignOf, EmailError, listsOf, type List } from "@/lib/email";
 import { sampleMerge } from "@/lib/markdown";
+import { requireUser } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Campaign" };
 
 export default async function CampaignPage({ params }: { params: Promise<{ brand: string; id: string }> }) {
+  await requireUser();
   const { brand: brandParam, id } = await params;
   const ctx = await brandFor(brandParam);
   if (!ctx) return null;

@@ -9,6 +9,7 @@ import { agent } from "./agent";
 import { config } from "./config";
 import { servingConfig } from "./domains";
 import { integrationFor, projectEnv, type Project } from "./projects";
+import { requireUser } from "./session";
 
 export const emailInstall = () => integrationFor("email");
 
@@ -271,6 +272,7 @@ export const brandsOnce = cache(listBrands);
  * to /email.
  */
 export async function brandFor(param: string): Promise<{ project: Project; brand: Brand; brands: Brand[] } | null> {
+  await requireUser();
   const project = emailInstall();
   if (!project) redirect("/email");
   const brands = await brandsOnce(project).catch(() => null);

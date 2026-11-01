@@ -3,11 +3,13 @@ import { AutomationButtons, AutomationEditor } from "@/components/email-forms";
 import { StatusPill, when } from "@/components/email-ui";
 import { Empty, Notice, PageHeader, Section, Stats } from "@/components/page";
 import { automationOf, brandFor, EmailError, listsOf, type List } from "@/lib/email";
+import { requireUser } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Automation" };
 
 export default async function AutomationPage({ params }: { params: Promise<{ brand: string; id: string }> }) {
+  await requireUser();
   const { brand: b, id } = await params;
   const ctx = await brandFor(b);
   if (!ctx) return null;

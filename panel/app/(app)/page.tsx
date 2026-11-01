@@ -15,6 +15,7 @@ import { allRepos } from "@/lib/github-repos";
 import { getApp } from "@/lib/github-store";
 import { latestUsage } from "@/lib/metrics";
 import { listProjects, type Project } from "@/lib/projects";
+import { requireUser } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Projects" };
@@ -74,6 +75,7 @@ function StateWord({ state }: { state: State }) {
 }
 
 export default async function ProjectsPage({ searchParams }: { searchParams: Promise<{ q?: string; status?: string; view?: string }> }) {
+  await requireUser();
   const { q, status, view } = await searchParams;
   // Warm the New project list in the background, so it opens without waiting on GitHub.
   if (getApp()) void allRepos().catch(() => {});

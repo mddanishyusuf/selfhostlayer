@@ -5,6 +5,7 @@ import { CARD, Notice, PageHeader, Section, Stats } from "@/components/page";
 import { RefreshEvery } from "@/components/refresh";
 import { cx } from "@/components/ui";
 import { realtimeOf, siteFor, type Realtime } from "@/lib/analytics";
+import { requireUser } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Realtime" };
@@ -22,6 +23,7 @@ function said(e: Realtime["latest"][number]): React.ReactNode {
 }
 
 export default async function RealtimePage({ params }: { params: Promise<{ site: string }> }) {
+  await requireUser();
   const ctx = await siteFor((await params).site);
   if (!ctx) return null;
   const { project, site } = ctx;

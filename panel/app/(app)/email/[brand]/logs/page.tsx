@@ -6,6 +6,7 @@ import { Icon } from "@/components/icon";
 import { CARD, Empty, KeyValues, Notice, PageHeader, Segmented } from "@/components/page";
 import { NO_AUTOFILL, buttonClass } from "@/components/ui";
 import { brandFor, messageOf, messagesOf } from "@/lib/email";
+import { requireUser } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Logs" };
@@ -21,6 +22,7 @@ const KINDS: [string, string][] = [
 ];
 
 export default async function LogsPage({ params, searchParams }: { params: Promise<{ brand: string }>; searchParams: Promise<Search> }) {
+  await requireUser();
   const ctx = await brandFor((await params).brand);
   if (!ctx) return null;
   const { project, brand } = ctx;

@@ -11,6 +11,7 @@ import { installedVersion } from "./deploy";
 import { servingConfig } from "./domains";
 import { integrationFor, listProjects, projectEnv, type Project } from "./projects";
 import type { ProviderId } from "./revenue-guides";
+import { requireUser } from "./session";
 
 /** The installed Analytics, if any. */
 export const analyticsInstall = () => integrationFor("analytics");
@@ -298,6 +299,7 @@ export function outdatedAnalytics(p: Project): string | null {
  * the pages need (the layout offers the update).
  */
 export async function siteFor(param: string): Promise<{ project: Project; site: Site; sites: Site[]; outdated: string | null } | null> {
+  await requireUser();
   const project = analyticsInstall();
   if (!project) redirect("/analytics");
   const sites = await sitesOnce(project).catch(() => null);

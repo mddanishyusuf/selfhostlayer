@@ -2,12 +2,14 @@ import { FormBuilder } from "@/components/forms-builder";
 import { FormStatus } from "@/components/forms-ui";
 import { Notice, PageHeader } from "@/components/page";
 import { formFor, formOf, formsPublicUrl } from "@/lib/forms";
+import { requireUser } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Build" };
 
 /** The builder: the questions, their logic, the design, and the form as people see it. */
 export default async function BuildPage({ params }: { params: Promise<{ id: string }> }) {
+  await requireUser();
   const ctx = await formFor((await params).id);
   if (!ctx) return null;
   const { project, form } = ctx;

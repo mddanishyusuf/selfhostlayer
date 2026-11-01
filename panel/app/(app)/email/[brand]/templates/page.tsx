@@ -5,11 +5,13 @@ import { Icon } from "@/components/icon";
 import { CARD, Empty, Notice, PageHeader } from "@/components/page";
 import { buttonClass } from "@/components/ui";
 import { brandFor, templatesOf, type Template } from "@/lib/email";
+import { requireUser } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Templates" };
 
 export default async function TemplatesPage({ params }: { params: Promise<{ brand: string }> }) {
+  await requireUser();
   const ctx = await brandFor((await params).brand);
   if (!ctx) return null;
   const { project, brand } = ctx;

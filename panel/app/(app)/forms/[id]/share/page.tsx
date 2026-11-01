@@ -1,12 +1,14 @@
 import { CopyLine, QrCode } from "@/components/forms-forms";
 import { Notice, PageHeader, Section } from "@/components/page";
 import { formFor, formsPublicUrl } from "@/lib/forms";
+import { requireUser } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Share" };
 
 /** The link (filled in ahead with ?field=…), its QR code, and the codes that put the form on another site. */
 export default async function SharePage({ params }: { params: Promise<{ id: string }> }) {
+  await requireUser();
   const ctx = await formFor((await params).id);
   if (!ctx) return null;
   const { project, form } = ctx;

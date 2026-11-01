@@ -2,11 +2,13 @@ import { notFound } from "next/navigation";
 import { TemplateEditor } from "@/components/email-forms";
 import { Notice, PageHeader } from "@/components/page";
 import { brandFor, EmailError, templateOf, type Template } from "@/lib/email";
+import { requireUser } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Template" };
 
 export default async function TemplatePage({ params }: { params: Promise<{ brand: string; id: string }> }) {
+  await requireUser();
   const { brand: b, id } = await params;
   const ctx = await brandFor(b);
   if (!ctx) return null;

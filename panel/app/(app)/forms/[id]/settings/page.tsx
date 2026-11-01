@@ -4,6 +4,7 @@ import { Notice, PageHeader, SettingsRow } from "@/components/page";
 import { cx } from "@/components/ui";
 import { emailInstall, listBrands } from "@/lib/email";
 import { formFor, formOf, formsPublicUrl, formsSettings } from "@/lib/forms";
+import { requireUser } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Form settings" };
@@ -11,6 +12,7 @@ export const metadata = { title: "Form settings" };
 const KINDS = { webhook: "Webhook", email: "Email to you", receipt: "Copy to them" } as const;
 
 export default async function FormSettingsPage({ params }: { params: Promise<{ id: string }> }) {
+  await requireUser();
   const ctx = await formFor((await params).id);
   if (!ctx) return null;
   const { project, form } = ctx;

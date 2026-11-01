@@ -3,11 +3,13 @@ import { when } from "@/components/email-ui";
 import { CopyButton } from "@/components/form";
 import { Empty, Notice, PageHeader, Section } from "@/components/page";
 import { brandFor, emailPublicUrl, keysOf, type KeyInfo } from "@/lib/email";
+import { requireUser } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "API" };
 
 export default async function ApiPage({ params }: { params: Promise<{ brand: string }> }) {
+  await requireUser();
   const ctx = await brandFor((await params).brand);
   if (!ctx) return null;
   const { project, brand } = ctx;

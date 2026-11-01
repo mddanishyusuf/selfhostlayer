@@ -9,6 +9,7 @@ import { config } from "./config";
 import { servingConfig } from "./domains";
 import type { Schema } from "./form-schema";
 import { integrationFor, projectEnv, type Project } from "./projects";
+import { requireUser } from "./session";
 
 export { answerText, FIELD_LABELS, type Field, type FieldType, type Op, type Schema } from "./form-schema";
 
@@ -114,6 +115,7 @@ export const formsOnce = cache(listForms);
 
 /** The Forms install and the form a page is for, or null when Forms can't be reached. */
 export async function formFor(param: string): Promise<{ project: Project; form: Form; forms: Form[] } | null> {
+  await requireUser();
   const project = formsInstall();
   if (!project) redirect("/forms");
   const forms = await formsOnce(project).catch(() => null);

@@ -3,6 +3,7 @@ import { NewCampaignButton } from "@/components/email-forms";
 import { pct, StatusPill, when } from "@/components/email-ui";
 import { CARD, Empty, Notice, PageHeader } from "@/components/page";
 import { brandFor, campaignsOf, listsOf, type Campaign, type List } from "@/lib/email";
+import { requireUser } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Campaigns" };
@@ -10,6 +11,7 @@ export const metadata = { title: "Campaigns" };
 const GRID = "minmax(0,1fr) 96px 90px 80px 80px 130px";
 
 export default async function CampaignsPage({ params }: { params: Promise<{ brand: string }> }) {
+  await requireUser();
   const ctx = await brandFor((await params).brand);
   if (!ctx) return null;
   const { project, brand } = ctx;

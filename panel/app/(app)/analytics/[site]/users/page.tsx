@@ -7,6 +7,7 @@ import { CARD, Empty, KeyValues, Notice, PageHeader, Segmented } from "@/compone
 import { buttonClass, NO_AUTOFILL, Pill, cx } from "@/components/ui";
 import { goalsOf, journeyOf, siteFor, visitsOf, type Goal, type Journey, type Visit } from "@/lib/analytics";
 import { money } from "@/lib/money";
+import { requireUser } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Users" };
@@ -136,6 +137,7 @@ function JourneyDrawer({ j, error, close }: { j: Journey | null; error: string |
 }
 
 export default async function UsersPage({ params, searchParams }: { params: Promise<{ site: string }>; searchParams: Promise<Params> }) {
+  await requireUser();
   const ctx = await siteFor((await params).site);
   if (!ctx) return null;
   const { project, site } = ctx;

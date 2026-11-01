@@ -5,6 +5,7 @@ import { KeyValues, Notice, PageHeader, SettingsRow } from "@/components/page";
 import { PROVIDERS, siteFor, snippet, sourcesOf, takesProvider, webhookUrl, type Source } from "@/lib/analytics";
 import { installedVersion } from "@/lib/deploy";
 import { GUIDES } from "@/lib/revenue-guides";
+import { requireUser } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Site settings" };
@@ -25,6 +26,7 @@ function SourceStatus({ s, webhook }: { s: Source; webhook: boolean }) {
 }
 
 export default async function SiteSettingsPage({ params }: { params: Promise<{ site: string }> }) {
+  await requireUser();
   const ctx = await siteFor((await params).site);
   if (!ctx) return null;
   const { project, site } = ctx;

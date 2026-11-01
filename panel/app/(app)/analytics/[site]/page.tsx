@@ -5,11 +5,13 @@ import { Breakdown, capital, change, Controls, country, duration, filtersOf, hre
 import { Notice, PageHeader, Section, Stats } from "@/components/page";
 import { liveNow, siteFor, siteStats, snippet, type SiteStats } from "@/lib/analytics";
 import { money } from "@/lib/money";
+import { requireUser } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Analytics" };
 
 export default async function OverviewPage({ params, searchParams }: { params: Promise<{ site: string }>; searchParams: Promise<Search> }) {
+  await requireUser();
   const ctx = await siteFor((await params).site);
   if (!ctx) return null;
   const { project, site } = ctx;

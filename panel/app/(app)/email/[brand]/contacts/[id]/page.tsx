@@ -4,11 +4,13 @@ import { ContactForm } from "@/components/email-forms";
 import { StatusPill, when } from "@/components/email-ui";
 import { CARD, Empty, Notice, PageHeader, Section } from "@/components/page";
 import { brandFor, contactOf, EmailError, listsOf } from "@/lib/email";
+import { requireUser } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Contact" };
 
 export default async function ContactPage({ params }: { params: Promise<{ brand: string; id: string }> }) {
+  await requireUser();
   const { brand: b, id } = await params;
   const ctx = await brandFor(b);
   if (!ctx) return null;

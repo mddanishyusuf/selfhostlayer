@@ -1,11 +1,13 @@
 import { BrandForm, DeleteBrand, ProviderForm, ProviderTools, SendingForm, SesEventsButton } from "@/components/email-forms";
 import { PageHeader, SettingsRow } from "@/components/page";
 import { brandFor, emailPublicUrl } from "@/lib/email";
+import { requireUser } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Brand settings" };
 
 export default async function BrandSettingsPage({ params }: { params: Promise<{ brand: string }> }) {
+  await requireUser();
   const ctx = await brandFor((await params).brand);
   if (!ctx) return null;
   const { project, brand } = ctx;

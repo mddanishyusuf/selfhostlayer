@@ -6,6 +6,7 @@ import { Icon } from "@/components/icon";
 import { CARD, Notice, PageHeader, TileIcon } from "@/components/page";
 import { goalsOf, siteFor, type Goal } from "@/lib/analytics";
 import { money } from "@/lib/money";
+import { requireUser } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Goals" };
@@ -13,6 +14,7 @@ export const metadata = { title: "Goals" };
 const GRID = "minmax(0,1fr) 90px 90px 80px 96px 32px";
 
 export default async function GoalsPage({ params, searchParams }: { params: Promise<{ site: string }>; searchParams: Promise<Search> }) {
+  await requireUser();
   const ctx = await siteFor((await params).site);
   if (!ctx) return null;
   const { project, site } = ctx;

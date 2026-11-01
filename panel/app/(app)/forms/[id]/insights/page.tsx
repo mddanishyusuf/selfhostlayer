@@ -2,6 +2,7 @@ import { BarChart } from "@/components/bar-chart";
 import { duration } from "@/components/forms-ui";
 import { Empty, Notice, PageHeader, Section, Segmented, Stats } from "@/components/page";
 import { FIELD_LABELS, formFor, insightsOf, type FieldType, type Insights } from "@/lib/forms";
+import { requireUser } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Insights" };
@@ -50,6 +51,7 @@ function Question({ q, total }: { q: Insights["fields"][number]; total: number }
 
 /** How the form does: views, starts, responses and how long it takes, then each question's answers. */
 export default async function InsightsPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ days?: string }> }) {
+  await requireUser();
   const ctx = await formFor((await params).id);
   if (!ctx) return null;
   const { project, form } = ctx;

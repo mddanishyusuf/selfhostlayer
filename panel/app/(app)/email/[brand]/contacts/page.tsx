@@ -6,6 +6,7 @@ import { Icon } from "@/components/icon";
 import { CARD, Empty, Notice, PageHeader, Section, Segmented } from "@/components/page";
 import { NO_AUTOFILL, buttonClass } from "@/components/ui";
 import { brandFor, contactsOf, listsOf, suppressionsOf, type List } from "@/lib/email";
+import { requireUser } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Contacts" };
@@ -14,6 +15,7 @@ type Search = { q?: string; list?: string; status?: string; page?: string; view?
 const GRID = "minmax(0,1.4fr) minmax(0,1fr) 110px 120px";
 
 export default async function ContactsPage({ params, searchParams }: { params: Promise<{ brand: string }>; searchParams: Promise<Search> }) {
+  await requireUser();
   const ctx = await brandFor((await params).brand);
   if (!ctx) return null;
   const { project, brand } = ctx;

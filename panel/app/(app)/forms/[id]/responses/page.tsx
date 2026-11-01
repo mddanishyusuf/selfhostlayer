@@ -9,6 +9,7 @@ import { Icon } from "@/components/icon";
 import { CARD, Empty, Notice, PageHeader } from "@/components/page";
 import { NO_AUTOFILL, buttonClass } from "@/components/ui";
 import { answerText, formFor, responseOf, responsesOf, type FormResponse } from "@/lib/forms";
+import { requireUser } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Responses" };
@@ -18,6 +19,7 @@ const ASKS = (t: string) => !["statement", "page_break"].includes(t);
 
 /** Every response, newest first: the first questions as columns, the rest when one is opened. */
 export default async function ResponsesPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<Search> }) {
+  await requireUser();
   const ctx = await formFor((await params).id);
   if (!ctx) return null;
   const { project, form } = ctx;

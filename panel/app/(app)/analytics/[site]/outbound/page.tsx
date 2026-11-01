@@ -3,6 +3,7 @@ import { Controls, filtersOf, hrefWith, rangeOf, type Search } from "@/component
 import { Icon } from "@/components/icon";
 import { CARD, Empty, Notice, PageHeader, Segmented } from "@/components/page";
 import { outboundOf, siteFor } from "@/lib/analytics";
+import { requireUser } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Outbound" };
@@ -10,6 +11,7 @@ export const metadata = { title: "Outbound" };
 const GRID = "minmax(0,1fr) 84px 84px";
 
 export default async function OutboundPage({ params, searchParams }: { params: Promise<{ site: string }>; searchParams: Promise<Search & { view?: string }> }) {
+  await requireUser();
   const ctx = await siteFor((await params).site);
   if (!ctx) return null;
   const { project, site } = ctx;
@@ -28,7 +30,8 @@ export default async function OutboundPage({ params, searchParams }: { params: P
   const bySite = sp.view !== "links";
   const rows = bySite
     ? [...links.reduce((m, l) => {
-        const host = new URL(l.url).host;
+        // Analytics keeps only http(s) links, but an older one may have kept anything.
+        const host = URL.canParse(l.url) ? new URL(l.url).host || l.url : l.url;
         const r = m.get(host) ?? { url: host, visitors: 0, clicks: 0, links: 0 };
         r.clicks += l.clicks;
         r.visitors = Math.max(r.visitors, l.visitors);
