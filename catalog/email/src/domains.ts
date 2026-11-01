@@ -74,6 +74,13 @@ export function publicDns(): Dns {
 
 const DOMAIN = /^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z][a-z0-9-]{0,62}$/;
 
+/**
+ * Where SES's Easy DKIM records point: dkim.amazonses.com, except in the
+ * regions with a DKIM domain of their own (docs.aws.amazon.com/general/latest/gr/ses.html).
+ */
+const OWN_DKIM_DOMAIN = new Set(["af-south-1", "ap-northeast-3", "ap-south-2", "ap-southeast-3", "ap-southeast-5", "ca-west-1", "eu-central-2", "eu-south-1", "il-central-1", "me-central-1", "us-gov-east-1"]);
+export const sesDkimDomain = (region: string) => (OWN_DKIM_DOMAIN.has(region) ? `dkim.${region}.amazonses.com` : "dkim.amazonses.com");
+
 export class Domains {
   readonly #db: DatabaseSync;
   readonly #secrets: Secrets;
@@ -98,7 +105,8 @@ export class Domains {
     const out: DnsRecord[] = [];
     if (brand?.provider === "ses") {
       const tokens = r.ses_tokens ? (JSON.parse(r.ses_tokens) as string[]) : [];
-      tokens.forEach((t, i) => out.push({ purpose: "DKIM", type: "CNAME", name: `${t}._domainkey.${r.domain}`, value: `${t}.dkim.amazonses.com`, required: true, ...check(`ses${i}`) }));
+      const target = sesDkimDomain(brand.ses?.region ?? "");
+      tokens.forEach((t, i) => out.push({ purpose: "DKIM", type: "CNAME", name: `${t}._domainkey.${r.domain}`, value: `${t}.${target}`, required: true, ...check(`ses${i}`) }));
     } else if (r.dkim_public) {
       out.push({ purpose: "DKIM", type: "TXT", name: `${r.selector}._domainkey.${r.domain}`, value: dkimRecord(r.dkim_public), required: true, ...check("dkim") });
     }
@@ -163,7 +171,7 @@ export class Domains {
       await Promise.all(
         tokens.map(async (t, i) => {
           const found = (await this.#dns.cname(`${t}._domainkey.${d.domain}`))[0] ?? null;
-          checks[`ses${i}`] = { ok: found?.toLowerCase().replace(/\.$/, "") === `${t}.dkim.amazonses.com`, found };
+          checks[`ses${i}`] = { ok: found?.toLowerCase().replace(/\.$/, "") === `${t}.${sesDkimDomain(brand.ses?.region ?? "")}`, found };
         }),
       );
     } else {

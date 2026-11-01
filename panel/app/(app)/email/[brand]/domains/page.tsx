@@ -1,6 +1,8 @@
+import { ChevronRightIcon } from "lucide-react";
 import { AddDomainForm, DomainButtons } from "@/components/email-forms";
 import { StatusPill, when } from "@/components/email-ui";
 import { CopyButton } from "@/components/form";
+import { Icon } from "@/components/icon";
 import { CARD, Empty, Notice, PageHeader } from "@/components/page";
 import { cx } from "@/components/ui";
 import { brandFor, domainsOf, type Domain } from "@/lib/email";
@@ -50,7 +52,18 @@ export default async function DomainsPage({ params }: { params: Promise<{ brand:
               <DomainButtons brandId={brand.id} id={d.id} domain={d.domain} />
             </span>
           </div>
-          <div className="border-t border-border">
+          {/* Folded once the domain is verified: the records are only needed again to change something. */}
+          <details open={d.status !== "verified"} className="group border-t border-border" data-testid="domain-records">
+            <summary className="flex cursor-pointer select-none list-none items-center gap-2 px-3.5 py-2.5 text-[13px] transition-colors hover:bg-hover [&::-webkit-details-marker]:hidden">
+              <Icon icon={ChevronRightIcon} size={14} className="text-muted transition-transform duration-150 group-open:rotate-90" />
+              <span className="font-medium">DNS records</span>
+              <span className="text-[12px] text-muted">
+                {d.records.filter((r) => r.ok === true).length} of {d.records.length} found
+              </span>
+              <span className="ml-auto text-[12px] text-muted group-open:hidden">Show</span>
+              <span className="ml-auto hidden text-[12px] text-muted group-open:inline">Hide</span>
+            </summary>
+            <div className="border-t border-border">
             {d.records.map((r) => (
               <div key={`${r.purpose}${r.name}`} className="grid gap-1.5 border-b border-border-soft px-3.5 py-2.5 last:border-b-0">
                 <div className="flex flex-wrap items-center gap-2 text-[13px]">
@@ -73,7 +86,8 @@ export default async function DomainsPage({ params }: { params: Promise<{ brand:
                 {r.found && r.ok === false && <p className="break-all text-[12px] text-muted">In DNS now: {r.found}</p>}
               </div>
             ))}
-          </div>
+            </div>
+          </details>
         </section>
       ))}
       <p className="text-[12px] text-dim">SPF: add your provider&apos;s include to the domain&apos;s one SPF record (a domain may have only one). DMARC: start with p=none, then tighten it once mail passes.</p>

@@ -182,6 +182,7 @@ export class Brands {
     const kind = input.provider;
     let config: Record<string, unknown>;
     let secret: string | null;
+    let sesMoved = false;
     if (kind === "smtp") {
       const host = oneLine(input.host, "host", 253, { required: true }).toLowerCase();
       if (!HOST.test(host)) throw new InputError("host", "must be a host name like smtp.example.com");
@@ -202,13 +203,17 @@ export class Brands {
       config = { region, accessKeyId };
       secret = key !== null ? this.#env.secrets.seal(key) : was.provider === "ses" && was.ses?.accessKeyId === accessKeyId ? row.provider_secret : null;
       if (secret === null) throw new InputError("secretAccessKey", "is required");
+      // Another region or AWS account has none of the old one's identities, DKIM tokens or event topic.
+      sesMoved = was.provider !== "ses" || was.ses?.region !== region || was.ses?.accessKeyId !== accessKeyId;
     } else if (kind === "none") {
       config = {};
       secret = null;
     } else throw new InputError("provider", "must be smtp, ses or none");
     tx(this.#env.db, () => {
-      this.#env.db.prepare("UPDATE brands SET provider = ?, provider_config = ?, provider_secret = ?, ses_events = CASE WHEN ? = 'ses' THEN ses_events ELSE NULL END WHERE id = ?").run(kind, JSON.stringify(config), secret, kind, id);
-      if (kind !== was.provider) this.#env.db.prepare("UPDATE domains SET status = 'pending', verified_at = NULL WHERE brand_id = ?").run(id);
+      this.#env.db.prepare("UPDATE brands SET provider = ?, provider_config = ?, provider_secret = ?, ses_events = CASE WHEN ? THEN ses_events ELSE NULL END WHERE id = ?").run(kind, JSON.stringify(config), secret, kind === "ses" && !sesMoved ? 1 : 0, id);
+      // Checked again; there, the next check makes each domain's identity in SES.
+      if (sesMoved) this.#env.db.prepare("UPDATE domains SET status = 'pending', verified_at = NULL, ses_tokens = NULL WHERE brand_id = ?").run(id);
+      else if (kind !== was.provider) this.#env.db.prepare("UPDATE domains SET status = 'pending', verified_at = NULL WHERE brand_id = ?").run(id);
     });
     void this.#senders.get(id)?.close();
     this.#senders.delete(id);

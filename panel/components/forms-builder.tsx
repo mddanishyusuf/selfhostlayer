@@ -10,7 +10,7 @@ import { FIELD_LABELS, type Field, type FieldType, type Op, type Schema } from "
 import type { Form } from "@/lib/forms";
 import { SubmitButton } from "./form";
 import { Icon } from "./icon";
-import { Button, Field as Labeled, FormError, Input, Select, cx } from "./ui";
+import { Button, buttonClass, Field as Labeled, FormError, Input, Select, cx } from "./ui";
 
 const GROUPS: [string, FieldType[]][] = [
   ["Text", ["short_text", "long_text", "email", "number", "url", "phone", "date"]],
@@ -279,18 +279,24 @@ export function FormBuilder({ form, publicUrl, preview }: { form: Form; publicUr
     <form action={run} className="grid grid-cols-[minmax(0,1fr)] gap-3.5" data-testid="form-builder">
       <input type="hidden" name="id" value={form.id} />
       <input type="hidden" name="schema" value={json} />
-      <section className="flex flex-wrap items-end gap-2 border border-border bg-card p-3.5">
-        <div className="min-w-[220px] flex-1">
-          <Labeled label="Title" htmlFor="fb-title">
-            <Input id="fb-title" name="title" value={title} onChange={(e) => setTitle(e.target.value)} required />
-          </Labeled>
-        </div>
-        <a href={pageUrl} target="_blank" rel="noreferrer" className="inline-flex h-[35px] items-center gap-1.5 border border-border px-3 text-[13px] hover:bg-hover">
-          <Icon icon={ExternalLinkIcon} size={13} /> Open the form
-        </a>
-        <SubmitButton pending="Saving…" className="w-auto">
-          Save
-        </SubmitButton>
+      <section className="border border-border bg-card p-3.5">
+        <Labeled
+          label="Title"
+          htmlFor="fb-title"
+          wide
+          action={
+            <>
+              <a href={pageUrl} target="_blank" rel="noreferrer" className={buttonClass("secondary")}>
+                <Icon icon={ExternalLinkIcon} size={14} /> Open the form
+              </a>
+              <SubmitButton pending="Saving…" className="w-auto">
+                Save
+              </SubmitButton>
+            </>
+          }
+        >
+          <Input id="fb-title" name="title" value={title} onChange={(e) => setTitle(e.target.value)} required />
+        </Labeled>
       </section>
       <FormError message={wrong?.message} />
       {state.saved && <p className="text-[13px] text-teal">{state.saved}</p>}

@@ -15,7 +15,7 @@ Opening a brand shrinks the panel's sidebar to its icons and opens Email's own s
 On the brand's **Settings** page, under **Provider**:
 
 - **SMTP** works with any provider (Amazon SES's SMTP, Postmark, Brevo, Mailgun, Resend, your own Postfix): host, port, security and the username and password. Use port **587** with STARTTLS (or 465 with TLS): many servers can't send on port 25, and Hetzner blocks 25 and 465 for new accounts. Credentials are never sent unencrypted unless security is set to None.
-- **Amazon SES** uses SES's API with an IAM user's access key. The user needs `ses:SendEmail`, `ses:GetAccount`, `ses:CreateEmailIdentity`, `ses:GetEmailIdentity`, `ses:DeleteEmailIdentity`, `ses:CreateConfigurationSet`, `ses:CreateConfigurationSetEventDestination`, `sns:CreateTopic` and `sns:Subscribe`. A new SES account is in its sandbox: it sends only to verified addresses, one email a second, until AWS gives it production access.
+- **Amazon SES** uses SES's API in the region you pick (every region SES runs in is listed, and another can be typed in) with an IAM user's access key. Changing the region or the key's account sets the brand's domains up again there: each needs **Check** once more, and bounce handling set up again. The user needs `ses:SendEmail`, `ses:GetAccount`, `ses:CreateEmailIdentity`, `ses:GetEmailIdentity`, `ses:DeleteEmailIdentity`, `ses:CreateConfigurationSet`, `ses:CreateConfigurationSetEventDestination`, `sns:CreateTopic` and `sns:Subscribe`. A new SES account is in its sandbox: it sends only to verified addresses, one email a second, until AWS gives it production access.
 
 **Send test** sends a real email; **Check the connection** logs in (SMTP) or reads the account's quota and sandbox state (SES) without sending. Passwords and keys are kept encrypted.
 
@@ -31,7 +31,7 @@ Mail goes out only from a verified domain of the brand. **Domains** → **Add do
 - **SPF** (recommended): your provider's `include:` in the domain's one SPF record.
 - **DMARC** (recommended): start with `v=DMARC1; p=none;`, then tighten it once mail passes.
 
-**Check** looks the records up in public DNS (Cloudflare's and Google's resolvers). The domain is verified once DKIM is there; with SES, once SES says so.
+**Check** looks the records up in public DNS (Cloudflare's and Google's resolvers). The domain is verified once DKIM is there; with SES, once SES says so. A verified domain's records fold away under **DNS records**, which opens them again.
 
 ## Contacts and lists
 

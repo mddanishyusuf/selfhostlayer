@@ -88,10 +88,33 @@ export function Label({ className, ...props }: ComponentProps<"label">) {
   return <label className={cx("font-bold text-foreground", className)} {...props} />;
 }
 
-export function Field({ label, htmlFor, hint, children }: { label: string; htmlFor: string; hint?: ReactNode; children: ReactNode }) {
+/**
+ * A label, its control, and a hint under it. `action` (a button or two) sits
+ * beside the control, centered on it, not beside the hint; on a phone it goes
+ * under the control when there's no room. `wide` lets the control take the row.
+ */
+export function Field({ label, htmlFor, hint, action, wide, children }: { label: string; htmlFor: string; hint?: ReactNode; action?: ReactNode; wide?: boolean; children: ReactNode }) {
   return (
     <div className="grid content-start gap-[5px]">
       <Label htmlFor={htmlFor}>{label}</Label>
+      {action ? (
+        <div className="flex flex-wrap items-center gap-2">
+          <div className={cx("min-w-[180px] flex-1", !wide && "sm:max-w-[340px]")}>{children}</div>
+          {action}
+        </div>
+      ) : (
+        children
+      )}
+      {hint && <p className="text-[12px] text-muted">{hint}</p>}
+    </div>
+  );
+}
+
+/** A label over a group of checkboxes or choices, as Field's is over a control. */
+export function Group({ label, hint, children }: { label: string; hint?: ReactNode; children: ReactNode }) {
+  return (
+    <div role="group" aria-label={label} className="grid content-start gap-[5px]">
+      <span className="font-bold text-foreground">{label}</span>
       {children}
       {hint && <p className="text-[12px] text-muted">{hint}</p>}
     </div>

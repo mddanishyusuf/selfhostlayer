@@ -244,5 +244,15 @@ describe("domains", () => {
     const v = await domains.verify(brand.id, d.id);
     expect(v.status).toBe("verified");
     expect(v.records.filter((r) => r.type === "CNAME").map((r) => r.ok)).toEqual([true, false, false]);
+    // Another region: SES there has no identity yet, and Zurich's DKIM records point at its own domain.
+    brands.setProvider(brand.id, { provider: "ses", region: "eu-central-2", accessKeyId: "AKIAIOSFODNN7EXAMPLE" });
+    expect(domains.list(brand.id)[0]).toMatchObject({ status: "pending", verifiedAt: null });
+    expect(domains.list(brand.id)[0]!.records.filter((r) => r.type === "CNAME")).toEqual([]);
+    const moved = await domains.verify(brand.id, d.id);
+    expect(moved.records.filter((r) => r.type === "CNAME").map((r) => [r.value, r.ok])).toEqual([
+      ["t1.dkim.eu-central-2.amazonses.com", false],
+      ["t2.dkim.eu-central-2.amazonses.com", false],
+      ["t3.dkim.eu-central-2.amazonses.com", false],
+    ]);
   });
 });

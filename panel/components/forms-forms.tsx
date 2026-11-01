@@ -13,7 +13,7 @@ import type { Form } from "@/lib/forms";
 import { CopyButton, SubmitButton } from "./form";
 import { Icon } from "./icon";
 import { Modal } from "./modal";
-import { Button, Field, FormError, Input, SecretInput, Select, cx } from "./ui";
+import { Button, Field, FormError, Group, Input, SecretInput, Select, cx } from "./ui";
 
 const initial: A.FormState = {};
 
@@ -53,22 +53,25 @@ export function NewFormDialog({ onClose }: { onClose: () => void }) {
           <Input id="nf-title" name="title" autoFocus placeholder={template === "blank" ? "Untitled form" : TEMPLATES.find((t) => t.id === template)!.name} />
         </Field>
         <input type="hidden" name="template" value={template} />
-        <div className="grid gap-1.5 sm:grid-cols-2" role="radiogroup" aria-label="Template">
-          {TEMPLATES.map((t) => (
-            <button
-              key={t.id}
-              type="button"
-              role="radio"
-              aria-checked={template === t.id}
-              onClick={() => setTemplate(t.id)}
-              className={cx("grid content-start gap-0.5 border px-3 py-2.5 text-left transition-colors duration-150", template === t.id ? "border-accent bg-selected" : "border-border hover:bg-hover")}
-              data-testid={`template-${t.id}`}
-            >
-              <b className="text-[13px]">{t.name}</b>
-              <span className="text-[12px] text-muted">{t.description}</span>
-            </button>
-          ))}
-        </div>
+        <Group label="Start from">
+          {/* Blank across the top, the four templates two by two under it. */}
+          <div className="grid gap-1.5 sm:grid-cols-2" role="radiogroup" aria-label="Start from">
+            {TEMPLATES.map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                role="radio"
+                aria-checked={template === t.id}
+                onClick={() => setTemplate(t.id)}
+                className={cx("grid content-start gap-0.5 border px-3 py-2.5 text-left transition-colors duration-150", t.id === "blank" && "sm:col-span-2", template === t.id ? "border-accent bg-selected" : "border-border hover:bg-hover")}
+                data-testid={`template-${t.id}`}
+              >
+                <b className="text-[13px]">{t.name}</b>
+                <span className="text-[12px] text-muted">{t.description}</span>
+              </button>
+            ))}
+          </div>
+        </Group>
         <FormError message={state.error} />
         <div className="flex justify-end gap-2">
           <Button type="button" variant="secondary" onClick={onClose}>
@@ -162,7 +165,7 @@ export function NotifyForm({ form, emailReady, emailFields }: { form: Form; emai
         </Field>
         {form.notify.webhookSecret && (
           <Field label="Signing secret" htmlFor="nt-secret" hint="sha256=HMAC of the body with this secret">
-            <div className="flex gap-2">
+            <div className="flex items-center gap-2">
               <SecretInput id="nt-secret" readOnly value={form.notify.webhookSecret} className="font-mono text-[12.5px]" />
               <CopyButton text={form.notify.webhookSecret} />
             </div>
@@ -218,21 +221,25 @@ export function EmailConnect({ connected, emailInstalled, brands }: { connected:
   if (!brands.length) return <p className="text-[13px] text-muted">Add a brand in Email first, with a From address on a verified domain.</p>;
   return (
     <form action={run} className="grid gap-2" data-testid="email-connect">
-      <div className="flex flex-wrap items-end gap-2">
-        <Field label="Brand" htmlFor="ec-brand" hint="Its From address and provider send the emails">
-          <Select id="ec-brand" name="brand" className="sm:w-[280px]">
-            {brands.map((b) => (
-              <option key={b.id} value={b.id}>
-                {b.name}
-                {b.from ? ` · ${b.from}` : " · no From address"}
-              </option>
-            ))}
-          </Select>
-        </Field>
-        <SubmitButton pending="Connecting…" className="w-auto">
-          Connect
-        </SubmitButton>
-      </div>
+      <Field
+        label="Brand"
+        htmlFor="ec-brand"
+        hint="Its From address and provider send the emails"
+        action={
+          <SubmitButton pending="Connecting…" className="w-auto">
+            Connect
+          </SubmitButton>
+        }
+      >
+        <Select id="ec-brand" name="brand">
+          {brands.map((b) => (
+            <option key={b.id} value={b.id}>
+              {b.name}
+              {b.from ? ` · ${b.from}` : " · no From address"}
+            </option>
+          ))}
+        </Select>
+      </Field>
       <Saved state={state} />
     </form>
   );
@@ -362,12 +369,16 @@ export function DeleteAllResponses({ formId, count }: { formId: number; count: n
 
 /** A line of code or a link, with a copy button. */
 export function CopyLine({ text, label = "Copy", testId }: { text: string; label?: string; testId?: string }) {
+  // The button by the code's only line, or by its first.
+  const lines = text.includes("\n");
   return (
-    <div className="flex min-w-0 items-stretch gap-2">
+    <div className={cx("flex min-w-0 gap-2", lines ? "items-start" : "items-center")}>
       <code className="min-w-0 flex-1 overflow-x-auto whitespace-pre border border-border bg-field px-2.5 py-2 font-mono text-[12.5px]" data-testid={testId}>
         {text}
       </code>
-      <CopyButton text={text} label={label} />
+      <span className={lines ? "mt-[5px]" : undefined}>
+        <CopyButton text={text} label={label} />
+      </span>
     </div>
   );
 }

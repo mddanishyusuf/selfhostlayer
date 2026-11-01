@@ -318,7 +318,10 @@ describe("reports", () => {
     expect(res.steps).toHaveLength(5);
     expect((await admin(`visits/${"x".repeat(12)}?site=${site.id}`)).status).toBe(404);
     expect((await admin(`visits/..%2F..?site=${site.id}`)).status).toBe(404);
-    expect(((await (await admin(`pages?site=${site.id}&range=today`)).json()) as { pages: unknown[] }).pages.length).toBeGreaterThan(0);
+    // The admin API counts by the real clock, not the test's day: a pageview now, for its today.
+    visit("81.2.69.4", [[0, "pageview", "/now"]], Date.now());
+    app.ingest.flush();
+    expect(((await (await admin(`pages?site=${site.id}&range=today`)).json()) as { pages: { path: string }[] }).pages.map((p) => p.path)).toContain("/now");
   });
 });
 

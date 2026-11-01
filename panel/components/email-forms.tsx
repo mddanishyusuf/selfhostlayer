@@ -8,11 +8,12 @@ import { useActionState, useEffect, useMemo, useState, type ReactNode } from "re
 import * as A from "@/app/actions/email";
 import type { Automation, Brand, Campaign, List, Step, Template } from "@/lib/email";
 import { markdownEmail, sampleMerge } from "@/lib/markdown";
+import { isSesRegion, SES_REGIONS } from "@/lib/ses-regions";
 import { CopyButton, SubmitButton } from "./form";
 import { Icon } from "./icon";
 import { MENU_ITEM, MoreMenu } from "./menu";
 import { Modal } from "./modal";
-import { Button, Field, FormError, Input, SecretInput, Select, cx } from "./ui";
+import { Button, Field, FormError, Group, Input, SecretInput, Select, cx } from "./ui";
 
 const initial: A.FormState = {};
 type Action = (prev: A.FormState, form: FormData) => Promise<A.FormState>;
@@ -170,9 +171,13 @@ export function SendingForm({ brand }: { brand: Brand }) {
   );
 }
 
+const OTHER = "other";
+
 export function ProviderForm({ brand }: { brand: Brand }) {
   const [state, run] = useActionState(A.saveProvider, initial);
   const [kind, setKind] = useState(brand.provider === "none" ? "smtp" : brand.provider);
+  const saved = brand.ses?.region ?? "";
+  const [region, setRegion] = useState(!saved ? "us-east-1" : isSesRegion(saved) ? saved : OTHER);
   return (
     <form action={run} className="grid gap-3" data-testid="provider-form">
       <Hidden values={{ brand: brand.id }} />
@@ -210,9 +215,25 @@ export function ProviderForm({ brand }: { brand: Brand }) {
       )}
       {kind === "ses" && (
         <div className="grid gap-3 sm:grid-cols-2">
-          <Field label="Region" htmlFor="p-region" hint="Where SES is set up: us-east-1, eu-west-1…">
-            <Input id="p-region" name="region" required defaultValue={brand.ses?.region ?? "us-east-1"} spellCheck={false} />
+          <Field label="Region" htmlFor="p-region" hint="Where SES is set up for you: the region at the top right of the AWS console">
+            <Select id="p-region" name={region === OTHER ? undefined : "region"} value={region} onChange={(e) => setRegion(e.target.value)}>
+              {SES_REGIONS.map(([group, regions]) => (
+                <optgroup key={group} label={group}>
+                  {regions.map(([code, name]) => (
+                    <option key={code} value={code}>
+                      {name} · {code}
+                    </option>
+                  ))}
+                </optgroup>
+              ))}
+              <option value={OTHER}>Another region…</option>
+            </Select>
           </Field>
+          {region === OTHER && (
+            <Field label="Region code" htmlFor="p-region-code" hint="As AWS writes it, like eu-west-1">
+              <Input id="p-region-code" name="region" required defaultValue={saved && !isSesRegion(saved) ? saved : ""} placeholder="eu-west-1" spellCheck={false} />
+            </Field>
+          )}
           <Field label="Access key ID" htmlFor="p-akid" hint="An IAM user's key, allowed SES and SNS">
             <Input id="p-akid" name="accessKeyId" required defaultValue={brand.ses?.accessKeyId} placeholder="AKIA…" spellCheck={false} />
           </Field>
@@ -237,14 +258,19 @@ export function ProviderTools({ brand }: { brand: Brand }) {
   const [test, runTest] = useActionState(A.sendTestEmail, initial);
   return (
     <div className="grid gap-3">
-      <form action={runTest} className="flex flex-wrap items-end gap-2" data-testid="test-email">
+      <form action={runTest} data-testid="test-email">
         <Hidden values={{ brand: brand.id }} />
-        <Field label="Send a test to" htmlFor="t-to">
-          <Input id="t-to" name="to" type="email" required placeholder="you@example.com" className="sm:w-[260px]" />
+        <Field
+          label="Send a test to"
+          htmlFor="t-to"
+          action={
+            <SubmitButton pending="Sending…" variant="secondary" className="w-auto">
+              Send test
+            </SubmitButton>
+          }
+        >
+          <Input id="t-to" name="to" type="email" required placeholder="you@example.com" />
         </Field>
-        <SubmitButton pending="Sending…" variant="secondary" className="w-auto">
-          Send test
-        </SubmitButton>
       </form>
       <Saved state={test} />
       <form action={runCheck} className="flex flex-wrap items-center gap-2.5">
@@ -314,14 +340,18 @@ export function AddDomainForm({ brandId }: { brandId: number }) {
   return (
     <form action={run} className="grid gap-2" data-testid="add-domain">
       <Hidden values={{ brand: brandId }} />
-      <div className="flex flex-wrap items-end gap-2">
-        <Field label="Domain" htmlFor="d-domain" hint="The part after @ in your From address">
-          <Input id="d-domain" name="domain" required placeholder="piqo.app" spellCheck={false} className="sm:w-[280px]" />
-        </Field>
-        <SubmitButton pending="Adding…" className="w-auto">
-          Add domain
-        </SubmitButton>
-      </div>
+      <Field
+        label="Domain"
+        htmlFor="d-domain"
+        hint="The part after @ in your From address"
+        action={
+          <SubmitButton pending="Adding…" className="w-auto">
+            Add domain
+          </SubmitButton>
+        }
+      >
+        <Input id="d-domain" name="domain" required placeholder="piqo.app" spellCheck={false} />
+      </Field>
       <Saved state={state} />
     </form>
   );
@@ -450,7 +480,9 @@ export function ContactButtons({ brandId, lists }: { brandId: number; lists: Lis
           <Field label="Name" htmlFor="c-name">
             <Input id="c-name" name="name" />
           </Field>
-          <ListChecks lists={lists} name="lists" />
+          <Group label="Lists">
+            <ListChecks lists={lists} name="lists" />
+          </Group>
         </DialogForm>
       )}
       {importing && (
@@ -460,10 +492,9 @@ export function ContactButtons({ brandId, lists }: { brandId: number; lists: Lis
             <Field label="CSV file" htmlFor="i-file" hint="Columns: email, name (or first and last name); every other column becomes a field">
               <input id="i-file" name="file" type="file" accept=".csv,text/csv" required className="text-[13px]" />
             </Field>
-            <div className="grid gap-1.5">
-              <span className="text-[13px] font-bold">Add them to</span>
+            <Group label="Add them to">
               <ListChecks lists={lists} name="lists" none="No lists yet: they're added as contacts only." />
-            </div>
+            </Group>
             <p className="text-[12px] text-muted">Import only people who asked for your emails. Nobody who unsubscribed is subscribed again, and imports start no automation.</p>
             <Saved state={state} />
             <div className="flex justify-end gap-2">
@@ -511,10 +542,9 @@ export function ContactForm({ brandId, contact, lists }: { brandId: number; cont
         <Field label="Fields" htmlFor="ce-fields" hint="One per line, as name: value; {{fields.name}} in an email">
           <textarea id="ce-fields" name="fields" rows={4} defaultValue={Object.entries(contact.fields).map(([k, v]) => `${k}: ${v}`).join("\n")} className="w-full border border-border bg-field px-2.5 py-2 font-mono text-[12.5px] outline-none focus:border-accent" spellCheck={false} />
         </Field>
-        <div className="grid gap-1.5">
-          <span className="text-[13px] font-bold">Lists</span>
+        <Group label="Lists">
           <ListChecks lists={lists} name="lists" checked={contact.lists} />
-        </div>
+        </Group>
         <Saved state={state} />
         <div>
           <SubmitButton pending="Saving…" className="w-auto">
@@ -537,14 +567,17 @@ export function SuppressForm({ brandId }: { brandId: number }) {
   return (
     <form action={run} className="grid gap-2">
       <Hidden values={{ brand: brandId }} />
-      <div className="flex flex-wrap items-end gap-2">
-        <Field label="Never email" htmlFor="s-email">
-          <Input id="s-email" name="email" type="email" required spellCheck={false} className="sm:w-[260px]" />
-        </Field>
-        <SubmitButton pending="Adding…" variant="secondary" className="w-auto">
-          Add
-        </SubmitButton>
-      </div>
+      <Field
+        label="Never email"
+        htmlFor="s-email"
+        action={
+          <SubmitButton pending="Adding…" variant="secondary" className="w-auto">
+            Add
+          </SubmitButton>
+        }
+      >
+        <Input id="s-email" name="email" type="email" required spellCheck={false} />
+      </Field>
       <Saved state={state} />
     </form>
   );
@@ -624,10 +657,9 @@ export function NewCampaignButton({ brandId, lists }: { brandId: number; lists: 
             <Field label="Name" htmlFor="cn-name" hint="For you; recipients see the subject">
               <Input id="cn-name" name="name" required autoFocus placeholder="October update" />
             </Field>
-            <div className="grid gap-1.5">
-              <span className="text-[13px] font-bold">To</span>
+            <Group label="To">
               <ListChecks lists={lists} name="lists" none="No lists yet: add one on Lists." />
-            </div>
+            </Group>
             <FormError message={state.error} />
             <div className="flex justify-end gap-2">
               <Button type="button" variant="secondary" onClick={() => setOpen(false)}>
@@ -673,38 +705,50 @@ export function CampaignEditor({ brand, campaign, lists, audience }: { brand: Br
           </Field>
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
-          <div className="grid content-start gap-1.5">
-            <span className="text-[13px] font-bold">To</span>
+          <Group label="To">
             <ListChecks lists={lists} name="lists" checked={campaign.lists} />
-          </div>
-          <div className="grid content-start gap-1.5">
-            <span className="text-[13px] font-bold">Leave out</span>
+          </Group>
+          <Group label="Leave out">
             <ListChecks lists={lists} name="excludeLists" checked={campaign.excludeLists} />
-          </div>
+          </Group>
         </div>
       </section>
       <ContentEditor format={campaign.format} source={campaign.source || campaign.html} brand={brand} />
-      <section className="flex flex-wrap items-end gap-2 border border-border bg-card p-3.5">
-        <SubmitButton pending="Saving…" variant="secondary" className="w-auto">
-          Save draft
-        </SubmitButton>
-        <span className="mx-1 hidden h-6 w-px bg-border sm:block" />
-        <Field label="Test to" htmlFor="ce-test">
-          <Input id="ce-test" name="testTo" type="email" placeholder="you@example.com" className="sm:w-[220px]" />
+      <section className="flex flex-wrap items-end gap-x-5 gap-y-3 border border-border bg-card p-3.5">
+        {/* As tall as a field, so it lines up with the buttons beside the fields. */}
+        <div className="flex h-[39px] items-center">
+          <SubmitButton pending="Saving…" variant="secondary" className="w-auto">
+            Save draft
+          </SubmitButton>
+        </div>
+        <Field
+          label="Test to"
+          htmlFor="ce-test"
+          action={
+            <Button type="submit" name="intent" value="test" variant="secondary">
+              Save and send test
+            </Button>
+          }
+        >
+          <Input id="ce-test" name="testTo" type="email" placeholder="you@example.com" />
         </Field>
-        <Button type="submit" name="intent" value="test" variant="secondary">
-          Save and send test
-        </Button>
-        <span className="flex-1" />
-        <Field label="Send at (your time)" htmlFor="ce-at">
+        <span className="hidden flex-1 lg:block" />
+        <Field
+          label="Send at (your time)"
+          htmlFor="ce-at"
+          action={
+            <>
+              <Button type="submit" name="intent" value="schedule" variant="secondary">
+                {scheduled ? "Reschedule" : "Schedule"}
+              </Button>
+              <Button type="button" onClick={() => setConfirming(true)} data-testid="send-now">
+                Send now…
+              </Button>
+            </>
+          }
+        >
           <Input id="ce-at" name="at" type="datetime-local" defaultValue={campaign.scheduledAt ? new Date(campaign.scheduledAt - new Date().getTimezoneOffset() * 60_000).toISOString().slice(0, 16) : ""} />
         </Field>
-        <Button type="submit" name="intent" value="schedule" variant="secondary">
-          {scheduled ? "Reschedule" : "Schedule"}
-        </Button>
-        <Button type="button" onClick={() => setConfirming(true)} data-testid="send-now">
-          Send now…
-        </Button>
       </section>
       <Saved state={state} />
       {confirming && (
@@ -1051,14 +1095,20 @@ export function CreateKeyForm({ brandId }: { brandId: number }) {
   const [state, run] = useActionState(A.createKey, initial);
   return (
     <div className="grid gap-3">
-      <form action={run} className="flex flex-wrap items-end gap-2" data-testid="create-key">
+      <form action={run} data-testid="create-key">
         <Hidden values={{ brand: brandId }} />
-        <Field label="Name" htmlFor="k-name" hint="Where it's used">
-          <Input id="k-name" name="name" required placeholder="Production app" className="sm:w-[260px]" />
+        <Field
+          label="Name"
+          htmlFor="k-name"
+          hint="Where it's used"
+          action={
+            <SubmitButton pending="Creating…" className="w-auto">
+              Create key
+            </SubmitButton>
+          }
+        >
+          <Input id="k-name" name="name" required placeholder="Production app" />
         </Field>
-        <SubmitButton pending="Creating…" className="w-auto">
-          Create key
-        </SubmitButton>
       </form>
       <FormError message={state.error} />
       {state.value && (
