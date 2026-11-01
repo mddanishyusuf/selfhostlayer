@@ -4,6 +4,7 @@ import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { runInNewContext } from "node:vm";
+import { createHmac } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createApp, type App } from "../src/app.ts";
 import { addGoal, goalStats, listGoals, MAX_GOALS, removeGoal, updateGoal } from "../src/goals.ts";
@@ -103,10 +104,13 @@ describe("the script", () => {
     for (const f of p.listeners.click ?? []) f({ target: { closest: () => stripe } });
     const dodo = { protocol: "https:", host: "checkout.dodopayments.com", hostname: "checkout.dodopayments.com", origin: "https://checkout.dodopayments.com", pathname: "/buy/pdt_1", search: "?quantity=1" };
     for (const f of p.listeners.click ?? []) f({ target: { closest: () => dodo } });
+    const lemon = { protocol: "https:", host: "piqo.lemonsqueezy.com", hostname: "piqo.lemonsqueezy.com", origin: "https://piqo.lemonsqueezy.com", pathname: "/buy/2a0d4b1e", search: "" };
+    for (const f of p.listeners.click ?? []) f({ target: { closest: () => lemon } });
     click({ host: "github.com", hostname: "github.com", origin: "https://github.com", pathname: "/x/y" });
     expect(stripe.search).toBe("client_reference_id=AbCdEfGh-_12");
     expect(dodo.search).toBe("?quantity=1&metadata_shl_visit=AbCdEfGh-_12");
-    expect(p.sent.filter((s) => s.body.n === "Outbound link").map((s) => s.body.p)).toEqual([{ url: "https://buy.stripe.com/test_123" }, { url: "https://checkout.dodopayments.com/buy/pdt_1" }, { url: "https://github.com/x/y" }]);
+    expect(lemon.search).toBe("checkout[custom][shl_visit]=AbCdEfGh-_12");
+    expect(p.sent.filter((s) => s.body.n === "Outbound link").map((s) => s.body.p)).toEqual([{ url: "https://buy.stripe.com/test_123" }, { url: "https://checkout.dodopayments.com/buy/pdt_1" }, { url: "https://piqo.lemonsqueezy.com/buy/2a0d4b1e" }, { url: "https://github.com/x/y" }]);
   });
 
   it("sends nothing from automated browsers or localhost, where the visit is null", async () => {
@@ -494,6 +498,93 @@ describe("revenue", () => {
     expect(app.revenue.sources(siteId)[0]).toMatchObject({ error: "Stripe answered 500: down for a bit", syncedAt: null });
     const res = await admin("sources", { method: "PUT", body: JSON.stringify({ site: siteId, provider: "polar", key: "short" }) });
     expect([res.status, ((await res.json()) as { field: string }).field]).toEqual([400, "key"]);
+  });
+
+  it("from Paddle: completed transactions in pages of 30, renewals by their origin, the visit from custom_data", async () => {
+    const iso = new Date(Date.now() - 3_600_000).toISOString();
+    const txn = (n: number, more: Record<string, unknown> = {}) => ({ id: `txn_${n}`, status: "completed", customer_id: `ctm_${n % 3}`, origin: "web", currency_code: "USD", billed_at: iso, created_at: iso, custom_data: null, details: { totals: { subtotal: "1000", tax: "200", total: "1200", currency_code: "USD" } }, ...more });
+    provider = (url) => {
+      if (url.host !== "sandbox-api.paddle.com" || url.pathname !== "/transactions") return { status: 404, body: { error: { detail: "not found" } } };
+      if (url.searchParams.get("per_page") === "1") return { body: { data: [], meta: { pagination: { per_page: 1, next: "", has_more: false } } } };
+      expect([url.searchParams.get("status"), url.searchParams.get("order_by")]).toEqual(["completed", "billed_at[ASC]"]);
+      if (!url.searchParams.get("after")) {
+        const page = Array.from({ length: 30 }, (_, i) => txn(i + 1, i === 0 ? { custom_data: { shl_visit: visits.a } } : i === 1 ? { origin: "subscription_recurring", customer_id: "ctm_a" } : {}));
+        return { body: { data: page, meta: { pagination: { per_page: 30, next: "https://sandbox-api.paddle.com/transactions?after=txn_30", has_more: true } } } };
+      }
+      expect(url.searchParams.get("after")).toBe("txn_30");
+      return { body: { data: [txn(31, { custom_data: { shl_visit: visits.b }, customer_id: "ctm_b" })], meta: { pagination: { per_page: 30, next: "https://sandbox-api.paddle.com/transactions?after=txn_31", has_more: false } } } };
+    };
+    // A sandbox key says so; a bare key would take the mode chosen.
+    const half = await admin("sources", { method: "PUT", body: JSON.stringify({ site: siteId, provider: "paddle", key: `pdl_live_apikey_${"p".repeat(20)}` }) });
+    expect([half.status, ((await half.json()) as { field: string }).field]).toEqual([400, "key"]);
+    const src = await (await admin("sources", { method: "PUT", body: JSON.stringify({ site: siteId, provider: "paddle", key: "pdl_sdbx_apikey_01jabcdefghijklmnopqrstuvw_AbCdEfGhIjKlMnOpQrStUv_x9z" }) })).json();
+    expect(src).toMatchObject({ provider: "paddle", mode: "test" });
+    // Connecting pulled them already; another sync finds nothing new.
+    await app.revenue.sync(siteId, "paddle");
+    expect(app.db.prepare("SELECT count(*) n FROM payments WHERE provider = 'paddle'").get()).toEqual({ n: 31 });
+    expect(await app.revenue.sync(siteId, "paddle")).toEqual({ provider: "paddle", added: 0 });
+    const rows = app.db.prepare("SELECT external_id id, amount, currency, visit, renewal FROM payments WHERE provider = 'paddle' AND external_id IN ('txn_1', 'txn_2', 'txn_31') ORDER BY external_id").all();
+    expect(rows).toEqual([
+      { id: "txn_1", amount: 1000, currency: "usd", visit: visits.a, renewal: 0 },
+      { id: "txn_2", amount: 1000, currency: "usd", visit: null, renewal: 1 },
+      { id: "txn_31", amount: 1000, currency: "usd", visit: visits.b, renewal: 0 },
+    ]);
+  });
+
+  /** A webhook as the provider sends it: the raw body, signed with the secret (or not). */
+  const hook = (provider: string, body: unknown, secret: string) => {
+    const raw = JSON.stringify(body);
+    const header = provider === "creem" ? "creem-signature" : "X-Signature";
+    return fetch(`${base}/webhooks/${provider}/${siteId}`, { method: "POST", body: raw, headers: { "Content-Type": "application/json", [header]: createHmac("sha256", secret).update(raw).digest("hex") } });
+  };
+
+  it("from Lemon Squeezy, by webhook: orders, and later subscription payments (not the first), live only, signed", async () => {
+    const secret = "ls-secret-0123456789";
+    expect((await admin("sources", { method: "PUT", body: JSON.stringify({ site: siteId, provider: "lemonsqueezy", key: secret }) })).status).toBe(200);
+    expect(asked).toEqual([]);
+    const at = new Date(Date.now() - 3_600_000).toISOString();
+    const order = (id: string, more: Record<string, unknown> = {}, meta: Record<string, unknown> = {}) => ({ meta: { event_name: "order_created", custom_data: { shl_visit: visits.a }, ...meta }, data: { type: "orders", id, attributes: { status: "paid", currency: "EUR", subtotal: 1000, tax: 210, total: 1210, customer_id: 77, test_mode: false, created_at: at, ...more } } });
+    expect(await (await hook("lemonsqueezy", order("1"), secret)).json()).toEqual({ received: true, added: 1 });
+    expect((await hook("lemonsqueezy", order("1"), secret)).status).toBe(200);
+    expect((await hook("lemonsqueezy", order("2"), "another-secret")).status).toBe(401);
+    expect((await hook("lemonsqueezy", order("3", { test_mode: true }), secret)).status).toBe(200);
+    const invoice = (id: string, reason: string) => ({ meta: { event_name: "subscription_payment_success", custom_data: {} }, data: { type: "subscription-invoices", id, attributes: { status: "paid", billing_reason: reason, currency: "EUR", subtotal: 1000, tax: 210, total: 1210, customer_id: 77, test_mode: false, created_at: at } } });
+    await hook("lemonsqueezy", invoice("50", "initial"), secret);
+    await hook("lemonsqueezy", invoice("51", "renewal"), secret);
+    expect((await fetch(`${base}/webhooks/lemonsqueezy/${siteId + 99}`, { method: "POST", body: "{}" })).status).toBe(404);
+    expect(app.db.prepare("SELECT external_id id, amount, currency, visit, renewal FROM payments WHERE provider = 'lemonsqueezy' ORDER BY external_id").all()).toEqual([
+      { id: "invoice:51", amount: 1000, currency: "eur", visit: visits.a, renewal: 1 },
+      { id: "order:1", amount: 1000, currency: "eur", visit: visits.a, renewal: 0 },
+    ]);
+    const s = (await (await admin(`sources?site=${siteId}`)).json()).sources[0];
+    expect(s).toMatchObject({ provider: "lemonsqueezy", payments: 2, error: null });
+    expect(s.syncedAt).toBeGreaterThan(0);
+  });
+
+  it("from Creem, by webhook: a checkout and its subscription's payments, the first kept once", async () => {
+    const secret = "whsec_creem0123456789";
+    await admin("sources", { method: "PUT", body: JSON.stringify({ site: siteId, provider: "creem", key: secret }) });
+    const now = Date.now() - 3_600_000;
+    const checkout = { id: "evt_1", eventType: "checkout.completed", created_at: now, object: { object: "checkout", mode: "prod", metadata: { shl_visit: visits.c }, customer: { id: "cust_1" }, order: { id: "ord_1", customer: "cust_1", amount: 1000, currency: "USD", tax_amount: 100, amount_paid: 1100, status: "paid", type: "recurring", transaction: "tran_1", created_at: new Date(now).toISOString() } } };
+    const paid = (id: string) => ({ id: `evt_${id}`, eventType: "subscription.paid", created_at: now, object: { object: "subscription", mode: "prod", customer: { id: "cust_1" }, metadata: {}, last_transaction: { id, amount: 1000, amount_paid: 1100, currency: "USD", tax_amount: 100, status: "paid", created_at: now } } });
+    // Before the first webhook, another secret is noted on the source; once they come, someone else's request isn't.
+    const errorOf = async () => (await (await admin(`sources?site=${siteId}`)).json()).sources[0].error;
+    expect((await hook("creem", paid("tran_0"), "whsec_pasted_wrong")).status).toBe(401);
+    expect(await errorOf()).toMatch(/another secret/);
+    // The first payment comes as a subscription payment too, maybe before its checkout.
+    await hook("creem", paid("tran_1"), secret);
+    expect(await errorOf()).toBeNull();
+    expect((await hook("creem", paid("tran_8"), "forged")).status).toBe(401);
+    expect(await errorOf()).toBeNull();
+    await hook("creem", checkout, secret);
+    await hook("creem", paid("tran_1"), secret);
+    await hook("creem", paid("tran_2"), secret);
+    await hook("creem", { ...checkout, object: { ...checkout.object, mode: "test", order: { ...checkout.object.order, transaction: "tran_9" } } }, secret);
+    expect(app.db.prepare("SELECT external_id id, amount, currency, visit, renewal FROM payments WHERE provider = 'creem' ORDER BY external_id").all()).toEqual([
+      { id: "tran_1", amount: 1000, currency: "usd", visit: visits.c, renewal: 0 },
+      { id: "tran_2", amount: 1000, currency: "usd", visit: visits.c, renewal: 1 },
+    ]);
+    expect((await (await admin("sync", { method: "POST", body: JSON.stringify({ site: siteId }) })).json()).results).toEqual([{ provider: "creem", added: 0 }]);
   });
 
   it("from Polar (sandbox) and Dodo Payments (each new payment read once, in the account's currency)", async () => {

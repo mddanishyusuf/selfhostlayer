@@ -3,7 +3,7 @@
 import { PlusIcon, RefreshCwIcon } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useActionState, useEffect, useState } from "react";
+import { useActionState, useEffect, useState, type ReactNode } from "react";
 import {
   addSite,
   deleteGoal,
@@ -21,12 +21,13 @@ import {
   type SyncState,
 } from "@/app/actions/analytics";
 import type { Provider } from "@/lib/analytics";
+import { GUIDES } from "@/lib/revenue-guides";
 import { CopyButton, SubmitButton } from "./form";
 import { Icon } from "./icon";
 import { MENU_ITEM, MoreMenu } from "./menu";
 import { Modal } from "./modal";
 import { SettingsRow } from "./page";
-import { Button, Field, FormError, Input, SecretInput, Select } from "./ui";
+import { Button, Field, FormError, Input, SecretInput, Select, cx } from "./ui";
 
 /** The fields of a new site; projects' domains one click away. */
 function SiteFields({ suggestions }: { suggestions: string[] }) {
@@ -267,39 +268,123 @@ export function GoalActions({ site, domain, goal }: { site: number; domain: stri
   );
 }
 
-const KEY_HELP: Record<Provider, { label: string; hint: string; placeholder: string }> = {
-  stripe: { label: "Restricted key", hint: "Developers → API keys → Create restricted key, with Read on Checkout Sessions and Invoices", placeholder: "rk_live_…" },
-  polar: { label: "Organization access token", hint: "Settings → Developers → New token, with orders:read", placeholder: "polar_oat_…" },
-  dodo: { label: "API key", hint: "Developer → API Keys → Add API key", placeholder: "Your Dodo Payments API key" },
-};
+/** A random secret of letters and digits, for a webhook whose secret is ours to choose (Lemon Squeezy's). */
+function newSecret(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(24));
+  return Array.from(bytes, (b) => "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"[b % 62]).join("");
+}
 
-/** Connects a provider, or gives it a new key. */
-export function SourceForm({ site, provider, connected }: { site: number; provider: Provider; connected: boolean }) {
+/**
+ * Connects a provider, or gives it a new key. A webhook's provider (Creem,
+ * Lemon Squeezy) shows where to add the webhook first, and keeps its signing
+ * secret; for Lemon Squeezy, whose secret is ours to choose, one is made here.
+ */
+export function SourceForm({ site, provider, connected, webhookUrl }: { site: number; provider: Provider; connected: boolean; webhookUrl?: string }) {
   const [state, action] = useActionState(saveSource, {} as SourceState);
-  const help = KEY_HELP[provider];
+  const guide = GUIDES[provider];
+  const [secret, setSecret] = useState("");
+  // Made in the browser, once: what's pasted into Lemon Squeezy has to stay what's saved here.
+  useEffect(() => {
+    if (guide.webhook?.secret === "ours" && !connected) setSecret(newSecret());
+  }, [guide.webhook?.secret, connected]);
   return (
-    <form action={action} className="grid gap-3" data-testid={`source-${provider}`}>
+    <form action={action} className="grid grid-cols-[minmax(0,1fr)] gap-3" data-testid={`source-${provider}`}>
       <input type="hidden" name="site" value={site} />
       <input type="hidden" name="provider" value={provider} />
-      <Field label={help.label} htmlFor={`key-${provider}`} hint={help.hint}>
-        <SecretInput id={`key-${provider}`} name="key" required placeholder={connected ? "A new key replaces the one in use" : help.placeholder} spellCheck={false} />
+      {guide.webhook && webhookUrl && (
+        <div className="grid grid-cols-[minmax(0,1fr)] gap-2 border border-border px-3 py-2.5 text-[13px]" data-testid={`webhook-${provider}`}>
+          <span className="text-muted">{guide.webhook.where}:</span>
+          <div className="flex min-w-0 items-center gap-2 bg-well px-2.5 py-1.5">
+            <code className="min-w-0 flex-1 truncate font-mono text-[12.5px]" data-testid="webhook-url">
+              {webhookUrl}
+            </code>
+            <CopyButton text={webhookUrl} />
+          </div>
+          {guide.webhook.secret === "ours" && secret && (
+            <div className="flex min-w-0 items-center gap-2 bg-well px-2.5 py-1.5">
+              <span className="shrink-0 text-[12px] text-muted">Signing secret</span>
+              <code className="min-w-0 flex-1 truncate font-mono text-[12.5px]" data-testid="webhook-secret">
+                {secret}
+              </code>
+              <CopyButton text={secret} />
+            </div>
+          )}
+          <span className="text-[12px] text-muted">
+            Events: {guide.webhook.events.map((e, i) => (
+              <span key={e}>
+                {i > 0 && ", "}
+                <code className="font-mono">{e}</code>
+              </span>
+            ))}
+          </span>
+        </div>
+      )}
+      <Field label={guide.key.label} htmlFor={`key-${provider}`} hint={guide.key.hint}>
+        <SecretInput
+          id={`key-${provider}`}
+          name="key"
+          required
+          {...(guide.webhook?.secret === "ours" && !connected ? { value: secret, onChange: (e: React.ChangeEvent<HTMLInputElement>) => setSecret(e.target.value) } : {})}
+          placeholder={connected ? (guide.webhook ? "A new secret replaces the one in use" : "A new key replaces the one in use") : guide.key.placeholder}
+          spellCheck={false}
+        />
       </Field>
-      {provider !== "stripe" && (
-        <Field label="Mode" htmlFor={`mode-${provider}`} hint={provider === "polar" ? "Sandbox is sandbox.polar.sh" : "Test mode is Dodo's test environment"}>
+      {guide.test && (
+        <Field label="Mode" htmlFor={`mode-${provider}`} hint={guide.test.hint}>
           <Select id={`mode-${provider}`} name="mode" defaultValue="live" className="max-w-[220px]">
             <option value="live">Live</option>
-            <option value="test">{provider === "polar" ? "Sandbox" : "Test"}</option>
+            <option value="test">{guide.test.name}</option>
           </Select>
         </Field>
       )}
       <FormError message={state.error} />
       {state.saved && <p className="text-[13px] text-teal">{state.saved}</p>}
       <div>
-        <SubmitButton pending="Checking the key…" variant={connected ? "secondary" : "primary"} className="w-auto">
-          {connected ? "Replace the key" : "Connect"}
+        <SubmitButton pending={guide.webhook ? "Saving…" : "Checking the key…"} variant={connected ? "secondary" : "primary"} className="w-auto">
+          {connected ? (guide.webhook ? "Replace the secret" : "Replace the key") : "Connect"}
         </SubmitButton>
       </div>
     </form>
+  );
+}
+
+/** Code to copy: lines kept as they are, scrolling sideways when long. */
+export function CodeBlock({ code, testId }: { code: string; testId?: string }) {
+  return (
+    <div className="flex items-start gap-2 bg-well py-2.5 pl-3 pr-2" data-testid={testId}>
+      <pre className="min-w-0 flex-1 overflow-x-auto font-mono text-[12.5px] leading-relaxed">{code}</pre>
+      <CopyButton text={code} />
+    </div>
+  );
+}
+
+/** One provider at a time, as tabs: a dot on the connected ones. Starts on the first connected, or the first. */
+export function RevenueTabs({ tabs }: { tabs: { id: Provider; name: string; connected: boolean; failing: boolean; panel: ReactNode }[] }) {
+  const [current, setCurrent] = useState(() => tabs.find((t) => t.connected)?.id ?? tabs[0]!.id);
+  return (
+    <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-3.5" data-testid="revenue-tabs">
+      <div role="tablist" aria-label="Payment providers" className="flex max-w-full gap-0.5 self-start justify-self-start overflow-x-auto border border-border bg-field p-[3px]">
+        {tabs.map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            role="tab"
+            aria-selected={t.id === current}
+            onClick={() => setCurrent(t.id)}
+            className={cx("flex items-center gap-1.5 whitespace-nowrap px-[13px] py-[5px] transition-colors duration-150", t.id === current ? "bg-raised text-foreground shadow-raise" : "text-muted hover:text-foreground")}
+            data-testid={`tab-${t.id}`}
+          >
+            {t.name}
+            {t.connected && <span className={cx("size-1.5", t.failing ? "bg-err-dot" : "bg-ok-dot")} title={t.failing ? "Failing" : "Connected"} />}
+          </button>
+        ))}
+      </div>
+      {tabs.map((t) => (
+        <div key={t.id} role="tabpanel" hidden={t.id !== current} className="min-w-0" data-testid={`panel-${t.id}`}>
+          {t.panel}
+        </div>
+      ))}
+    </div>
   );
 }
 

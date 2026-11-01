@@ -6,8 +6,8 @@
 // events. No cookies, no storage. Events go with sendBeacon as text, so
 // browsers make no preflight request; pageviews go with fetch, whose answer
 // names the visit: window.shl.visit, or `await window.shl.ready`, for the
-// site to pass into its checkout. Links to Stripe Payment Links and Dodo
-// Payments' links get it added on the way out. Nothing is sent from
+// site to pass into its checkout. Links to Stripe Payment Links, Dodo
+// Payments' links and Lemon Squeezy's buy links get it added on the way out. Nothing is sent from
 // localhost, files, automated browsers (navigator.webdriver) or pages being
 // prerendered.
 
@@ -35,7 +35,7 @@ export const SCRIPT = `(function () {
   function click(e) {
     var a = e.target.closest && e.target.closest("a[href]"), v = shl.visit, q;
     if (!a || !/^https?:$/.test(a.protocol) || a.host === location.host) return;
-    q = a.hostname === "buy.stripe.com" ? "client_reference_id" : a.hostname === "checkout.dodopayments.com" ? "metadata_shl_visit" : "";
+    q = a.hostname === "buy.stripe.com" ? "client_reference_id" : a.hostname === "checkout.dodopayments.com" ? "metadata_shl_visit" : /\.lemonsqueezy\.com$/.test(a.hostname) && a.pathname.indexOf("/buy/") >= 0 ? "checkout[custom][shl_visit]" : "";
     if (v && q && a.search.indexOf(q + "=") < 0) a.search += (a.search ? "&" : "") + q + "=" + v;
     send("Outbound link", { url: a.origin + a.pathname });
   }

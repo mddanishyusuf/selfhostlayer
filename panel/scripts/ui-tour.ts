@@ -1178,6 +1178,25 @@ if (process.env.TOUR_ANALYTICS === "1") {
   await screenshot("analytics-site-settings");
   console.log("  ✓ Revenue offers to connect a provider; the site's Settings has the line to paste and each provider's key");
 
+  // Revenue by webhook: Lemon Squeezy connected in its tab, then a payment posted to Analytics'
+  // address as Lemon Squeezy would, signed with the secret the tab made (and one forged).
+  await hydrated('[data-testid="revenue-tabs"]', "the revenue tabs to come alive");
+  await click('[data-testid="tab-lemonsqueezy"]');
+  await waitFor(`(document.querySelector('[data-testid="webhook-secret"]')?.textContent ?? "").trim().length > 10`, "the signing secret the tab makes");
+  const hookUrl = String(await evaluate(`document.querySelector('[data-testid="webhook-lemonsqueezy"] [data-testid="webhook-url"]').textContent`)).trim();
+  const hookSecret = String(await evaluate(`document.querySelector('[data-testid="webhook-secret"]').textContent`)).trim();
+  await click('[data-testid="source-lemonsqueezy"] button[type=submit]');
+  await waitFor(`document.body.innerText.includes("Lemon Squeezy is connected")`, "Lemon Squeezy connected", 20_000);
+  const order = JSON.stringify({ meta: { event_name: "order_created", custom_data: { shl_visit: visitId } }, data: { type: "orders", id: "7001", attributes: { status: "paid", currency: "USD", subtotal: 4900, tax: 0, total: 4900, customer_id: 1, test_mode: false, created_at: new Date().toISOString() } } });
+  const posted = await boxRequest(hookUrl, { method: "POST", headers: { "Content-Type": "application/json", "X-Signature": createHmac("sha256", hookSecret).update(order).digest("hex") }, body: order });
+  if (posted.status !== 200 || !posted.body.includes('"added":1')) throw new Error(`${hookUrl} answered ${posted.status}: ${posted.body}`);
+  const forged = await boxRequest(hookUrl, { method: "POST", headers: { "Content-Type": "application/json", "X-Signature": "0".repeat(64) }, body: order });
+  if (forged.status !== 401) throw new Error(`a webhook with another signature answered ${forged.status}`);
+  await go(`${site}/revenue?range=today`);
+  await waitFor(`document.body.innerText.includes("Lemon Squeezy")`, "the payment on Revenue", 20_000);
+  await screenshot("analytics-revenue");
+  console.log("  ✓ Lemon Squeezy by webhook: signed with the secret its tab made, a forged one refused, the payment on Revenue");
+
   await go("/projects/analytics/settings");
   await waitForPath("/projects/analytics/settings");
   await click('[data-testid="uninstall"]');

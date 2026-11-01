@@ -1,32 +1,42 @@
-// Revenue from Stripe, Polar and Dodo Payments, credited to the visits that
-// brought it, with no cookies:
+// Revenue from Stripe, Polar, Paddle, Dodo Payments, Creem and Lemon Squeezy,
+// credited to the visits that brought it, with no cookies:
 //   1. the script names the visit (window.shl.visit, or await window.shl.ready);
-//   2. the site passes it into its checkout's metadata as shl_visit (links to
-//      Stripe Payment Links and Dodo Payments get it from the script);
-//   3. Analytics pulls the payments with a key per provider, every 10 minutes
-//      and on Sync now, from a day before the last sync (90 days the first
-//      time).
+//   2. the site passes it into its checkout as shl_visit: metadata (Stripe,
+//      Polar, Dodo, Creem), custom_data (Paddle) or custom data (Lemon
+//      Squeezy); links to Stripe Payment Links, Dodo Payments and Lemon
+//      Squeezy get it from the script;
+//   3. Analytics pulls the payments of Stripe, Polar, Paddle and Dodo with a
+//      key per provider, every 10 minutes and on Sync now, from a day before
+//      the last sync (90 days the first time). Creem and Lemon Squeezy show
+//      no checkout's data in their APIs: their webhooks post each payment to
+//      /webhooks/<provider>/<site>, checked against the signing secret.
 // Kept: the amount without tax, its currency and time, and the provider's
 // customer id; no email or name. A payment with no visit of its own (a
 // renewal, a second purchase) goes to its customer's first visit. Keys are
 // kept encrypted under a key made from the admin token, so the database alone
 // doesn't give them away.
-import { createCipheriv, createDecipheriv, hkdfSync, randomBytes } from "node:crypto";
+import { createCipheriv, createDecipheriv, createHmac, hkdfSync, randomBytes, timingSafeEqual } from "node:crypto";
 import type { DatabaseSync, SQLInputValue } from "node:sqlite";
 import { InputError } from "../../lib/http.ts";
 import { VISIT_ID } from "./ingest.ts";
 import { DAY, type Filters, HOUR, type Range, visitFilters, visitWhere, windowOf } from "./stats.ts";
 
-export const PROVIDERS = ["stripe", "polar", "dodo"] as const;
+export const PROVIDERS = ["stripe", "polar", "paddle", "dodo", "creem", "lemonsqueezy"] as const;
 export type Provider = (typeof PROVIDERS)[number];
 export type Mode = "live" | "test";
+/** The providers that post their payments here, rather than being pulled. */
+export const WEBHOOKS: readonly Provider[] = ["creem", "lemonsqueezy"];
+type Pulls = Exclude<Provider, "creem" | "lemonsqueezy">;
 
-export const NAMES: Record<Provider, string> = { stripe: "Stripe", polar: "Polar", dodo: "Dodo Payments" };
-const BASES: Record<Provider, Record<Mode, string>> = {
+export const NAMES: Record<Provider, string> = { stripe: "Stripe", polar: "Polar", paddle: "Paddle", dodo: "Dodo Payments", creem: "Creem", lemonsqueezy: "Lemon Squeezy" };
+const BASES: Record<Pulls, Record<Mode, string>> = {
   stripe: { live: "https://api.stripe.com/v1", test: "https://api.stripe.com/v1" },
   polar: { live: "https://api.polar.sh/v1", test: "https://sandbox-api.polar.sh/v1" },
+  paddle: { live: "https://api.paddle.com", test: "https://sandbox-api.paddle.com" },
   dodo: { live: "https://live.dodopayments.com", test: "https://test.dodopayments.com" },
 };
+/** The header each webhook's HMAC-SHA256 (hex, of the raw body) comes in. */
+export const SIGNATURE_HEADERS: Record<string, string> = { creem: "creem-signature", lemonsqueezy: "x-signature" };
 
 /** Each sync starts this long before the last one: a checkout is listed by when it opened, and stays open up to a day. */
 export const OVERLAP = DAY + 20 * 60_000;
@@ -182,14 +192,102 @@ async function* dodo(get: Get, since: number, known: (id: string) => boolean): A
   }
 }
 
+/**
+ * Completed transactions: a checkout's, or a subscription's later payment
+ * (its origin says so). Pages of 30, the most Paddle gives.
+ */
+async function* paddle(get: Get, since: number): AsyncGenerator<Pulled[]> {
+  let after = "";
+  for (let page = 0; page < MAX_PAGES * 4; page++) {
+    const r = await get(`/transactions?${qs({ status: "completed", "billed_at[GTE]": new Date(since).toISOString(), order_by: "billed_at[ASC]", per_page: "30", ...(after ? { after } : {}) })}`);
+    const items = (r.data ?? []) as Json[];
+    const out: Pulled[] = [];
+    for (const t of items) {
+      const totals = (t.details?.totals ?? {}) as Json;
+      out.push({
+        id: String(t.id),
+        at: Date.parse(t.billed_at ?? t.created_at),
+        amount: Math.max(0, (Number(totals.total) || 0) - (Number(totals.tax) || 0)),
+        currency: String(t.currency_code ?? totals.currency_code ?? "usd"),
+        customer: idOf(t.customer_id),
+        visit: visitIn(t.custom_data),
+        renewal: typeof t.origin === "string" && t.origin.startsWith("subscription_"),
+      });
+    }
+    yield out;
+    const next = r.meta?.pagination?.next;
+    if (items.length < 30 || r.meta?.pagination?.has_more === false || typeof next !== "string") return;
+    after = new URL(next).searchParams.get("after") ?? String(items.at(-1)!.id);
+  }
+}
+
+const time = (v: unknown) => (typeof v === "number" ? v : Date.parse(String(v)));
+
+/**
+ * A Lemon Squeezy webhook: a paid order, or a subscription's later payment
+ * (its first is the order's). The checkout's custom data comes in meta.
+ */
+function lemonsqueezy(body: Json, mode: Mode): Pulled[] {
+  const a = (body.data?.attributes ?? {}) as Json;
+  if (Boolean(a.test_mode ?? body.meta?.test_mode) !== (mode === "test")) return [];
+  const paid = { at: time(a.created_at), amount: Math.max(0, (Number(a.total) || 0) - (Number(a.tax) || 0)), currency: String(a.currency ?? "usd"), customer: a.customer_id == null ? null : String(a.customer_id), visit: visitIn(body.meta?.custom_data) };
+  const event = body.meta?.event_name;
+  if (event === "order_created" && body.data?.type === "orders" && a.status === "paid") return [{ id: `order:${body.data.id}`, ...paid, renewal: false }];
+  if (event === "subscription_payment_success" && body.data?.type === "subscription-invoices" && a.status === "paid" && a.billing_reason !== "initial") return [{ id: `invoice:${body.data.id}`, ...paid, renewal: true }];
+  return [];
+}
+
+/** Creem's modes that aren't live payments. */
+const CREEM_TESTS = ["test", "sandbox", "local"];
+
+/**
+ * A Creem webhook: a completed checkout's order, or a subscription's payment.
+ * A subscription's first payment comes as both: one transaction, kept once.
+ */
+function creem(body: Json, mode: Mode): Pulled[] {
+  const o = (body.object ?? {}) as Json;
+  if (CREEM_TESTS.includes(String(o.mode)) !== (mode === "test")) return [];
+  if (body.eventType === "checkout.completed") {
+    const order = (o.order ?? {}) as Json;
+    if (order.status !== "paid") return [];
+    return [
+      {
+        id: String(order.transaction ?? order.id),
+        at: time(order.created_at) || time(body.created_at),
+        amount: Math.max(0, (Number(order.amount_paid ?? order.amount) || 0) - (Number(order.tax_amount) || 0)),
+        currency: String(order.currency ?? "usd"),
+        customer: idOf(o.customer) ?? idOf(order.customer),
+        visit: visitIn(o.metadata) ?? visitIn(o.subscription?.metadata),
+        renewal: false,
+      },
+    ];
+  }
+  if (body.eventType === "subscription.paid") {
+    const t = (o.last_transaction ?? {}) as Json;
+    if (t.status !== "paid" || !t.id) return [];
+    return [
+      {
+        id: String(t.id),
+        at: time(t.created_at) || time(body.created_at),
+        amount: Math.max(0, (Number(t.amount_paid ?? t.amount) || 0) - (Number(t.tax_amount) || 0)),
+        currency: String(t.currency ?? "usd"),
+        customer: idOf(o.customer),
+        visit: visitIn(o.metadata),
+        renewal: true,
+      },
+    ];
+  }
+  return [];
+}
+
 /** A small request that only works with a key that can read payments. */
-const PROBES: Record<Provider, string> = { stripe: "/checkout/sessions?limit=1", polar: "/orders/?limit=1", dodo: "/payments?page_size=1" };
+const PROBES: Record<Pulls, string> = { stripe: "/checkout/sessions?limit=1", polar: "/orders/?limit=1", paddle: "/transactions?per_page=1", dodo: "/payments?page_size=1" };
 
 /** What a provider said went wrong, from its error body. */
 function problemIn(body: Json | null): string | null {
   if (!body) return null;
   const detail = body.detail;
-  const text = body.error?.message ?? (typeof detail === "string" ? detail : Array.isArray(detail) ? detail[0]?.msg : null) ?? body.message ?? (typeof body.error === "string" ? body.error : null);
+  const text = body.error?.message ?? body.error?.detail ?? (typeof detail === "string" ? detail : Array.isArray(detail) ? detail[0]?.msg : null) ?? body.message ?? (typeof body.error === "string" ? body.error : null);
   return typeof text === "string" ? text.slice(0, 300) : null;
 }
 
@@ -200,7 +298,7 @@ export interface RevenueOptions {
   flush?: () => void;
   fetch?: typeof fetch;
   /** Another address for each provider (tests). */
-  bases?: Partial<Record<Provider, string>>;
+  bases?: Partial<Record<Pulls, string>>;
 }
 
 export class Revenue {
@@ -208,7 +306,7 @@ export class Revenue {
   readonly #key: Buffer;
   readonly #flush: () => void;
   readonly #fetch: typeof fetch;
-  readonly #bases: Partial<Record<Provider, string>>;
+  readonly #bases: Partial<Record<Pulls, string>>;
   #running = new Map<string, Promise<SyncResult>>();
 
   constructor(db: DatabaseSync, o: RevenueOptions) {
@@ -237,7 +335,7 @@ export class Revenue {
     }
   }
 
-  #client(provider: Provider, mode: Mode, key: string): Get {
+  #client(provider: Pulls, mode: Mode, key: string): Get {
     const base = this.#bases[provider] ?? BASES[provider][mode];
     return async (path) => {
       let res: Response;
@@ -264,7 +362,7 @@ export class Revenue {
   }
 
   sources(siteId: number): Source[] {
-    const rows = this.#db.prepare("SELECT * FROM revenue_sources WHERE site_id = ? ORDER BY CASE provider WHEN 'stripe' THEN 0 WHEN 'polar' THEN 1 ELSE 2 END").all(siteId) as unknown as SourceRow[];
+    const rows = this.#db.prepare("SELECT * FROM revenue_sources WHERE site_id = ? ORDER BY CASE provider WHEN 'stripe' THEN 0 WHEN 'polar' THEN 1 WHEN 'paddle' THEN 2 WHEN 'dodo' THEN 3 WHEN 'creem' THEN 4 ELSE 5 END").all(siteId) as unknown as SourceRow[];
     const counts = new Map((this.#db.prepare("SELECT provider, count(*) n FROM payments WHERE site_id = ? GROUP BY provider").all(siteId) as { provider: string; n: number }[]).map((r) => [r.provider, r.n]));
     return rows.map((r) => ({
       provider: r.provider,
@@ -283,25 +381,33 @@ export class Revenue {
    * Adds a provider's key, or replaces it, once a small request shows it can
    * read payments; then pulls the last 90 days in the background. Another key
    * or mode starts over: a source's payments are the ones its key can see.
+   * A webhook's provider keeps its signing secret instead, and waits for it.
    */
   async setSource(siteId: number, input: Record<string, unknown>): Promise<Source> {
     const provider = input.provider as Provider;
     if (!PROVIDERS.includes(provider)) throw new InputError("provider", `must be one of ${PROVIDERS.join(", ")}`);
+    const webhook = WEBHOOKS.includes(provider);
     const key = typeof input.key === "string" ? input.key.trim() : "";
-    if (key.length < 16 || key.length > 500 || /\s/.test(key)) throw new InputError("key", `must be a ${NAMES[provider]} API key`);
+    if (webhook ? key.length < 6 || key.length > 200 || /\s/.test(key) : key.length < 16 || key.length > 500 || /\s/.test(key)) throw new InputError("key", webhook ? `must be the signing secret of ${NAMES[provider]}'s webhook` : `must be a ${NAMES[provider]} API key`);
     let mode: Mode;
     if (provider === "stripe") {
       const m = /^(?:sk|rk)_(live|test)_/.exec(key);
       if (!m) throw new InputError("key", "must be a Stripe secret or restricted key (rk_live_… or sk_live_…)");
       mode = m[1] as Mode;
+    } else if (provider === "paddle" && key.startsWith("pdl_")) {
+      // Paddle's keys since May 2025; older ones are 50 random characters, and take the mode chosen.
+      if (!/^pdl_(live|sdbx)_apikey_[a-z\d]{26}_[a-zA-Z\d]{22}_[a-zA-Z\d]{3}$/.test(key)) throw new InputError("key", "isn't a whole Paddle API key: they start pdl_live_apikey_ (or pdl_sdbx_apikey_) and are 69 characters");
+      mode = key.startsWith("pdl_live_") ? "live" : "test";
     } else {
       if (input.mode !== undefined && input.mode !== "live" && input.mode !== "test") throw new InputError("mode", "must be live or test");
       mode = (input.mode as Mode | undefined) ?? "live";
     }
-    try {
-      await this.#client(provider, mode, key)(PROBES[provider]);
-    } catch (err) {
-      throw new InputError("key", `${(err as Error).message}`);
+    if (!webhook) {
+      try {
+        await this.#client(provider as Pulls, mode, key)(PROBES[provider as Pulls]);
+      } catch (err) {
+        throw new InputError("key", `${(err as Error).message}`);
+      }
     }
     const was = this.#row(siteId, provider);
     let same = false;
@@ -326,7 +432,7 @@ export class Revenue {
       this.#db.exec("ROLLBACK");
       throw err;
     }
-    this.sync(siteId, provider).catch((err: unknown) => console.error(`syncing ${NAMES[provider]} failed: ${(err as Error).message}`));
+    if (!webhook) this.sync(siteId, provider).catch((err: unknown) => console.error(`syncing ${NAMES[provider]} failed: ${(err as Error).message}`));
     return this.sources(siteId).find((s) => s.provider === provider)!;
   }
 
@@ -373,13 +479,15 @@ export class Revenue {
   async #run(siteId: number, provider: Provider): Promise<SyncResult> {
     const src = this.#row(siteId, provider);
     if (!src) return { provider, added: 0, error: "isn't connected to this site" };
+    // Its payments come by webhook: nothing to pull.
+    if (WEBHOOKS.includes(provider)) return { provider, added: 0 };
     const started = Date.now();
     const since = src.synced_at ? src.synced_at - OVERLAP : started - FIRST_DAYS * DAY;
     let added = 0;
     try {
-      const get = this.#client(provider, src.mode, this.#open(src.api_key));
+      const get = this.#client(provider as Pulls, src.mode, this.#open(src.api_key));
       const known = this.#db.prepare("SELECT 1 FROM payments WHERE site_id = ? AND provider = ? AND external_id = ?");
-      const pages = provider === "stripe" ? stripe(get, since) : provider === "polar" ? polar(get, since) : dodo(get, since, (id) => known.get(siteId, provider, id) !== undefined);
+      const pages = provider === "stripe" ? stripe(get, since) : provider === "polar" ? polar(get, since) : provider === "paddle" ? paddle(get, since) : dodo(get, since, (id) => known.get(siteId, provider, id) !== undefined);
       for await (const batch of pages) {
         // Removed while it ran: nothing more to keep.
         if (!this.#row(siteId, provider)) return { provider, added, error: "removed while it synced" };
@@ -392,6 +500,34 @@ export class Revenue {
       this.#db.prepare("UPDATE revenue_sources SET sync_error = ?, error_at = ? WHERE site_id = ? AND provider = ?").run(message, Date.now(), siteId, provider);
       return { provider, added, error: message };
     }
+  }
+
+  /**
+   * A webhook from Creem or Lemon Squeezy: checked against the signing secret
+   * kept for the site, then its payment kept. Until the first one comes in, a
+   * wrong signature is noted on the source (a secret pasted wrong is the
+   * likely reason nothing comes); after that, it's someone else's request.
+   */
+  receive(siteId: number, provider: string, raw: Buffer, signature: string | undefined): Received {
+    if (!WEBHOOKS.includes(provider as Provider)) throw new InputError("provider", "sends no webhooks here", 404);
+    const p = provider as Provider;
+    const src = this.#row(siteId, p);
+    if (!src) throw new InputError("provider", "isn't connected to this site", 404);
+    const want = Buffer.from(createHmac("sha256", this.#open(src.api_key)).update(raw).digest("hex"));
+    const given = Buffer.from((signature ?? "").trim().toLowerCase());
+    if (given.length !== want.length || !timingSafeEqual(given, want)) {
+      if (src.synced_at === null) this.#db.prepare("UPDATE revenue_sources SET sync_error = ?, error_at = ? WHERE site_id = ? AND provider = ?").run("A webhook came signed with another secret: check the signing secret.", Date.now(), siteId, p);
+      throw new InputError("signature", "doesn't match the signing secret", 401);
+    }
+    let body: Json;
+    try {
+      body = JSON.parse(raw.toString("utf8")) as Json;
+    } catch {
+      throw new InputError("body", "must be JSON");
+    }
+    const added = this.store(siteId, p, p === "creem" ? creem(body, src.mode) : lemonsqueezy(body, src.mode));
+    this.#db.prepare("UPDATE revenue_sources SET synced_at = ?, sync_error = NULL, error_at = NULL WHERE site_id = ? AND provider = ?").run(Date.now(), siteId, p);
+    return { provider: p, added };
   }
 
   /** Keeps a batch of payments, each credited to its own visit or its customer's first; returns how many are new. */
@@ -407,7 +543,7 @@ export class Revenue {
     );
     const payment = db.prepare(
       `INSERT INTO payments (site_id, provider, external_id, at, amount, currency, customer, visit, renewal) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-       ON CONFLICT (site_id, provider, external_id) DO UPDATE SET at = excluded.at, amount = excluded.amount, currency = excluded.currency, customer = excluded.customer, visit = coalesce(excluded.visit, payments.visit), renewal = excluded.renewal`,
+       ON CONFLICT (site_id, provider, external_id) DO UPDATE SET at = excluded.at, amount = excluded.amount, currency = excluded.currency, customer = coalesce(excluded.customer, payments.customer), visit = coalesce(excluded.visit, payments.visit), renewal = min(payments.renewal, excluded.renewal)`,
     );
     let added = 0;
     db.exec("BEGIN");
@@ -432,6 +568,11 @@ export class Revenue {
     }
     return added;
   }
+}
+
+export interface Received {
+  provider: Provider;
+  added: number;
 }
 
 export interface SyncResult {

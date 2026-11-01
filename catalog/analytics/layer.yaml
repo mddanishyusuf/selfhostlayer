@@ -2,7 +2,7 @@
 # panel's Analytics page (PLAN-ANALYTICS.md).
 id: analytics
 name: Analytics
-version: 0.2.0
+version: 0.3.0
 summary: Cookie-free web analytics for your sites, with no data leaving the server.
 runtime:
   kind: node

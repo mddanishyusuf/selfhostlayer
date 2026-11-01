@@ -93,6 +93,23 @@ export const MIGRATIONS = [
      at INTEGER NOT NULL,
      PRIMARY KEY (site_id, provider, customer)
    );`,
+  // 3: Paddle, Creem and Lemon Squeezy as providers (the last two send webhooks,
+  // and their source keeps the webhook's signing secret where others keep a key).
+  `CREATE TABLE revenue_sources_3 (
+     site_id INTEGER NOT NULL,
+     provider TEXT NOT NULL CHECK (provider IN ('stripe', 'polar', 'paddle', 'dodo', 'creem', 'lemonsqueezy')),
+     api_key TEXT NOT NULL,
+     key_hint TEXT NOT NULL,
+     mode TEXT NOT NULL CHECK (mode IN ('live', 'test')),
+     synced_at INTEGER,
+     sync_error TEXT,
+     error_at INTEGER,
+     created_at INTEGER NOT NULL,
+     PRIMARY KEY (site_id, provider)
+   );
+   INSERT INTO revenue_sources_3 SELECT site_id, provider, api_key, key_hint, mode, synced_at, sync_error, error_at, created_at FROM revenue_sources;
+   DROP TABLE revenue_sources;
+   ALTER TABLE revenue_sources_3 RENAME TO revenue_sources;`,
 ];
 
 /** analytics.db, migrated. */

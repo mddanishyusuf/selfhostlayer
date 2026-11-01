@@ -1,8 +1,9 @@
 // Analytics as one HTTP server: /healthz, /script.js, POST /api/event (from
-// any site's pages), and the admin API (/_admin/…, this server only). Payments
-// are pulled from the sites' providers every 10 minutes.
+// any site's pages), POST /webhooks/<provider>/<site> (Creem's and Lemon
+// Squeezy's payments), and the admin API (/_admin/…, this server only).
+// Payments are pulled from the other providers every 10 minutes.
 import { mkdirSync, statSync } from "node:fs";
-import { createServer, type Server } from "node:http";
+import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { join } from "node:path";
 import type { DatabaseSync } from "node:sqlite";
 import { loadGeo, type Geo } from "../../lib/geo.ts";
@@ -10,7 +11,7 @@ import { fail, InputError, json, readBody, send } from "../../lib/http.ts";
 import { handleAdmin, type AdminContext } from "./admin.ts";
 import { openDb } from "./db.ts";
 import { Ingest } from "./ingest.ts";
-import { Revenue, type RevenueOptions, SYNC_EVERY } from "./revenue.ts";
+import { Revenue, type RevenueOptions, SIGNATURE_HEADERS, SYNC_EVERY } from "./revenue.ts";
 import { SCRIPT } from "./script.ts";
 import { Sites } from "./sites.ts";
 
@@ -101,6 +102,18 @@ export function createApp(o: AppOptions): App {
     res.end(`${JSON.stringify(r)}\n`);
   }
 
+  /** A payment provider's webhook, signed with the secret kept for its site. */
+  async function webhook(req: IncomingMessage, res: ServerResponse, url: URL): Promise<void> {
+    if (req.method !== "POST") return json(res, 405, { error: "POST only" });
+    const m = /^\/webhooks\/([a-z]{1,20})\/(\d{1,9})$/.exec(url.pathname);
+    if (!m) return json(res, 404, { error: "not found" });
+    const [, provider, site] = m as unknown as [string, string, string];
+    const raw = await readBody(req, 1024 * 1024);
+    const header = SIGNATURE_HEADERS[provider];
+    const r = revenue.receive(Number(site), provider, raw, header ? [req.headers[header]].flat()[0] : undefined);
+    json(res, 200, { received: true, added: r.added });
+  }
+
   const server = createServer((req, res) => {
     const url = new URL(req.url ?? "/", "http://analytics");
     const route =
@@ -110,7 +123,9 @@ export function createApp(o: AppOptions): App {
           ? Promise.resolve(send(res, 200, SCRIPT, { "Content-Type": "application/javascript; charset=utf-8", "Cache-Control": "public, max-age=3600" }))
           : url.pathname === "/api/event"
             ? event(req, res)
-            : url.pathname === "/_admin" || url.pathname.startsWith("/_admin/")
+            : url.pathname.startsWith("/webhooks/")
+              ? webhook(req, res, url)
+              : url.pathname === "/_admin" || url.pathname.startsWith("/_admin/")
               ? handleAdmin(req, res, ctx, url)
               : url.pathname === "/"
                 ? Promise.resolve(send(res, 200, "Analytics by Self Host Layer: this address takes events from its sites' pages.\n", { "Content-Type": "text/plain; charset=utf-8" }))

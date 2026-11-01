@@ -2,7 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { analyticsApi, AnalyticsError, analyticsInstall, PROVIDERS, type Site, type Source } from "@/lib/analytics";
+import { analyticsApi, AnalyticsError, analyticsInstall, PROVIDERS, type Provider, type Site, type Source } from "@/lib/analytics";
+import { GUIDES } from "@/lib/revenue-guides";
 import { requireUser } from "@/lib/session";
 
 const text = (form: FormData, name: string) => String(form.get(name) ?? "").trim();
@@ -109,6 +110,7 @@ export async function saveSource(_prev: SourceState, form: FormData): Promise<So
   );
   if ("error" in r) return { error: r.error, field: r.field };
   refresh();
+  if (GUIDES[provider as Provider]?.webhook) return { saved: `${name} is connected: its payments come in as its webhook sends them.` };
   return { saved: `${name} is connected. Its payments from the last 90 days are coming in.` };
 }
 

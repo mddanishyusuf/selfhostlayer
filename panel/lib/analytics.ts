@@ -10,6 +10,7 @@ import { config } from "./config";
 import { installedVersion } from "./deploy";
 import { servingConfig } from "./domains";
 import { integrationFor, listProjects, projectEnv, type Project } from "./projects";
+import type { ProviderId } from "./revenue-guides";
 
 /** The installed Analytics, if any. */
 export const analyticsInstall = () => integrationFor("analytics");
@@ -131,12 +132,25 @@ export interface Visit {
   revenue: number;
 }
 
-export type Provider = "stripe" | "polar" | "dodo";
-export const PROVIDERS: { id: Provider; name: string }[] = [
+export type Provider = ProviderId;
+/** In the order shown; since: the oldest Analytics that takes it. */
+export const PROVIDERS: { id: Provider; name: string; since?: string }[] = [
   { id: "stripe", name: "Stripe" },
   { id: "polar", name: "Polar" },
+  { id: "paddle", name: "Paddle", since: "0.3.0" },
   { id: "dodo", name: "Dodo Payments" },
+  { id: "creem", name: "Creem", since: "0.3.0" },
+  { id: "lemonsqueezy", name: "Lemon Squeezy", since: "0.3.0" },
 ];
+
+/** Whether the installed Analytics takes a provider (Paddle, Creem and Lemon Squeezy came in 0.3.0). */
+export function takesProvider(p: Project, provider: { since?: string }): boolean {
+  const version = installedVersion(p.id)?.version;
+  return !provider.since || !version || !isNewer(provider.since, version);
+}
+
+/** Where Creem's or Lemon Squeezy's webhook posts a site's payments. */
+export const webhookUrl = (p: Project, site: number, provider: Provider) => `https://${scriptDomain(p)}/webhooks/${provider}/${site}`;
 
 export interface Journey {
   visit: Visit;

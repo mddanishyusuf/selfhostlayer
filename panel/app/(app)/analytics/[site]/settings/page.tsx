@@ -1,27 +1,23 @@
 import Link from "next/link";
-import { RemoveSite, RemoveSourceButton, Snippet, SourceForm, SubdomainsToggle, SyncNowButton } from "@/components/analytics-forms";
+import { CodeBlock, RemoveSite, RemoveSourceButton, RevenueTabs, Snippet, SourceForm, SubdomainsToggle, SyncNowButton } from "@/components/analytics-forms";
 import { when } from "@/components/analytics-ui";
 import { KeyValues, Notice, PageHeader, SettingsRow } from "@/components/page";
-import { Pill } from "@/components/ui";
-import { PROVIDERS, siteFor, snippet, sourcesOf, type Source } from "@/lib/analytics";
+import { PROVIDERS, siteFor, snippet, sourcesOf, takesProvider, webhookUrl, type Source } from "@/lib/analytics";
+import { installedVersion } from "@/lib/deploy";
+import { GUIDES } from "@/lib/revenue-guides";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Site settings" };
 
-const CHECKOUT = `// In the page: the visit, from the script
-const visit = window.shl ? await window.shl.ready : null;
-
-// On your server, where the checkout is made:
-metadata: { shl_visit: visit }`;
-
-function SourceStatus({ s }: { s: Source }) {
+function SourceStatus({ s, webhook }: { s: Source; webhook: boolean }) {
+  const status = s.syncing ? "Syncing…" : s.error ? <span className="text-rose">{s.error}</span> : webhook ? (s.syncedAt ? `Last webhook ${when(s.syncedAt)} UTC` : "Waiting for its first webhook") : s.syncedAt ? `Synced ${when(s.syncedAt)} UTC` : "Waiting for its first sync";
   return (
     <KeyValues
       inset
       items={[
-        ["Status", s.syncing ? "Syncing…" : s.error ? <span className="text-rose">{s.error}</span> : s.syncedAt ? `Synced ${when(s.syncedAt)} UTC` : "Waiting for its first sync"],
+        ["Status", status],
         ["Mode", s.mode === "live" ? "Live" : "Test"],
-        ["Key", <code key="k" className="font-mono text-[12.5px]">…{s.keyHint}</code>],
+        [webhook ? "Secret" : "Key", <code key="k" className="font-mono text-[12.5px]">…{s.keyHint}</code>],
         ["Payments", s.payments.toLocaleString("en")],
       ]}
     />
@@ -61,39 +57,41 @@ export default async function SiteSettingsPage({ params }: { params: Promise<{ s
       </SettingsRow>
       {!ctx.outdated && (
         <>
-          <SettingsRow id="revenue" title="Credit payments to visits" description="So Revenue shows what each source, campaign and page brings in.">
-            <p className="text-[13px]">
-              Pass the visit into your checkout&apos;s metadata as <code className="font-mono">shl_visit</code>. Stripe&apos;s Payment Links and Dodo Payments&apos; links on your pages get it when clicked, with nothing to add.
-            </p>
-            <pre className="overflow-x-auto bg-well px-3 py-2.5 font-mono text-[12.5px] leading-relaxed">{CHECKOUT}</pre>
+          <SettingsRow id="revenue" title="Revenue attribution" description="Which visits, sources and campaigns bring in the money. Connect a provider, and pass the visit into its checkout as shl_visit.">
+            <RevenueTabs
+              tabs={PROVIDERS.map((provider) => {
+                const s = sources.find((x) => x.provider === provider.id);
+                const guide = GUIDES[provider.id];
+                return {
+                  id: provider.id,
+                  name: provider.name,
+                  connected: !!s,
+                  failing: !!s?.error,
+                  panel: (
+                    <div className="grid grid-cols-[minmax(0,1fr)] gap-3">
+                      <p className="text-[13px] text-muted">{guide.counts}</p>
+                      {s && <SourceStatus s={s} webhook={!!guide.webhook} />}
+                      {takesProvider(project, provider) ? (
+                        <SourceForm site={site.id} provider={provider.id} connected={!!s} webhookUrl={guide.webhook ? webhookUrl(project, site.id, provider.id) : undefined} />
+                      ) : (
+                        <Notice lead="Update" tone="gold">
+                          Analytics to {provider.since} or newer for {provider.name}: this one is {installedVersion(project.id)?.version}. Its Settings page has the update.
+                        </Notice>
+                      )}
+                      {s && <RemoveSourceButton site={site.id} provider={provider.id} name={provider.name} />}
+                      <div className="grid grid-cols-[minmax(0,1fr)] gap-1.5 border-t border-border pt-3">
+                        <b className="text-[13px]">Pass the visit</b>
+                        <CodeBlock code={guide.code} testId={`code-${provider.id}`} />
+                        {guide.links && <p className="text-[12px] text-muted">{guide.links}</p>}
+                      </div>
+                    </div>
+                  ),
+                };
+              })}
+            />
             <p className="text-[12px] text-muted">A renewal, or a customer&apos;s next purchase, goes to their first visit. Kept for each payment: the amount without tax, its currency and time, and the customer&apos;s id, never their email or name.</p>
-            {sources.length > 0 && <SyncNowButton site={site.id} />}
+            {sources.some((x) => !GUIDES[x.provider].webhook) && <SyncNowButton site={site.id} />}
           </SettingsRow>
-          {PROVIDERS.map(({ id, name }) => {
-            const s = sources.find((x) => x.provider === id);
-            return (
-              <SettingsRow
-                key={id}
-                id={`provider-${id}`}
-                title={
-                  <span className="flex items-center gap-2">
-                    {name} {s && <Pill outline>{s.error ? "Failing" : "Connected"}</Pill>}
-                  </span>
-                }
-                description={
-                  id === "stripe"
-                    ? "Completed checkouts, and paid invoices for renewals."
-                    : id === "polar"
-                      ? "Paid orders, from production or the sandbox."
-                      : "Succeeded payments, in your account's currency."
-                }
-              >
-                {s && <SourceStatus s={s} />}
-                <SourceForm site={site.id} provider={id} connected={!!s} />
-                {s && <RemoveSourceButton site={site.id} provider={id} name={name} />}
-              </SettingsRow>
-            );
-          })}
         </>
       )}
       <SettingsRow title="Remove the site" description="Deletes everything counted for it, payments included.">

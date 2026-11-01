@@ -1,6 +1,6 @@
 # Analytics
 
-Analytics counts the visits to your sites on your own server, with no cookies and nothing sent anywhere else: visitors, pages, where they came from, countries and devices, the goals visitors reach, and the revenue each source brings in from Stripe, Polar or Dodo Payments. It works for the apps you deploy here and for any other site you run.
+Analytics counts the visits to your sites on your own server, with no cookies and nothing sent anywhere else: visitors, pages, where they came from, countries and devices, the goals visitors reach, and the revenue each source brings in from Stripe, Polar, Paddle, Dodo Payments, Creem or Lemon Squeezy. It works for the apps you deploy here and for any other site you run.
 
 ## Install, and your first site
 
@@ -14,11 +14,15 @@ Analytics counts the visits to your sites on your own server, with no cookies an
 
 The visits show up within a second.
 
+## Your sites
+
+**Analytics** in the sidebar opens the list of your sites, busiest first. Each shows its visitors in the last 24 hours (and how that compares with the 24 hours before), its pageviews, an hourly chart, where most visitors came from, and who's on it now. Click one to open it. **Add a site** is at the top.
+
 ## Analytics' own sidebar
 
 Opening a site in Analytics shrinks the panel's sidebar to its icons, and Analytics' own sidebar opens beside it:
 
-- **The site picker** at the top: every site, with its visitors in the last 24 hours and a green dot when someone's on it now, and **Add a site**.
+- **The site picker** at the top: every site, with its visitors in the last 24 hours and a green dot when someone's on it now, then **All sites** (back to the list) and **Add a site**.
 - **The site's pages:** Overview, Realtime, Pages, Users, Goals, Revenue, Outbound and Settings.
 - **Analytics** at the bottom, with its version: its deployments, logs, backups and updates.
 
@@ -63,24 +67,35 @@ A goal is a page or a custom event:
 
 Revenue shows which sources, campaigns, first pages and countries bring paying customers, with no cookies:
 
-1. **Connect a provider** on the site's **Settings** page, with a key that can read payments:
+1. **Connect a provider** on the site's **Settings** page, under **Revenue attribution**: a tab for each provider, with what it needs, its checkout code, and its status once connected (a dot on the tab).
    - **Stripe:** a restricted key (Developers → API keys → Create restricted key) with **Read** on Checkout Sessions and Invoices. Analytics reads completed checkouts, and paid invoices for renewals.
    - **Polar:** an organization access token (Settings → Developers) with `orders:read`, for production or the sandbox. Analytics reads paid orders.
+   - **Paddle:** an API key (Developer tools → Authentication) with **Read** on transactions; a sandbox key (`pdl_sdbx_…`) says so itself. Analytics reads completed transactions, and counts the ones a subscription made later as renewals.
    - **Dodo Payments:** an API key (Developer → API Keys), live or test. Analytics reads succeeded payments, in your account's own currency.
+   - **Creem** and **Lemon Squeezy** don't show a checkout's data in their APIs, so they send their payments instead: add a webhook in the provider with the address the tab shows (`https://<analytics address>/webhooks/<provider>/<site>`) and its events, and the webhook's signing secret in the tab. Creem makes the secret (Developers → Webhooks; events `checkout.completed` and `subscription.paid`). For Lemon Squeezy (Settings → Webhooks; events `order_created` and `subscription_payment_success`), the tab makes one to paste there. Every webhook is checked against the secret, and one with another signature is refused; until the first payment comes in, the tab says so, since a secret pasted wrong is the likely reason. Test mode counts the provider's test payments only.
 
-   Analytics checks the key with one small request, then reads the last 90 days of payments, and new ones every 10 minutes. **Sync now** reads them at once.
+   Analytics checks a key with one small request, then reads the last 90 days of payments, and new ones every 10 minutes. **Sync now** reads them at once. Webhooks bring each payment as it's made.
 
-2. **Credit payments to visits:** the script names each visit. Pass it into your checkout's metadata as `shl_visit`:
+2. **Credit payments to visits:** the script names each visit. Pass it into your checkout as `shl_visit`. The tab of each provider has the code, like this for Stripe:
 
    ```js
    // In the page: the visit, from the script
    const visit = window.shl ? await window.shl.ready : null;
+   await fetch("/api/checkout", { method: "POST", body: JSON.stringify({ visit }) });
 
-   // On your server, where the checkout is made (Stripe, Polar or Dodo Payments):
-   metadata: { shl_visit: visit }
+   // On your server (stripe-node): the visit in the Checkout Session's metadata
+   const session = await stripe.checkout.sessions.create({
+     mode: "payment",
+     line_items: [{ price: "price_…", quantity: 1 }],
+     success_url: "https://example.com/thanks",
+     metadata: { shl_visit: visit },
+   });
    ```
 
-   Links to **Stripe Payment Links** (`buy.stripe.com`) and **Dodo Payments' payment links** (`checkout.dodopayments.com/buy/…`) on your pages get the visit added when they're clicked, with nothing to add.
+   It goes in the checkout's `metadata` with Stripe, Polar, Dodo Payments and Creem, in `customData` with Paddle.js (`custom_data` on a transaction made through Paddle's API), and in `checkoutData.custom` with Lemon Squeezy. Links on your pages get the visit added when they're clicked, with nothing to add:
+   - **Stripe Payment Links** (`buy.stripe.com`)
+   - **Dodo Payments' payment links** (`checkout.dodopayments.com/buy/…`)
+   - **Lemon Squeezy's buy links** (`….lemonsqueezy.com/buy/…`)
 
 A payment with the visit is credited to that visit's source, campaign, first page and country. A renewal, or a customer's later purchase, goes to their first visit, and so does a free trial's first payment. Payments with no visit count in the totals as unattributed.
 

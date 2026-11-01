@@ -8,6 +8,7 @@ import { CARD, Notice, PageHeader, PillLink, Section, Segmented, Stats, TileIcon
 import { Pill } from "@/components/ui";
 import { PROVIDERS, revenueOf, siteFor, type Revenue, type RevenueRow } from "@/lib/analytics";
 import { money } from "@/lib/money";
+import { GUIDES } from "@/lib/revenue-guides";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Revenue" };
@@ -75,7 +76,7 @@ export default async function RevenuePage({ params, searchParams }: { params: Pr
           </TileIcon>
           <p className="text-[17px] font-bold">See which sources bring paying customers</p>
           <p className="max-w-[560px] text-muted">
-            Connect Stripe, Polar or Dodo Payments with a key that can read payments. Each payment whose checkout carries the visit (<code className="font-mono text-[12.5px]">shl_visit</code>, from <code className="font-mono text-[12.5px]">window.shl.visit</code>) is
+            Connect Stripe, Polar, Paddle, Dodo Payments, Creem or Lemon Squeezy. Each payment whose checkout carries the visit (<code className="font-mono text-[12.5px]">shl_visit</code>, from <code className="font-mono text-[12.5px]">window.shl.visit</code>) is
             credited to where that visit came from, its campaign, its first page and its country. No cookies, and nothing about the customer but their id.
           </p>
           <PillLink href={settings} primary>
@@ -106,7 +107,7 @@ export default async function RevenuePage({ params, searchParams }: { params: Pr
         <Notice key={s.provider} lead={`${providerName(s.provider)} failed`} tone="err">
           {s.error}{" "}
           <Link href={settings} className="underline">
-            Check its key
+            {GUIDES[s.provider].webhook ? "Check its signing secret" : "Check its key"}
           </Link>
         </Notice>
       ))}
