@@ -3,7 +3,7 @@
 // Analytics' own sidebar, beside the panel's (shrunk to its icons): the site
 // picker at the top, then the site's pages. On phones it's a picker and a row
 // of tabs above the page. The range chosen on one page carries to the next.
-import { ActivityIcon, CheckIcon, ChevronsUpDownIcon, CircleDollarSignIcon, FileTextIcon, GlobeIcon, LayoutDashboardIcon, PlusIcon, PuzzleIcon, SettingsIcon, SquareArrowOutUpRightIcon, TargetIcon, UsersIcon } from "lucide-react";
+import { ActivityIcon, CheckIcon, ChevronsUpDownIcon, CircleDollarSignIcon, FileTextIcon, GlobeIcon, LayoutDashboardIcon, LayoutGridIcon, PlusIcon, PuzzleIcon, SettingsIcon, SquareArrowOutUpRightIcon, TargetIcon, UsersIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
@@ -96,6 +96,12 @@ function SitePicker({ sites, current, suggestions, wide }: { sites: NavSite[]; c
               </button>
             ))}
             <div className="my-1 h-px bg-border" />
+            <Link href="/analytics" role="menuitem" className={MENU_ITEM} onClick={close} data-testid="all-sites">
+              <span className="grid w-4 shrink-0 place-items-center">
+                <Icon icon={LayoutGridIcon} size={14} />
+              </span>
+              All sites
+            </Link>
             <button
               type="button"
               role="menuitem"

@@ -1108,6 +1108,11 @@ if (process.env.TOUR_ANALYTICS === "1") {
   const code = String(await evaluate(`document.querySelector('[data-testid="snippet"] code').textContent`));
   if (!code.includes(`https://${domain}/script.js`) || !code.includes(`data-site="${panelHost}"`)) throw new Error(`the line to paste: ${code}`);
   console.log(`  ✓ added ${panelHost} as a site; its dashboard shows the line to paste`);
+  await go("/analytics");
+  await waitFor(`[...document.querySelectorAll('[data-testid="site-row"]')].some((r) => r.innerText.includes(${JSON.stringify(panelHost)}))`, "the site in the list of sites");
+  await click('[data-testid="site-row"]');
+  await waitFor(`location.pathname === ${JSON.stringify(`/analytics/${panelHost}`)}`, "the site's dashboard, from the list");
+  console.log("  ✓ /analytics lists the sites, and a row opens its dashboard");
 
   // A person's visit: no webdriver flag, a desktop User-Agent, and the script on one of the panel's pages.
   await send("Emulation.setUserAgentOverride", { userAgent: DESKTOP_UA });

@@ -76,6 +76,18 @@ export function AddSiteDialog({ suggestions, onClose }: { suggestions: string[];
   );
 }
 
+export function AddSiteButton({ suggestions }: { suggestions: string[] }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <Button onClick={() => setOpen(true)} data-testid="add-site-button">
+        <Icon icon={PlusIcon} size={16} /> Add a site
+      </Button>
+      {open && <AddSiteDialog suggestions={suggestions} onClose={() => setOpen(false)} />}
+    </>
+  );
+}
+
 /** The first site, right on the page. */
 export function FirstSite({ suggestions }: { suggestions: string[] }) {
   return (

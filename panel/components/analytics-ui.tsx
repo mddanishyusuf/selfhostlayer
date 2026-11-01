@@ -48,6 +48,26 @@ export function when(at: number, now = Date.now()): string {
   return new Date(now).toISOString().slice(0, 10) === d.toISOString().slice(0, 10) ? time : `${d.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" })} ${time}`;
 }
 
+/** Visitors an hour over a day, as small bars with each hour named on hover; empty hours are a line. */
+export function Spark({ series, testId }: { series: { at: number; visitors: number }[]; testId?: string }) {
+  const W = 168;
+  const H = 28;
+  const slot = W / Math.max(series.length, 1);
+  const top = Math.max(1, ...series.map((p) => p.visitors));
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} width={W} height={H} role="img" aria-label="Visitors an hour, the last 24 hours" className="block max-w-full" data-testid={testId}>
+      {series.map((p, i) => {
+        const h = p.visitors ? Math.max(2, (p.visitors / top) * H) : 1;
+        return (
+          <rect key={p.at} x={i * slot + 1} y={H - h} width={Math.max(1, slot - 2)} height={h} fill={p.visitors ? "var(--chart)" : "var(--border)"}>
+            <title>{`${when(p.at)}: ${p.visitors.toLocaleString("en")} visitor${p.visitors === 1 ? "" : "s"}`}</title>
+          </rect>
+        );
+      })}
+    </svg>
+  );
+}
+
 export const rangeOf = (sp: Search): Range => (RANGES.some(([r]) => r === sp.range) ? (sp.range as Range) : "7d");
 
 export function filtersOf(sp: Search): Partial<Record<Filter, string>> {
