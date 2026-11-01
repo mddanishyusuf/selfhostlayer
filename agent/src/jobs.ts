@@ -80,7 +80,11 @@ function findDatabases(dir, rel, out) {
   const url = process.env.DATABASE_URL || "";
   if (url.startsWith("postgresql://")) {
     const dump = path.join(snap, ".layer-postgres.dump");
-    const r = spawnSync("/usr/bin/pg_dump", ["--format=custom", "--no-owner", "--no-privileges", "--file=" + dump, process.env.DATABASE_URL], { stdio: ["ignore", "ignore", "pipe"], encoding: "utf8" });
+    // The password in the environment, as for MySQL below; the URL without it.
+    const u = new URL(url);
+    const password = decodeURIComponent(u.password);
+    u.password = "";
+    const r = spawnSync("/usr/bin/pg_dump", ["--format=custom", "--no-owner", "--no-privileges", "--file=" + dump, u.href], { stdio: ["ignore", "ignore", "pipe"], encoding: "utf8", env: { ...process.env, PGPASSWORD: password } });
     if (r.status !== 0) {
       console.error("layer: pg_dump failed: " + String(r.stderr || r.error).trim().split("\n").pop());
       process.exit(5);
@@ -285,7 +289,9 @@ export const RESTORE_JOB = [
   'if [ -f "$dump" ]; then',
   '  case "${DATABASE_URL:-}" in',
   '    postgresql://*)',
-  '      if ! pg_restore --clean --if-exists --no-owner --no-privileges --exit-on-error --single-transaction --dbname="$DATABASE_URL" "$dump"; then rm -f -- "$dump"; echo "layer: files restored, but loading the Postgres dump failed"; exit 2; fi',
+  // The password in the environment (the agent's URL: a hex password), not in pg_restore's arguments.
+  '      rest="${DATABASE_URL#postgresql://}"; login="${rest%%@*}"; PGPASSWORD="${login#*:}"; export PGPASSWORD',
+  '      if ! pg_restore --clean --if-exists --no-owner --no-privileges --exit-on-error --single-transaction --dbname="postgresql://${login%%:*}@${rest#*@}" "$dump"; then rm -f -- "$dump"; echo "layer: files restored, but loading the Postgres dump failed"; exit 2; fi',
   '      rm -f -- "$dump"; echo "layer: Postgres database restored" ;;',
   '    *) rm -f -- "$dump"; echo "layer: the backup has a Postgres dump, but the app has no Postgres now; skipped it" ;;',
   '  esac',

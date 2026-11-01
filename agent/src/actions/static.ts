@@ -7,9 +7,11 @@
 // - The copy runs as the app user (sandboxed) with `cp -L`, turning symlinks
 //   into plain copies of what that user can read, and fails on anything that
 //   isn't a regular file or folder. No sandbox has write access afterwards.
+// - Then the agent hands the copy to root, checking again that it holds only
+//   files and folders, so not even the app's own user could add a symlink later.
 // - Release folders are setgid `caddy` (2750), so Caddy (and only Caddy) can read them.
 import { randomBytes } from "node:crypto";
-import { existsSync, lstatSync, readdirSync, readlinkSync, renameSync, rmSync, symlinkSync } from "node:fs";
+import { existsSync, lchownSync, lstatSync, readdirSync, readlinkSync, renameSync, rmSync, symlinkSync } from "node:fs";
 import { join } from "node:path";
 import { assertFullSha, assertRelativePath, assertSlug } from "@layer/protocol";
 import type { ActionTable, CallIO, Context, Params } from "../context.ts";
@@ -29,6 +31,22 @@ function assertOutputDir(value: unknown): string {
 export const COPY_SCRIPT =
   'cp -rL -- "$1/." "$2/" || { echo "layer: copying $3 failed (missing folder, or a symlink to something this app can\'t read)"; exit 1; }; ' +
   'if [ -n "$(find "$2" ! -type f ! -type d -print -quit)" ]; then echo "layer: $3 contains special files (sockets, devices)"; exit 1; fi';
+
+/**
+ * Gives the published tree to uid (root in production), group Caddy. Nothing
+ * writes there once the copy's unit has stopped, so lstat sees what Caddy
+ * will serve: anything but files and folders fails the publish.
+ */
+function seal(dir: string, uid: number, gid: number, top = dir): void {
+  for (const entry of readdirSync(dir)) {
+    const p = join(dir, entry);
+    const st = lstatSync(p);
+    if (st.isDirectory()) seal(p, uid, gid, top);
+    else if (!st.isFile()) throw new ActionError("publish_failed", `${p.slice(top.length + 1)} isn't a file or a folder; the live version is unchanged`);
+    lchownSync(p, uid, gid);
+  }
+  if (dir === top) lchownSync(dir, uid, gid);
+}
 
 async function staticPublish(params: Params, ctx: Context, io: CallIO) {
   const slug = assertSlug(params.slug);
@@ -78,6 +96,12 @@ async function staticPublish(params: Params, ctx: Context, io: CallIO) {
   if (code !== 0) {
     rmSync(dest, { recursive: true, force: true });
     throw new ActionError("publish_failed", `publishing ${outputDir} failed (exit ${code}); the live version is unchanged`);
+  }
+  try {
+    seal(dest, process.getuid?.() ?? 0, gid);
+  } catch (err) {
+    rmSync(dest, { recursive: true, force: true });
+    throw err;
   }
 
   // Switch `current` atomically: a new symlink renamed over the old one.

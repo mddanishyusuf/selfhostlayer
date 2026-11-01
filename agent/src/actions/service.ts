@@ -370,8 +370,10 @@ async function installPostgres(ctx: Context) {
 }
 
 /** Runs SQL as the postgres superuser (peer auth over the local socket), in the postgres database or the one named. Returns rows as text. */
+// SQL goes on stdin: a role's password in an argument would show in the
+// process list for a moment, and in the error if the command failed.
 async function psql(ctx: Context, sql: string, opts: { allowFail?: boolean; database?: string } = {}) {
-  return ctx.exec(BIN.runuser, ["-u", "postgres", "--", BIN.psql, "-X", "-q", "-tA", "-v", "ON_ERROR_STOP=1", ...(opts.database ? ["-d", opts.database] : []), "-c", sql], { allowFail: opts.allowFail, timeoutMs: 120_000 });
+  return ctx.exec(BIN.runuser, ["-u", "postgres", "--", BIN.psql, "-X", "-q", "-tA", "-v", "ON_ERROR_STOP=1", ...(opts.database ? ["-d", opts.database] : [])], { allowFail: opts.allowFail, timeoutMs: 120_000, input: sql });
 }
 
 async function waitForPostgres(ctx: Context): Promise<void> {
@@ -403,7 +405,7 @@ async function postgresAdd(params: Params, ctx: Context) {
   await psql(ctx, `REVOKE ALL ON DATABASE ${pg.database} FROM PUBLIC`);
   writeServices(ctx, slug, { ...state, postgres: pg });
   // Prove the credentials the app gets work, over TCP like the app connects.
-  const check = await ctx.exec(BIN.runuser, ["-u", "postgres", "--", BIN.psql, "-X", "-tA", "-c", "SELECT current_user", serviceEnv({ postgres: pg }).DATABASE_URL!], { allowFail: true });
+  const check = await ctx.exec(BIN.runuser, ["-u", "postgres", "--", BIN.psql, "-X", "-tA", "-c", "SELECT current_user", `postgresql://${pg.user}@127.0.0.1:5432/${pg.database}`], { allowFail: true, env: { PGPASSWORD: pg.password } });
   if (check.code !== 0 || check.stdout.trim() !== pg.user) throw new ActionError("start_failed", `the new credentials don't work: ${check.stderr.trim()}`);
   return { slug, database: pg.database, env: ["DATABASE_URL"] };
 }
@@ -478,8 +480,9 @@ collation-server = utf8mb4_unicode_ci
 }
 
 /** Runs SQL as root over the local socket (MariaDB's unix_socket login). Returns rows as text. */
+// On stdin, as for psql: passwords stay out of the process list.
 async function mysql(ctx: Context, sql: string, opts: { allowFail?: boolean } = {}) {
-  return ctx.exec(BIN.mariadb, ["--batch", "--skip-column-names", "--execute", sql], { allowFail: opts.allowFail, timeoutMs: 120_000 });
+  return ctx.exec(BIN.mariadb, ["--batch", "--skip-column-names"], { allowFail: opts.allowFail, timeoutMs: 120_000, input: sql });
 }
 
 async function waitForMysql(ctx: Context): Promise<void> {

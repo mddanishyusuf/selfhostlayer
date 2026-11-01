@@ -3,7 +3,7 @@
 // uploads; and restores one the panel downloaded. Bucket credentials and the
 // encryption key never reach the agent.
 import { randomBytes } from "node:crypto";
-import { chmodSync, closeSync, constants, createReadStream, existsSync, fchmodSync, fchownSync, fstatSync, openSync, readdirSync, readSync, renameSync, rmSync, statSync } from "node:fs";
+import { closeSync, constants, createReadStream, existsSync, fchmodSync, fchownSync, fstatSync, openSync, readdirSync, readSync, renameSync, rmSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { assertSlug, ValidationError } from "@layer/protocol";
 import type { ActionTable, CallIO, Context, Params } from "../context.ts";
@@ -287,7 +287,8 @@ async function dataImport(params: Params, ctx: Context, io: CallIO) {
       if (had) renameSync(join(app.appDir, previous), app.data);
       throw err;
     }
-    chmodSync(app.data, 0o700);
+    // Through O_NOFOLLOW (ensureDir): root never chmods through a symlink put in its place.
+    ensureDir(app.data, 0o700);
     pruneReplaced(app.appDir, previous);
   } finally {
     // Whatever happened: no half-imported folder stays, and the app runs again.

@@ -37,6 +37,8 @@ export interface ExecOptions {
   allowFail?: boolean;
   /** Extra environment, for a password that mustn't show in the process list. */
   env?: Record<string, string>;
+  /** Written to stdin: SQL with a password in it stays out of the process list (and out of errors). */
+  input?: string;
 }
 
 /** Runs one program with an argv array. Never through a shell. */
@@ -59,7 +61,7 @@ export const realExec: Exec = (file, args, opts = {}) => {
     return Promise.reject(new Error(`exec needs an absolute path, got ${file}`));
   }
   return new Promise((resolve, reject) => {
-    execFile(
+    const child = execFile(
       file,
       args,
       { shell: false, env: opts.env ? { ...SAFE_ENV, ...opts.env } : SAFE_ENV, timeout: opts.timeoutMs ?? 60_000, maxBuffer: 16 * 1024 * 1024 },
@@ -73,5 +75,6 @@ export const realExec: Exec = (file, args, opts = {}) => {
         }
       },
     );
+    if (opts.input !== undefined) child.stdin?.end(opts.input);
   });
 };

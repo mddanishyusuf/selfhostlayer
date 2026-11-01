@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readdirSync, readFileSync, readlinkSync, utimesSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, readlinkSync, symlinkSync, utimesSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { appActions } from "../src/actions/app.ts";
@@ -74,6 +74,22 @@ describe("static.publish", () => {
     expect(live()).toBe(before);
     expect(existsSync(join(siteDir(), before))).toBe(true);
     expect(readdirSync(siteDir()).filter((e) => e.startsWith(sha("a")))).toEqual([before]);
+  });
+
+  it("checks the copy again as root: a symlink in it fails the publish", async () => {
+    await publish({});
+    const before = live();
+    const destOf = (args: string[]) => args.find((a) => a.startsWith("--property=ReadWritePaths="))!.split("=")[2]!;
+    env.spawner.respond = (_file, args) => {
+      const dest = destOf(args);
+      mkdirSync(join(dest, "assets"));
+      writeFileSync(join(dest, "index.html"), "<p>hi</p>");
+      symlinkSync("/etc/passwd", join(dest, "assets", "leak"));
+      return { code: 0 };
+    };
+    await expect(publish({})).rejects.toThrow(/assets\/leak isn't a file or a folder/);
+    expect(live()).toBe(before);
+    expect(readdirSync(siteDir()).filter((e) => e !== "current")).toEqual([before]);
   });
 
   it("keeps only the newest 3 published releases", async () => {

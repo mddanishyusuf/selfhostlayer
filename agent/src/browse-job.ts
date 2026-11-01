@@ -163,13 +163,17 @@ function browseSqlite() {
 function browsePostgres() {
   const url = process.env.DATABASE_URL || "";
   if (!url.startsWith("postgresql://")) fail("this app has no Postgres");
+  // The password in the environment, not in psql's arguments (other users could see those).
+  const login = new URL(url);
+  const password = decodeURIComponent(login.password);
+  login.password = "";
   const psql = (sql) => {
-    const r = spawnSync("/usr/bin/psql", ["--no-psqlrc", "--quiet", "--tuples-only", "--no-align", "--set=ON_ERROR_STOP=1", "--command=" + sql, url], {
+    const r = spawnSync("/usr/bin/psql", ["--no-psqlrc", "--quiet", "--tuples-only", "--no-align", "--set=ON_ERROR_STOP=1", "--command=" + sql, login.href], {
       encoding: "utf8",
       maxBuffer: 64 * 1024 * 1024,
       timeout: 20000,
       // Every transaction read-only, and no statement longer than 5 s.
-      env: { ...process.env, PGOPTIONS: "-c default_transaction_read_only=on -c statement_timeout=5000", PGCONNECT_TIMEOUT: "5", PGAPPNAME: "layer-viewer" },
+      env: { ...process.env, PGPASSWORD: password, PGOPTIONS: "-c default_transaction_read_only=on -c statement_timeout=5000", PGCONNECT_TIMEOUT: "5", PGAPPNAME: "layer-viewer" },
     });
     // psql's error comes with LINE and caret lines after it: the ERROR line says why.
     if (r.status !== 0) fail((String(r.stderr).split("\n").find((l) => l.includes("ERROR:")) || lastLine(r.stderr)).replace(/^.*?ERROR:\s*/, "") || "psql failed");
