@@ -64,7 +64,7 @@ export function Answer({ field, response, fileHref }: { field: Field; response: 
   }
   if (field.type === "email") {
     return (
-      <a href={`mailto:${String(a)}`} className="break-all text-accent hover:underline">
+      <a href={`mailto:${encodeURIComponent(String(a))}`} className="break-all text-accent hover:underline">
         {String(a)}
       </a>
     );

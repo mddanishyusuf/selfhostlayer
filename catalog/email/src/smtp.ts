@@ -148,6 +148,9 @@ export class SmtpConnection {
       if (cfg.security === "starttls") {
         if (!c.extensions.has("STARTTLS")) throw new SmtpError(`${cfg.host} doesn't offer STARTTLS: use TLS (port 465), or "none" for a relay on this server`, 0, true);
         await c.#command("STARTTLS", [220]);
+        // Whatever came after the 220, before TLS, could be someone on the way
+        // putting words in the server's mouth: never read it as its answers.
+        if (c.#pending.length || c.#lines.length || c.#buffer) throw new SmtpError(`${cfg.host} sent more after its answer to STARTTLS: refusing the connection`, 0, true);
         await c.#upgrade(cfg.host);
         await c.#ehlo(o.name);
       }
@@ -174,6 +177,9 @@ export class SmtpConnection {
     plain.removeAllListeners("data");
     plain.removeAllListeners("error");
     plain.removeAllListeners("close");
+    this.#buffer = "";
+    this.#lines = [];
+    this.#pending = [];
     return new Promise((resolve, reject) => {
       const secure = tlsConnect({ socket: plain as Socket, servername: host, ca: this.#ca }, () => resolve());
       secure.once("error", (err) => reject(new SmtpError(`TLS with ${host} failed: ${err.message}`)));

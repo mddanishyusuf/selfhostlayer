@@ -16,7 +16,7 @@ import { Contacts } from "./contacts.ts";
 import { getSetting, openDb, setSetting } from "./db.ts";
 import { Domains, type Dns } from "./domains.ts";
 import { Mailer } from "./mailer.ts";
-import { handlePublic, type PublicContext } from "./public.ts";
+import { handlePublic, publicLimits, type PublicContext } from "./public.ts";
 import { Secrets } from "../../lib/secrets.ts";
 import { Templates } from "./templates.ts";
 
@@ -75,7 +75,7 @@ export function createApp(o: AppOptions): App {
 
   const admin: AdminContext = { db, brands, domains, contacts, campaigns, templates, automations, mailer, keys, token: o.token, version: o.version, publicUrl: () => publicUrl, setPublicUrl, smtpCa: o.smtpCa };
   const api: ApiContext = { db, brands, domains, contacts, templates, automations, mailer, keys };
-  const pub: PublicContext = { db, brands, domains, contacts, mailer, secrets, publicUrl: () => publicUrl, fetch: o.fetch, snsCertificate: o.snsCertificate };
+  const pub: PublicContext = { db, brands, domains, contacts, mailer, secrets, publicUrl: () => publicUrl, fetch: o.fetch, snsCertificate: o.snsCertificate, limits: publicLimits() };
 
   const timers: NodeJS.Timeout[] = [];
   if (o.background !== false) {

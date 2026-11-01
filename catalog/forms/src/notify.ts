@@ -5,6 +5,11 @@
 //            the Email integration's API (Forms keeps no SMTP of its own: the
 //            panel gives it Email's address, a key and a From).
 // Each is tried again after 1 minute, 10 minutes and an hour.
+//
+// A copy goes to whatever address someone typed, so it never repeats what was
+// typed (anyone could send words of their own in the form's name that way):
+// only answers the form's own words make up, one copy an address a day, and
+// at most RECEIPTS_A_DAY a day from a form.
 import { createHmac } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
 import { InputError } from "../../lib/http.ts";
@@ -12,7 +17,8 @@ import type { Secrets } from "../../lib/secrets.ts";
 import { getSetting, setSetting } from "./db.ts";
 import type { Form, Forms } from "./forms.ts";
 import type { Response, Responses } from "./responses.ts";
-import { answerText, NO_ANSWER } from "./schema.ts";
+import { isEmail } from "./answers.ts";
+import { answerText, NO_ANSWER, type FieldType } from "./schema.ts";
 
 export interface EmailConfig {
   /** Email's public address, like https://email.example.com. */
@@ -22,6 +28,10 @@ export interface EmailConfig {
 }
 
 const RETRY = [60_000, 10 * 60_000, 60 * 60_000];
+const DAY = 86_400_000;
+/** Answers typed in, links and file names: never in a copy to the respondent. */
+const TYPED: FieldType[] = ["short_text", "long_text", "email", "url", "phone", "hidden", "file"];
+const RECEIPTS_A_DAY = 200;
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
 /** The response as the webhook sends it: by id, and as a list with labels. */
@@ -40,13 +50,15 @@ export function payload(form: Form, r: Response): Record<string, unknown> {
 
 export const sign = (secret: string, body: string) => `sha256=${createHmac("sha256", secret).update(body).digest("hex")}`;
 
-/** The answers as an email: a row per question. */
-function answersHtml(form: Form, r: Response): string {
-  const rows = form.schema.fields
-    .filter((f) => !NO_ANSWER.includes(f.type) && r.answers[f.id] !== undefined)
+/** The answers as an email: a row per question. A copy to the respondent has the ones the form's words make up only. */
+function answersHtml(form: Form, r: Response, receipt = false): string {
+  const answered = form.schema.fields.filter((f) => !NO_ANSWER.includes(f.type) && r.answers[f.id] !== undefined);
+  const rows = answered
+    .filter((f) => !receipt || !TYPED.includes(f.type))
     .map((f) => `<tr><td style="padding:8px 12px 8px 0;color:#71717a;vertical-align:top;white-space:nowrap">${esc(f.label || f.id)}</td><td style="padding:8px 0;white-space:pre-wrap">${esc(answerText(r.answers[f.id]))}</td></tr>`)
     .join("");
-  return `<div style="font:15px/1.5 -apple-system,Segoe UI,Helvetica,Arial,sans-serif;color:#18181b;max-width:600px"><h2 style="font-size:18px;margin:0 0 12px">${esc(form.title)}</h2><table style="border-collapse:collapse">${rows}</table></div>`;
+  const note = receipt ? `<p style="margin:0 0 12px">Thanks: your answers came in.${answered.some((f) => TYPED.includes(f.type)) ? " Answers you typed aren't repeated in this email." : ""}</p>` : "";
+  return `<div style="font:15px/1.5 -apple-system,Segoe UI,Helvetica,Arial,sans-serif;color:#18181b;max-width:600px"><h2 style="font-size:18px;margin:0 0 12px">${esc(form.title)}</h2>${note}${rows ? `<table style="border-collapse:collapse">${rows}</table>` : ""}</div>`;
 }
 
 export class Notifier {
@@ -114,17 +126,25 @@ export class Notifier {
       const r = this.#responses.get(formId, d.response_id);
       if (d.kind === "webhook") {
         const body = JSON.stringify(payload(form, r));
-        const res = await this.#fetch(form.notify.webhook, { method: "POST", headers: { "Content-Type": "application/json", "User-Agent": "Self-Host-Layer-Forms", "X-Forms-Signature": sign(form.notify.webhookSecret, body) }, body, signal: AbortSignal.timeout(15_000) });
-        if (!res.ok) throw new Error(`the webhook answered ${res.status}`);
+        const res = await this.#fetch(form.notify.webhook, { method: "POST", headers: { "Content-Type": "application/json", "User-Agent": "Self-Host-Layer-Forms", "X-Forms-Signature": sign(form.notify.webhookSecret, body) }, body, redirect: "manual", signal: AbortSignal.timeout(15_000) });
+        // A redirect isn't followed (it could point anywhere, this server included): it's a failure.
+        if (!res.ok) throw new Error(`the webhook answered ${res.status}${res.status >= 300 && res.status < 400 ? " (a redirect: give the address it points to)" : ""}`);
       } else if (d.kind === "email") {
         // Replies go to whoever answered: the address their copy goes to, or else the form's first Email answer.
         const asked = form.notify.receiptField || form.schema.fields.find((f) => f.type === "email" && r.answers[f.id])?.id;
         const replyTo = asked ? answerText(r.answers[asked]) : "";
         await this.#email(form.notify.email, `New response to ${form.title}`, answersHtml(form, r), replyTo || undefined);
       } else {
-        const to = answerText(r.answers[form.notify.receiptField]);
-        if (!to) return void this.#db.prepare("UPDATE deliveries SET status = 'done', error = 'no address in the answers' WHERE id = ?").run(d.id);
-        await this.#email(to, `Your answers to ${form.title}`, answersHtml(form, r));
+        const to = answerText(r.answers[form.notify.receiptField]).trim().toLowerCase();
+        const skip = (why: string) => void this.#db.prepare("UPDATE deliveries SET status = 'done', error = ? WHERE id = ?").run(why, d.id);
+        if (!to) return skip("no address in the answers");
+        if (!isEmail(to)) return skip("the answer isn't an email address");
+        const sent = this.#db
+          .prepare("SELECT count(*) n, count(CASE WHEN json_extract(r.answers, ?) = ? THEN 1 END) mine FROM deliveries d JOIN responses r ON r.id = d.response_id WHERE d.kind = 'receipt' AND d.status = 'done' AND d.error IS NULL AND r.form_id = ? AND d.created_at > ?")
+          .get(`$."${form.notify.receiptField}"`, to, formId, Date.now() - DAY) as { n: number; mine: number };
+        if (sent.mine > 0) return skip("a copy went to this address in the last day");
+        if (sent.n >= RECEIPTS_A_DAY) return skip(`${RECEIPTS_A_DAY} copies went out today, the most a day`);
+        await this.#email(to, `Your answers to ${form.title}`, answersHtml(form, r, true));
       }
       this.#db.prepare("UPDATE deliveries SET status = 'done', attempts = attempts + 1, error = NULL WHERE id = ?").run(d.id);
     } catch (err) {
@@ -153,7 +173,7 @@ export class Notifier {
     const sample: Response = { id: 0, formId: form.id, answers: Object.fromEntries(form.schema.fields.filter((f) => !NO_ANSWER.includes(f.type)).map((f) => [f.id, f.type === "number" ? 42 : f.options[0] ?? "A sample answer"])), meta: { duration: 30_000, country: null, device: null, browser: null, referrer: null }, files: [], createdAt: Date.now() };
     const body = JSON.stringify({ ...payload(form, sample), test: true });
     try {
-      const res = await this.#fetch(form.notify.webhook, { method: "POST", headers: { "Content-Type": "application/json", "User-Agent": "Self-Host-Layer-Forms", "X-Forms-Signature": sign(form.notify.webhookSecret, body) }, body, signal: AbortSignal.timeout(15_000) });
+      const res = await this.#fetch(form.notify.webhook, { method: "POST", headers: { "Content-Type": "application/json", "User-Agent": "Self-Host-Layer-Forms", "X-Forms-Signature": sign(form.notify.webhookSecret, body) }, body, redirect: "manual", signal: AbortSignal.timeout(15_000) });
       return res.ok ? { status: res.status } : { status: res.status, error: `it answered ${res.status}` };
     } catch (err) {
       return { status: 0, error: (err as Error).message };

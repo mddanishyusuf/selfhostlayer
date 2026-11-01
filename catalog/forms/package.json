@@ -1,6 +1,6 @@
 {
   "name": "@layer-catalog/forms",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "description": "Forms and surveys on your own server, one page or one question at a time: an integration for Self Host Layer.",
   "type": "module",

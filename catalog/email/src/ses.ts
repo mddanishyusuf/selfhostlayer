@@ -188,13 +188,15 @@ export interface SnsMessage {
   Token?: string;
 }
 
+// SNS's signing certificates, by URL: a few, rotated rarely.
 const certs = new Map<string, string>();
+const CERTS_MAX = 32;
 
-/** The certificate's URL must be SNS's own, over HTTPS. */
+/** The certificate's URL must be SNS's own, over HTTPS, and plain: no port, login, query or fragment to vary. */
 export function snsCertUrlOk(url: string): boolean {
   try {
     const u = new URL(url);
-    return u.protocol === "https:" && /^sns\.[a-z0-9-]+\.amazonaws\.com(\.cn)?$/.test(u.hostname) && u.pathname.endsWith(".pem");
+    return u.protocol === "https:" && !u.port && !u.username && !u.password && !u.search && !u.hash && /^sns\.[a-z0-9-]+\.amazonaws\.com(\.cn)?$/.test(u.hostname) && /^\/[\w.-]+\.pem$/.test(u.pathname);
   } catch {
     return false;
   }
@@ -209,12 +211,14 @@ export function snsSignedText(m: SnsMessage): string {
 /** Whether SNS signed this message (the certificate is fetched once per URL). */
 export async function verifySns(m: SnsMessage, o: { fetch?: typeof fetch; certificate?: string } = {}): Promise<boolean> {
   if (!o.certificate && !snsCertUrlOk(m.SigningCertURL)) return false;
-  let pem = o.certificate ?? certs.get(m.SigningCertURL);
+  const url = o.certificate ? "" : new URL(m.SigningCertURL).href;
+  let pem = o.certificate ?? certs.get(url);
   if (!pem) {
-    const res = await (o.fetch ?? fetch)(m.SigningCertURL, { signal: AbortSignal.timeout(10_000) });
+    const res = await (o.fetch ?? fetch)(url, { signal: AbortSignal.timeout(10_000) });
     if (!res.ok) return false;
     pem = await res.text();
-    certs.set(m.SigningCertURL, pem);
+    if (certs.size >= CERTS_MAX) certs.delete(certs.keys().next().value!);
+    certs.set(url, pem);
   }
   try {
     const key = new X509Certificate(pem).publicKey;

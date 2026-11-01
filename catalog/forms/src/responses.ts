@@ -3,7 +3,7 @@
 // on disk, data/uploads/<form>/<response>/<file id>, read back only through the
 // admin API. Also the CSV export and the insights.
 import { randomBytes } from "node:crypto";
-import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, renameSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import type { DatabaseSync, SQLInputValue } from "node:sqlite";
 import { csvCell } from "../../lib/csv.ts";
@@ -83,11 +83,16 @@ export class Responses {
     return { id: r.id, formId: r.form_id, answers: JSON.parse(r.answers), meta: JSON.parse(r.meta), files: this.#files(r.id), createdAt: r.created_at };
   }
 
-  /** Keeps a response and writes its files; returns its id. */
-  store(form: Form, answers: Record<string, unknown>, uploads: Upload[], meta: Meta, now = Date.now()): number {
+  /** Where files wait while they come in, beside their final place (so they're moved, never copied). */
+  get staging(): string {
+    return join(this.#dir, ".incoming");
+  }
+
+  /** Keeps a response and moves its files in from where they came (`path`); returns its id. */
+  store(form: Form, answers: Record<string, unknown>, uploads: (Upload & { path: string })[], meta: Meta, now = Date.now()): number {
     const db = this.#db;
     db.exec("BEGIN");
-    let id: number;
+    let id = 0;
     try {
       id = Number(db.prepare("INSERT INTO responses (form_id, answers, meta, created_at) VALUES (?, ?, ?, ?)").run(form.id, JSON.stringify(answers), JSON.stringify(meta), now).lastInsertRowid);
       if (uploads.length) {
@@ -95,13 +100,14 @@ export class Responses {
         mkdirSync(dir, { recursive: true });
         for (const u of uploads) {
           const fileId = randomBytes(12).toString("hex");
-          writeFileSync(join(dir, fileId), u.data, { mode: 0o600 });
-          db.prepare("INSERT INTO files (id, response_id, form_id, field_id, name, type, size, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)").run(fileId, id, form.id, u.fieldId, u.name, u.type, u.data.length, now);
+          db.prepare("INSERT INTO files (id, response_id, form_id, field_id, name, type, size, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)").run(fileId, id, form.id, u.fieldId, u.name, u.type, u.size, now);
+          renameSync(u.path, join(dir, fileId));
         }
       }
       db.exec("COMMIT");
     } catch (err) {
       db.exec("ROLLBACK");
+      if (id) rmSync(join(this.#dir, String(form.id), String(id)), { recursive: true, force: true });
       throw err;
     }
     return id;

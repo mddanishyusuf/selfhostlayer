@@ -47,10 +47,12 @@ Each contact has an address, a name, custom fields, the lists it's in, and a sta
 
 **Lists** group contacts. Each list has a signup endpoint, `https://<email address>/subscribe/<key>`, which takes a plain HTML form, or JSON with `Accept: application/json`. The Lists page has a form to paste:
 
-- `email` is required; `name` and any other field go on the contact.
+- `email` is required; `name` and any other field go on a new contact.
 - A hidden `_hp` field keeps bots out.
-- `redirect` sends the visitor to your thank-you page.
-- With **double opt-in**, new signups get an email with a link to confirm first.
+- `redirect` sends the visitor to your thank-you page: on the brand's website, its sending domain, or the site the form is on.
+- With **double opt-in**, new signups get an email with a link to confirm first. The link opens a page with a **Confirm** button: mail scanners open every link in an email, so only the button confirms.
+
+Anyone can send a signup form with any address, so it never changes someone who's already a contact: it only adds them to the list. Their name and fields stay, someone waiting to confirm still has to, and someone who unsubscribed stays unsubscribed. They're sent a link to come back instead (it works for a week), and only that link resubscribes them. A form sends at most one such email an address a day, and takes 10 signups a minute from one address.
 
 ## Campaigns
 

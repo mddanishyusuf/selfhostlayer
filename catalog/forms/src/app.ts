@@ -1,17 +1,23 @@
 // Forms as one HTTP server: /healthz, the forms' pages and their answers
 // (/f/<slug>…), /embed.js, and the admin API (/_admin/…, this server only).
 // Notifications go out in the background.
+//
+// The page sends a response as one request (FORMAT): a line of JSON with the
+// answers and each file's field, name, type and size, then the files' bytes
+// one after another. Everything is checked before a file's bytes are read, and
+// files go straight to disk: a response never sits in memory, however big.
 import { randomBytes } from "node:crypto";
-import { mkdirSync, statSync } from "node:fs";
+import { closeSync, mkdirSync, openSync, rmSync, statfsSync, statSync, writeSync } from "node:fs";
 import { createServer, type IncomingMessage, type Server } from "node:http";
 import { join } from "node:path";
 import type { DatabaseSync } from "node:sqlite";
 import { clientIp, loadGeo, type Geo } from "../../lib/geo.ts";
 import { fail, InputError, json, readBody, send } from "../../lib/http.ts";
+import { Limiter, limitKey } from "../../lib/limit.ts";
 import { Secrets } from "../../lib/secrets.ts";
 import { readAgent, referrerHost } from "../../lib/ua.ts";
 import { handleAdmin, type AdminContext } from "./admin.ts";
-import { checkAnswers } from "./answers.ts";
+import { checkAnswers, maxAnswersBytes } from "./answers.ts";
 import { getSetting, openDb, setSetting } from "./db.ts";
 import { Forms } from "./forms.ts";
 import { Notifier } from "./notify.ts";
@@ -44,8 +50,78 @@ export interface App {
   close: () => Promise<void>;
 }
 
-const MAX_BODY = 40 * 1024 * 1024;
+const FORMAT = "application/x-forms-response";
 const DAY = 86_400_000;
+/** Responses with files coming in at once (each up to 25 MB on disk while it does). */
+const UPLOADS_AT_ONCE = 8;
+/** Files wait while the disk has less than this free, or 5% of it. */
+const DISK_FLOOR = 1024 ** 3;
+
+/** A response as the page sends it (FORMAT), read a piece at a time. */
+class Submission {
+  readonly #chunks: AsyncIterator<Buffer>;
+  #left: Buffer = Buffer.alloc(0);
+
+  constructor(req: IncomingMessage) {
+    this.#chunks = req[Symbol.asyncIterator]();
+  }
+
+  async #more(): Promise<boolean> {
+    const { value, done } = await this.#chunks.next();
+    if (done) return false;
+    this.#left = this.#left.length ? Buffer.concat([this.#left, value as Buffer]) : (value as Buffer);
+    return true;
+  }
+
+  /** The line of JSON, at most max bytes. */
+  async head(max: number): Promise<Record<string, unknown>> {
+    let from = 0;
+    let at: number;
+    while ((at = this.#left.indexOf(10, from)) < 0) {
+      if (this.#left.length > max) throw new InputError("body", "the answers are too long", 413);
+      from = this.#left.length;
+      if (!(await this.#more())) throw new InputError("body", "the answers couldn't be read");
+    }
+    if (at > max) throw new InputError("body", "the answers are too long", 413);
+    const line = this.#left.subarray(0, at).toString("utf8");
+    this.#left = this.#left.subarray(at + 1);
+    let v: unknown;
+    try {
+      v = JSON.parse(line);
+    } catch {
+      v = null;
+    }
+    if (typeof v !== "object" || v === null || Array.isArray(v)) throw new InputError("body", "the answers couldn't be read");
+    return v as Record<string, unknown>;
+  }
+
+  /** The next `size` bytes, into a new file. */
+  async file(path: string, size: number): Promise<void> {
+    const fd = openSync(path, "wx", 0o600);
+    try {
+      for (let need = size; need > 0; ) {
+        if (!this.#left.length && !(await this.#more())) throw new InputError("files", "a file didn't come whole: try again");
+        const piece = this.#left.subarray(0, need);
+        for (let off = 0; off < piece.length; ) off += writeSync(fd, piece, off);
+        need -= piece.length;
+        this.#left = this.#left.subarray(piece.length);
+      }
+    } finally {
+      closeSync(fd);
+    }
+  }
+
+  /** That nothing came after the files. */
+  async end(): Promise<void> {
+    if (this.#left.length || (await this.#more())) throw new InputError("files", "more came than the files announced");
+  }
+}
+
+/** Whether the disk has room for `bytes` more, above the floor. */
+function roomFor(dir: string, bytes: number): boolean {
+  const s = statfsSync(dir);
+  return s.bavail * s.bsize - bytes >= Math.max(DISK_FLOOR, s.blocks * s.bsize * 0.05);
+}
 const mtime = (path: string) => {
   try {
     return statSync(path).mtimeMs;
@@ -83,16 +159,13 @@ export function createApp(o: AppOptions): App {
     timers.push(t, g);
   }
 
-  const limits = new Map<string, { n: number; reset: number }>();
-  const limited = (key: string, max: number, now: number) => {
-    const w = limits.get(key);
-    if (!w || w.reset <= now) {
-      if (limits.size > 20_000) limits.clear();
-      limits.set(key, { n: 1, reset: now + 60_000 });
-      return false;
-    }
-    return ++w.n > max;
-  };
+  // Answers from one address to a form, and views and starts it counts, a minute (IPv6 by its /64).
+  const answersFrom = new Limiter(10, 60_000);
+  const beaconsFrom = new Limiter(30, 60_000);
+  // A crash can leave files that were coming in: nothing ever reads them.
+  rmSync(responses.staging, { recursive: true, force: true });
+  mkdirSync(responses.staging, { recursive: true, mode: 0o700 });
+  let uploading = 0;
 
   /** The start token: when the page was made, signed. */
   const token = (slug: string, now: number) => `${now}.${secrets.sign("t", slug, String(now))}`;
@@ -108,13 +181,23 @@ export function createApp(o: AppOptions): App {
     const closed = forms.closedBecause(form, now);
     if (closed) return { status: 410, body: { error: form.closedMessage || "This form isn't taking answers any more." } };
     const ip = clientIp(req) ?? "";
-    if (limited(`${ip}|${form.id}`, 10, now)) return { status: 429, body: { error: "Too many answers from here: wait a minute." } };
+    if (answersFrom.hit(`${limitKey(ip)}|${form.id}`)) return { status: 429, body: { error: "Too many answers from here: wait a minute." } };
+    const max = maxAnswersBytes(form.schema);
+    const sub = String(req.headers["content-type"] ?? "").startsWith(FORMAT) ? new Submission(req) : null;
     let input: Record<string, unknown>;
     try {
-      const v = JSON.parse((await readBody(req, MAX_BODY)).toString("utf8")) as unknown;
-      if (typeof v !== "object" || v === null || Array.isArray(v)) throw new Error();
-      input = v as Record<string, unknown>;
+      if (sub) input = await sub.head(max);
+      else {
+        // JSON, from a page loaded before files came this way: answers only.
+        const v = JSON.parse((await readBody(req, max)).toString("utf8")) as unknown;
+        if (typeof v !== "object" || v === null || Array.isArray(v)) throw new Error();
+        input = v as Record<string, unknown>;
+        const files = input.files;
+        if (files && typeof files === "object" && Object.keys(files).length) return { status: 409, body: { error: "This page changed since it was loaded: load it again to send files." } };
+        input.files = [];
+      }
     } catch (err) {
+      if (err instanceof InputError && err.status === 413) return { status: 413, body: { error: sub ? "The answers are too long." : "This page changed since it was loaded: load it again." } };
       if (err instanceof InputError) throw err;
       return { status: 400, body: { error: "The answers couldn't be read." } };
     }
@@ -126,10 +209,39 @@ export function createApp(o: AppOptions): App {
     const agent = readAgent(req.headers["user-agent"]);
     if (agent.bot) return { status: 200, body: { ok: true } };
     const { answers, uploads } = checkAnswers(form.schema, input as { answers?: unknown; files?: unknown });
+    // Everything checked: now the files' bytes, if any came (all are read, even a hidden question's, then dropped).
+    const announced = (input.files as { size: number }[] | undefined) ?? [];
+    const coming = announced.reduce((n, f) => n + f.size, 0);
+    const paths: string[] = [];
+    if (sub) {
+      if (announced.length) {
+        if (uploading >= UPLOADS_AT_ONCE) return { status: 503, body: { error: "Busy with other files: try again in a minute." } };
+        if (!roomFor(responses.staging, coming)) return { status: 507, body: { error: "The server is short of room for files: try again later." } };
+      }
+      uploading += announced.length ? 1 : 0;
+      try {
+        for (const f of announced) {
+          const path = join(responses.staging, randomBytes(12).toString("hex"));
+          paths.push(path);
+          await sub.file(path, f.size);
+        }
+        await sub.end();
+      } catch (err) {
+        for (const p of paths) rmSync(p, { force: true });
+        throw err;
+      } finally {
+        uploading -= announced.length ? 1 : 0;
+      }
+    }
     const referrer = referrerHost(typeof req.headers.referer === "string" ? req.headers.referer : undefined, new URL(publicUrl).hostname);
-    const rid = responses.store(form, answers, uploads, { duration: age, country: ip ? (geo?.geo.country(ip) ?? null) : null, device: agent.device, browser: agent.browser, referrer }, now);
-    notifier.queue(form, rid, now);
-    return { status: 200, body: { ok: true, id: rid } };
+    try {
+      const rid = responses.store(form, answers, uploads.map((u) => ({ ...u, path: paths[u.index]! })), { duration: age, country: ip ? (geo?.geo.country(ip) ?? null) : null, device: agent.device, browser: agent.browser, referrer }, now);
+      notifier.queue(form, rid, now);
+      return { status: 200, body: { ok: true, id: rid } };
+    } finally {
+      // Files the response doesn't keep (a hidden question's), or all of them if it failed.
+      for (const p of paths) rmSync(p, { force: true });
+    }
   }
 
   const server = createServer((req, res) => {
@@ -162,7 +274,7 @@ export function createApp(o: AppOptions): App {
         // View and start beacons: counted for people, once per page.
         await readBody(req, 1024).catch(() => Buffer.alloc(0));
         const form = forms.bySlug(slug);
-        if (form && !readAgent(req.headers["user-agent"]).bot && !limited(`${action}|${clientIp(req) ?? ""}|${form.id}`, 30, now)) forms.count(form.id, action === "view" ? "views" : "starts");
+        if (form && !readAgent(req.headers["user-agent"]).bot && !beaconsFrom.hit(`${action}|${limitKey(clientIp(req))}|${form.id}`)) forms.count(form.id, action === "view" ? "views" : "starts");
         return send(res, 204, "");
       }
       if (p === "/") return send(res, 200, "Forms by Self Host Layer: forms live at /f/<slug>.\n", { "Content-Type": "text/plain; charset=utf-8" });

@@ -42,6 +42,8 @@ export function contactVars(c: { email: string; name: string; fields: Record<str
 }
 
 /** Text from HTML: paragraphs and line breaks kept, links as "text (url)", the rest of the markup gone. */
+const ENTITIES: Record<string, string> = { amp: "&", lt: "<", gt: ">", quot: '"', nbsp: " " };
+
 export function htmlToText(html: string): string {
   return html
     .replace(/<(head|style|script|title)\b[^>]*>[\s\S]*?<\/\1>/gi, "")
@@ -53,9 +55,13 @@ export function htmlToText(html: string): string {
     .replace(/<li\b[^>]*>/gi, "\n- ")
     .replace(/<\/(p|div|h[1-6]|tr|table|ul|ol|blockquote)>/gi, "\n\n")
     .replace(/<[^>]+>/g, "")
-    .replace(/&nbsp;/g, " ")
-    .replace(/&(amp|lt|gt|quot|#39);/g, (m) => ({ "&amp;": "&", "&lt;": "<", "&gt;": ">", "&quot;": '"', "&#39;": "'" })[m]!)
-    .replace(/&#(\d+);/g, (_m, n: string) => String.fromCodePoint(Number(n)))
+    // Entities in one pass: "&amp;#65;" stays as written. Numbers that aren't characters go.
+    .replace(/&(amp|lt|gt|quot|nbsp|#\d{1,8}|#x[\da-f]{1,7});/gi, (_m, e: string) => {
+      const named = ENTITIES[e.toLowerCase()];
+      if (named !== undefined) return named;
+      const n = e[1] === "x" || e[1] === "X" ? parseInt(e.slice(2), 16) : Number(e.slice(1));
+      return n > 0 && n <= 0x10ffff && (n < 0xd800 || n > 0xdfff) ? String.fromCodePoint(n) : "";
+    })
     .replace(/[ \t]+\n/g, "\n")
     .replace(/\n[ \t]+/g, "\n")
     .replace(/\n{3,}/g, "\n\n")

@@ -282,9 +282,52 @@ describe("signup forms", () => {
     expect(mail.data).toContain("Subject: Confirm your subscription to Piqo");
     const link = /(http:\/\/127\.0\.0\.1:\d+\/confirm\/[\w.-]+)/.exec(mail.data.replace(/=\r\n/g, "").replace(/=3D/g, "="))![1]!;
     expect((await admin(`brands/${id}/contacts?q=cy`)).body.contacts[0].status).toBe("unconfirmed");
-    expect(await (await fetch(link)).text()).toContain("Thanks for confirming");
+    // Mail scanners open every link: opening it only asks, the button confirms.
+    expect(await (await fetch(link)).text()).toContain(">Confirm</button>");
+    expect((await admin(`brands/${id}/contacts?q=cy`)).body.contacts[0].status).toBe("unconfirmed");
+    expect(await (await fetch(link, { method: "POST" })).text()).toContain("Thanks for confirming");
     expect((await admin(`brands/${id}/contacts?q=cy`)).body.contacts[0].status).toBe("subscribed");
     expect((await fetch(link.replace(/.$/, (c) => (c === "A" ? "B" : "A")))).status).toBe(400);
+  });
+
+  it("change nobody who's already a contact: no new name, no resubscribing, nothing confirmed but from the inbox", async () => {
+    const id = await readyBrand();
+    const open = (await admin(`brands/${id}/lists`, { body: { name: "Open" } })).body;
+    const confirmed = (await admin(`brands/${id}/lists`, { body: { name: "Confirmed", doubleOptIn: true } })).body;
+    const post = (key: string, body: string, headers: Record<string, string> = {}) => fetch(`${base}/subscribe/${key}`, { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded", ...headers }, body, redirect: "manual" });
+    const contact = async (q: string) => (await admin(`brands/${id}/contacts?q=${q}`)).body.contacts[0];
+    // A name and fields come only with a new address, however it's written.
+    await post(open.publicKey, "email=dee%40example.com&name=Dee&plan=pro");
+    await post(open.publicKey, "email=%20DEE%40example.com%20&name=Mallory&plan=free");
+    expect(await contact("dee")).toMatchObject({ name: "Dee", fields: { plan: "pro" }, status: "subscribed" });
+    // Still to confirm: a list without double opt-in doesn't skip it.
+    await post(confirmed.publicKey, "email=eve%40example.com");
+    await post(open.publicKey, "email=eve%40example.com");
+    expect((await contact("eve")).status).toBe("unconfirmed");
+    // Unsubscribed: the form doesn't bring them back; the link it sends does, with a click.
+    app.contacts.unsubscribe(id, "dee@example.com");
+    expect(await (await post(open.publicKey, "email=dee%40example.com")).text()).toContain("Check your inbox");
+    expect((await contact("dee")).status).toBe("unsubscribed");
+    await app.mailer.drain();
+    const again = () => smtp.received.filter((m) => m.data.includes("Subject: Confirm you'd like emails from Piqo again"));
+    expect(again()).toHaveLength(1);
+    const link = /(http:\/\/127\.0\.0\.1:\d+\/confirm\/[\w.-]+)/.exec(again()[0]!.data.replace(/=\r\n/g, "").replace(/=3D/g, "="))![1]!;
+    await fetch(link);
+    expect((await contact("dee")).status).toBe("unsubscribed");
+    expect(await (await fetch(link, { method: "POST" })).text()).toContain("Thanks for confirming");
+    expect((await contact("dee")).status).toBe("subscribed");
+    // Unsubscribed again: that link is spent, and a day's one link has gone already.
+    app.contacts.unsubscribe(id, "dee@example.com");
+    expect(await (await fetch(link, { method: "POST" })).text()).toContain("can't be subscribed again");
+    await post(open.publicKey, "email=dee%40example.com");
+    await app.mailer.drain();
+    expect(again()).toHaveLength(1);
+    expect((await contact("dee")).status).toBe("unsubscribed");
+    // After signing up, only the brand's own sites, or the form's, come next.
+    const away = await post(open.publicKey, "email=fay%40example.com&redirect=https%3A%2F%2Fevil.example%2F");
+    expect([away.status, away.headers.get("location")]).toEqual([200, null]);
+    const home = await post(open.publicKey, "email=gus%40example.com&redirect=https%3A%2F%2Fshop.example%2Fthanks", { Origin: "https://shop.example" });
+    expect([home.status, home.headers.get("location")]).toEqual([303, "https://shop.example/thanks"]);
   });
 });
 

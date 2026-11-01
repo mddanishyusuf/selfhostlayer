@@ -1,5 +1,5 @@
 import { createHmac } from "node:crypto";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, readdirSync, rmSync } from "node:fs";
 import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -80,13 +80,14 @@ describe("answers", () => {
     expect(() => checkAnswers(s, { answers: { email: "a@b.co" } })).toThrow(expect.objectContaining({ field: "name" }));
   });
 
-  it("take files in base64, of the kinds the field allows, up to 10 MB", () => {
-    const pdf = { name: "cv.pdf", type: "application/pdf", data: Buffer.from("%PDF-1.4").toString("base64") };
-    const r = checkAnswers(s, { answers: ok, files: { cv: pdf } });
+  it("take files announced by name, type and size, of the kinds the field allows, up to 10 MB", () => {
+    const pdf = { field: "cv", name: "cv.pdf", type: "application/pdf", size: 8 };
+    const r = checkAnswers(s, { answers: ok, files: [pdf] });
     expect(r.answers.cv).toBe("cv.pdf");
-    expect(r.uploads[0]).toMatchObject({ fieldId: "cv", name: "cv.pdf", type: "application/pdf" });
-    expect(() => checkAnswers(s, { answers: ok, files: { cv: { ...pdf, name: "x.exe", type: "application/x-msdownload" } } })).toThrow(/isn't a kind of file/);
-    expect(() => checkAnswers(s, { answers: ok, files: { cv: { ...pdf, data: Buffer.alloc(11 * 1024 * 1024).toString("base64") } } })).toThrow(/10 MB/);
+    expect(r.uploads[0]).toEqual({ fieldId: "cv", name: "cv.pdf", type: "application/pdf", size: 8, index: 0 });
+    expect(() => checkAnswers(s, { answers: ok, files: [{ ...pdf, name: "x.exe", type: "application/x-msdownload" }] })).toThrow(/isn't a kind of file/);
+    expect(() => checkAnswers(s, { answers: ok, files: [{ ...pdf, size: 11 * 1024 * 1024 }] })).toThrow(/10 MB/);
+    for (const bad of [[pdf, pdf], [{ ...pdf, field: "name" }], [{ ...pdf, size: -1 }], [{ ...pdf, size: 1.5 }], { cv: pdf }]) expect(() => checkAnswers(s, { answers: ok, files: bad })).toThrow(/couldn't be read|must list/);
     expect([accepts(".pdf,image/*", "a.PNG", "image/png"), accepts("", "a", "b/c"), accepts(".pdf", "a.png", "image/png")]).toEqual([true, true, false]);
   });
 });
@@ -102,10 +103,10 @@ describe("Forms over HTTP", () => {
   let app: App;
   let base = "";
   let dir = "";
-  const hooks: { url: string; headers: Record<string, string>; body: string }[] = [];
+  const hooks: { url: string; headers: Record<string, string>; body: string; redirect?: string }[] = [];
   const fakeFetch = (async (url: string | URL | Request, init?: RequestInit) => {
-    hooks.push({ url: String(url), headers: init?.headers as Record<string, string>, body: String(init?.body) });
-    return new Response(JSON.stringify({ id: "x" }), { status: String(url).includes("broken") ? 500 : 200 });
+    hooks.push({ url: String(url), headers: init?.headers as Record<string, string>, body: String(init?.body), redirect: init?.redirect });
+    return new Response(JSON.stringify({ id: "x" }), { status: String(url).includes("broken") ? 500 : String(url).includes("moved") ? 302 : 200 });
   }) as typeof fetch;
   beforeEach(async () => {
     dir = mkdtempSync(join(tmpdir(), "forms-"));
@@ -130,7 +131,11 @@ describe("Forms over HTTP", () => {
     const cfg = JSON.parse(/<script type="application\/json" id="cfg">([\s\S]*?)<\/script>/.exec(html)![1]!);
     return { res, html, cfg };
   }
-  const submit = (slug: string, body: unknown, ua = "Mozilla/5.0 (Macintosh) Chrome/130.0 Safari/537.36") => fetch(`${base}/f/${slug}/submit`, { method: "POST", headers: { "Content-Type": "application/json", "User-Agent": ua, "X-Forwarded-For": "81.2.69.160", Referer: "https://news.ycombinator.com/item?id=1" }, body: JSON.stringify(body) });
+  const headers = (type: string, ua: string) => ({ "Content-Type": type, "User-Agent": ua, "X-Forwarded-For": "81.2.69.160", Referer: "https://news.ycombinator.com/item?id=1" });
+  const submit = (slug: string, body: unknown, ua = "Mozilla/5.0 (Macintosh) Chrome/130.0 Safari/537.36") => fetch(`${base}/f/${slug}/submit`, { method: "POST", headers: headers("application/json", ua), body: JSON.stringify(body) });
+  /** As the page sends a response with files: a line of JSON, then the files' bytes. */
+  const submitFiles = (slug: string, head: Record<string, unknown>, bytes: Buffer[], ua = "Mozilla/5.0 (Macintosh) Chrome/130.0 Safari/537.36") =>
+    fetch(`${base}/f/${slug}/submit`, { method: "POST", headers: headers("application/x-forms-response", ua), body: Buffer.concat([Buffer.from(JSON.stringify(head) + "\n"), ...bytes]) });
   const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
   it("serves a form, counts views and starts, refuses spam and wrong answers, keeps the right ones", async () => {
@@ -149,16 +154,32 @@ describe("Forms over HTTP", () => {
     const missing = await submit(form.slug, { t: cfg.token, answers: { ...answers, other: "" } });
     expect([missing.status, await missing.json()]).toEqual([422, { error: "other: an answer is required", field: "other" }]);
     expect(await (await submit(form.slug, { t: cfg.token, hp: "http://spam.example", answers })).json()).toEqual({ ok: true });
-    const pdf = { name: "cv.pdf", type: "application/pdf", data: Buffer.from("%PDF-1.4 hello").toString("base64") };
-    const ok = await submit(form.slug, { t: cfg.token, answers, files: { cv: pdf } });
+    // Files come after the answers, never in them: a page from before that is told to load again.
+    const pdf = Buffer.from("%PDF-1.4 hello");
+    const old = await submit(form.slug, { t: cfg.token, answers, files: { cv: { name: "cv.pdf", type: "application/pdf", data: pdf.toString("base64") } } });
+    expect([old.status, (await old.json()).error]).toEqual([409, "This page changed since it was loaded: load it again to send files."]);
+    const announce = (size = pdf.length) => ({ t: cfg.token, answers, files: [{ field: "cv", name: "cv.pdf", type: "application/pdf", size }] });
+    const short = await submitFiles(form.slug, announce(pdf.length + 5), [pdf]);
+    expect([short.status, (await short.json()).error]).toEqual([422, "a file didn't come whole: try again"]);
+    const extra = await submitFiles(form.slug, announce(), [pdf, Buffer.from("more")]);
+    expect([extra.status, (await extra.json()).error]).toEqual([422, "more came than the files announced"]);
+    const ok = await submitFiles(form.slug, announce(), [pdf]);
     expect(ok.status).toBe(200);
+    // Nothing waits in the staging folder after: kept files moved, the rest removed.
+    expect(readdirSync(join(dir, "uploads", ".incoming"))).toEqual([]);
     const { id } = (await ok.json()) as { id: number };
     const r = (await admin(`forms/${form.id}/responses/${id}`)).body;
     expect(r.answers).toEqual({ ...answers, cv: "cv.pdf" });
     expect(r.meta).toMatchObject({ device: "desktop", browser: "Chrome", referrer: "news.ycombinator.com" });
     expect(r.meta.duration).toBeGreaterThanOrEqual(50);
     const file = await fetch(`${base}/_admin/forms/${form.id}/files/${r.files[0].id}`, { headers: { Authorization: `Bearer ${TOKEN}` } });
-    expect([file.headers.get("content-disposition"), await file.text()]).toEqual(['attachment; filename="cv.pdf"', "%PDF-1.4 hello"]);
+    expect([file.headers.get("content-disposition"), await file.text()]).toEqual(["attachment; filename=\"cv.pdf\"; filename*=UTF-8''cv.pdf", "%PDF-1.4 hello"]);
+    // A name in any script downloads: filename* has it, beside a plain one.
+    const named = await submitFiles(form.slug, { t: cfg.token, answers, files: [{ field: "cv", name: "résumé 简历.pdf", type: "application/pdf", size: pdf.length }] }, [pdf]);
+    const other = (await admin(`forms/${form.id}/responses/${((await named.json()) as { id: number }).id}`)).body;
+    const download = await fetch(`${base}/_admin/forms/${form.id}/files/${other.files[0].id}`, { headers: { Authorization: `Bearer ${TOKEN}` } });
+    expect([download.status, download.headers.get("content-disposition")]).toEqual([200, `attachment; filename="r_sum_ __.pdf"; filename*=UTF-8''${encodeURIComponent("résumé 简历.pdf")}`]);
+    await admin(`forms/${form.id}/responses/${other.id}`, { method: "DELETE" });
     const list = (await admin(`forms/${form.id}/responses?q=writer`)).body;
     expect(list.total).toBe(1);
     const csv = (await admin(`forms/${form.id}/export`)).body as string;
@@ -222,6 +243,19 @@ describe("Forms over HTTP", () => {
     ]);
     expect(mails[0].auth).toBe(`Bearer em_${"k".repeat(30)}`);
     expect(mails[0].html).toContain("Hi &lt;there&gt;");
+    // The copy goes to whatever address was typed, so it never repeats what was typed.
+    expect(mails[1].html).not.toContain("there");
+    expect(mails[1].html).toContain("Answers you typed aren't repeated in this email.");
+    // One copy an address a day from a form, however it's written.
+    const second = await load(form.slug);
+    await wait(60);
+    await submit(form.slug, { t: second.cfg.token, answers: { name: "Mallory", email: "ADA@example.com", message: "Buy now" } });
+    await app.notifier.tick();
+    expect((await admin(`forms/${form.id}`)).body.deliveries.find((d: { kind: string }) => d.kind === "receipt")).toMatchObject({ status: "done", error: "a copy went to this address in the last day" });
+    // A webhook's redirect isn't followed: it could point anywhere, this server included.
+    expect(hook.redirect).toBe("manual");
+    await admin(`forms/${form.id}`, { method: "PATCH", body: { notify: { webhook: "https://moved.example.com/" } } });
+    expect((await admin(`forms/${form.id}/test-webhook`, { method: "POST" })).body).toEqual({ status: 302, error: "it answered 302" });
     // A webhook that fails is tried again later; with no copy, replies still go to whoever answered.
     await admin(`forms/${form.id}`, { method: "PATCH", body: { notify: { webhook: "https://broken.example.com/", receiptField: "" } } });
     const again = await load(form.slug);

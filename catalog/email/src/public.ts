@@ -4,13 +4,16 @@
 //   GET  /u/<id>.<sig>          unsubscribe: asks first
 //   POST /u/<id>.<sig>          unsubscribes (the button, or RFC 8058's one-click from the inbox)
 //   POST /subscribe/<list key>  a site's signup form (form or JSON), with double opt-in when the list has it
-//   GET  /confirm/<token>       the double opt-in link
+//   GET  /confirm/<token>       the double opt-in link: asks first (mail scanners open every link)
+//   POST /confirm/<token>       confirms, or brings back someone who unsubscribed and asked to rejoin
 //   POST /webhooks/ses          SNS: SES's bounces, complaints and deliveries, signature checked
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { DatabaseSync } from "node:sqlite";
+import { clientIp } from "../../lib/geo.ts";
 import { html, InputError, json, readBody, send } from "../../lib/http.ts";
+import { Limiter, limitKey } from "../../lib/limit.ts";
 import type { Brands } from "./brands.ts";
-import type { Contacts } from "./contacts.ts";
+import { checkEmail, type Contacts } from "./contacts.ts";
 import type { Domains } from "./domains.ts";
 import type { Mailer } from "./mailer.ts";
 import { escapeHtml } from "./render.ts";
@@ -28,8 +31,13 @@ export interface PublicContext {
   fetch?: typeof fetch;
   /** SNS's signing certificate in tests, instead of fetching it. */
   snsCertificate?: string;
+  /** Signups from one address a minute (IPv6 by its /64), and confirmation emails: one an address a day. */
+  limits: { signups: Limiter; confirmations: Limiter };
 }
 
+export const publicLimits = () => ({ signups: new Limiter(10, 60_000), confirmations: new Limiter(1, DAY) });
+
+const DAY = 86_400_000;
 const GIF = Buffer.from("R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7", "base64");
 const MAX_EVENTS = 20;
 
@@ -44,18 +52,21 @@ function page(res: ServerResponse, status: number, title: string, body: string, 
   );
 }
 
-const limits = new Map<string, { n: number; reset: number }>();
-function limited(key: string, max: number, now = Date.now()): boolean {
-  const w = limits.get(key);
-  if (!w || w.reset <= now) {
-    if (limits.size > 20_000) limits.clear();
-    limits.set(key, { n: 1, reset: now + 60_000 });
-    return false;
-  }
-  return ++w.n > max;
-}
+/** How long the link that brings back someone who unsubscribed works. */
+const REJOIN_MS = 7 * DAY;
 
-const ipOf = (req: IncomingMessage) => String(req.headers["x-forwarded-for"] ?? req.socket.remoteAddress ?? "").split(",")[0]!.trim();
+/** Where a signup form may send people after: the brand's site or sending domain, or the site the form is on. */
+function redirectTo(value: unknown, req: IncomingMessage, brand: { website: string; fromEmail: string }): string | undefined {
+  if (typeof value !== "string" || !/^https?:\/\/\S+$/.test(value) || !URL.canParse(value)) return undefined;
+  const host = new URL(value).hostname;
+  const sites = [brand.website, req.headers.origin, req.headers.referer]
+    .filter((u): u is string => typeof u === "string" && URL.canParse(u))
+    .map((u) => new URL(u).hostname)
+    .concat(brand.fromEmail.split("@")[1] ?? [])
+    .map((h) => h.toLowerCase().replace(/^www\./, ""))
+    .filter(Boolean);
+  return sites.some((s) => host === s || host.endsWith(`.${s}`)) ? value : undefined;
+}
 
 async function form(req: IncomingMessage): Promise<Record<string, unknown>> {
   const raw = (await readBody(req, 64 * 1024)).toString("utf8");
@@ -151,24 +162,31 @@ export async function handlePublic(req: IncomingMessage, res: ServerResponse, ct
       answer(404, "No such list", "This signup form points at a list that's been deleted.");
       return true;
     }
-    if (limited(`sub|${ipOf(req)}`, 10)) {
+    if (ctx.limits.signups.hit(`${limitKey(clientIp(req))}|${list.brandId}`)) {
       answer(429, "Too many tries", "Wait a minute, then try again.");
       return true;
     }
     const body = await form(req);
-    const redirect = typeof body.redirect === "string" && /^https?:\/\/\S+$/.test(body.redirect) ? body.redirect : undefined;
+    const brand = ctx.brands.must(list.brandId);
+    const redirect = redirectTo(body.redirect, req, brand);
     // A filled-in honeypot is a bot: it's told all went well.
     if (body._hp) {
       answer(200, "subscribed", "Thanks!", redirect);
       return true;
     }
-    const brand = ctx.brands.must(list.brandId);
-    const was = typeof body.email === "string" ? ctx.contacts.byEmail(list.brandId, body.email) : null;
-    const fields = Object.fromEntries(Object.entries(body).filter(([k, v]) => /^[a-z][a-z0-9_]{0,39}$/.test(k) && !["email", "name", "redirect"].includes(k) && typeof v === "string"));
-    const confirm = list.doubleOptIn && was?.status !== "subscribed";
     let contact;
     try {
-      contact = ctx.contacts.upsert(list.brandId, { email: body.email, name: body.name, fields, lists: [list.id], status: confirm ? "unconfirmed" : "subscribed" }, { source: "form" }).contact;
+      const was = ctx.contacts.byEmail(list.brandId, checkEmail(body.email));
+      if (was) {
+        // Someone already here only joins the list. A form anyone can send never
+        // changes their name, fields or status: an unsubscribe stands, and a
+        // confirmation still has to come from their inbox.
+        ctx.contacts.addToList(list.brandId, was.id, list.id);
+        contact = ctx.contacts.get(list.brandId, was.id);
+      } else {
+        const fields = Object.fromEntries(Object.entries(body).filter(([k, v]) => /^[a-z][a-z0-9_]{0,39}$/.test(k) && !["email", "name", "redirect"].includes(k) && typeof v === "string"));
+        contact = ctx.contacts.upsert(list.brandId, { email: body.email, name: body.name, fields, lists: [list.id], status: list.doubleOptIn ? "unconfirmed" : "subscribed" }, { source: "form" }).contact;
+      }
     } catch (err) {
       if (err instanceof InputError) {
         answer(422, "Check your email address", err.message);
@@ -176,11 +194,15 @@ export async function handlePublic(req: IncomingMessage, res: ServerResponse, ct
       }
       throw err;
     }
-    if (confirm && contact.status === "unconfirmed") {
-      const token = `${list.brandId}.${contact.id}.${ctx.secrets.sign("confirm", String(list.brandId), String(contact.id))}`;
-      const link = `${ctx.publicUrl()}/confirm/${token}`;
-      // Nothing goes to a suppressed address, but the form says the same either way.
-      if (brand.fromEmail && ctx.domains.verifiedFor(brand.id, brand.fromEmail) && !ctx.contacts.isSuppressed(brand.id, contact.email)) {
+    // A link by email when there's something to confirm: a new address on a list
+    // with double opt-in, one that was never confirmed, or one that unsubscribed
+    // and asks to come back (only the link brings them back).
+    const rejoin = contact.status === "unsubscribed";
+    if (contact.status === "unconfirmed" || rejoin) {
+      const parts = rejoin ? [String(list.brandId), String(contact.id), String(now)] : [String(list.brandId), String(contact.id)];
+      const link = `${ctx.publicUrl()}/confirm/${parts.join(".")}.${ctx.secrets.sign(rejoin ? "rejoin" : "confirm", ...parts)}`;
+      // Nothing goes to a suppressed address, or twice a day to one, but the form says the same either way.
+      if (brand.fromEmail && ctx.domains.verifiedFor(brand.id, brand.fromEmail) && !ctx.contacts.isSuppressed(brand.id, contact.email) && !ctx.limits.confirmations.hit(`${brand.id}|${contact.email}`)) {
         ctx.mailer.queue({
           brandId: brand.id,
           kind: "confirm",
@@ -188,9 +210,9 @@ export async function handlePublic(req: IncomingMessage, res: ServerResponse, ct
           payload: {
             from: brand.fromName ? `${brand.fromName} <${brand.fromEmail}>` : brand.fromEmail,
             to: [contact.email],
-            subject: `Confirm your subscription to ${brand.name}`,
-            html: `<div style="font:16px/1.5 -apple-system,Segoe UI,Helvetica,Arial,sans-serif;max-width:520px;margin:0 auto;padding:24px"><p>Please confirm you'd like emails from ${escapeHtml(brand.name)}${list.name ? ` (${escapeHtml(list.name)})` : ""}.</p><p><a href="${link}" style="display:inline-block;padding:10px 18px;background:#171717;color:#fff;text-decoration:none">Confirm</a></p><p style="color:#737373;font-size:13px">If you didn't sign up, ignore this email: you won't hear from us.</p></div>`,
-            text: `Please confirm you'd like emails from ${brand.name}: ${link}\n\nIf you didn't sign up, ignore this email.`,
+            subject: rejoin ? `Confirm you'd like emails from ${brand.name} again` : `Confirm your subscription to ${brand.name}`,
+            html: `<div style="font:16px/1.5 -apple-system,Segoe UI,Helvetica,Arial,sans-serif;max-width:520px;margin:0 auto;padding:24px"><p>Please confirm you'd like emails from ${escapeHtml(brand.name)}${list.name ? ` (${escapeHtml(list.name)})` : ""}${rejoin ? " again" : ""}.</p><p><a href="${link}" style="display:inline-block;padding:10px 18px;background:#171717;color:#fff;text-decoration:none">Confirm</a></p><p style="color:#737373;font-size:13px">If you didn't sign up, ignore this email: you won't hear from us.</p></div>`,
+            text: `Please confirm you'd like emails from ${brand.name}${rejoin ? " again" : ""}: ${link}\n\nIf you didn't sign up, ignore this email.`,
           },
         });
       }
@@ -201,16 +223,26 @@ export async function handlePublic(req: IncomingMessage, res: ServerResponse, ct
     return true;
   }
 
-  m = /^\/confirm\/(\d+)\.(\d+)\.([\w-]{22})$/.exec(p);
+  // The link's token: brand.contact.sig, or brand.contact.asked.sig for coming back after unsubscribing.
+  m = /^\/confirm\/(\d+)\.(\d+)\.(?:(\d{13})\.)?([\w-]{22})$/.exec(p);
   if (m) {
-    const [, brandId, contactId, sig] = m as unknown as [string, string, string, string];
-    if (!ctx.secrets.verify(sig, "confirm", brandId, contactId)) {
-      page(res, 400, "This link doesn't work", "It may have been cut short when it was copied.");
+    const [, brandId, contactId, asked, sig] = m as unknown as [string, string, string, string | undefined, string];
+    const valid = asked ? ctx.secrets.verify(sig, "rejoin", brandId, contactId, asked) && now - Number(asked) <= REJOIN_MS : ctx.secrets.verify(sig, "confirm", brandId, contactId);
+    if (!valid) {
+      page(res, 400, "This link doesn't work", asked ? "It's over a week old, or was cut short when it was copied: sign up again for a new one." : "It may have been cut short when it was copied.");
       return true;
     }
     try {
-      const c = ctx.contacts.confirm(Number(brandId), Number(contactId));
       const brand = ctx.brands.must(Number(brandId));
+      // Mail scanners open every link in an email: only the button confirms.
+      if (req.method !== "POST") {
+        const c = ctx.contacts.get(Number(brandId), Number(contactId));
+        if (c.status === "subscribed") page(res, 200, "You're subscribed", `${escapeHtml(c.email)} gets emails from ${escapeHtml(brand.name)}.`);
+        else page(res, 200, `Emails from ${brand.name}?`, `Confirm that ${escapeHtml(c.email)} would like emails from ${escapeHtml(brand.name)}.`, { label: "Confirm", action: p });
+        return true;
+      }
+      await readBody(req, 8192).catch(() => Buffer.alloc(0));
+      const c = asked ? ctx.contacts.rejoin(Number(brandId), Number(contactId), Number(asked)) : ctx.contacts.confirm(Number(brandId), Number(contactId));
       page(res, 200, "You're subscribed", c.status === "subscribed" ? `Thanks for confirming: ${escapeHtml(c.email)} will get emails from ${escapeHtml(brand.name)}.` : "This address can't be subscribed again from here.");
     } catch {
       page(res, 404, "This link doesn't work", "The subscription it confirms was deleted.");

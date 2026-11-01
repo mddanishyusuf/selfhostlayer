@@ -83,7 +83,7 @@ const ROUTES: [string, string, Handler][] = [
     "forms/:id/files/:file",
     ({ ctx, p, res }) => {
       const f = ctx.responses.file(id(p.id, "form"), p.file!);
-      res.writeHead(200, { "Content-Type": f.type, "Content-Length": String(f.size), "Content-Disposition": `attachment; filename="${f.name.replace(/["\\\r\n]/g, "_")}"`, "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" });
+      res.writeHead(200, { "Content-Type": f.type, "Content-Length": String(f.size), "Content-Disposition": `attachment; filename="${f.name.replace(/[^\x20-\x7e]|["\\]/g, "_")}"; filename*=UTF-8''${encodeURIComponent(f.name)}`, "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" });
       createReadStream(f.path).pipe(res);
       return undefined;
     },

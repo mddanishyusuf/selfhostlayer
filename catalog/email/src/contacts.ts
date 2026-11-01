@@ -5,7 +5,7 @@
 // who left; the suppression list (hard bounces, complaints, addresses added
 // by hand) stops every kind of email, transactional ones included.
 import type { DatabaseSync, SQLInputValue } from "node:sqlite";
-import { csvCell, parseCsv } from "../../lib/csv.ts";
+import { csvCell, csvValue, parseCsv } from "../../lib/csv.ts";
 import { InputError } from "../../lib/http.ts";
 import { text } from "./brands.ts";
 import { tx } from "./db.ts";
@@ -297,6 +297,19 @@ export class Contacts {
     return this.get(brandId, id);
   }
 
+  /**
+   * Back on the brand's lists after unsubscribing, from the link sent when they
+   * asked to rejoin at `asked`: not if they unsubscribed again after that, or
+   * the address is suppressed.
+   */
+  rejoin(brandId: number, id: number, asked: number): Contact {
+    const c = this.get(brandId, id);
+    if (c.status !== "unsubscribed" || this.isSuppressed(brandId, c.email)) return c;
+    const left = (this.#db.prepare("SELECT unsubscribed_at FROM contacts WHERE id = ?").get(id) as { unsubscribed_at: number | null }).unsubscribed_at;
+    if (left !== null && left > asked) return c;
+    return this.update(brandId, id, { status: "subscribed" });
+  }
+
   /** Unsubscribes by address (a link in an email, the API); true when they were subscribed. */
   unsubscribe(brandId: number, email: string, now = Date.now()): boolean {
     const r = this.#db.prepare("UPDATE contacts SET status = 'unsubscribed', unsubscribed_at = ?, updated_at = ? WHERE brand_id = ? AND email = ? AND status IN ('subscribed', 'unconfirmed')").run(now, now, brandId, email.toLowerCase());
@@ -341,8 +354,9 @@ export class Contacts {
    * imported starts an automation.
    */
   importCsv(brandId: number, csv: string, o: { lists?: unknown; status?: unknown } = {}): { created: number; updated: number; skipped: { line: number; reason: string }[] } {
-    const [header, ...rows] = parseCsv(csv);
+    const [header, ...raw] = parseCsv(csv);
     if (!header) throw new InputError("csv", "the file is empty");
+    const rows = raw.map((r) => r.map(csvValue));
     if (rows.length > MAX_IMPORT) throw new InputError("csv", `at most ${MAX_IMPORT.toLocaleString("en")} contacts at a time`);
     const names = header.map((h) => h.trim().toLowerCase());
     const at = (aliases: string[]) => names.findIndex((n) => aliases.includes(n));

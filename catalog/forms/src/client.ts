@@ -1,8 +1,8 @@
 // The script and styles of a form's page: it renders the form from its schema
 // (classic: a page of fields, page breaks for steps; conversational: one
 // question at a time, Enter to go on, a progress bar), applies the logic,
-// checks answers as they're given, sends files in base64, posts the answers as
-// JSON, and shows the thank-you screen. It counts a view on load and a start at
+// checks answers as they're given, posts the answers as a line of JSON with the
+// files' bytes after it, and shows the thank-you screen. It counts a view on load and a start at
 // the first answer, and in an embed tells the page around it how tall it is.
 // Plain JS from 2017 on: no framework, no build step, nothing fetched.
 
@@ -139,9 +139,8 @@ export const CLIENT_JS = String.raw`(function () {
             if (!picked) return;
             touch();
             if (picked.size > 10 * 1024 * 1024) { errors[f.id] = "Files are at most 10 MB."; return render(); }
-            var reader = new FileReader();
-            reader.onload = function () { files[f.id] = { name: picked.name, type: picked.type || "application/octet-stream", data: String(reader.result).split(",")[1] || "" }; delete errors[f.id]; render(); };
-            reader.readAsDataURL(picked);
+            // The file itself: it's sent as it is, after the answers.
+            files[f.id] = picked; delete errors[f.id]; render();
           } }),
           file ? h("span", { class: "muted", text: file.name }) : null,
         ]);
@@ -202,7 +201,11 @@ export const CLIENT_JS = String.raw`(function () {
     var hp = document.getElementById("hp");
     var shown = {};
     F.forEach(function (f) { if (f.type !== "file" && visible(f) && has(answers[f.id])) shown[f.id] = answers[f.id]; });
-    post("/submit", { t: cfg.token, hp: hp ? hp.value : "", answers: shown, files: files }).then(function (r) {
+    // A line of JSON (the answers, and each file's name, type and size), then the files' bytes.
+    var sent = F.filter(function (f) { return f.type === "file" && visible(f) && files[f.id]; });
+    var head = { t: cfg.token, hp: hp ? hp.value : "", answers: shown, files: sent.map(function (f) { var x = files[f.id]; return { field: f.id, name: x.name, type: x.type || "application/octet-stream", size: x.size }; }) };
+    var body = new Blob([JSON.stringify(head) + "\n"].concat(sent.map(function (f) { return files[f.id]; })));
+    fetch(cfg.base + "/submit", { method: "POST", headers: { "Content-Type": "application/x-forms-response" }, body: body }).then(function (r) {
       return r.json().catch(function () { return {}; }).then(function (j) {
         sending = false;
         if (!r.ok) {

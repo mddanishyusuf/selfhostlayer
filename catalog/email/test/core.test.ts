@@ -1,4 +1,5 @@
 import { createSign } from "node:crypto";
+import { createServer } from "node:net";
 import { afterEach, describe, expect, it } from "vitest";
 import { Brands } from "../src/brands.ts";
 import { openDb } from "../src/db.ts";
@@ -6,8 +7,10 @@ import { dkimSign, dkimVerify, newKeyPair, relaxedBody } from "../src/dkim.ts";
 import { Domains, type Dns } from "../src/domains.ts";
 import { buildMessage, checkHeaders, parseAddress, parseAddresses, quotedPrintable } from "../src/mime.ts";
 import { SendError, SmtpSender } from "../src/providers.ts";
+import { SmtpConnection } from "../src/smtp.ts";
+import { htmlToText } from "../src/render.ts";
 import { Secrets } from "../../lib/secrets.ts";
-import { Ses, signV4, snsSignedText, verifySns, type SnsMessage } from "../src/ses.ts";
+import { Ses, signV4, snsCertUrlOk, snsSignedText, verifySns, type SnsMessage } from "../src/ses.ts";
 import { fakeSmtp, type FakeSmtp } from "./fake-smtp.ts";
 import { TEST_CERT, TEST_KEY } from "./fixtures.ts";
 
@@ -68,6 +71,15 @@ describe("messages", () => {
   });
 });
 
+describe("the text part", () => {
+  it("decodes entities once, and drops numbers that aren't characters", () => {
+    expect(htmlToText("<p>Fish &amp; chips &#127839; &#x1F35F; &nbsp;x</p>")).toBe("Fish & chips \u{1F35F} \u{1F35F}  x");
+    // A contact's field, escaped into the HTML, comes out as typed.
+    expect(htmlToText("<p>Hi &amp;#65; &amp;lt;b&amp;gt;</p>")).toBe("Hi &#65; &lt;b&gt;");
+    expect(htmlToText("<p>&#99999999; &#xD800; &#0;ok</p>")).toBe("ok");
+  });
+});
+
 describe("DKIM", () => {
   const keys = newKeyPair();
   const message = () => buildMessage({ from: { email: "news@piqo.app" }, to: [{ email: "ada@example.com" }], subject: "Hi", text: "Hello  there \n\n\n", html: "<p>Hello</p>", id: "x1" });
@@ -115,6 +127,24 @@ describe("SMTP", () => {
     expect([got.from, got.to, got.user]).toEqual(["news@piqo.app", ["ada@example.com"], "apikey"]);
     expect(got.data).toContain("\r\n.starts with a dot");
     expect(dkimVerify(Buffer.from(`${got.data}\r\n`), keys.publicBase64)).toEqual({ ok: true });
+  });
+
+  it("refuses a server that says more after its STARTTLS answer (someone on the way could have)", async () => {
+    const raw = createServer((sock) => {
+      sock.write("220 hi\r\n");
+      sock.on("data", (d) => {
+        const line = String(d);
+        if (line.startsWith("EHLO")) sock.write("250-hi\r\n250 STARTTLS\r\n");
+        else if (line.startsWith("STARTTLS")) sock.write("220 go ahead\r\n250 smuggled\r\n");
+      });
+    });
+    await new Promise<void>((r) => raw.listen(0, "127.0.0.1", r));
+    const port = (raw.address() as { port: number }).port;
+    try {
+      await expect(SmtpConnection.open({ host: "127.0.0.1", port, security: "starttls" }, { name: "x" })).rejects.toThrow(/more after its answer to STARTTLS/);
+    } finally {
+      raw.close();
+    }
   });
 
   it("sends over TLS from the start; a refused recipient is a permanent bounce; a dropped connection is reopened", async () => {
@@ -177,6 +207,9 @@ describe("Amazon SES", () => {
     expect(await verifySns(m, { certificate: TEST_CERT })).toBe(true);
     expect(await verifySns({ ...m, Message: '{"notificationType":"Complaint"}' }, { certificate: TEST_CERT })).toBe(false);
     expect(await verifySns({ ...m, SigningCertURL: "https://evil.example.com/x.pem" })).toBe(false);
+    // Only SNS's plain certificate URLs: nothing to vary, so each is fetched once.
+    expect(snsCertUrlOk("https://sns.us-east-1.amazonaws.com/SimpleNotificationService-0123456789abcdef.pem")).toBe(true);
+    for (const bad of ["https://sns.us-east-1.amazonaws.com/x.pem?n=1", "https://sns.us-east-1.amazonaws.com/x.pem#1", "https://sns.us-east-1.amazonaws.com:8443/x.pem", "https://a:b@sns.us-east-1.amazonaws.com/x.pem", "http://sns.us-east-1.amazonaws.com/x.pem"]) expect(snsCertUrlOk(bad)).toBe(false);
   });
 });
 

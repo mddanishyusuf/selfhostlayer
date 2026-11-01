@@ -61,7 +61,7 @@ On **Design**:
 
 **Responses** lists them newest first, with the first questions as columns, how long each took and when it came. Search looks through the answers. Opening one shows every answer whole, files to download, and where it came from: the country, the device, the browser and the site that linked to the form. **CSV** downloads them all, a column per question. A response can be deleted from its panel, or all of them with **Delete every response…**.
 
-Files sent with a response are never public: they're downloaded through the panel only, as files (never shown in the browser).
+Files sent with a response are never public: they're downloaded through the panel only, as files (never shown in the browser). They're written to disk as they come in, never held in memory, and Forms takes no more while the disk has less than 1 GB free (or 5% of it).
 
 ## Insights
 
@@ -90,8 +90,8 @@ A closed form shows its message, or "This form isn't taking answers any more", i
 On the form's **Settings**, under **Notifications**:
 
 - **Email me at:** every response, with its answers, to your address; replies go to the respondent when the form asks for their email.
-- **Send respondents a copy:** their answers, to the address they gave in one of the form's Email questions.
-- **Webhook:** each response posted as JSON to your URL.
+- **Send respondents a copy:** a note that their answers came in, to the address they gave in one of the form's Email questions, with the answers they picked (choices, ratings, numbers, dates). What they typed isn't repeated: anyone can type someone else's address, and the copy goes out in your brand's name. One copy goes to an address a day from a form, and at most 200 a day from a form.
+- **Webhook:** each response posted as JSON to your URL. A redirect isn't followed (it counts as a failure): give the address it ends at.
 
 Emails go out through the [Email](email.md) integration: **Sending email** connects Forms to one of Email's brands. It makes an API key for Forms in that brand, and sends as the brand's From address through its SMTP or SES. This is for every form. Forms has no SMTP settings of its own.
 

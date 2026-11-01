@@ -2,7 +2,7 @@
 # question at a time, managed from the panel's Forms page (PLAN-FORMS.md).
 id: forms
 name: Forms
-version: 0.1.0
+version: 0.1.1
 summary: Forms and surveys on your own server, one page or one question at a time.
 runtime:
   kind: node
