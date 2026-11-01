@@ -37,6 +37,8 @@ export interface AppOptions {
   fetch?: typeof fetch;
   /** The shortest time between a page's load and its answers. */
   minMs?: number;
+  /** Free disk files must leave (tests); by default 5% of the disk, at least 1 GB and at most 10 GB. */
+  diskFloor?: number;
 }
 
 export interface App {
@@ -52,10 +54,12 @@ export interface App {
 
 const FORMAT = "application/x-forms-response";
 const DAY = 86_400_000;
-/** Responses with files coming in at once (each up to 25 MB on disk while it does). */
+/** Responses with files coming in at once (each up to 25 MB on disk while it does), and from one address. */
 const UPLOADS_AT_ONCE = 8;
-/** Files wait while the disk has less than this free, or 5% of it. */
-const DISK_FLOOR = 1024 ** 3;
+const UPLOADS_FROM_ONE = 2;
+/** An upload that sends nothing for this long ends: a slot isn't held by a connection that stalls. */
+const UPLOAD_IDLE_MS = 30_000;
+const GB = 1024 ** 3;
 
 /** A response as the page sends it (FORMAT), read a piece at a time. */
 class Submission {
@@ -67,7 +71,14 @@ class Submission {
   }
 
   async #more(): Promise<boolean> {
-    const { value, done } = await this.#chunks.next();
+    let next: IteratorResult<Buffer>;
+    try {
+      next = await this.#chunks.next();
+    } catch {
+      // The sender went away (or stalled and was cut off): theirs to send again, not a server error.
+      throw new InputError("files", "the upload stopped before it was done: try again");
+    }
+    const { value, done } = next;
     if (done) return false;
     this.#left = this.#left.length ? Buffer.concat([this.#left, value as Buffer]) : (value as Buffer);
     return true;
@@ -117,10 +128,10 @@ class Submission {
   }
 }
 
-/** Whether the disk has room for `bytes` more, above the floor. */
-function roomFor(dir: string, bytes: number): boolean {
+/** Whether the disk has room for `bytes` more and still `floor` free (by default 5% of it, 1 to 10 GB). */
+function roomFor(dir: string, bytes: number, floor?: number): boolean {
   const s = statfsSync(dir);
-  return s.bavail * s.bsize - bytes >= Math.max(DISK_FLOOR, s.blocks * s.bsize * 0.05);
+  return s.bavail * s.bsize - bytes >= (floor ?? Math.min(10 * GB, Math.max(GB, s.blocks * s.bsize * 0.05)));
 }
 const mtime = (path: string) => {
   try {
@@ -166,6 +177,7 @@ export function createApp(o: AppOptions): App {
   rmSync(responses.staging, { recursive: true, force: true });
   mkdirSync(responses.staging, { recursive: true, mode: 0o700 });
   let uploading = 0;
+  const uploadingFrom = new Map<string, number>();
 
   /** The start token: when the page was made, signed. */
   const token = (slug: string, now: number) => `${now}.${secrets.sign("t", slug, String(now))}`;
@@ -214,11 +226,14 @@ export function createApp(o: AppOptions): App {
     const coming = announced.reduce((n, f) => n + f.size, 0);
     const paths: string[] = [];
     if (sub) {
+      const who = limitKey(ip);
       if (announced.length) {
-        if (uploading >= UPLOADS_AT_ONCE) return { status: 503, body: { error: "Busy with other files: try again in a minute." } };
-        if (!roomFor(responses.staging, coming)) return { status: 507, body: { error: "The server is short of room for files: try again later." } };
+        if (uploading >= UPLOADS_AT_ONCE || (uploadingFrom.get(who) ?? 0) >= UPLOADS_FROM_ONE) return { status: 503, body: { error: "Busy with other files: try again in a minute." } };
+        if (!roomFor(responses.staging, coming, o.diskFloor)) return { status: 507, body: { error: "The server is short of room for files: try again later." } };
+        uploading++;
+        uploadingFrom.set(who, (uploadingFrom.get(who) ?? 0) + 1);
+        req.setTimeout(UPLOAD_IDLE_MS, () => req.destroy());
       }
-      uploading += announced.length ? 1 : 0;
       try {
         for (const f of announced) {
           const path = join(responses.staging, randomBytes(12).toString("hex"));
@@ -230,7 +245,13 @@ export function createApp(o: AppOptions): App {
         for (const p of paths) rmSync(p, { force: true });
         throw err;
       } finally {
-        uploading -= announced.length ? 1 : 0;
+        if (announced.length) {
+          uploading--;
+          const n = (uploadingFrom.get(who) ?? 1) - 1;
+          if (n > 0) uploadingFrom.set(who, n);
+          else uploadingFrom.delete(who);
+          req.setTimeout(0);
+        }
       }
     }
     const referrer = referrerHost(typeof req.headers.referer === "string" ? req.headers.referer : undefined, new URL(publicUrl).hostname);

@@ -61,7 +61,7 @@ On **Design**:
 
 **Responses** lists them newest first, with the first questions as columns, how long each took and when it came. Search looks through the answers. Opening one shows every answer whole, files to download, and where it came from: the country, the device, the browser and the site that linked to the form. **CSV** downloads them all, a column per question. A response can be deleted from its panel, or all of them with **Delete every response…**.
 
-Files sent with a response are never public: they're downloaded through the panel only, as files (never shown in the browser). They're written to disk as they come in, never held in memory, and Forms takes no more while the disk has less than 1 GB free (or 5% of it).
+Files sent with a response are never public: they're downloaded through the panel only, as files (never shown in the browser). They're written to disk as they come in, never held in memory, and Forms takes no more while the disk has less than 5% of it free (at least 1 GB, at most 10 GB).
 
 ## Insights
 

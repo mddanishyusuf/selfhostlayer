@@ -1,5 +1,6 @@
 import { createHmac } from "node:crypto";
 import { mkdtempSync, readdirSync, rmSync } from "node:fs";
+import { request } from "node:http";
 import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -111,7 +112,7 @@ describe("Forms over HTTP", () => {
   beforeEach(async () => {
     dir = mkdtempSync(join(tmpdir(), "forms-"));
     hooks.length = 0;
-    app = createApp({ dataDir: dir, token: TOKEN, secret: "s".repeat(64), releaseDir: dir, version: "test", background: false, fetch: fakeFetch, minMs: 50 });
+    app = createApp({ dataDir: dir, token: TOKEN, secret: "s".repeat(64), releaseDir: dir, version: "test", background: false, fetch: fakeFetch, minMs: 50, diskFloor: 0 });
     await new Promise<void>((r) => app.server.listen(0, "127.0.0.1", r));
     base = `http://127.0.0.1:${(app.server.address() as AddressInfo).port}`;
   });
@@ -137,6 +138,10 @@ describe("Forms over HTTP", () => {
   const submitFiles = (slug: string, head: Record<string, unknown>, bytes: Buffer[], ua = "Mozilla/5.0 (Macintosh) Chrome/130.0 Safari/537.36") =>
     fetch(`${base}/f/${slug}/submit`, { method: "POST", headers: headers("application/x-forms-response", ua), body: Buffer.concat([Buffer.from(JSON.stringify(head) + "\n"), ...bytes]) });
   const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+  /** Waits until `ok` holds (for what only shows on disk), at most 5 s. */
+  const until = async (ok: () => boolean, what: string) => {
+    for (const end = Date.now() + 5000; !ok(); await wait(20)) if (Date.now() > end) throw new Error(`timed out waiting for ${what}`);
+  };
 
   it("serves a form, counts views and starts, refuses spam and wrong answers, keeps the right ones", async () => {
     const form = (await admin("forms", { body: { title: "Tell us about you", schema: SURVEY } })).body;
@@ -163,6 +168,20 @@ describe("Forms over HTTP", () => {
     expect([short.status, (await short.json()).error]).toEqual([422, "a file didn't come whole: try again"]);
     const extra = await submitFiles(form.slug, announce(), [pdf, Buffer.from("more")]);
     expect([extra.status, (await extra.json()).error]).toEqual([422, "more came than the files announced"]);
+    // Two uploads at once from an address: a third waits its turn, and one that stalls frees its slot when it ends.
+    const from = { ...headers("application/x-forms-response", "Mozilla/5.0 Chrome/130.0"), "X-Forwarded-For": "81.2.69.200" };
+    const stalled = [0, 1].map(() => {
+      const r = request(`${base}/f/${form.slug}/submit`, { method: "POST", headers: { ...from, "Content-Length": "100000" } });
+      r.on("error", () => {});
+      r.write(JSON.stringify(announce(50_000)) + "\nsome bytes");
+      return r;
+    });
+    const staging = join(dir, "uploads", ".incoming");
+    await until(() => readdirSync(staging).length === 2, "both stalled uploads to start");
+    const third = await fetch(`${base}/f/${form.slug}/submit`, { method: "POST", headers: from, body: Buffer.concat([Buffer.from(JSON.stringify(announce()) + "\n"), pdf]) });
+    expect([third.status, (await third.json()).error]).toEqual([503, "Busy with other files: try again in a minute."]);
+    for (const r of stalled) r.destroy();
+    await until(() => readdirSync(staging).length === 0, "the stalled uploads' files to go");
     const ok = await submitFiles(form.slug, announce(), [pdf]);
     expect(ok.status).toBe(200);
     // Nothing waits in the staging folder after: kept files moved, the rest removed.
