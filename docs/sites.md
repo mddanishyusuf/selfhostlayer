@@ -60,7 +60,12 @@ The import:
 
 `wp-config.php` stays the server's: this site's database and fresh salts.
 
-**Ghost:** create the site, then use Ghost's own **Settings → Import/Export** to bring in the old site's export (posts, pages, tags, members). Copy its `content/images` folder in with the site's **Backups → Import data**, as an archive of `content/` (`tar -czf content.tar.gz content`).
+**Ghost:** create the site, then use Ghost's own **Settings → Import/Export** to bring in the old site's export (posts, pages, tags, members). Copy its images over SSH:
+
+```sh
+rsync -a content/images/ root@new-server:/srv/apps/<site>/data/content/images/
+ssh root@new-server chown -R app-<site>:app-<site> /srv/apps/<site>/data/content/images
+```
 
 ## Safety
 
