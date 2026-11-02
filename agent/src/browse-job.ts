@@ -8,10 +8,16 @@
 // read commands alone. Values longer than 2000 characters are cut, and rows
 // stop at 4 MB of output.
 //
+// A table's rows can be narrowed by the visual builder's filters (req.where,
+// see sql-where.ts). For a SQL table they come with what editing needs: the
+// columns' types (schema) and each row's primary key (key), the rowid for a
+// SQLite table without one.
+//
 // It prints one line, `LAYER-BROWSE {tables, files?, more?, result?}`, or
 // `layer: <why>` on stderr and exits non-zero.
+import { WHERE_LIB } from "./sql-where.ts";
 
-export const BROWSE_JOB = String.raw`
+export const BROWSE_JOB = WHERE_LIB + String.raw`
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
@@ -31,6 +37,13 @@ function fail(message) {
 const lastLine = (s) => String(s || "").trim().split("\n").filter(Boolean).pop() || "";
 function finish(out) {
   process.stdout.write("LAYER-BROWSE " + JSON.stringify(out) + "\n");
+}
+
+/** A primary key value exactly: big integers as text, so they don't lose digits. */
+function keyValue(v) {
+  if (typeof v === "bigint") return Number.isSafeInteger(Number(v)) ? Number(v) : v.toString();
+  if (v instanceof Uint8Array) return null;
+  return v === undefined ? null : v;
 }
 
 /** A value as the panel shows it: long text cut (with its length), bytes as a size. */
@@ -126,13 +139,38 @@ function browseSqlite() {
   if (req.op === "rows") {
     const t = tables.find((x) => x.name === req.table);
     if (!t) fail("there's no table " + req.table);
-    const columns = db.prepare("SELECT name FROM pragma_table_info(?)").all(t.name).map((c) => c.name);
+    const info = db.prepare("SELECT name, type, \"notnull\" AS nn, pk FROM pragma_table_info(?)").all(t.name);
+    const columns = info.map((c) => c.name);
     if (req.sort && !columns.includes(req.sort)) fail("there's no column " + req.sort);
+    const params = [];
+    const where = whereSql(req.where, columns, sqliteDialect(params));
+    // Editing finds a row by its primary key, or by its rowid (a table without
+    // a primary key always has one; WITHOUT ROWID tables need a primary key).
+    const pk = info.filter((c) => Number(c.pk) > 0).sort((a, b) => Number(a.pk) - Number(b.pk)).map((c) => c.name);
+    const editable = t.type === "table";
+    const keyColumns = !editable ? [] : pk.length ? pk : ["rowid"];
+    const byRowid = editable && !pk.length;
     const begun = Date.now();
-    const stmt = db.prepare("SELECT * FROM " + q(t.name) + (req.sort ? " ORDER BY " + q(req.sort) + (req.desc ? " DESC" : "") : "") + " LIMIT ? OFFSET ?");
+    const stmt = db.prepare(
+      "SELECT " + (byRowid ? 'rowid AS "layer:rowid", ' : "") + "* FROM " + q(t.name) + where +
+        (req.sort ? " ORDER BY " + q(req.sort) + (req.desc ? " DESC" : "") : "") + " LIMIT ? OFFSET ?",
+    );
     stmt.setReturnArrays(true);
-    const taken = take(stmt.all(req.limit, req.offset).map((r) => r.map(cell)));
-    out.result = { columns: stmt.columns().map((c) => c.name), rows: taken.rows, truncated: taken.truncated, total: t.rows ?? count(t.name), ms: Date.now() - begun };
+    stmt.setReadBigInts(true);
+    const raw = stmt.all(...params, req.limit, req.offset).map((r) => (byRowid ? r : [null, ...r]));
+    const keyAt = keyColumns.map((k) => (k === "rowid" ? -1 : columns.indexOf(k)));
+    const taken = take(raw.map((r) => r.slice(1).map(cell)));
+    const total = where ? Number(db.prepare("SELECT COUNT(*) AS n FROM " + q(t.name) + where).get(...params).n) : t.rows ?? count(t.name);
+    out.result = {
+      columns,
+      rows: taken.rows,
+      truncated: taken.truncated,
+      total,
+      ms: Date.now() - begun,
+      schema: info.map((c) => ({ name: c.name, type: c.type || "", nullable: !Number(c.nn) && !Number(c.pk), pk: Number(c.pk) > 0 })),
+      editable,
+      key: editable ? { columns: keyColumns, rows: raw.slice(0, taken.rows.length).map((r) => keyAt.map((i) => keyValue(i === -1 ? r[0] : r[i + 1]))) } : null,
+    };
   }
   if (req.op === "query") {
     const begun = Date.now();
@@ -194,16 +232,36 @@ function browsePostgres() {
   if (req.op === "rows") {
     const t = tables.find((x) => x.name === req.table);
     if (!t) fail("there's no table " + req.table);
-    const columns = psql("SELECT coalesce(json_agg(attname ORDER BY attnum), '[]') FROM pg_attribute WHERE attrelid = " + lit(t.ref) + "::regclass AND attnum > 0 AND NOT attisdropped");
+    const info = psql(
+      "SELECT coalesce(json_agg(json_build_object('name', a.attname, 'type', format_type(a.atttypid, a.atttypmod), 'nullable', NOT a.attnotnull, " +
+        "'pk', coalesce(a.attnum = ANY(i.indkey), false)) ORDER BY a.attnum), '[]') FROM pg_attribute a " +
+        "LEFT JOIN pg_index i ON i.indrelid = a.attrelid AND i.indisprimary " +
+        "WHERE a.attrelid = " + lit(t.ref) + "::regclass AND a.attnum > 0 AND NOT a.attisdropped",
+    );
+    const columns = info.map((c) => c.name);
     if (req.sort && !columns.includes(req.sort)) fail("there's no column " + req.sort);
+    const where = whereSql(req.where, columns, postgresDialect());
+    // Editing finds a row by its primary key, read as text so big numbers keep every digit.
+    const editable = t.type === "table";
+    const keyColumns = editable ? info.filter((c) => c.pk).map((c) => c.name) : [];
     const begun = Date.now();
     const page = psql(
-      "SELECT json_build_object('rows', (SELECT coalesce(json_agg(to_json(p)), '[]') FROM (SELECT * FROM " + t.ref +
+      "SELECT json_build_object('rows', (SELECT coalesce(json_agg(json_build_object('r', to_json(p), 'k', json_build_array(" +
+        keyColumns.map((k) => "p." + qi(k) + "::text").join(", ") + "))), '[]') FROM (SELECT * FROM " + t.ref + where +
         (req.sort ? " ORDER BY " + qi(req.sort) + (req.desc ? " DESC" : "") : "") +
-        " LIMIT " + req.limit + " OFFSET " + req.offset + ") p), 'total', (SELECT count(*) FROM " + t.ref + "))",
+        " LIMIT " + req.limit + " OFFSET " + req.offset + ") p), 'total', (SELECT count(*) FROM " + t.ref + where + "))",
     );
-    const taken = take(page.rows.map((r) => columns.map((c) => cell(r[c]))));
-    out.result = { columns, rows: taken.rows, truncated: taken.truncated, total: page.total, ms: Date.now() - begun };
+    const taken = take(page.rows.map((x) => columns.map((c) => cell(x.r[c]))));
+    out.result = {
+      columns,
+      rows: taken.rows,
+      truncated: taken.truncated,
+      total: page.total,
+      ms: Date.now() - begun,
+      schema: info,
+      editable,
+      key: editable && keyColumns.length ? { columns: keyColumns, rows: page.rows.slice(0, taken.rows.length).map((x) => x.k) } : null,
+    };
   }
   if (req.op === "query") {
     const begun = Date.now();
@@ -265,14 +323,33 @@ function browseMysql() {
     const t = tables.find((x) => x.name === req.table);
     if (!t) fail("there's no table " + req.table);
     const begun = Date.now();
-    const [cols, counted, rows] = mariadb(
-      "SELECT column_name AS c FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = " + lit(t.name) + " ORDER BY ordinal_position; " +
-        "SELECT COUNT(*) AS n FROM " + qi(t.name) + "; " +
-        "SELECT * FROM " + qi(t.name) + (req.sort ? " ORDER BY " + qi(req.sort) + (req.desc ? " DESC" : "") : "") + " LIMIT " + req.limit + " OFFSET " + req.offset,
+    const [cols] = mariadb(
+      "SELECT column_name AS c, column_type AS t, is_nullable AS n, column_key AS k FROM information_schema.columns " +
+        "WHERE table_schema = DATABASE() AND table_name = " + lit(t.name) + " ORDER BY ordinal_position",
     );
-    const columns = (cols || []).map((r) => r[0][1]);
-    const taken = take((rows || []).map((r) => columns.map((c) => cell(r.find((f) => f[0] === c)?.[1] ?? null))));
-    out.result = { columns, rows: taken.rows, truncated: taken.truncated, total: Number(counted?.[0]?.[0]?.[1] ?? 0), ms: Date.now() - begun };
+    const schema = (cols || []).map((r) => ({ name: field(r, "c"), type: field(r, "t") || "", nullable: field(r, "n") === "YES", pk: field(r, "k") === "PRI" }));
+    const columns = schema.map((c) => c.name);
+    if (req.sort && !columns.includes(req.sort)) fail("there's no column " + req.sort);
+    const where = whereSql(req.where, columns, mysqlDialect());
+    const [counted, rows] = mariadb(
+      "SELECT COUNT(*) AS n FROM " + qi(t.name) + where + "; " +
+        "SELECT * FROM " + qi(t.name) + where + (req.sort ? " ORDER BY " + qi(req.sort) + (req.desc ? " DESC" : "") : "") + " LIMIT " + req.limit + " OFFSET " + req.offset,
+    );
+    // Editing finds a row by its primary key (MariaDB sends every value as text, so keys are exact).
+    const editable = t.type === "table";
+    const keyColumns = editable ? schema.filter((c) => c.pk).map((c) => c.name) : [];
+    const raw = (rows || []).map((r) => columns.map((c) => r.find((f) => f[0] === c)?.[1] ?? null));
+    const taken = take(raw.map((r) => r.map(cell)));
+    out.result = {
+      columns,
+      rows: taken.rows,
+      truncated: taken.truncated,
+      total: Number(counted?.[0]?.[0]?.[1] ?? 0),
+      ms: Date.now() - begun,
+      schema,
+      editable,
+      key: editable && keyColumns.length ? { columns: keyColumns, rows: raw.slice(0, taken.rows.length).map((r) => keyColumns.map((k) => r[columns.indexOf(k)])) } : null,
+    };
   }
   if (req.op === "query") {
     const begun = Date.now();

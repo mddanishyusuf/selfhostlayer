@@ -237,6 +237,26 @@ const MIGRATIONS = [
      updated_at INTEGER NOT NULL,
      PRIMARY KEY (project_id, path)
    );`,
+  // Backups taken before an edit in the database viewer (SQLite can't change a CHECK, so the table is rebuilt).
+  `CREATE TABLE backups_new (
+     id INTEGER PRIMARY KEY,
+     kind TEXT NOT NULL CHECK (kind IN ('app', 'panel')),
+     project_id INTEGER REFERENCES projects(id) ON DELETE SET NULL,
+     slug TEXT NOT NULL,
+     status TEXT NOT NULL CHECK (status IN ('running', 'ok', 'failed')),
+     trigger TEXT NOT NULL CHECK (trigger IN ('schedule', 'manual', 'edit')),
+     object_key TEXT,
+     bytes INTEGER,
+     contents TEXT,
+     error TEXT,
+     started_at INTEGER NOT NULL,
+     finished_at INTEGER,
+     deleted_at INTEGER
+   );
+   INSERT INTO backups_new SELECT id, kind, project_id, slug, status, trigger, object_key, bytes, contents, error, started_at, finished_at, deleted_at FROM backups;
+   DROP TABLE backups;
+   ALTER TABLE backups_new RENAME TO backups;
+   CREATE INDEX backups_by_slug ON backups (kind, slug, started_at);`,
 ];
 
 function open(): DatabaseSync {

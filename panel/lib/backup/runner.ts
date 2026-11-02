@@ -25,7 +25,8 @@ export interface Backup {
   projectId: number | null;
   slug: string;
   status: "running" | "ok" | "failed";
-  trigger: "schedule" | "manual";
+  /** "edit": taken just before a change in the database viewer. */
+  trigger: "schedule" | "manual" | "edit";
   objectKey: string | null;
   bytes: number | null;
   contents: { sqlite?: { path: string; bytes: number }[]; postgres?: { bytes: number } | null; mysql?: { bytes: number } | null; mongodb?: { bytes: number } | null } | null;
@@ -147,11 +148,20 @@ async function encryptAndUpload(settings: BackupSettings, key: string, source: R
   return storage(settings.destination).upload(key, source.pipe(encrypted));
 }
 
-/** Deletes the oldest successful backups past the retention count. */
+/** How many backups taken before edits each app keeps, apart from its scheduled and manual ones. */
+export const KEEP_EDIT_BACKUPS = 5;
+
+/**
+ * Deletes the oldest successful backups past the retention count. Backups
+ * taken before edits count on their own, so a busy afternoon of edits never
+ * pushes out the daily ones.
+ */
 async function prune(settings: BackupSettings, kind: Backup["kind"], slug: string): Promise<void> {
-  const old = db()
-    .prepare("SELECT id, object_key FROM backups WHERE kind = ? AND slug = ? AND status = 'ok' AND deleted_at IS NULL ORDER BY started_at DESC LIMIT -1 OFFSET ?")
-    .all(kind, slug, settings.keep) as { id: number; object_key: string }[];
+  const past = (edits: boolean, keep: number) =>
+    db()
+      .prepare(`SELECT id, object_key FROM backups WHERE kind = ? AND slug = ? AND status = 'ok' AND deleted_at IS NULL AND trigger ${edits ? "=" : "<>"} 'edit' ORDER BY started_at DESC LIMIT -1 OFFSET ?`)
+      .all(kind, slug, keep) as { id: number; object_key: string }[];
+  const old = [...past(false, settings.keep), ...past(true, KEEP_EDIT_BACKUPS)];
   const s3 = storage(settings.destination);
   for (const b of old) {
     try {
@@ -232,6 +242,35 @@ export const backupProjects = () => listProjects().filter((p) => p.runtime.kind 
 
 export function backUpProject(project: Project, trigger: Backup["trigger"] = "manual"): Promise<Backup> {
   return queued(() => backupApp(project, trigger));
+}
+
+/** A backup before an edit is reused for this long: a run of quick edits shares one. */
+export const EDIT_BACKUP_REUSE_MS = 10 * 60_000;
+
+/** Whether edits can be backed up first: a bucket is connected and its recovery key saved. */
+export const canBackUpEdits = () => {
+  const settings = getBackupSettings();
+  return !!settings?.keyConfirmed;
+};
+
+/** The newest successful backup of an app (any trigger) from the last few minutes, if there is one. */
+export function recentBackup(slug: string, now = Date.now()): Backup | null {
+  const row = db()
+    .prepare("SELECT * FROM backups WHERE kind = 'app' AND slug = ? AND status = 'ok' AND deleted_at IS NULL AND finished_at >= ? ORDER BY finished_at DESC LIMIT 1")
+    .get(slug, now - EDIT_BACKUP_REUSE_MS) as Row | undefined;
+  return row ? fromRow(row) : null;
+}
+
+/**
+ * Backs an app up before an edit, unless it was backed up in the last ten
+ * minutes. Throws if the backup fails: then the edit doesn't happen.
+ */
+export async function backUpBeforeEdit(project: Project): Promise<Backup> {
+  const recent = recentBackup(project.slug);
+  if (recent) return recent;
+  const backup = await backUpProject(project, "edit");
+  if (backup.status !== "ok") throw new Error(`The backup before this change failed, so nothing was changed: ${backup.error ?? "unknown error"}`);
+  return backup;
 }
 
 /** The panel, then every app. */

@@ -1,6 +1,7 @@
 import { isActionName, ValidationError, type Response } from "@layer/protocol";
 import { activityActions } from "./actions/activity.ts";
 import { browseActions } from "./actions/browse.ts";
+import { editActions } from "./actions/edit.ts";
 import { appActions } from "./actions/app.ts";
 import { buildActions } from "./actions/build.ts";
 import { catalogActions } from "./actions/catalog.ts";
@@ -49,6 +50,7 @@ export const ACTION_TABLE: ActionTable = {
   ...metricsActions,
   ...activityActions,
   ...browseActions,
+  ...editActions,
 };
 
 export const MAX_LINE_BYTES = 1024 * 1024;

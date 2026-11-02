@@ -46,6 +46,8 @@ export const ACTIONS = [
   "mongodb.add",
   "mongodb.remove",
   "db.browse",
+  "db.count",
+  "db.update",
   "firewall.status",
   "panel.site",
   "panel.address",

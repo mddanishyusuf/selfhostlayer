@@ -2,18 +2,25 @@ import { ChevronLeftIcon, ChevronRightIcon, SearchIcon } from "lucide-react";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { DataGrid, QueryBox } from "@/components/data-grid";
+import { EditableRows } from "@/components/db-editor";
 import { Icon } from "@/components/icon";
-import { CARD, Empty, Notice, PageHeader, PillLink } from "@/components/page";
+import { CARD, Empty, Notice, PageHeader, PillLink, Segmented } from "@/components/page";
+import { QueryBuilder } from "@/components/query-builder";
 import { NO_AUTOFILL, buttonClass, cx } from "@/components/ui";
-import { browse, ENGINES, isSql, PAGE_SIZE, parseDb, type BrowseResult } from "@/lib/browse";
+import { canBackUpEdits } from "@/lib/backup/runner";
+import { browse, ENGINES, isSql, PAGE_SIZE, parseDb, parseWhere, type BrowseResult } from "@/lib/browse";
 import { getProjectBySlug } from "@/lib/projects";
 import { requireUser } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Database" };
 
-/** db: which database; t: the table, collection or key; q: the query; s, d: sort column and direction; p: page. */
-type Search = { db?: string; t?: string; q?: string; s?: string; d?: string; p?: string };
+/**
+ * db: which database; t: the table, collection or key; q: the query; s, d:
+ * sort column and direction; p: page; w: the visual builder's filters (JSON);
+ * m: "sql" for the SQL box instead of the builder (SQL databases only).
+ */
+type Search = { db?: string; t?: string; q?: string; s?: string; d?: string; p?: string; w?: string; m?: string };
 
 const size = (bytes: number) => (bytes < 1048576 ? `${Math.max(1, Math.round(bytes / 1024))} KB` : `${(bytes / 1048576).toFixed(1)} MB`);
 
@@ -28,7 +35,7 @@ export default async function DatabaseViewPage({ params, searchParams }: { param
   const e = ENGINES[engine];
   const base = `/projects/${project.slug}/databases/view`;
   const href = (next: Partial<Search>) => {
-    const all: Search = { db: sp.db, t: sp.t, q: sp.q, s: sp.s, d: sp.d, ...next };
+    const all: Search = { db: sp.db, t: sp.t, q: sp.q, s: sp.s, d: sp.d, w: sp.w, m: sp.m, ...next };
     const u = new URLSearchParams();
     for (const [k, v] of Object.entries(all)) if (v) u.set(k, v);
     return `${base}?${u}`;
@@ -37,13 +44,27 @@ export default async function DatabaseViewPage({ params, searchParams }: { param
   const q = sp.q?.trim() ?? "";
   const table = sp.t || undefined;
   const picking = engine === "sqlite" && !file;
+  // SQL databases open on the visual builder; the SQL box is a tab (m=sql), and a query in the URL means it.
+  const sqlMode = isSql(engine) && (sp.m === "sql" || (!!q && sp.m !== "builder"));
+  const where = isSql(engine) && !sqlMode ? parseWhere(sp.w) : undefined;
   // SQL: a query stands alone, or a table's rows. MongoDB: a filter runs on a collection. Redis: a pattern narrows the keys, and a key shows its value.
-  const op = picking ? "tables" : engine === "redis" ? (table ? "rows" : q ? "query" : "tables") : q && (isSql(engine) || table) ? "query" : table ? "rows" : "tables";
+  const op = picking ? "tables" : engine === "redis" ? (table ? "rows" : q ? "query" : "tables") : q && (sqlMode || (!isSql(engine) && table)) ? "query" : table ? "rows" : "tables";
   const queried = op === "query" && isSql(engine);
   let data: BrowseResult | null = null;
   let error: string | null = null;
   try {
-    data = await browse(project.slug, { engine, file, op, table: queried ? undefined : table, query: q || undefined, offset: (page - 1) * PAGE_SIZE, limit: PAGE_SIZE, sort: sp.s, desc: sp.d === "1" });
+    data = await browse(project.slug, {
+      engine,
+      file,
+      op,
+      table: queried ? undefined : table,
+      query: (sqlMode || !isSql(engine)) && q ? q : undefined,
+      offset: (page - 1) * PAGE_SIZE,
+      limit: PAGE_SIZE,
+      sort: sp.s,
+      desc: sp.d === "1",
+      where: op === "rows" ? where : undefined,
+    });
   } catch (err) {
     error = (err as Error).message;
     // Still list what's in the database when a query or a page fails.
@@ -58,10 +79,17 @@ export default async function DatabaseViewPage({ params, searchParams }: { param
   const sortLinks = sortable ? result.columns.map((c) => href({ s: sp.s === c && sp.d === "1" ? undefined : c, d: sp.s === c && sp.d !== "1" ? "1" : undefined, p: undefined })) : undefined;
   const paged = result && !queried && result.total !== null;
   const from = (page - 1) * PAGE_SIZE + 1;
+  const editing = !!result && !queried && isSql(engine) && !!result.editable && !!result.schema && !!table;
+  const backedUp = canBackUpEdits();
 
   return (
     <>
-      <PageHeader back={`/projects/${project.slug}/databases`} title={project.slug} crumb={file ? `${e.label} · ${file}` : e.label} meta="Read-only" />
+      <PageHeader
+        back={`/projects/${project.slug}/databases`}
+        title={project.slug}
+        crumb={file ? `${e.label} · ${file}` : e.label}
+        meta={isSql(engine) ? (backedUp ? "Edits are backed up first" : "Edits can't be undone: no backup storage") : "Read-only"}
+      />
       <div className={cx(CARD, "grid md:min-h-[calc(100dvh-110px)]", !picking && "md:grid-cols-[248px_minmax(0,1fr)]")}>
         <aside className={cx("min-w-0 border-b border-border md:border-b-0 md:border-r", picking && "hidden")} data-testid="db-tables">
           {engine === "redis" && (
@@ -84,7 +112,7 @@ export default async function DatabaseViewPage({ params, searchParams }: { param
                 {tables.map((t) => (
                   <Link
                     key={t.name}
-                    href={href({ t: t.name, q: engine === "redis" ? sp.q : undefined, s: undefined, d: undefined, p: undefined })}
+                    href={href({ t: t.name, q: engine === "redis" ? sp.q : undefined, s: undefined, d: undefined, p: undefined, w: undefined, m: undefined })}
                     className={cx("flex items-center gap-2 px-4 py-[7px] transition-colors duration-150 hover:bg-hover", t.name === table && !queried ? "bg-selected text-foreground" : "text-muted")}
                   >
                     <span className="min-w-0 flex-1 truncate font-mono text-[12.5px]">{t.name}</span>
@@ -101,11 +129,32 @@ export default async function DatabaseViewPage({ params, searchParams }: { param
 
         <section className="min-w-0">
           {!picking && isSql(engine) && (
-            <form action={base} className="grid gap-2 border-b border-border px-3.5 py-3" data-testid="db-query">
-              <input type="hidden" name="db" value={sp.db} />
-              <QueryBox name="q" defaultValue={q} lines={q.split("\n").length > 2 ? 6 : 2} placeholder={`SELECT * FROM ${table ?? tables[0]?.name ?? "table"} LIMIT 20`} />
-              <QueryActions clear={q ? href({ q: undefined, t: undefined }) : undefined} note="Read-only · one statement · 500 rows at most" />
-            </form>
+            <div className="grid gap-3 border-b border-border px-3.5 py-3">
+              <Segmented
+                items={[
+                  { href: href({ m: undefined, q: undefined, p: undefined }), label: "Builder", active: !sqlMode },
+                  { href: href({ m: "sql", w: undefined, p: undefined }), label: "SQL", active: sqlMode },
+                ]}
+              />
+              {sqlMode ? (
+                <form action={base} className="grid gap-2" data-testid="db-query">
+                  <input type="hidden" name="db" value={sp.db} />
+                  <input type="hidden" name="m" value="sql" />
+                  <QueryBox name="q" defaultValue={q} lines={q.split("\n").length > 2 ? 6 : 2} placeholder={`SELECT * FROM ${table ?? tables[0]?.name ?? "table"} LIMIT 20`} />
+                  <QueryActions clear={q ? href({ q: undefined, t: undefined }) : undefined} note="Read-only · one statement · 500 rows at most" />
+                </form>
+              ) : (
+                <QueryBuilder
+                  key={`${table ?? ""}|${sp.w ?? ""}`}
+                  tables={tables.map((t) => t.name)}
+                  table={table}
+                  columns={result && !queried ? result.columns : []}
+                  where={where}
+                  base={base}
+                  db={sp.db!}
+                />
+              )}
+            </div>
           )}
           {engine === "mongodb" && table && (
             <form action={base} className="grid gap-2 border-b border-border px-3.5 py-3" data-testid="db-query">
@@ -139,7 +188,23 @@ export default async function DatabaseViewPage({ params, searchParams }: { param
                 )}
                 <span className="ml-auto text-[12px] tabular-nums text-dim">{result.ms} ms</span>
               </div>
-              {result.rows.length ? (
+              {editing && result.rows.length ? (
+                <EditableRows
+                  key={`${table}|${sp.w ?? ""}|${page}|${sp.s ?? ""}|${sp.d ?? ""}`}
+                  slug={project.slug}
+                  db={sp.db!}
+                  table={table!}
+                  columns={result.columns}
+                  rows={result.rows}
+                  schema={result.schema!}
+                  keys={result.key ?? null}
+                  total={result.total ?? result.rows.length}
+                  where={where}
+                  firstRow={from}
+                  sortLinks={sortLinks}
+                  sorted={sortable && sp.s ? { column: sp.s, desc: sp.d === "1" } : undefined}
+                />
+              ) : result.rows.length ? (
                 <DataGrid columns={result.columns} rows={result.rows} firstRow={queried ? 1 : from} sortLinks={sortLinks} sorted={sortable && sp.s ? { column: sp.s, desc: sp.d === "1" } : undefined} />
               ) : (
                 <p className="px-3.5 py-10 text-center text-[12px] text-muted">No rows.</p>

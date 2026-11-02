@@ -13,6 +13,7 @@ import { ActionError } from "../errors.ts";
 import { lookupUser } from "../fsutil.ts";
 import { sandboxArgs, SYSTEMD_RUN } from "../sandbox.ts";
 import { appLayout } from "./app.ts";
+import { FILTER_OPS, type Filter, type Where } from "../sql-where.ts";
 import { mongodbInstalled, readServices } from "./service.ts";
 
 export const ENGINES = ["sqlite", "postgres", "mysql", "mongodb", "redis"] as const;
@@ -53,6 +54,40 @@ export function assertQuery(engine: Engine, value: unknown): string {
   return statement;
 }
 
+const CONTROL = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/;
+
+/** A value typed into the builder or the editor: text, newlines allowed, no other control characters. */
+export function assertValue(value: unknown, field: string, maxLength = 20_000): string {
+  if (typeof value !== "string" || value.length > maxLength || CONTROL.test(value)) throw new ValidationError(field, `must be text of at most ${maxLength} characters`);
+  return value;
+}
+
+/**
+ * The visual builder's filters, for SQL tables: up to 20 of "column op
+ * value", all or any of them. The job checks the columns exist and turns
+ * values into parameters or quoted literals (sql-where.ts).
+ */
+export function assertWhere(value: unknown): Where | undefined {
+  if (value === undefined || value === null || value === "") return undefined;
+  if (typeof value !== "object" || Array.isArray(value)) throw new ValidationError("where", "must be {match, filters}");
+  const w = value as Record<string, unknown>;
+  const match = oneOf(w.match ?? "all", ["all", "any"] as const, "where.match");
+  if (!Array.isArray(w.filters) || w.filters.length > 20) throw new ValidationError("where.filters", "must be a list of at most 20 filters");
+  const filters = w.filters.map((raw, i): Filter => {
+    const f = (raw ?? {}) as Record<string, unknown>;
+    const at = `where.filters[${i}]`;
+    const column = assertLine(f.column, `${at}.column`, 256);
+    const op = oneOf(f.op, FILTER_OPS, `${at}.op`);
+    if (op === "null" || op === "not_null") return { column, op };
+    if (op === "in") {
+      if (!Array.isArray(f.value) || !f.value.length || f.value.length > 100) throw new ValidationError(`${at}.value`, "must be a list of 1 to 100 values");
+      return { column, op, value: f.value.map((v, j) => assertValue(v, `${at}.value[${j}]`, 2000)) };
+    }
+    return { column, op, value: assertValue(f.value, `${at}.value`, 2000) };
+  });
+  return filters.length ? { match, filters } : undefined;
+}
+
 async function dbBrowse(params: Params, ctx: Context) {
   const slug = assertSlug(params.slug);
   const engine = oneOf(params.engine, ENGINES, "engine");
@@ -77,6 +112,8 @@ async function dbBrowse(params: Params, ctx: Context) {
   // Redis's key pattern also narrows the key list while a key is open.
   const query = params.query === undefined || params.query === "" ? undefined : assertQuery(engine, params.query);
   if (op === "query" && !query) throw new ValidationError("query", "is required to run a query");
+  const where = assertWhere(params.where);
+  if (where && (op !== "rows" || !(engine === "sqlite" || engine === "postgres" || engine === "mysql"))) throw new ValidationError("where", "only narrows a SQL table's rows");
   const request = {
     engine,
     op,
@@ -87,6 +124,7 @@ async function dbBrowse(params: Params, ctx: Context) {
     limit: assertInt(params.limit ?? 50, "limit", 1, 200),
     sort: params.sort === undefined || params.sort === "" ? undefined : assertLine(params.sort, "sort", 256),
     desc: params.desc === true,
+    where,
   };
 
   const user = await lookupUser(ctx.exec, app.user);

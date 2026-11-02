@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Fragment, useState } from "react";
+import { Fragment, useState, type ReactNode } from "react";
 import type { Cell } from "@/lib/browse";
 import { NO_AUTOFILL, cx } from "./ui";
 
@@ -33,18 +33,49 @@ function Value({ cell, open = false }: { cell: Cell; open?: boolean }) {
   );
 }
 
+/** Picking rows to edit: a checkbox per row and one for the page. */
+export interface GridSelection {
+  selected: ReadonlySet<number>;
+  toggle: (row: number) => void;
+  toggleAll: () => void;
+}
+
 /**
  * Rows of a table, a collection or a Redis key. A row opens to show every
  * value whole (up to the agent's 2000 characters). With sortLinks, column
- * names sort the table.
+ * names sort the table. With select, rows can be picked (for editing), and
+ * rowAction adds buttons to an open row.
  */
-export function DataGrid({ columns, rows, firstRow, sortLinks, sorted }: { columns: string[]; rows: Cell[][]; firstRow: number; sortLinks?: string[]; sorted?: { column: string; desc: boolean } }) {
+export function DataGrid({
+  columns,
+  rows,
+  firstRow,
+  sortLinks,
+  sorted,
+  select,
+  rowAction,
+}: {
+  columns: string[];
+  rows: Cell[][];
+  firstRow: number;
+  sortLinks?: string[];
+  sorted?: { column: string; desc: boolean };
+  select?: GridSelection;
+  rowAction?: (row: number) => ReactNode;
+}) {
   const [open, setOpen] = useState<number | null>(null);
+  const all = !!select && rows.length > 0 && select.selected.size === rows.length;
+  const box = "size-[14px] cursor-pointer accent-[var(--color-accent)]";
   return (
     <div className="max-h-[calc(100dvh-250px)] overflow-auto" data-testid="data-grid">
       <table className="w-max min-w-full border-collapse font-mono text-[12.5px]">
         <thead className="sticky top-0 z-[1]">
           <tr>
+            {select && (
+              <th className="w-[36px] border-b border-border bg-card py-2 pl-4 sm:pl-6">
+                <input type="checkbox" aria-label="Pick every row on this page" checked={all} onChange={select.toggleAll} className={box} />
+              </th>
+            )}
             <th className="border-b border-border bg-card py-2 pl-4 pr-3 text-right font-sans text-[12px] font-medium text-dim sm:pl-6">#</th>
             {columns.map((c, i) => (
               <th key={i} className="whitespace-nowrap border-b border-border bg-card px-3 py-2 text-left font-sans text-[12px] font-medium text-muted">
@@ -65,7 +96,12 @@ export function DataGrid({ columns, rows, firstRow, sortLinks, sorted }: { colum
         <tbody>
           {rows.map((row, r) => (
             <Fragment key={r}>
-              <tr onClick={() => setOpen(open === r ? null : r)} className={cx("cursor-pointer transition-colors duration-150 hover:bg-hover", open === r && "bg-selected")}>
+              <tr onClick={() => setOpen(open === r ? null : r)} className={cx("cursor-pointer transition-colors duration-150 hover:bg-hover", (open === r || select?.selected.has(r)) && "bg-selected")}>
+                {select && (
+                  <td className="border-b border-border py-1.5 pl-4 sm:pl-6" onClick={(e) => e.stopPropagation()}>
+                    <input type="checkbox" aria-label={`Pick row ${firstRow + r}`} checked={select.selected.has(r)} onChange={() => select.toggle(r)} className={box} />
+                  </td>
+                )}
                 <td className="border-b border-border py-1.5 pl-4 pr-3 text-right text-dim tabular-nums sm:pl-6">{firstRow + r}</td>
                 {row.map((cell, c) => (
                   <td key={c} className={cx("max-w-[340px] truncate whitespace-nowrap border-b border-border px-3 py-1.5", typeof cell === "number" && "text-right tabular-nums")}>
@@ -76,8 +112,9 @@ export function DataGrid({ columns, rows, firstRow, sortLinks, sorted }: { colum
               </tr>
               {open === r && (
                 <tr className="bg-selected/50">
-                  <td className="border-b border-border" />
+                  <td colSpan={select ? 2 : 1} className="border-b border-border" />
                   <td colSpan={columns.length + 1} className="border-b border-border px-3 py-3">
+                    {rowAction && <div className="mb-3 flex gap-2 font-sans">{rowAction(r)}</div>}
                     <dl className="grid max-w-[960px] grid-cols-[minmax(72px,max-content)_minmax(0,1fr)] gap-x-5 gap-y-2">
                       {columns.map((c, i) => (
                         <Fragment key={i}>

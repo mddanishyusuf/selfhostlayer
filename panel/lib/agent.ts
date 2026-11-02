@@ -352,11 +352,39 @@ function fakeBrowse(p: Record<string, unknown>) {
   const d = byEngine[String(p.engine)] ?? sql;
   if (p.op === "tables") return { tables: d.tables };
   if (p.op === "query" && p.engine !== "mongodb" && p.engine !== "redis") return { tables: d.tables, result: { columns: ["domain", "visits"], rows: [["piqo.app", 48_210], ["maillayer.com", 9_120]], total: null, truncated: false, ms: 3 } };
+  if (d === sql) {
+    // A SQL table: what editing needs (columns' types, each row's key); a view can't be edited.
+    const editable = sql.tables.find((t) => t.name === p.table)?.type === "table";
+    const types = ["integer", "text", "integer", "timestamp", "jsonb", "bytea"];
+    const where = p.where as { filters?: unknown[] } | undefined;
+    const rows = where?.filters?.length ? d.rows.slice(0, 1) : d.rows;
+    return {
+      tables: d.tables,
+      result: {
+        columns: d.columns,
+        rows,
+        total: where?.filters?.length ? 1 : d.total,
+        truncated: false,
+        ms: 4,
+        schema: d.columns.map((c, i) => ({ name: c, type: types[i] ?? "text", nullable: c !== "id" && c !== "domain", pk: c === "id" })),
+        editable,
+        key: editable ? { columns: ["id"], rows: rows.map((r) => [r[0] as number]) } : null,
+      },
+    };
+  }
   return { tables: d.tables, result: { columns: d.columns, rows: d.rows, total: d.total, truncated: false, ms: 4, ...(p.engine === "redis" ? { ttl: -1 } : {}) } };
+}
+
+/** Editing in fake mode: the count is the rows picked by key, 12 for filters or the whole table. */
+function fakeEdit(action: "db.count" | "db.update", p: Record<string, unknown>) {
+  const target = (p.target ?? {}) as { keys?: { rows: unknown[] } };
+  const matches = target.keys ? target.keys.rows.length : 12;
+  return action === "db.count" ? { matches } : { updated: Number(p.expect ?? matches) };
 }
 
 export async function agent<T>(action: ActionName, params: Record<string, unknown> = {}, opts: Omit<CallOptions, "socket"> = {}): Promise<T> {
   if (config.fakeAgent && action === "db.browse") return fakeBrowse(params) as T;
+  if (config.fakeAgent && (action === "db.count" || action === "db.update")) return fakeEdit(action, params) as T;
   if (config.fakeAgent && action === "service.status") return fakeServiceStatus(params) as T;
   if (config.fakeAgent && action in FAKE) return FAKE[action] as T;
   return callAgent<T>(action, params, { ...opts, socket: config.agentSocket });

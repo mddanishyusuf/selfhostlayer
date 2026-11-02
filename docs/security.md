@@ -35,6 +35,8 @@ No two apps share a password.
 
 The panel's database viewer works inside these walls. Each page it shows is a short sandboxed job running as the app's own user with the app's own logins, so it can't see another app's data, and every engine is opened read-only: SQLite read-only with `query_only`, Postgres with `default_transaction_read_only` and a 5-second statement limit, MySQL in a read-only session, MongoDB with `find` alone (no server-side JavaScript), Redis with read commands alone. A query is one statement: a `;` in the middle is refused before anything runs.
 
+Editing rows (SQLite, Postgres and MySQL tables) is a separate action, `db.update`, run the same way: a sandboxed job as the app's own user with the app's own logins, so an edit can't reach anything the app itself can't. The visual builder's filters and the new values never become SQL syntax: columns are checked against the table and quoted, values are bound parameters (SQLite) or escaped literals (Postgres, MySQL), and operators come from a fixed list. Each edit is one transaction that writes only if exactly the number of rows the user confirmed still match. The panel backs the app up to your bucket first, and the agent's audit log records the table, the columns and how many rows, never the values.
+
 **Secrets it can read but not change.** Env vars are encrypted in the panel's database (AES-256-GCM). On disk they exist only as `/etc/layer/apps/<app>/app.env`, owned by root and readable by nobody else. systemd reads that file and hands the variables to the app's process, so the app gets its env but has no file it could rewrite. Values never appear in build logs.
 
 ## The network

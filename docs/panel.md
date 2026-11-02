@@ -106,13 +106,16 @@ One of each per app. PostgreSQL, MySQL and Redis are installed on the server the
 
 Adding or removing a database restarts the app on the same build, with zero downtime, so it gets the new URL. Removing one asks you to type the app's name. Unless you say otherwise, it keeps a final dump in `/var/lib/layer-agent/archive/`.
 
-**Browse data** (next to each database, and **Browse SQLite databases** for the files in `DATA_DIR`) opens a read-only viewer: the tables, collections or keys on the left, a page of rows on the right. The sidebar shrinks to its icons there, to give the rows the width; the button at its bottom opens the whole menu. Click a column to sort by it, a row to see every value whole (JSON indented). Above the rows:
+**Browse data** (next to each database, and **Browse SQLite databases** for the files in `DATA_DIR`) opens the viewer: the tables, collections or keys on the left, a page of rows on the right. The sidebar shrinks to its icons there, to give the rows the width; the button at its bottom opens the whole menu. Click a column to sort by it, a row to see every value whole (JSON indented). Above the rows:
 
-- **SQL** (SQLite, PostgreSQL, MySQL): run a query. One statement, without `;` (also not inside quotes), up to 500 rows and 5 seconds.
+- **Builder** (SQLite, PostgreSQL, MySQL; the default): pick a table, then add filters of a column, an operator (is, is not, contains, starts with, >, ≤, is one of, is NULL…) and a value, matching all or any of them. The filters stay in the address, so a filtered view can be bookmarked or shared.
+- **SQL** (the other tab): run a query. One statement, without `;` (also not inside quotes), up to 500 rows and 5 seconds. A query's results are read-only.
 - **MongoDB:** filter a collection with JSON, like `{"status": "active"}` or `{"_id": {"$oid": "…"}}`. Filters that run JavaScript (`$where`, `$function`) are refused.
 - **Redis:** narrow the keys with a pattern, like `session:*`. A key shows its value: a string, a hash's fields, a list or a sorted set page by page, and when it expires.
 
-The viewer reads with the app's own login, as the app's own user, so it sees exactly what the app can. Nothing it runs can write: SQLite is opened read-only, Postgres and MySQL in read-only transactions, MongoDB only finds, and Redis only reads. Values longer than 2,000 characters are cut, with their full length shown.
+**Editing rows** (SQL tables, not views): open a row and click **Edit row**, pick rows with the checkboxes and click **Edit selected**, or click **Edit all … rows** to change every row the filters match (every row in the table without filters). Only the values you change are written; a column that takes NULL has a NULL box. Before anything is written, a review says how many rows change and to what. Confirming backs the app up first (listed under Backups as "before an edit"; a backup from the last ten minutes is reused, and the last 5 are kept apart from the daily ones), then updates the rows in one transaction, and only if the same number of rows still match. Without backup storage connected, the review says the change can't be undone and asks you to confirm that. Rows are found by their primary key (a SQLite table without one by its rowid); a Postgres or MySQL table without a primary key can only be edited through filters. Long text cut at 2,000 characters and binary values can't be edited here. MongoDB and Redis stay read-only.
+
+The viewer reads with the app's own login, as the app's own user, so it sees exactly what the app can. Browsing never writes: SQLite is opened read-only, Postgres and MySQL in read-only transactions, MongoDB only finds, and Redis only reads. Values longer than 2,000 characters are cut, with their full length shown.
 
 ```sh
 sudo -u postgres psql -c '\l'          # Postgres databases
