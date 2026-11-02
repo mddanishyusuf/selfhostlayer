@@ -121,7 +121,7 @@ describe("data.import", () => {
     expect(run).toContain("--uid=app-piqo");
     expect(run).toContain("--property=IPAddressDeny=any");
     expect(run.slice(run.indexOf("--") + 1, run.indexOf("--") + 5)).toEqual([env.paths.runtimeNode, "--no-warnings", "-e", systemdLiteral(IMPORT_JOB)]);
-    expect(run.at(-1)).toBe("gzip");
+    expect(run.slice(-2)).toEqual(["gzip", ""]);
     // The app runs during the long part; it's only stopped for the swap.
     const order = [...env.fake.calls.filter(([f, a]) => f === BIN.systemctl && (a === "stop" || a === "start")).map((c) => c[1])];
     expect(order).toEqual(["stop", "start"]);
@@ -161,11 +161,39 @@ describe("data.import", () => {
     writeFileSync(join(env.paths.restoreDir, file), tar);
     env.spawner.respond = job("data");
     await dataImport();
-    expect(env.spawner.calls.find(([f]) => f === SYSTEMD_RUN)!.at(-1)).toBe("tar");
+    expect(env.spawner.calls.find(([f]) => f === SYSTEMD_RUN)!.slice(-2)).toEqual(["plain", ""]);
 
     writeFileSync(join(env.paths.restoreDir, file), "PK\u0003\u0004 a zip file");
-    await expect(dataImport()).rejects.toThrow("isn't a .tar.gz or .tar archive");
+    await expect(dataImport()).rejects.toThrow("isn't a .tar.gz or .tar archive, or a SQLite database");
     expect(existsSync(join(appDir(), "data", "app.db"))).toBe(true);
+  });
+
+  it("puts a single database in place of the one in data/, and leaves the rest", async () => {
+    writeFileSync(join(env.paths.restoreDir, file), "SQLite format 3\0 and the rest");
+    writeFileSync(join(appDir(), "data", "old.db-wal"), "OLD WAL");
+    mkdirSync(join(appDir(), "data", "uploads"));
+    env.spawner.respond = (f, args) => {
+      if (f !== SYSTEMD_RUN) return undefined;
+      const [, , , , dir, when, , name] = args.slice(args.indexOf("--") + 1);
+      expect(name).toBe("superdev.db");
+      mkdirSync(join(dir!, `data.importing-${when}`));
+      writeFileSync(join(dir!, `data.importing-${when}`, "old.db"), "NEW");
+      return { code: 0, output: `LAYER-IMPORT {"root":"","sqlite":[{"path":"old.db","bytes":3}],"files":1,"bytes":3,"database":"old.db"}\n` };
+    };
+    const result = (await backupActions["data.import"]!.run({ slug: "piqo", file, name: "superdev.db.gz" }, env.ctx, NO_IO)) as any;
+    expect(result).toMatchObject({ database: "old.db", files: 1 });
+    expect(readFileSync(join(appDir(), "data", "old.db"), "utf8")).toBe("NEW");
+    expect(existsSync(join(appDir(), "data", "old.db-wal"))).toBe(false);
+    expect(existsSync(join(appDir(), "data", "uploads"))).toBe(true);
+    expect(readFileSync(join(appDir(), result.previous, "old.db-wal"), "utf8")).toBe("OLD WAL");
+    expect(env.spawner.calls.find(([f]) => f === SYSTEMD_RUN)!.slice(-2)).toEqual(["plain", "superdev.db"]);
+  });
+
+  it("refuses a database name that isn't a plain file name", async () => {
+    await expect(backupActions["data.import"]!.run({ slug: "piqo", file, name: "../etc/passwd" }, env.ctx, NO_IO)).rejects.toThrow("plain file name");
+    env.spawner.respond = (f) => (f === SYSTEMD_RUN ? { code: 0, output: `LAYER-IMPORT {"root":"","sqlite":[],"files":1,"bytes":3,"database":"../x"}\n` } : undefined);
+    await expect(dataImport()).rejects.toThrow("plain file name");
+    expect(readdirSync(appDir()).filter((n) => n.startsWith("data.importing-"))).toEqual([]);
   });
 });
 

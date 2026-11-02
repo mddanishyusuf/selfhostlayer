@@ -11,7 +11,7 @@ Run it as root (or with `sudo`).
 | `layer logs <app> [-f] [-n 100] [--color blue\|green]` | The app's output; `-f` follows it. | `journalctl -u 'app-<app>@*' -f` |
 | `layer score <app> [--color blue\|green]` | systemd's security score for the app's sandbox (0 is the safest, 10 the least). | `systemd-analyze security app-<app>@blue` |
 | `layer info` | The server: OS, CPU and load, memory, disk, Node versions, Caddy and the agent. | |
-| `layer import <app> <file.tar.gz>` | Replaces the app's `data/` folder with an archive from another server. SQLite files are checked first; the app is stopped and started around the swap; the replaced folder is kept next to it. | |
+| `layer import <app> <file.tar.gz>` | Replaces the app's `data/` folder with an archive from another server. SQLite files are checked first; the app is stopped and started around the swap; the replaced folder is kept next to it. Given a single SQLite database (`app.db`, gzipped or not), it replaces only that database in `data/`. | |
 | `layer access` | Who may open the panel: anyone, or a list of addresses. | `/etc/caddy/sites/_panel.caddy` |
 | `layer access reset` | Lets everyone reach the sign-in page again, for when you've locked yourself out. | |
 | `layer update [version]` | Updates the panel, agent and CLI from the update feed (without a version: to the newest release, if it's newer) and follows the installer's output. Apps keep running. | `journalctl -u layer-update.service -f` |

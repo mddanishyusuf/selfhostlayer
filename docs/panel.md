@@ -136,7 +136,7 @@ systemctl status layer-redis-<app>     # the app's Redis
 
 The replaced data stays next to it as `data.before-restore-<time>`. For MySQL and MongoDB, that folder also holds a dump of the database as it was.
 
-**Import** brings a data folder from another server. It goes through the same checks as a restore. See [Moving an app from pm2](moving-from-pm2.md).
+**Import** brings a data folder from another server (a `.tar.gz` or `.tar`), or a single SQLite database (`.db`, `.sqlite`, gzipped or not) that replaces just that database. It goes through the same checks as a restore. See [Moving an app from pm2](moving-from-pm2.md).
 
 ### Cron jobs
 Commands on a schedule, run as the app's user with its env vars, in its sandbox. Each job is a systemd timer:

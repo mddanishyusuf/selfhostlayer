@@ -120,7 +120,32 @@ expect "the import restarted Redis too" "$out" '.ok == true and (.result.restart
 systemctl is-active --quiet "layer-redis-$slug" && pass "Redis runs again" || fail "Redis isn't running" "$(journalctl -u "layer-redis-$slug" -n 5 --no-pager)"
 call redis.remove "{\"slug\":\"$slug\",\"keepData\":false}" >/dev/null
 
+echo "A single SQLite database, gzipped: it replaces data/'s database, the rest stays"
+echo "kept" | runuser -u "app-$slug" -- tee "$app/data/notes.txt" >/dev/null
+make_db "$work/backup-2026.db" 77
+gzip -k "$work/backup-2026.db"
+name="$(stage "$work/backup-2026.db.gz")"
+out="$(call data.import "{\"slug\":\"$slug\",\"file\":\"$name\",\"name\":\"backup-2026.db.gz\"}")"
+rm -f "$restore_dir/$name"
+expect "it went in as data/'s only database" "$out" '.ok == true and .result.database == "app.sqlite3"'
+[[ "$(rows "$app/data/app.sqlite3")" == 77 ]] && pass "the new database is in place (77 rows)" || fail "rows: $(rows "$app/data/app.sqlite3")"
+[[ "$(cat "$app/data/notes.txt")" == kept ]] && pass "the rest of data/ stayed" || fail "notes.txt is gone"
+[[ "$(stat -c '%U %a' "$app/data/app.sqlite3")" == "app-$slug 600" ]] && pass "the database is the app's, 600" || fail "db: $(stat -c '%U %a' "$app/data/app.sqlite3")"
+prev="$(jq -r '.result.previous' <<<"$out")"
+[[ "$(rows "$app/$prev/app.sqlite3")" == 42 ]] && pass "the replaced database is kept in $prev" || fail "previous database not kept"
+echo "A raw database through the layer CLI"
+make_db "$work/app.sqlite3" 42
+cli="$(layer import "$slug" "$work/app.sqlite3" 2>&1)"
+grep -q "Imported the database as data/app.sqlite3" <<<"$cli" && pass "layer import takes a .sqlite3 file" || fail "layer import of a database" "$cli"
+[[ "$(rows "$app/data/app.sqlite3")" == 42 ]] && pass "42 rows again" || fail "rows: $(rows "$app/data/app.sqlite3")"
+
 echo "Refused, and nothing changes"
+echo "a gzipped text file" | gzip >"$work/junk.gz"
+out="$(import "$work/junk.gz")"
+expect "a gzip with neither inside is refused, and says so" "$out" '.ok == false and (.error.message | test("what.s inside is neither"))'
+head -c 300 "$work/a.tar.gz" >"$work/cut.tar.gz"
+out="$(import "$work/cut.tar.gz")"
+expect "a cut-off archive is refused, and says so" "$out" '.ok == false and (.error.message | test("cut off|Unexpected EOF"))'
 mkdir -p "$work/c"
 make_db "$work/c/app.sqlite3" 5000
 dd if=/dev/urandom of="$work/c/app.sqlite3" bs=4096 seek=3 count=20 conv=notrunc status=none

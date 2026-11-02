@@ -176,12 +176,13 @@ interface ImportResponse {
   files?: number;
   bytes?: number;
   restarted?: string[];
-  previous?: string;
+  previous?: string | null;
+  database?: string;
 }
 
 /**
- * A data/ archive from another server: pick it, type the app name, and it
- * uploads with progress. The agent checks it before anything is replaced.
+ * A data/ archive from another server, or a single SQLite database: pick it,
+ * type the app name, and it uploads with progress. The agent checks it before anything is replaced.
  */
 export function ImportData({ slug }: { slug: string }) {
   const router = useRouter();
@@ -198,7 +199,7 @@ export function ImportData({ slug }: { slug: string }) {
     setPhase("uploading");
     setProgress(0);
     const xhr = new XMLHttpRequest();
-    xhr.open("POST", `/api/projects/${slug}/import?confirm=${encodeURIComponent(typed)}`);
+    xhr.open("POST", `/api/projects/${slug}/import?confirm=${encodeURIComponent(typed)}&name=${encodeURIComponent(file.name)}`);
     xhr.setRequestHeader("Content-Type", "application/octet-stream");
     xhr.upload.onprogress = (e) => e.lengthComputable && setProgress(e.loaded / e.total);
     xhr.upload.onload = () => setPhase("importing");
@@ -211,10 +212,13 @@ export function ImportData({ slug }: { slug: string }) {
       }
       if (xhr.status === 200 && body.ok) {
         const dbs = body.sqlite?.length ?? 0;
+        const restarted = body.restarted?.length ? ` ${slug} restarted on the new data.` : "";
         setMessage(
-          `Imported ${body.files} file${body.files === 1 ? "" : "s"} (${fileSize(body.bytes ?? 0)})${dbs ? `, ${dbs} SQLite database${dbs === 1 ? "" : "s"} checked` : ""}.` +
-            (body.restarted?.length ? ` ${slug} restarted on the new data.` : "") +
-            ` The replaced data is kept in ${body.previous} until the next import or restore.`,
+          body.database
+            ? `Imported the database as data/${body.database} (${fileSize(body.bytes ?? 0)}, checked); the rest of data/ is as it was.${restarted}` +
+                (body.previous ? ` The replaced file is kept in ${body.previous} until the next import or restore.` : "")
+            : `Imported ${body.files} file${body.files === 1 ? "" : "s"} (${fileSize(body.bytes ?? 0)})${dbs ? `, ${dbs} SQLite database${dbs === 1 ? "" : "s"} checked` : ""}.${restarted}` +
+                ` The replaced data is kept in ${body.previous} until the next import or restore.`,
         );
         setPhase("done");
         router.refresh();
@@ -245,11 +249,11 @@ export function ImportData({ slug }: { slug: string }) {
           <input
             type="file"
             name="archive"
-            accept=".tar.gz,.tgz,.tar,application/gzip,application/x-tar"
+            accept=".tar.gz,.tgz,.tar,.db,.sqlite,.sqlite3,.gz,application/gzip,application/x-tar"
             className="sr-only"
             onChange={(e) => setFile(e.target.files?.[0] ?? null)}
           />
-          <span className="truncate">{file ? `${file.name} · ${fileSize(file.size)}` : "Choose a .tar.gz…"}</span>
+          <span className="truncate">{file ? `${file.name} · ${fileSize(file.size)}` : "Choose a .tar.gz or a SQLite file…"}</span>
         </label>
         <Button type="button" variant="secondary" disabled={!file} onClick={() => setOpen(true)}>
           Import…
@@ -269,7 +273,7 @@ export function ImportData({ slug }: { slug: string }) {
           ) : (
             <>
               <p className="text-[12px] text-muted">
-                The app&apos;s data folder is replaced by this archive. SQLite databases are checked first; if anything is wrong, nothing changes. The current data is kept beside it until the next import or restore.
+                An archive (.tar.gz or .tar) replaces the app&apos;s whole data folder. A single SQLite database (.db or .sqlite, gzipped or not) replaces only the database of that name in it, or its only database. Databases are checked first; if anything is wrong, nothing changes. What&apos;s replaced is kept beside it until the next import or restore.
               </p>
               <Field label={`Type ${slug} to confirm`} htmlFor="import-confirm">
                 <Input id="import-confirm" value={typed} onChange={(e) => setTyped(e.target.value)} autoComplete="off" spellCheck={false} autoFocus />

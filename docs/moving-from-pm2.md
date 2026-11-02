@@ -42,6 +42,8 @@ Before anything is replaced, the archive is unpacked and every SQLite database i
 
 Then the app stops (its Redis too), the folders are swapped and everything starts again. The data that was there before is kept in `/srv/apps/<app>/data.before-restore-…` until the next import or restore.
 
+**Just one database?** Import the SQLite file itself (`app.db`, or `app.db.gz`): it replaces the database of the same name in `data/`, or `data/`'s only database, and the rest of `data/` stays as it is. It's checked the same way first, and the file it replaced is kept beside `data/`. With no database in `data/` yet, it goes in under its own name, so name it the way the app opens it.
+
 Postgres isn't part of the archive: dump it on the old server with `pg_dump --format=custom` and load it with `pg_restore --no-owner` into the `DATABASE_URL` shown on the app's **Databases** page.
 
 ## 5. Switch traffic

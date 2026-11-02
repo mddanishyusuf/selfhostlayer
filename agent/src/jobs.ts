@@ -155,25 +155,35 @@ function findDatabases(dir, rel, out) {
 `;
 
 /**
- * Import: `node -e IMPORT_JOB <appDir> <stamp> <gzip|tar>` with an archive of
- * a data folder from somewhere else (another server, made by hand) on stdin.
- * It unpacks into data.importing-<stamp> and drops macOS litter (._*,
+ * Import: `node -e IMPORT_JOB <appDir> <stamp> <gzip|plain> <name>` with, on
+ * stdin, either an archive of a data folder from somewhere else (another
+ * server, made by hand: tar, or tar.gz) or a single SQLite database (raw or
+ * gzipped). What it is comes from its first bytes after gunzip, here, as the
+ * app: root never decompresses it.
+ *
+ * An archive unpacks into data.importing-<stamp> and drops macOS litter (._*,
  * .DS_Store, __MACOSX). An archive holding a single folder counts as that
- * folder. Every SQLite file (found by its header) must open, replay its WAL
- * and pass PRAGMA integrity_check; stale -shm files go. The agent swaps the
- * result in with the app stopped, or deletes it when this fails. The last
- * stderr line is `LAYER-IMPORT {"root","sqlite":[{path,bytes}],"files","bytes"}`.
+ * folder. A database goes in as data.importing-<stamp>/<target>: the file in
+ * data/ named like the upload, else data/'s only database, else the upload's
+ * name (data.db with none); the agent then replaces just that file. Every
+ * SQLite file (found by its header) must open, replay its WAL and pass
+ * PRAGMA integrity_check; stale -shm files go. The agent swaps the result in
+ * with the app stopped, or deletes it when this fails. The last stderr line
+ * is `LAYER-IMPORT {"root","sqlite":[{path,bytes}],"files","bytes","database"?}`.
  */
 export const IMPORT_JOB = String.raw`
 const fs = require("node:fs");
 const path = require("node:path");
+const zlib = require("node:zlib");
+const { Readable, pipeline } = require("node:stream");
 const { spawn } = require("node:child_process");
 const { DatabaseSync } = require("node:sqlite");
 
-const [app, stamp, format] = process.argv.slice(1);
+const [app, stamp, format, wanted] = process.argv.slice(1);
 const work = path.join(app, "data.importing-" + stamp);
 const HEADER = Buffer.from("SQLite format 3\0");
 const LITTER = (name) => name === "__MACOSX" || name === ".DS_Store" || name.startsWith("._");
+const SIDECAR = /-(shm|wal|journal)$/;
 
 function fail(code, message) {
   console.error("layer: " + message);
@@ -214,18 +224,72 @@ function files(dir, own = false, rel = "", out = []) {
   return out;
 }
 
+/** Which file in data/ a single database replaces. */
+function targetFor(name) {
+  const data = path.join(app, "data");
+  let entries = [];
+  try {
+    entries = fs.readdirSync(data, { withFileTypes: true });
+  } catch {}
+  if (entries.some((e) => e.name === name)) return name;
+  const dbs = entries.filter((e) => e.isFile() && !SIDECAR.test(e.name) && isSqlite(path.join(data, e.name)));
+  return dbs.length === 1 ? dbs[0].name : name;
+}
+
+async function receive() {
+  const input = format === "gzip" ? process.stdin.pipe(zlib.createGunzip()) : process.stdin;
+  const chunks = input[Symbol.asyncIterator]();
+  let head = Buffer.alloc(0);
+  for (let next; head.length < 512 && !(next = await chunks.next()).done; ) head = Buffer.concat([head, next.value]);
+  // A cut-off or damaged gzip ends the stream early: tar alone might take what came.
+  let broken = null;
+  const rest = Readable.from((async function* () {
+    yield head;
+    try {
+      for (let next; !(next = await chunks.next()).done; ) yield next.value;
+    } catch (err) {
+      broken = err;
+      throw err;
+    }
+  })());
+
+  if (head.length >= 262 && head.toString("latin1", 257, 262) === "ustar") {
+    const tar = spawn("/usr/bin/tar", ["--extract", "--file=-", "--no-same-owner", "--no-same-permissions", "--directory=" + work], { stdio: ["pipe", "inherit", "pipe"] });
+    let said = "";
+    tar.stderr.on("data", (chunk) => {
+      process.stderr.write(chunk);
+      said += chunk;
+    });
+    // tar may stop reading early on a broken archive; its exit code says so.
+    pipeline(rest, tar.stdin, () => {});
+    const code = await new Promise((done) => tar.on("close", done));
+    if (broken) fail(4, "the archive is cut off or damaged (" + (broken.message || broken) + "); data/ is unchanged");
+    if (code !== 0) {
+      // tar's own reason, not its closing lines or warnings about macOS headers.
+      const why = said
+        .split("\n")
+        .map((l) => /^(?:\/usr\/bin\/)?tar: (.+)$/.exec(l)?.[1])
+        .filter((l) => l && !/^(Exiting with failure|Error is not recoverable|Ignoring unknown extended header)/.test(l))
+        .at(-1);
+      fail(4, "the archive could not be unpacked (" + (why || "tar exited " + code) + "); data/ is unchanged");
+    }
+    return null;
+  }
+  if (head.length >= 16 && head.subarray(0, 16).equals(HEADER)) {
+    const name = targetFor(wanted || "data.db");
+    await new Promise((done, failed) => pipeline(rest, fs.createWriteStream(path.join(work, name), { flags: "wx", mode: 0o600 }), (err) => (err ? failed(err) : done())));
+    console.log("A single SQLite database: it replaces data/" + name + ", and the rest of data/ stays.");
+    return name;
+  }
+  fail(4, "this isn't a .tar.gz or .tar of a data folder, or a SQLite database" + (format === "gzip" ? " (it's gzip, but what's inside is neither)" : "") + "; data/ is unchanged");
+}
+
 try {
   fs.mkdirSync(work, { mode: 0o700 });
 } catch (err) {
   fail(2, "can't make " + work + ": " + err.message);
 }
-const tar = spawn(
-  "/usr/bin/tar",
-  ["--extract", ...(format === "gzip" ? ["--gzip"] : []), "--file=-", "--no-same-owner", "--no-same-permissions", "--directory=" + work],
-  { stdio: ["inherit", "inherit", "inherit"] },
-);
-tar.on("close", (code) => {
-  if (code !== 0) fail(4, "the archive could not be unpacked (tar exited " + code + "); data/ is unchanged");
+receive().then((database) => {
   try {
     files(work, true);
     const top = fs.readdirSync(work, { withFileTypes: true });
@@ -263,11 +327,11 @@ tar.on("close", (code) => {
     const all = files(base);
     if (all.length === 0) fail(5, "the archive has no files; data/ is unchanged");
     const bytes = all.reduce((n, f) => n + fs.statSync(path.join(base, f)).size, 0);
-    console.error("LAYER-IMPORT " + JSON.stringify({ root, sqlite, files: all.length, bytes }));
+    console.error("LAYER-IMPORT " + JSON.stringify({ root, sqlite, files: all.length, bytes, ...(database ? { database } : {}) }));
   } catch (err) {
     fail(2, "import failed: " + (err && err.message ? err.message : err));
   }
-});
+}, (err) => fail(4, "the file could not be read (" + (err && err.message ? err.message : err) + "); data/ is unchanged"));
 `;
 
 /**

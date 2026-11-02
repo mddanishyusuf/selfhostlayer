@@ -16,7 +16,10 @@ export const dynamic = "force-dynamic";
 const MAX_BYTES = 20 * 1024 ** 3;
 
 export interface ImportResult {
-  previous: string;
+  /** The replaced data, kept beside data/ (null when a database was new). */
+  previous: string | null;
+  /** Set when the upload was a single SQLite database: the file in data/ it replaced. */
+  database?: string;
   sqlite: { path: string; bytes: number }[];
   files: number;
   bytes: number;
@@ -26,8 +29,8 @@ export interface ImportResult {
 const fail = (error: string, status: number) => Response.json({ error }, { status });
 
 /**
- * A data/ archive from another server. The body is the file itself and
- * ?confirm=<slug> the typed confirmation. It streams to the restore folder,
+ * A data/ archive from another server, or a single SQLite database. The body
+ * is the file itself, ?name= its name and ?confirm=<slug> the typed confirmation. It streams to the restore folder,
  * then the agent checks it and swaps it in (data.import); the file is
  * deleted either way.
  */
@@ -59,7 +62,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
   try {
     await pipeline(Readable.fromWeb(request.body as WebReadableStream), limit, createWriteStream(path, { mode: 0o600, flags: "wx" }));
     if (received !== length) return fail("The upload was cut off. Nothing changed.", 400);
-    const result = await agent<ImportResult>("data.import", { slug: project.slug, file });
+    const name = new URL(request.url).searchParams.get("name") ?? "";
+    const result = await agent<ImportResult>("data.import", { slug: project.slug, file, ...(name ? { name } : {}) });
     return Response.json({ ok: true, ...result });
   } catch (err) {
     return fail(err instanceof AgentError || err instanceof Error ? err.message : "The import failed. Nothing changed.", 422);

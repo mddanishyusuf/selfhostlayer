@@ -3,7 +3,7 @@
 import { execFileSync, spawn } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { chmodSync, chownSync, constants, copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, statSync } from "node:fs";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import { parseArgs } from "node:util";
 import { AgentError, assertSlug, callAgent, isActionName } from "@layer/protocol";
 
@@ -22,7 +22,7 @@ const HELP = `${bold("layer")}: Self Host Layer on this server
   layer logs <app> [-f] [-n 100] [--color blue|green]
   layer score <app> [--color blue|green]   systemd sandbox score (0 = safest)
   layer info                       server summary
-  layer import <app> <file>        replace the app's data/ with a .tar.gz from another server
+  layer import <app> <file>        replace the app's data/ with a .tar.gz from another server, or one SQLite database in it
                                    (SQLite checked first; the replaced data is kept)
   layer access [reset]             who may open the panel; reset lets everyone reach the sign-in again
   layer update [version]           update the panel, agent and CLI from the release feed (apps keep running)
@@ -131,11 +131,16 @@ async function importData(slug: string, source: string) {
     chownSync(copy, uid, gid);
     chmodSync(copy, 0o600);
     console.log(dim(`Importing ${source} into ${slug}…`));
-    const r = await callAgent<{ previous: string; sqlite: { path: string }[]; files: number; bytes: number; restarted: string[] }>(
+    const r = await callAgent<{ previous: string | null; database?: string; sqlite: { path: string }[]; files: number; bytes: number; restarted: string[] }>(
       "data.import",
-      { slug, file: name },
+      { slug, file: name, name: basename(source) },
       { onChunk: (c) => process.stdout.write(dim(c)) },
     );
+    if (r.database) {
+      console.log(`${green("✓")} Imported the database as data/${r.database} (${size(r.bytes)}, checked); the rest of data/ is as it was.${r.restarted.length ? " The app restarted on the new data." : ""}`);
+      if (r.previous) console.log(dim(`  The replaced file is kept in /srv/apps/${slug}/${r.previous} until the next import or restore.`));
+      return;
+    }
     const checked = r.sqlite.length ? `, ${r.sqlite.length} SQLite database${r.sqlite.length === 1 ? "" : "s"} checked` : "";
     console.log(`${green("✓")} Imported ${r.files} file${r.files === 1 ? "" : "s"} (${size(r.bytes)})${checked}.${r.restarted.length ? " The app restarted on the new data." : ""}`);
     console.log(dim(`  The replaced data is kept in /srv/apps/${slug}/${r.previous} until the next import or restore.`));
@@ -209,7 +214,7 @@ async function main() {
     case "repair": return repair();
     case "update": return update(arg);
     case "import": {
-      if (!arg || !extra) throw new Error("usage: layer import <app> <file.tar.gz>");
+      if (!arg || !extra) throw new Error("usage: layer import <app> <file.tar.gz | file.db>");
       return importData(arg, extra);
     }
     case "call": {

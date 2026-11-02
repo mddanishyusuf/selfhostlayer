@@ -3,7 +3,7 @@
 // uploads; and restores one the panel downloaded. Bucket credentials and the
 // encryption key never reach the agent.
 import { randomBytes } from "node:crypto";
-import { closeSync, constants, createReadStream, existsSync, fchmodSync, fchownSync, fstatSync, openSync, readdirSync, readSync, renameSync, rmSync, statSync } from "node:fs";
+import { closeSync, constants, createReadStream, existsSync, fchmodSync, fchownSync, fstatSync, lstatSync, openSync, readdirSync, readSync, renameSync, rmSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { assertSlug, ValidationError } from "@layer/protocol";
 import type { ActionTable, CallIO, Context, Params } from "../context.ts";
@@ -207,6 +207,64 @@ function pruneReplaced(appDir: string, keep: string): void {
   }
 }
 
+const SQLITE = Buffer.from("SQLite format 3\0");
+
+/** The upload's own file name, for a single database: a plain name, without .gz. */
+function uploadName(value: unknown): string {
+  if (value === undefined || value === "") return "";
+  const name = typeof value === "string" ? value.replace(/\.gz$/i, "") : "";
+  if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$/.test(name) || /-(shm|wal|journal)$/.test(name)) throw new ValidationError("name", "must be a plain file name like app.db");
+  return name;
+}
+
+/**
+ * A single database: only data/<name> is replaced (its old -wal and -shm go
+ * with it), with the app stopped; the rest of data/ stays. The old file is
+ * kept in data.before-restore-<stamp>/, like a replaced folder.
+ */
+async function replaceDatabase(
+  ctx: Context,
+  slug: string,
+  user: { uid: number; gid: number },
+  work: string,
+  when: string,
+  reported: string,
+  result: { sqlite: { path: string; bytes: number }[]; files: number; bytes: number },
+) {
+  const app = appLayout(ctx, slug);
+  let name: string;
+  let incoming: string;
+  try {
+    name = uploadName(reported);
+    incoming = childOf(work, name);
+    if (!name || !lstatSync(incoming, { throwIfNoEntry: false })?.isFile()) throw new ActionError("import_failed", "the import job left no database to put in; data/ is unchanged");
+  } catch (err) {
+    rmSync(work, { recursive: true, force: true });
+    throw err;
+  }
+  const units = await activeUnits(ctx, slug);
+  for (const unit of units) await ctx.exec(BIN.systemctl, ["stop", unit]);
+  const previous = `data.before-restore-${when}`;
+  let replaced = false;
+  try {
+    ensureDir(app.data, 0o700, user);
+    const kept = join(app.appDir, previous);
+    for (const file of [name, `${name}-wal`, `${name}-shm`, `${name}-journal`]) {
+      const old = childOf(app.data, file);
+      if (!existsSync(old)) continue;
+      ensureDir(kept, 0o700, user);
+      renameSync(old, join(kept, file));
+      replaced = true;
+    }
+    renameSync(incoming, join(app.data, name));
+    pruneReplaced(app.appDir, previous);
+  } finally {
+    rmSync(work, { recursive: true, force: true });
+    await startAgain(ctx, slug, units);
+  }
+  return { slug, database: name, previous: replaced ? previous : null, sqlite: result.sqlite, files: result.files, bytes: result.bytes, restarted: units };
+}
+
 /**
  * Data from somewhere else (another server, a hand-made archive) replaces an
  * app's data/. Everything is unpacked and checked first, while the app keeps
@@ -217,14 +275,16 @@ async function dataImport(params: Params, ctx: Context, io: CallIO) {
   const slug = assertSlug(params.slug);
   const name = assertStagedName(params.file, "file");
   const { app, user } = await requireAppUser(ctx, slug);
+  const database = uploadName(params.name);
   const fd = await openPanelFile(ctx, name);
-  // gzip, or a plain tar ("ustar" at byte 257). Read at an explicit position, so stdin still starts at 0.
+  // gzip (the job finds out what's inside), a plain tar ("ustar" at byte 257)
+  // or a SQLite database. Read at an explicit position, so stdin still starts at 0.
   const head = Buffer.alloc(262);
   const n = readSync(fd, head, 0, head.length, 0);
   const gzip = n >= 2 && head[0] === 0x1f && head[1] === 0x8b;
-  if (!gzip && head.subarray(257, 262).toString("latin1") !== "ustar") {
+  if (!gzip && head.subarray(257, 262).toString("latin1") !== "ustar" && !head.subarray(0, 16).equals(SQLITE)) {
     closeSync(fd);
-    throw new ActionError("bad_archive", `${name} isn't a .tar.gz or .tar archive`);
+    throw new ActionError("bad_archive", `${name} isn't a .tar.gz or .tar archive, or a SQLite database`);
   }
   try {
     diskGuard(ctx);
@@ -251,7 +311,7 @@ async function dataImport(params: Params, ctx: Context, io: CallIO) {
         memoryMb: 512,
         timeoutSec: 3600,
         network: false,
-        command: [ctx.paths.runtimeNode, "--no-warnings", "-e", IMPORT_JOB, app.appDir, when, gzip ? "gzip" : "tar"],
+        command: [ctx.paths.runtimeNode, "--no-warnings", "-e", IMPORT_JOB, app.appDir, when, gzip ? "gzip" : "plain", database],
       }),
       {
         stdin: createReadStream("", { fd }),
@@ -271,8 +331,9 @@ async function dataImport(params: Params, ctx: Context, io: CallIO) {
     const reason = output.split("\n").filter((l) => l.startsWith("layer: ")).at(-1)?.slice(7);
     throw new ActionError("import_failed", reason ?? `the import job exited ${code}; data/ is unchanged`);
   }
-  const result = JSON.parse(report[1]!) as { root: string; sqlite: { path: string; bytes: number }[]; files: number; bytes: number };
-  // The job ran as the app: its folder name is checked like any other input.
+  const result = JSON.parse(report[1]!) as { root: string; sqlite: { path: string; bytes: number }[]; files: number; bytes: number; database?: string };
+  // The job ran as the app: its folder and file names are checked like any other input.
+  if (result.database !== undefined) return replaceDatabase(ctx, slug, user, work, when, result.database, result);
   const source = result.root ? childOf(work, result.root) : work;
 
   const units = await activeUnits(ctx, slug);
