@@ -37,6 +37,7 @@ export const ACTIONS = [
   "wordpress.config",
   "wordpress.status",
   "wordpress.run",
+  "wordpress.import",
   "build.cancel",
   "cache.clean",
   "cron.write",

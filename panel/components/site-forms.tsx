@@ -101,3 +101,66 @@ export function Secret({ value }: { value: string }) {
     </span>
   );
 }
+
+/**
+ * Brings a WordPress in from another server: an archive with its wp-content
+ * and a .sql dump. Uploaded with progress, then loaded as the site.
+ */
+export function WordpressImport({ slug }: { slug: string }) {
+  const [file, setFile] = useState<File | null>(null);
+  const [typed, setTyped] = useState("");
+  const [phase, setPhase] = useState<"idle" | "uploading" | "importing" | "done" | "error">("idle");
+  const [progress, setProgress] = useState(0);
+  const [message, setMessage] = useState("");
+  const busy = phase === "uploading" || phase === "importing";
+  const start = () => {
+    if (!file) return;
+    setPhase("uploading");
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", `/api/projects/${slug}/import?confirm=${encodeURIComponent(typed)}&kind=wordpress`);
+    xhr.setRequestHeader("Content-Type", "application/octet-stream");
+    xhr.upload.onprogress = (e) => e.lengthComputable && setProgress(e.loaded / e.total);
+    xhr.upload.onload = () => setPhase("importing");
+    xhr.onload = () => {
+      let body: { ok?: boolean; error?: string; oldUrl?: string; url?: string; replaced?: number } = {};
+      try {
+        body = JSON.parse(xhr.responseText);
+      } catch {
+        // a proxy's error page
+      }
+      if (xhr.status === 200 && body.ok) {
+        setMessage(`Imported${body.oldUrl ? ` ${body.oldUrl}` : ""}: its database and wp-content are in place${body.replaced ? `, and ${body.replaced} mentions of its old address now point here` : ""}. The site's previous wp-content is kept as wp-content.before-import.`);
+        setPhase("done");
+      } else {
+        setMessage(body.error ?? `The import failed (HTTP ${xhr.status}).`);
+        setPhase("error");
+      }
+    };
+    xhr.onerror = () => {
+      setMessage("The upload was interrupted. Nothing changed.");
+      setPhase("error");
+    };
+    xhr.send(file);
+  };
+  return (
+    <div className="grid gap-3" data-testid="wordpress-import">
+      <label className="inline-flex h-9 w-fit max-w-full cursor-pointer items-center gap-2 border border-dashed border-border-strong px-3 text-[12px] text-muted hover:border-accent hover:text-foreground">
+        <input type="file" accept=".zip,.tar.gz,.tgz,.tar" className="sr-only" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+        <span className="truncate">{file ? file.name : "Choose a .zip or .tar.gz…"}</span>
+      </label>
+      {file && phase !== "done" && (
+        <Field label={`Type ${slug} to replace this site's content and database`} htmlFor="wp-import-confirm">
+          <Input id="wp-import-confirm" value={typed} onChange={(e) => setTyped(e.target.value)} autoComplete="off" spellCheck={false} />
+        </Field>
+      )}
+      {busy && <p className="text-[12px] text-muted">{phase === "uploading" ? `Uploading… ${Math.round(progress * 100)}%` : "Loading the database and files…"}</p>}
+      {phase === "done" && <p className="text-[13px] text-teal">{message}</p>}
+      {phase === "error" && <FormError message={message} />}
+      {file && phase !== "done" && (
+        <button type="button" onClick={start} disabled={busy || typed !== slug} className="w-fit border border-border px-3 py-1.5 text-[13px] font-bold disabled:opacity-50">
+          {busy ? "Importing…" : "Import"}
+        </button>
+      )}
+    </div>
+  );
+}

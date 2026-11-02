@@ -96,6 +96,23 @@ echo "WP-Cron from a timer"
 systemctl is-enabled --quiet "app-$slug-wpcron.timer" && pass "the timer is on" || fail "no WP-Cron timer"
 systemctl start "app-$slug-wpcron.service" && pass "WP-Cron runs as the site" || fail "WP-Cron failed" "$(journalctl -u "app-$slug-wpcron" -n 5 --no-pager)"
 
+echo "Bringing a site in (wp-content and a .sql dump, another table prefix and address)"
+mkdir -p "$work/old/site/wp-content/uploads"
+echo "old upload" >"$work/old/site/wp-content/uploads/old.txt"
+wp db export - --skip-plugins --skip-themes 2>/dev/null | sed -e 's/`wp_/`old_/g' -e "s#https://$host#https://old.example.com#g" >"$work/old/site/backup.sql"
+tar -czf "$work/old.tar.gz" -C "$work/old" site
+name="$slug-$(date -u +%Y%m%d%H%M%S)-$(openssl rand -hex 4).tar.gz"
+install -d -o layer -g layer -m 700 "$restore_dir"
+install -o layer -g layer -m 600 "$work/old.tar.gz" "$restore_dir/$name"
+out="$(call wordpress.import "{\"slug\":\"$slug\",\"file\":\"$name\"}")"
+rm -f "$restore_dir/$name"
+expect "wordpress.import" "$out" '.ok == true and .result.prefix == "old_" and .result.oldUrl == "https://old.example.com" and .result.replaced > 0'
+grep -q "table_prefix = 'old_'" "$docroot/wp-config.php" && pass "wp-config.php has the dump's table prefix" || fail "table prefix not set"
+[[ "$(wp option get home)" == "https://$host" ]] && pass "the old address now points here" || fail "home: $(wp option get home)"
+[[ "$(curl_ "https://$host/wp-content/uploads/old.txt")" == "old upload" ]] && pass "its uploads are served" || fail "old upload not served"
+[[ -f "$docroot/wp-content/mu-plugins/layer-mail.php" && -d "$docroot/wp-content.before-import" ]] && pass "the mail plugin stays, the old wp-content is kept aside" || fail "mu-plugin or before-import missing"
+grep -q "Test Blog" <<<"$(curl_ "https://$host/")" && pass "the site answers after the import" || fail "site down after import"
+
 echo "Back up and restore"
 post="$(wp post create --post_title='Before the backup' --post_status=publish --porcelain)"
 out="$(call backup.snapshot "{\"slug\":\"$slug\"}")"

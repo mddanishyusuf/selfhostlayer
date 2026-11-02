@@ -23,7 +23,7 @@ const STAGED_FILE = /^[a-z][a-z0-9-]{0,62}-[0-9]{14}-[0-9a-f]{8}\.tar\.gz$/;
 /** Staged snapshots nobody collected (the panel crashed mid-upload) go after a day. */
 const STALE_MS = 24 * 3600 * 1000;
 
-function assertStagedName(value: unknown, field: string): string {
+export function assertStagedName(value: unknown, field: string): string {
   if (typeof value !== "string" || !STAGED_FILE.test(value)) throw new ValidationError(field, "must be a backup file name like piqo-20261029030000-1a2b3c4d.tar.gz");
   return value;
 }
@@ -147,7 +147,7 @@ async function startAgain(ctx: Context, slug: string, units: string[]): Promise<
  * symlinks and checked to really be the panel's, so a compromised panel
  * can't make root read some other file into an app.
  */
-async function openPanelFile(ctx: Context, name: string): Promise<number> {
+export async function openPanelFile(ctx: Context, name: string): Promise<number> {
   const file = childOf(ctx.paths.restoreDir, name);
   let fd: number;
   try {

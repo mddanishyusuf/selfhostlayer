@@ -2,7 +2,7 @@
 // wp-cli as a pinned phar (sha512), the install and everything after it run
 // as the site's own user in a sandbox. See PLAN-SITES.md.
 import { createHash, randomBytes } from "node:crypto";
-import { chmodSync, createReadStream, existsSync, readdirSync, readFileSync, renameSync, rmSync } from "node:fs";
+import { chmodSync, closeSync, createReadStream, existsSync, readdirSync, readFileSync, readSync, renameSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { Readable } from "node:stream";
 import { assertLine, assertSlug, ValidationError } from "@layer/protocol";
@@ -24,6 +24,7 @@ import {
   type WordpressState,
 } from "../templates/wordpress.ts";
 import { appLayout } from "./app.ts";
+import { assertStagedName, openPanelFile } from "./backup.ts";
 import { download } from "./node.ts";
 import { phpAccess, phpInstalled, phpWrite } from "./php.ts";
 import { readServices } from "./service.ts";
@@ -395,6 +396,103 @@ async function wordpressRun(params: Params, ctx: Context, io: CallIO) {
   }
 }
 
+/**
+ * Brings an existing WordPress in, from an archive (.tar.gz, .tar or .zip)
+ * holding its wp-content folder and a .sql dump, as most backup plugins make.
+ * Everything runs as the site: unpack, then the dump into its own database
+ * (with the dump's table prefix), then wp-content swapped in (the old one
+ * kept as wordpress/wp-content.before-import) and the old address replaced by
+ * this site's. wp-config.php stays generated (this site's database and salts).
+ */
+const IMPORT_UNPACK = [
+  "set -eu",
+  'work="$1" kind="$2"',
+  'rm -rf -- "$work"; mkdir -p -- "$work/x"',
+  'case "$kind" in',
+  '  zip) cat >"$work/in.zip"; unzip -q "$work/in.zip" -d "$work/x"; rm -f -- "$work/in.zip" ;;',
+  '  gzip) tar --extract --gzip --file=- --no-same-owner --no-same-permissions --directory="$work/x" ;;',
+  '  *) tar --extract --file=- --no-same-owner --no-same-permissions --directory="$work/x" ;;',
+  "esac",
+  'content="$(find "$work/x" -maxdepth 4 -type d -name wp-content -not -path "*/wp-content/*" | head -n 1)"',
+  'sql="$(find "$work/x" -maxdepth 4 -type f -name "*.sql" | head -n 1)"',
+  'if [ -z "$content" ]; then echo "layer: the archive has no wp-content folder"; exit 3; fi',
+  'if [ -z "$sql" ]; then echo "layer: the archive has no .sql dump of the database"; exit 3; fi',
+  'prefix="$(grep -m 1 -oE "CREATE TABLE (IF NOT EXISTS )?`[A-Za-z0-9_]+options`" "$sql" | sed -E "s/.*`([A-Za-z0-9_]*)options`/\\1/")"',
+  'echo "LAYER-IMPORT content=$content"',
+  'echo "LAYER-IMPORT sql=$sql"',
+  'echo "LAYER-IMPORT prefix=${prefix:-wp_}"',
+].join("\n");
+
+const IMPORT_SWAP = [
+  "set -eu",
+  'root="$1" content="$2"',
+  'rm -rf -- "$root/wp-content.before-import"',
+  'mv -- "$root/wp-content" "$root/wp-content.before-import"',
+  'mv -- "$content" "$root/wp-content"',
+  // The mail plugin is the server's, not the old site's.
+  'mkdir -p -- "$root/wp-content/mu-plugins"',
+  'cp -- "$root/wp-content.before-import/mu-plugins/layer-mail.php" "$root/wp-content/mu-plugins/layer-mail.php"',
+].join("\n");
+
+async function wordpressImport(params: Params, ctx: Context, io: CallIO) {
+  const slug = assertSlug(params.slug);
+  const name = assertStagedName(params.file, "file");
+  const state = wordpressState(ctx, slug);
+  if (!state) throw new ActionError("not_found", `${slug} isn't a WordPress site`);
+  const app = appLayout(ctx, slug);
+  const fd = await openPanelFile(ctx, name);
+  const head = Buffer.alloc(262);
+  readSync(fd, head, 0, head.length, 0);
+  const kind = head[0] === 0x50 && head[1] === 0x4b ? "zip" : head[0] === 0x1f && head[1] === 0x8b ? "gzip" : head.subarray(257, 262).toString("latin1") === "ustar" ? "tar" : null;
+  if (!kind) {
+    closeSync(fd);
+    throw new ActionError("bad_archive", "the file isn't a .zip, .tar.gz or .tar");
+  }
+  const work = join(app.data, `wordpress-import-${randomBytes(4).toString("hex")}`);
+  try {
+    io.emit("Unpacking the archive as the site…\n");
+    const unpack = await job(ctx, slug, ["/bin/sh", "-c", IMPORT_UNPACK, "layer-import", work, kind], { stdin: createReadStream("", { fd, autoClose: false }) });
+    const said = (k: string) => new RegExp(`^LAYER-IMPORT ${k}=(.+)$`, "m").exec(unpack.output)?.[1]?.trim();
+    if (unpack.code !== 0) throw new ActionError("import_failed", lastLine(unpack.output).replace(/^layer: /, ""));
+    const content = said("content");
+    const sql = said("sql");
+    const prefix = said("prefix") ?? "wp_";
+    if (!content?.startsWith(`${work}/`) || !sql?.startsWith(`${work}/`)) throw new ActionError("import_failed", "the archive's layout couldn't be read");
+    if (!/^[A-Za-z0-9_]{1,20}$/.test(prefix)) throw new ActionError("import_failed", `the dump's table prefix (${prefix}) isn't one WordPress takes`);
+
+    io.emit(`Loading the database (tables ${prefix}*)…\n`);
+    const before = state.tablePrefix;
+    saveState(ctx, slug, { ...state, tablePrefix: prefix });
+    await writeConfig(ctx, slug, { ...state, tablePrefix: prefix });
+    const loaded = await wp(ctx, slug, ["db", "import", sql, "--skip-plugins", "--skip-themes"]);
+    if (loaded.code !== 0) {
+      saveState(ctx, slug, { ...state, tablePrefix: before });
+      await writeConfig(ctx, slug, state);
+      throw new ActionError("import_failed", `the dump didn't load: ${lastLine(loaded.output)}`);
+    }
+    const oldUrl = lastLine((await wp(ctx, slug, ["option", "get", "siteurl", "--skip-plugins", "--skip-themes"])).output).replace(/\/+$/, "");
+
+    io.emit("Putting its wp-content in place…\n");
+    const docroot = join(app.data, DOCROOT);
+    const swap = await job(ctx, slug, ["/bin/sh", "-c", IMPORT_SWAP, "layer-import", docroot, content]);
+    if (swap.code !== 0) throw new ActionError("import_failed", `wp-content couldn't be swapped in: ${lastLine(swap.output)}`);
+
+    let replaced = 0;
+    if (/^https?:\/\//.test(oldUrl) && oldUrl !== state.url) {
+      io.emit(`Replacing ${oldUrl} with ${state.url}…\n`);
+      const r = await wp(ctx, slug, ["search-replace", oldUrl, state.url, "--all-tables-with-prefix", "--skip-columns=guid", "--format=count", "--skip-plugins", "--skip-themes"]);
+      replaced = Number(lastLine(r.output)) || 0;
+    }
+    await wp(ctx, slug, ["cache", "flush", "--skip-plugins", "--skip-themes"]);
+    await wp(ctx, slug, ["rewrite", "flush", "--skip-plugins", "--skip-themes"]);
+    await phpAccess(ctx, slug);
+    return { slug, oldUrl, url: state.url, prefix, replaced };
+  } finally {
+    closeSync(fd);
+    await job(ctx, slug, ["/bin/rm", "-rf", "--", work]).catch(() => {});
+  }
+}
+
 /** Removes WP-Cron and the state (app.delete removes the rest). */
 export async function removeWordpress(ctx: Context, slug: string): Promise<void> {
   const name = wpCronUnitName(slug);
@@ -413,5 +511,6 @@ export const wordpressActions: ActionTable = {
   "wordpress.config": { mutates: true, run: wordpressConfig, redact: (p) => ({ ...p, mail: p.mail && typeof p.mail === "object" ? { kind: (p.mail as { kind?: unknown }).kind } : p.mail }) },
   "wordpress.status": { mutates: false, run: wordpressStatus },
   "wordpress.run": { mutates: true, run: wordpressRun },
+  "wordpress.import": { mutates: true, run: wordpressImport },
 };
 

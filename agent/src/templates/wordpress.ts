@@ -12,6 +12,8 @@ export interface WordpressState {
   xmlrpc: boolean;
   /** How wp_mail sends: Email's API, or SMTP, or not at all. */
   mail: WordpressMail | null;
+  /** wp_ for new sites; an imported site keeps its own. */
+  tablePrefix?: string;
 }
 
 export type WordpressMail =
@@ -52,7 +54,7 @@ export function renderWpConfig(state: WordpressState, db: { database: string; us
     "define('DB_CHARSET', 'utf8mb4');",
     "define('DB_COLLATE', '');",
     ...SALT_KEYS.map((k) => `define('${k}', ${q(state.salts[k] ?? "")});`),
-    "$table_prefix = 'wp_';",
+    `$table_prefix = ${q(state.tablePrefix ?? "wp_")};`,
     `define('WP_HOME', ${q(state.url)});`,
     `define('WP_SITEURL', ${q(state.url)});`,
     ...(state.url.startsWith("https://") ? ["define('FORCE_SSL_ADMIN', true);"] : []),

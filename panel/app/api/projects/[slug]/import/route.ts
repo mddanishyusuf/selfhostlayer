@@ -62,7 +62,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
   try {
     await pipeline(Readable.fromWeb(request.body as WebReadableStream), limit, createWriteStream(path, { mode: 0o600, flags: "wx" }));
     if (received !== length) return fail("The upload was cut off. Nothing changed.", 400);
-    const name = new URL(request.url).searchParams.get("name") ?? "";
+    const search = new URL(request.url).searchParams;
+    // A Sites WordPress brought in from another server: its wp-content and a .sql dump.
+    if (search.get("kind") === "wordpress") {
+      if (project.source !== "site" || project.catalogApp !== "wordpress") return fail("Only a WordPress site takes a WordPress import.", 400);
+      const result = await agent<{ oldUrl: string; url: string; replaced: number }>("wordpress.import", { slug: project.slug, file });
+      return Response.json({ ok: true, ...result });
+    }
+    const name = search.get("name") ?? "";
     const result = await agent<ImportResult>("data.import", { slug: project.slug, file, ...(name ? { name } : {}) });
     return Response.json({ ok: true, ...result });
   } catch (err) {

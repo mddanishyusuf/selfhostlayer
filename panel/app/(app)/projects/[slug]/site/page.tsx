@@ -4,7 +4,7 @@ import { Suspense } from "react";
 import { forgetPasswordAction } from "@/app/actions/sites";
 import { Icon } from "@/components/icon";
 import { CARD, KeyValues, Notice, PageHeader, PillLink, SettingsRow } from "@/components/page";
-import { Secret, SiteButton } from "@/components/site-forms";
+import { Secret, SiteButton, WordpressImport } from "@/components/site-forms";
 import { EngineTile } from "@/components/sites";
 import { Button, Pill, Skeleton } from "@/components/ui";
 import { agent } from "@/lib/agent";
@@ -65,6 +65,9 @@ async function WordpressDetails({ project }: { project: Project }) {
       </SettingsRow>
       <SettingsRow title="A new password" description="For the owner's account, if it's lost. Shown once.">
         <SiteButton slug={project.slug} op="reset-password" label="Make a new password" pending="Making…" />
+      </SettingsRow>
+      <SettingsRow title="Bring a site in" description="From another server: an archive (.zip or .tar.gz) with its wp-content folder and a .sql dump of its database, as most backup plugins make. Its address is replaced with this site's.">
+        <WordpressImport slug={project.slug} />
       </SettingsRow>
     </>
   );
