@@ -44,6 +44,24 @@ A site has a project's pages: Overview, Deployments, Logs, Domains, Databases, B
 
 **Domains** work as for any project: add yours on the site's Domains page. For WordPress, the site's address changes with it.
 
+## Bringing a site in
+
+**WordPress:** on the site's WordPress page, **Bring a site in** takes an archive (`.zip`, `.tar.gz` or `.tar`) holding the old site's `wp-content` folder and a `.sql` dump of its database. Most backup plugins make exactly that, or by hand:
+
+```sh
+wp db export backup.sql && tar -czf site.tar.gz wp-content backup.sql
+```
+
+The import:
+- runs as the site;
+- loads the dump into the site's own database, keeping its table prefix;
+- puts its `wp-content` in place, with the site's previous one kept as `wp-content.before-import`;
+- replaces the old address with the site's everywhere in the database.
+
+`wp-config.php` stays the server's: this site's database and fresh salts.
+
+**Ghost:** create the site, then use Ghost's own **Settings → Import/Export** to bring in the old site's export (posts, pages, tags, members). Copy its `content/images` folder in with the site's **Backups → Import data**, as an archive of `content/` (`tar -czf content.tar.gz content`).
+
 ## Safety
 
 **Every WordPress site runs its own PHP**, as its own user, in a systemd sandbox, with:
