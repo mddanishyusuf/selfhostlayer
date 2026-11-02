@@ -71,7 +71,7 @@ describe("backup.restore", () => {
     env.fake.respond = (f, args) => (f === BIN.systemctl && args[0] === "is-active" ? { code: 0, stdout: "active\n", stderr: "" } : undefined);
     env.spawner.respond = () => ({ code: 1 });
     await expect(restore(file)).rejects.toThrow("data/ is unchanged");
-    expect(env.fake.calls.filter(([f, a]) => f === BIN.systemctl && a === "start")).toHaveLength(3);
+    expect(env.fake.calls.filter(([f, a]) => f === BIN.systemctl && a === "start")).toHaveLength(4);
   });
 
   it("restarts the app's Redis around it, so Redis loads the restored data/redis", async () => {

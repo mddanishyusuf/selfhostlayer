@@ -98,6 +98,8 @@ export function testEnv(): TestEnv {
     staticGroup: null,
     archiveRoot: join(root, "var", "lib", "layer-agent", "archive"),
     mongodbAdmin: join(root, "var", "lib", "layer-agent", "mongodb-admin.json"),
+    phpRunRoot: join(root, "run", "layer-php"),
+    phpState: join(root, "var", "lib", "layer-agent", "php.json"),
     managedDir: join(root, "var", "lib", "layer-agent", "managed"),
     updatesDir: join(root, "var", "lib", "layer-agent", "updates"),
     catalogDir: join(root, "var", "lib", "layer-agent", "catalog"),

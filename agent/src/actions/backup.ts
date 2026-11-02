@@ -12,8 +12,10 @@ import { BIN } from "../exec.ts";
 import { childOf, ensureDir, lookupGid, lookupUser } from "../fsutil.ts";
 import { IMPORT_JOB, RESTORE_JOB, SNAPSHOT_JOB } from "../jobs.ts";
 import { sandboxArgs, SYSTEMD_RUN } from "../sandbox.ts";
-import { appLayout } from "./app.ts";
+import { appLayout, dataMode } from "./app.ts";
+import { phpAccess } from "./php.ts";
 import { diskGuard } from "./build.ts";
+import { phpUnitName } from "../templates/php.ts";
 import { redisUnit } from "../templates/redis.ts";
 import { readServices } from "./service.ts";
 
@@ -120,7 +122,7 @@ async function backupSnapshot(params: Params, ctx: Context, io: CallIO) {
  * Started again in reverse order: Redis first, then the app.
  */
 async function activeUnits(ctx: Context, slug: string): Promise<string[]> {
-  const units = [`app-${slug}@blue.service`, `app-${slug}@green.service`, redisUnit(slug)];
+  const units = [`app-${slug}@blue.service`, `app-${slug}@green.service`, phpUnitName(slug), redisUnit(slug)];
   const active = [];
   for (const unit of units) {
     const { stdout } = await ctx.exec(BIN.systemctl, ["is-active", unit], { allowFail: true });
@@ -129,8 +131,9 @@ async function activeUnits(ctx: Context, slug: string): Promise<string[]> {
   return active;
 }
 
-/** Starts what activeUnits stopped. data/ may be new, so Redis gets its folder back first. */
+/** Starts what activeUnits stopped. data/ may be new, so Redis gets its folder back, and Caddy its access to a PHP site's files, first. */
 async function startAgain(ctx: Context, slug: string, units: string[]): Promise<void> {
+  await phpAccess(ctx, slug).catch(() => {});
   if (readServices(ctx, slug).redis) {
     const app = appLayout(ctx, slug);
     const user = await lookupUser(ctx.exec, app.user);
@@ -247,7 +250,7 @@ async function replaceDatabase(
   const previous = `data.before-restore-${when}`;
   let replaced = false;
   try {
-    ensureDir(app.data, 0o700, user);
+    ensureDir(app.data, dataMode(app.etcDir), user);
     const kept = join(app.appDir, previous);
     for (const file of [name, `${name}-wal`, `${name}-shm`, `${name}-journal`]) {
       const old = childOf(app.data, file);
@@ -349,7 +352,7 @@ async function dataImport(params: Params, ctx: Context, io: CallIO) {
       throw err;
     }
     // Through O_NOFOLLOW (ensureDir): root never chmods through a symlink put in its place.
-    ensureDir(app.data, 0o700);
+    ensureDir(app.data, dataMode(app.etcDir));
     pruneReplaced(app.appDir, previous);
   } finally {
     // Whatever happened: no half-imported folder stays, and the app runs again.

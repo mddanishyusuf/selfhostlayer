@@ -25,6 +25,10 @@ export interface Paths {
   archiveRoot: string;
   /** The agent's own MongoDB login (root 600), made when MongoDB is installed. */
   mongodbAdmin: string;
+  /** PHP-FPM sockets, one folder per site (Sites' WordPress). */
+  phpRunRoot: string;
+  /** Which PHP is installed: {version, fpm}. */
+  phpState: string;
   /** Copies of every generated file, for `layer repair`. */
   managedDir: string;
   /** Releases downloaded for panel.update. */
@@ -69,6 +73,8 @@ export const DEFAULT_PATHS: Paths = {
   staticGroup: "caddy",
   archiveRoot: "/var/lib/layer-agent/archive",
   mongodbAdmin: "/var/lib/layer-agent/mongodb-admin.json",
+  phpRunRoot: "/run/layer-php",
+  phpState: "/var/lib/layer-agent/php.json",
   managedDir: "/var/lib/layer-agent/managed",
   updatesDir: "/var/lib/layer-agent/updates",
   catalogDir: "/var/lib/layer-agent/catalog",

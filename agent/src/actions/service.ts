@@ -24,6 +24,7 @@ import { renderEnvFile } from "../templates/env-file.ts";
 import { MONGOD_CONF, MONGODB_KEYRING, MONGODB_SERIES, MONGODB_SIGNING_KEY, MONGODB_SOURCES, MONGOSH_CONF, mongodbSource, renderMongodConf, renderMongodDropin, renderMongoshConf } from "../templates/mongodb.ts";
 import { redisUnit, renderRedisConf, renderRedisUnit } from "../templates/redis.ts";
 import { appLayout } from "./app.ts";
+import { installPhp } from "./php.ts";
 
 export const REDIS_PORTS = { min: 6400, max: 6999 };
 const REDIS_BINARIES = ["/usr/bin/redis-server", "/usr/bin/valkey-server"];
@@ -89,7 +90,8 @@ async function serviceInstall(params: Params, ctx: Context) {
   if (name === "postgres") return installPostgres(ctx);
   if (name === "mysql") return installMysql(ctx);
   if (name === "mongodb") return installMongodb(ctx);
-  if (name !== "redis") throw new ValidationError("name", 'must be "redis", "postgres", "mysql" or "mongodb"');
+  if (name === "php") return installPhp(ctx);
+  if (name !== "redis") throw new ValidationError("name", 'must be "redis", "postgres", "mysql", "mongodb" or "php"');
   if (redisBinary()) return { name, installed: true, binary: redisBinary(), already: true };
   await apt(ctx, ["update", "-q"], "layer-apt-update");
   // Some releases ship Valkey (the Redis fork) instead of Redis; both work the same here.

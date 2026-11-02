@@ -8,7 +8,9 @@ import { BIN } from "../exec.ts";
 import { childOf, ensureDir, removeManaged, writeFileAtomic } from "../fsutil.ts";
 import { assertDomains, assertRedirects, renderCaddySite, renderStaticSite } from "../templates/caddy-site.ts";
 import { parseColorEnvPort } from "../templates/env-file.ts";
+import { assertBlocks, phpSocketDir, renderPhpSite } from "../templates/php.ts";
 import { appLayout } from "./app.ts";
+import { phpSettings } from "./php.ts";
 
 /**
  * Sends the app's domains to one color by rewriting its Caddy site and
@@ -23,7 +25,16 @@ async function proxySet(params: Params, ctx: Context) {
 
   let content: string;
   let target: Record<string, unknown>;
-  if (params.static === true) {
+  if (params.php === true) {
+    // A PHP site (Sites' WordPress), its FPM written by php.write.
+    const settings = phpSettings(ctx, slug);
+    if (!settings) throw new ActionError("not_found", `${slug} has no PHP yet (run php.write first)`);
+    const redirects = assertRedirects(params.redirects, domains);
+    const block = assertBlocks(params.block);
+    const socket = `${phpSocketDir(ctx.paths.phpRunRoot, slug)}/php.sock`;
+    content = renderPhpSite({ slug, domains, redirects, docroot: join(app.data, settings.root), socket, block, uploadMb: settings.uploadMb });
+    target = { php: true, block, redirects };
+  } else if (params.static === true) {
     // A static site, published by static.publish.
     const root = join(childOf(ctx.paths.staticRoot, slug), "current");
     if (!existsSync(root)) throw new ActionError("not_found", `${slug} has no published static site yet (run static.publish first)`);
@@ -53,7 +64,7 @@ async function proxySet(params: Params, ctx: Context) {
     await ctx.exec(BIN.systemctl, ["reload", "caddy"], { allowFail: true, timeoutMs: 120_000 });
     throw new ActionError("invalid_config", "Caddy refused the new config, so the previous one was kept (see journalctl -u caddy)");
   }
-  pointCurrent(app.appDir, params.static === true ? staticSha(ctx, slug) : liveSha(app.appDir, String(params.color)));
+  if (params.php !== true) pointCurrent(app.appDir, params.static === true ? staticSha(ctx, slug) : liveSha(app.appDir, String(params.color)));
   return { slug, domains, ...target };
 }
 

@@ -10,6 +10,7 @@ import { cronActions } from "./actions/cron.ts";
 import { firewallActions } from "./actions/firewall.ts";
 import { serviceActions } from "./actions/service.ts";
 import { envActions } from "./actions/env.ts";
+import { phpActions } from "./actions/php.ts";
 import { logsActions } from "./actions/logs.ts";
 import { metricsActions } from "./actions/metrics.ts";
 import { panelActions } from "./actions/panel.ts";
@@ -32,6 +33,7 @@ export const ACTION_TABLE: ActionTable = {
   ...nodeActions,
   ...appActions,
   ...envActions,
+  ...phpActions,
   ...unitActions,
   ...releaseActions,
   ...proxyActions,

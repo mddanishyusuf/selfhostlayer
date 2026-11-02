@@ -78,15 +78,15 @@ ${renderRedirects(redirects)}`;
 
 export interface LiveMarker {
   slug: string;
-  color: Color | "static";
+  color: Color | "static" | "php";
   port: number | null;
 }
 
 export function parseLiveMarker(content: string): LiveMarker | null {
-  const match = /^# layer: slug=([a-z0-9-]+) live=(blue|green|static)(?: port=(\d+))?$/m.exec(content);
+  const match = /^# layer: slug=([a-z0-9-]+) live=(blue|green|static|php)(?: port=(\d+))?$/m.exec(content);
   if (!match) return null;
-  return match[2] === "static"
-    ? { slug: match[1]!, color: "static", port: null }
+  return match[2] === "static" || match[2] === "php"
+    ? { slug: match[1]!, color: match[2], port: null }
     : { slug: match[1]!, color: match[2] as Color, port: Number(match[3]) };
 }
 

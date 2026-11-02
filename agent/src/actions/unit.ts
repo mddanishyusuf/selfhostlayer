@@ -51,7 +51,7 @@ export function liveColor(ctx: Context, slug: string): Color | null {
   const site = childOf(ctx.paths.caddySitesDir, `${slug}.caddy`);
   if (!existsSync(site)) return null;
   const live = parseLiveMarker(readFileSync(site, "utf8"))?.color ?? null;
-  return live === "static" ? null : live;
+  return live === "static" || live === "php" ? null : live;
 }
 
 async function unitWrite(params: Params, ctx: Context) {

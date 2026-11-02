@@ -10,6 +10,7 @@ import { parseColorEnvPort, renderColorEnv, renderEnvFile } from "../templates/e
 import { unitName } from "../templates/app-unit.ts";
 import { parseLiveMarker } from "../templates/caddy-site.ts";
 import { cronNames, removeCronUnits } from "./cron.ts";
+import { removePhp } from "./php.ts";
 import { removeMongodb, removeMysql, removePostgres, removeRedis } from "./service.ts";
 
 export function appLayout(ctx: Context, slug: string) {
@@ -27,6 +28,12 @@ export function appLayout(ctx: Context, slug: string) {
     colorEnv: (color: "blue" | "green") => join(etcDir, `${color}.env`),
   };
 }
+
+/**
+ * data/'s mode: 0700, or 0710 for a PHP site, whose data/ has an ACL letting
+ * Caddy through. chmod 0700 would set the ACL's mask to nothing and cut Caddy off.
+ */
+export const dataMode = (etcDir: string) => (existsSync(join(etcDir, "php.json")) ? 0o710 : 0o700);
 
 function readPorts(layout: ReturnType<typeof appLayout>) {
   const port = (color: "blue" | "green") => {
@@ -63,7 +70,7 @@ async function appCreate(params: Params, ctx: Context) {
   const owner = { uid: user.uid, gid: user.gid };
   ensureDir(app.appDir, 0o750, owner);
   ensureDir(app.releases, 0o750, owner);
-  ensureDir(app.data, 0o700, owner);
+  ensureDir(app.data, dataMode(app.etcDir), owner);
   ensureDir(app.cache, 0o700, owner);
   ensureDir(app.etcDir, 0o755);
   if (!existsSync(app.appEnv)) writeFileAtomic(app.appEnv, renderEnvFile({}), 0o600);
@@ -101,6 +108,7 @@ async function appDelete(params: Params, ctx: Context) {
     await ctx.exec(BIN.systemctl, ["disable", unit], { allowFail: true });
   }
   for (const name of cronNames(ctx, slug)) await removeCronUnits(ctx, slug, name);
+  await removePhp(ctx, slug);
   await removeRedis(ctx, slug, true);
   // Before the app's files go: with keepData its database is dumped to the archive.
   await removePostgres(ctx, slug, keepData);
@@ -150,7 +158,7 @@ async function appList(_params: Params, ctx: Context) {
   const apps = slugs.map((slug) => {
     const app = appLayout(ctx, slug);
     const site = childOf(ctx.paths.caddySitesDir, `${slug}.caddy`);
-    const live: Color | "static" | null = existsSync(site) ? (parseLiveMarker(readFileSync(site, "utf8"))?.color ?? null) : null;
+    const live: Color | "static" | "php" | null = existsSync(site) ? (parseLiveMarker(readFileSync(site, "utf8"))?.color ?? null) : null;
     const domains = existsSync(site) ? (/^([^#\s][^{]*)\{/m.exec(readFileSync(site, "utf8"))?.[1] ?? "").split(",").map((d) => d.trim()).filter(Boolean) : [];
     return {
       slug,
