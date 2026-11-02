@@ -23,6 +23,7 @@ const LABELS: Record<string, string> = {
   "app.create": "Set up the app",
   "app.delete": "Deleted the app",
   "env.write": "Wrote env vars",
+  "files.place": "Wrote private files",
   "unit.write": "Wrote its service unit",
   "unit.start": "Started a version",
   "unit.stop": "Stopped a version",

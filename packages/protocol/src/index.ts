@@ -23,6 +23,7 @@ export const ACTIONS = [
   "release.prune",
   "source.fetch",
   "build.run",
+  "files.place",
   "build.cancel",
   "cache.clean",
   "cron.write",

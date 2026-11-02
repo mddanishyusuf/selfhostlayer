@@ -1,14 +1,15 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { AgentError } from "@layer/protocol";
+import { AgentError, assertPrivateFiles, PRIVATE_FILES, ValidationError } from "@layer/protocol";
 import { agent } from "@/lib/agent";
 import { activeDeployment, cancelDeployment, deploymentPath, deployProject, getDeployment, rollbackTo, type Deployment } from "@/lib/deploy";
 import { parseRepoUrl } from "@/lib/github-repo";
 import { importRepo } from "@/lib/import";
 import { removePreview } from "@/lib/preview";
 import { parseEnvVars, parseSettings } from "@/lib/project-settings";
-import { deleteProject, getProject, getProjectBySlug, setProjectEnv, updateProjectSettings } from "@/lib/projects";
+import { deleteProject, deleteProjectFile, getProject, getProjectBySlug, projectFiles, setProjectEnv, setProjectFile, updateProjectSettings } from "@/lib/projects";
 import { restartWithNewEnv } from "@/lib/services";
 import { requireUser } from "@/lib/session";
 
@@ -82,6 +83,58 @@ export async function saveEnvAction(_prev: EnvState, form: FormData): Promise<En
   }
   if (!d) return { saved: activeDeployment(project.id) ? "Saved. A deploy is running: redeploy after it to load them." : "Saved. The first deploy uses them." };
   redirect(deploymentPath(project.slug, d.id));
+}
+
+export interface FileState {
+  error?: string;
+  saved?: string;
+  /** Bumped on each save, so the form clears. */
+  done?: number;
+}
+
+/** After a private file changes: redeploy now (intent "apply"), or say the next deploy uses it. */
+async function applyFiles(project: NonNullable<ReturnType<typeof getProjectBySlug>>, form: FormData, saved: string): Promise<FileState> {
+  if (form.get("intent") !== "apply") return { saved: `${saved} The next deploy writes it.`, done: Date.now() };
+  if (activeDeployment(project.id)) return { saved: `${saved} A deploy is running: redeploy after it.`, done: Date.now() };
+  let d: Deployment;
+  try {
+    d = await deployProject(project, "manual");
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "Couldn't start the deployment." };
+  }
+  redirect(deploymentPath(project.slug, d.id));
+}
+
+/** Adds or replaces a private file (path and content), checked like the agent checks it. */
+export async function saveFileAction(_prev: FileState, form: FormData): Promise<FileState> {
+  await requireUser();
+  const project = getProjectBySlug(field(form, "slug"));
+  if (!project || project.source !== "github") redirect("/");
+  const path = field(form, "path").replace(/^\.?\/+/, "");
+  const content = String(form.get("content") ?? "");
+  if (!content) return { error: "Paste the file's contents, or choose the file." };
+  const others = projectFiles(project.id).filter((f) => f.path !== path);
+  try {
+    assertPrivateFiles([...others, { path, content }]);
+  } catch (err) {
+    if (!(err instanceof ValidationError)) throw err;
+    if (err.field.endsWith(".path")) return { error: "Give a path inside the project, like serviceAccountKey.json or config/key.json: letters, digits, dots, dashes and underscores." };
+    if (err.field.endsWith(".content")) return { error: `${path} is over ${PRIVATE_FILES.fileBytes / 1024} KB.` };
+    return { error: `A project can have ${PRIVATE_FILES.max} private files, ${PRIVATE_FILES.totalBytes / 1024 ** 2} MB together.` };
+  }
+  setProjectFile(project.id, path, content);
+  revalidatePath(`/projects/${project.slug}/env`);
+  return applyFiles(project, form, `Saved ${path}.`);
+}
+
+export async function deleteFileAction(_prev: FileState, form: FormData): Promise<FileState> {
+  await requireUser();
+  const project = getProjectBySlug(field(form, "slug"));
+  if (!project) redirect("/");
+  const path = field(form, "path");
+  deleteProjectFile(project.id, path);
+  revalidatePath(`/projects/${project.slug}/env`);
+  return { saved: `Removed ${path}. The next deploy leaves it out; the live release keeps its copy until then.`, done: Date.now() };
 }
 
 /** Deletes the project (or uninstalls an integration) and its app on the server (data/ is archived unless asked otherwise). */

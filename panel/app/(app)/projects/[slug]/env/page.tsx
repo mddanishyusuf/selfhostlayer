@@ -1,10 +1,10 @@
 import { notFound } from "next/navigation";
 import { KeyValues, PageHeader, SettingsRow } from "@/components/page";
 import { SecretUrl } from "@/components/services";
-import { EnvForm } from "@/components/settings";
+import { EnvForm, PrivateFiles } from "@/components/settings";
 import { Pill } from "@/components/ui";
 import { liveDeployment } from "@/lib/deploy";
-import { getProjectBySlug, projectEnv } from "@/lib/projects";
+import { getProjectBySlug, projectEnv, projectFiles } from "@/lib/projects";
 import { serviceStatus } from "@/lib/services";
 import { requireUser } from "@/lib/session";
 
@@ -45,6 +45,14 @@ export default async function EnvPage({ params }: { params: Promise<{ slug: stri
     <>
       <PageHeader title={project.slug} crumb="Environment" meta="Encrypted · only the app's process sees them" />
       <EnvForm slug={project.slug} initial={Object.entries(projectEnv(project.id))} isStatic={isStatic} live={!!liveDeployment(project.id)} />
+      {project.source === "github" && (
+        <PrivateFiles
+          slug={project.slug}
+          files={projectFiles(project.id).map((f) => ({ path: f.path, bytes: Buffer.byteLength(f.content) }))}
+          isStatic={isStatic}
+          live={!!liveDeployment(project.id)}
+        />
+      )}
       {provided.length > 0 && (
         <SettingsRow title="Set for you" description="The server sets these. Databases update their own URLs when you add or remove them.">
           <KeyValues inset items={provided} />

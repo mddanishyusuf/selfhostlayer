@@ -153,6 +153,8 @@ Your variables, encrypted in the panel's database. On deploy they're written to 
 
 Edit them as rows, or switch to **Raw .env** to see them all as one `.env` file. Paste a whole file there; switching back to **Rows** turns each `KEY=value` line into a row, and lines that aren't `KEY=value` are pointed out before they're left out. Values stay hidden until you click **Show values**, and the browser never fills them in with a saved password.
 
+**Private files** are files the app needs that aren't in Git, like a Firebase `serviceAccountKey.json`. Give a path in the project (`serviceAccountKey.json`, `config/key.json`) and paste the contents or choose the file. They're encrypted in the panel's database and never shown again: saving the same path replaces the file. Each deploy writes them into the release, relative to the project's root folder, before the build, so the build and the app both find them. They belong to the app's user and only it can read them (600). Changes apply on the next deploy (**Save and redeploy**). Up to 20 files, 512 KB each. A static site only has them while it builds: anything the build copies into its output is public.
+
 **Set for you** lists what the server provides:
 
 - `DATA_DIR`: the folder that survives deploys.

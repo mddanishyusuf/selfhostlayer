@@ -236,3 +236,31 @@ describe("bunAsset", () => {
     expect(() => bunAsset("ia32")).toThrow();
   });
 });
+
+describe("files.place", () => {
+  const place = (params: Record<string, unknown>) => buildActions["files.place"]!.run({ slug: "hello", sha: SHA, ...params }, env.ctx, NO_IO) as Promise<any>;
+
+  it("writes the files as the app, offline, with the contents on stdin only", async () => {
+    const result = await place({ rootDir: "web", files: [{ path: "serviceAccountKey.json", content: '{"private_key":"SECRET"}' }] });
+    expect(result).toEqual({ slug: "hello", sha: SHA, placed: 1 });
+    const run = env.spawner.calls.find(([f]) => f === SYSTEMD_RUN)!;
+    expect(run).toContain("--uid=app-hello");
+    expect(run).toContain("--property=IPAddressDeny=any");
+    expect(run.at(-1)).toBe(join(env.paths.appsRoot, "hello", "releases", SHA, "web"));
+    expect(run.join(" ")).not.toContain("SECRET");
+  });
+
+  it("does nothing without files, and refuses paths outside the project", async () => {
+    expect(await place({ files: [] })).toMatchObject({ placed: 0 });
+    expect(env.spawner.calls).toEqual([]);
+    await expect(place({ files: [{ path: "../etc/passwd", content: "x" }] })).rejects.toThrow("'..'");
+    await expect(place({ files: [{ path: "/etc/passwd", content: "x" }] })).rejects.toThrow();
+    await expect(place({ files: [{ path: "a.json", content: "x".repeat(600 * 1024) }] })).rejects.toThrow("over 512 KB");
+  });
+
+  it("keeps the contents out of the audit log", () => {
+    const redacted = buildActions["files.place"]!.redact!({ slug: "hello", sha: SHA, files: [{ path: "key.json", content: "SECRET" }] });
+    expect(JSON.stringify(redacted)).not.toContain("SECRET");
+    expect(redacted).toMatchObject({ paths: ["key.json"] });
+  });
+});

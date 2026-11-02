@@ -154,6 +154,28 @@ export function setProjectEnv(projectId: number, vars: Record<string, string>): 
 }
 
 /** What an integration's manifest decides (lib/catalog.ts applies it before each deploy). */
+export interface PrivateFile {
+  path: string;
+  content: string;
+  updatedAt: number;
+}
+
+/** Private files, decrypted, by path. */
+export function projectFiles(projectId: number): PrivateFile[] {
+  const rows = db().prepare("SELECT path, content_enc, updated_at FROM project_files WHERE project_id = ? ORDER BY path").all(projectId) as { path: string; content_enc: string; updated_at: number }[];
+  return rows.map((r) => ({ path: r.path, content: decrypt(r.content_enc), updatedAt: r.updated_at }));
+}
+
+export function setProjectFile(projectId: number, path: string, content: string): void {
+  db()
+    .prepare("INSERT INTO project_files (project_id, path, content_enc, updated_at) VALUES (?, ?, ?, ?) ON CONFLICT (project_id, path) DO UPDATE SET content_enc = excluded.content_enc, updated_at = excluded.updated_at")
+    .run(projectId, path, encrypt(content), now());
+}
+
+export function deleteProjectFile(projectId: number, path: string): void {
+  db().prepare("DELETE FROM project_files WHERE project_id = ? AND path = ?").run(projectId, path);
+}
+
 export function updateIntegration(id: number, s: { runtime: Runtime; nodeVersion: string; memoryMb: number }): void {
   db().prepare("UPDATE projects SET runtime = ?, node_version = ?, memory_mb = ? WHERE id = ?").run(JSON.stringify(s.runtime), s.nodeVersion, s.memoryMb, id);
 }

@@ -229,6 +229,14 @@ const MIGRATIONS = [
    ALTER TABLE projects ADD COLUMN catalog_app TEXT;
    ALTER TABLE deployments ADD COLUMN version TEXT;
    ALTER TABLE deployments ADD COLUMN manifest TEXT;`,
+  // Private files (a service account key…): kept encrypted, written into each release before its build.
+  `CREATE TABLE project_files (
+     project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+     path TEXT NOT NULL,
+     content_enc TEXT NOT NULL,
+     updated_at INTEGER NOT NULL,
+     PRIMARY KEY (project_id, path)
+   );`,
 ];
 
 function open(): DatabaseSync {

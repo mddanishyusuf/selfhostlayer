@@ -16,6 +16,7 @@ import {
   assertInt,
   assertNodeVersion,
   assertPackageManager,
+  assertPrivateFiles,
   assertRelativePath,
   assertSlug,
   COLORS,
@@ -393,6 +394,62 @@ async function buildRun(params: Params, ctx: Context, io: CallIO) {
   return { slug, sha, steps };
 }
 
+/**
+ * Writes the project's private files into a fetched release, relative to its
+ * root (rootDir), as the app in a sandboxed job: a symlink in the repo can
+ * only lead where the app may write anyway. The files come on stdin, never in
+ * arguments or logs, and are the app's alone (600). Run before the build, so
+ * the build and the app both find them.
+ */
+const PLACE_FILES_JOB = String.raw`
+const fs = require("node:fs");
+const path = require("node:path");
+const root = process.argv[1];
+let input = "";
+process.stdin.setEncoding("utf8");
+process.stdin.on("data", (c) => (input += c));
+process.stdin.on("end", () => {
+  for (const f of JSON.parse(input)) {
+    const target = path.join(root, f.path);
+    fs.mkdirSync(path.dirname(target), { recursive: true, mode: 0o700 });
+    fs.rmSync(target, { force: true });
+    const fd = fs.openSync(target, fs.constants.O_WRONLY | fs.constants.O_CREAT | fs.constants.O_EXCL | fs.constants.O_NOFOLLOW, 0o600);
+    fs.writeSync(fd, f.content);
+    fs.closeSync(fd);
+    console.log("  " + f.path);
+  }
+});
+`;
+
+async function filesPlace(params: Params, ctx: Context, io: CallIO) {
+  const slug = assertSlug(params.slug);
+  const sha = assertFullSha(params.sha);
+  const rootDir = params.rootDir === undefined || params.rootDir === "" ? null : assertRelativePath(params.rootDir, "rootDir");
+  const files = assertPrivateFiles(params.files);
+  if (files.length === 0) return { slug, sha, placed: 0 };
+  const { app, user } = await requireAppUser(ctx, slug);
+  const release = join(app.releases, sha);
+  if (!isRealDir(release)) throw new ActionError("not_found", `release ${sha.slice(0, 7)} isn't fetched yet (run source.fetch first)`);
+  const code = await runJob(
+    ctx,
+    io,
+    {
+      unit: jobUnits(slug).build,
+      user: user.name,
+      cwd: release,
+      readWrite: [release],
+      env: { PATH: "/usr/bin:/bin" },
+      memoryMb: 256,
+      timeoutSec: 60,
+      network: false,
+      command: [ctx.paths.runtimeNode, "--no-warnings", "-e", PLACE_FILES_JOB, rootDir ? join(release, rootDir) : release],
+    },
+    Readable.from([JSON.stringify(files)]),
+  );
+  if (code !== 0) throw new ActionError("files_failed", `writing the private files failed (exit ${code})`);
+  return { slug, sha, placed: files.length };
+}
+
 async function buildCancel(params: Params, ctx: Context) {
   const slug = assertSlug(params.slug);
   const units = jobUnits(slug);
@@ -489,6 +546,12 @@ export const buildActions: ActionTable = {
   },
   "catalog.fetch": { mutates: true, lock: "build", run: catalogFetch },
   "build.run": { mutates: true, lock: "build", run: buildRun },
+  // Never write the files' contents to the audit log.
+  "files.place": {
+    mutates: true,
+    run: filesPlace,
+    redact: (params) => ({ slug: params.slug, sha: params.sha, paths: Array.isArray(params.files) ? params.files.map((f: { path?: unknown }) => f?.path) : [] }),
+  },
   // No lock: it must be able to stop a build that holds the build lock.
   "build.cancel": { mutates: false, run: buildCancel },
   "release.prune": { mutates: true, run: releasePrune },

@@ -26,7 +26,7 @@ import { servingConfig } from "./domains";
 import { getApp } from "./github-store";
 import { BUILD_SLOTS, readState } from "./panel-state";
 import { latestCommit } from "./github-repo";
-import { getProject, listProjects, projectEnv, type Project } from "./projects";
+import { getProject, listProjects, projectEnv, projectFiles, type Project } from "./projects";
 
 export const BUN_VERSION = "1.3.9";
 const DRAIN_MS = 2000;
@@ -417,6 +417,12 @@ async function run(id: number): Promise<void> {
     } else {
       const token = await repoToken(p);
       const fetched = await stream("source.fetch", { slug: p.slug, owner: p.repoOwner, repo: p.repoName, sha: d.sha, ...(token ? { token } : {}) });
+      // Private files go in before the build, rollbacks included, so each release has today's.
+      const files = projectFiles(p.id);
+      if (files.length) {
+        log(id, `Writing ${files.length} private file${files.length === 1 ? "" : "s"}:\n`);
+        await stream("files.place", { slug: p.slug, sha: d.sha, rootDir: p.rootDir, files: files.map(({ path, content }) => ({ path, content })) });
+      }
       // A rollback whose release is still on disk skips the build.
       const builtBefore = !!db().prepare("SELECT 1 FROM deployments WHERE project_id = ? AND sha = ? AND status = 'ready' AND id != ?").get(p.id, d.sha, id);
       if (d.trigger === "rollback" && builtBefore && fetched.fetched === false) {

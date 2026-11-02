@@ -1,10 +1,10 @@
 "use client";
 
-import { EyeIcon, EyeOffIcon, PlusIcon, Trash2Icon } from "lucide-react";
-import { useActionState, useState } from "react";
+import { EyeIcon, EyeOffIcon, FileLockIcon, PlusIcon, Trash2Icon } from "lucide-react";
+import { useActionState, useEffect, useRef, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { saveIntegrationSettings, type IntegrationSettingsState } from "@/app/actions/integrations";
-import { removeProject, saveEnvAction, saveSettings, type EnvState, type SettingsState } from "@/app/actions/projects";
+import { deleteFileAction, removeProject, saveEnvAction, saveFileAction, saveSettings, type EnvState, type FileState, type SettingsState } from "@/app/actions/projects";
 import { badDotEnvLines, formatDotEnv, parseDotEnv } from "@/lib/project-settings";
 import { Icon } from "./icon";
 import { Modal } from "./modal";
@@ -297,6 +297,133 @@ export function EnvForm({ slug, initial, isStatic, live }: { slug: string; initi
         <ApplyButtons isStatic={isStatic} live={live} />
       </SettingsRow>
     </form>
+  );
+}
+
+const kb = (bytes: number) => (bytes < 1024 ? `${bytes} B` : `${(bytes / 1024).toFixed(bytes < 10240 ? 1 : 0)} KB`);
+
+function RemoveFile({ slug, path }: { slug: string; path: string }) {
+  const [state, action] = useActionState(deleteFileAction, {} as FileState);
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <Button type="button" variant="secondary" size="sm" onClick={() => setOpen(true)} aria-label={`Remove ${path}`}>
+        <Icon icon={Trash2Icon} size={14} />
+      </Button>
+      <Modal open={open} onClose={() => setOpen(false)} title={`Remove ${path}?`} description="The next deploy leaves it out, so an app that needs it won't start. The live release keeps its copy until then.">
+        <form action={action} className="flex justify-end gap-2 px-[18px] py-5">
+          <input type="hidden" name="slug" value={slug} />
+          <input type="hidden" name="path" value={path} />
+          <FormError message={state.error} />
+          <Button type="button" variant="secondary" onClick={() => setOpen(false)}>
+            Cancel
+          </Button>
+          <Button type="submit" variant="danger">
+            Remove
+          </Button>
+        </form>
+      </Modal>
+    </>
+  );
+}
+
+function FileButtons({ live }: { live: boolean }) {
+  const { pending, data } = useFormStatus();
+  const intent = data?.get("intent");
+  return (
+    <div className="flex flex-wrap justify-end gap-2">
+      <Button type="submit" name="intent" value="save" variant={live ? "secondary" : "primary"} disabled={pending}>
+        {pending && intent === "save" ? "Saving…" : "Save file"}
+      </Button>
+      {live && (
+        <Button type="submit" name="intent" value="apply" disabled={pending}>
+          {pending && intent === "apply" ? "Starting…" : "Save and redeploy"}
+        </Button>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Private files: files a project needs that aren't in Git (a service account
+ * key). Their contents never come back to the browser: saving a path again
+ * replaces the file.
+ */
+export function PrivateFiles({ slug, files, isStatic, live }: { slug: string; files: { path: string; bytes: number }[]; isStatic: boolean; live: boolean }) {
+  const [state, action] = useActionState(saveFileAction, {} as FileState);
+  const form = useRef<HTMLFormElement>(null);
+  const [path, setPath] = useState("");
+  const [content, setContent] = useState("");
+  useEffect(() => {
+    if (!state.done) return;
+    form.current?.reset();
+    setPath("");
+    setContent("");
+  }, [state.done]);
+  const choose = async (file: File | undefined) => {
+    if (!file) return;
+    setContent(await file.text());
+    if (!path) setPath(file.name);
+  };
+  return (
+    <SettingsRow
+      title="Private files"
+      description={
+        <>
+          Files the app needs that aren&apos;t in Git, like <code className="font-mono text-[12px]">serviceAccountKey.json</code>. They&apos;re kept encrypted, and each deploy writes them
+          into the project&apos;s root (or a folder in it) before the build, readable by the app alone. Saving a path again replaces it.
+          {isStatic && " A static site only uses them while it builds: anything the build copies into its output is public."}
+        </>
+      }
+    >
+      {files.length > 0 && (
+        <div className="grid border border-border">
+          {files.map((f) => (
+            <div key={f.path} className="flex items-center gap-2.5 border-b border-border-soft px-3 py-2 last:border-b-0">
+              <Icon icon={FileLockIcon} size={15} className="text-muted" />
+              <code className="min-w-0 flex-1 truncate font-mono text-[13px]">{f.path}</code>
+              <span className="text-[12px] text-muted tabular-nums">{kb(f.bytes)}</span>
+              <RemoveFile slug={slug} path={f.path} />
+            </div>
+          ))}
+        </div>
+      )}
+      <form ref={form} action={action} className="grid gap-3">
+        <input type="hidden" name="slug" value={slug} />
+        <Field label="Path in the project" htmlFor="file-path" hint="Relative to the project's root: serviceAccountKey.json, config/key.json">
+          <Input id="file-path" name="path" value={path} onChange={(e) => setPath(e.target.value)} placeholder="serviceAccountKey.json" spellCheck={false} className="font-mono text-[13px]" />
+        </Field>
+        <Field
+          label="Contents"
+          htmlFor="file-content"
+          hint={
+            <>
+              Paste it, or{" "}
+              <label className="cursor-pointer text-accent hover:underline">
+                choose the file
+                <input type="file" className="sr-only" onChange={(e) => void choose(e.target.files?.[0])} />
+              </label>
+              . It&apos;s never shown again: to change it, save it again.
+            </>
+          }
+        >
+          <textarea
+            id="file-content"
+            name="content"
+            rows={8}
+            value={content}
+            onChange={(e) => setContent(e.target.value)}
+            spellCheck={false}
+            {...NO_AUTOFILL}
+            placeholder='{ "type": "service_account", … }'
+            className="w-full border border-border bg-field px-2.5 py-2 font-mono text-[12.5px] leading-[1.5] outline-none transition-[border-color,box-shadow] duration-150 placeholder:text-placeholder focus:border-accent focus:shadow-focus"
+          />
+        </Field>
+        <FormError message={state.error} />
+        {state.saved && <p className="text-[13px] text-teal">{state.saved}</p>}
+        <FileButtons live={live} />
+      </form>
+    </SettingsRow>
   );
 }
 

@@ -100,6 +100,31 @@ export function assertRelativePath(value: unknown, field = "path"): string {
   return value;
 }
 
+/** Private files: at most this many per project, each and all together at most these sizes. */
+export const PRIVATE_FILES = { max: 20, fileBytes: 512 * 1024, totalBytes: 2 * 1024 * 1024 };
+
+/**
+ * A project's private files: [{ path, content }], each path relative to the
+ * project's root (serviceAccountKey.json, config/firebase.json), once.
+ */
+export function assertPrivateFiles(value: unknown, field = "files"): { path: string; content: string }[] {
+  if (!Array.isArray(value) || value.length > PRIVATE_FILES.max) throw new ValidationError(field, `must be a list of at most ${PRIVATE_FILES.max} files`);
+  const seen = new Set<string>();
+  let total = 0;
+  return value.map((f: unknown, i) => {
+    const file = (f ?? {}) as { path?: unknown; content?: unknown };
+    const path = assertRelativePath(file.path, `${field}[${i}].path`);
+    if (seen.has(path)) throw new ValidationError(`${field}[${i}].path`, `${path} is listed twice`);
+    seen.add(path);
+    if (typeof file.content !== "string") throw new ValidationError(`${field}[${i}].content`, "must be text");
+    const bytes = Buffer.byteLength(file.content);
+    if (bytes > PRIVATE_FILES.fileBytes) throw new ValidationError(`${field}[${i}].content`, `${path} is over ${PRIVATE_FILES.fileBytes / 1024} KB`);
+    total += bytes;
+    if (total > PRIVATE_FILES.totalBytes) throw new ValidationError(field, `all files together are over ${PRIVATE_FILES.totalBytes / 1024 ** 2} MB`);
+    return { path, content: file.content };
+  });
+}
+
 /** A lowercase hostname like example.com or app.example.internal. No wildcards or IPs. */
 export function assertDomain(value: unknown, field = "domain"): string {
   if (typeof value !== "string" || value.length > 253) {
