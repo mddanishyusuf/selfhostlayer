@@ -1,6 +1,6 @@
 # Self Host Layer: "Vercel on your own VPS, without Docker"
 
-> Weeks 1–4 built, and the panel redesigned. Weeks 5–6 (combined) are planned in [PLAN-WEEK5.md](PLAN-WEEK5.md). The marketplace starts with Links, a link shortener built from scratch: [PLAN-LINKS.md](PLAN-LINKS.md). Planned next: one-click WordPress sites on a PHP runtime of their own, [PLAN-WORDPRESS.md](PLAN-WORDPRESS.md). Read [PLAN-WEEK4.md](PLAN-WEEK4.md) too. When you (Claude) open this folder, read this file, [PLAN-WEEK3.md](PLAN-WEEK3.md), [PLAN-WEEK2.md](PLAN-WEEK2.md), [PLAN-WEEK1.md](PLAN-WEEK1.md) and [RESEARCH.md](RESEARCH.md) before suggesting anything.
+> Weeks 1–4 built, and the panel redesigned. Weeks 5–6 (combined) are planned in [PLAN-WEEK5.md](PLAN-WEEK5.md). The marketplace starts with Links, a link shortener built from scratch: [PLAN-LINKS.md](PLAN-LINKS.md). Planned next: **Sites**, one-click WordPress (on a PHP runtime, decided 2026-11-02) and Ghost sites: [PLAN-SITES.md](PLAN-SITES.md). Read [PLAN-WEEK4.md](PLAN-WEEK4.md) too. When you (Claude) open this folder, read this file, [PLAN-WEEK3.md](PLAN-WEEK3.md), [PLAN-WEEK2.md](PLAN-WEEK2.md), [PLAN-WEEK1.md](PLAN-WEEK1.md) and [RESEARCH.md](RESEARCH.md) before suggesting anything.
 >
 > **Name:** Self Host Layer. Domain **selfhostlayer.com** (owned). Repo: https://github.com/mddanishyusuf/selfhostlayer. The internal identifier is **`layer`**: CLI `layer`, Linux user `layer`, paths `/opt/layer`, `/etc/layer`, `/var/lib/layer`, units `layer-agent` / `layer-panel`, manifest `layer.yaml`.
 
