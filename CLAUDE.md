@@ -201,6 +201,6 @@ The panel uses the design of our AgentOS app (`~/projects/agent-os/web/src/theme
 - **Published the same day:** panel 0.1.15; Links 0.1.1, Analytics 0.3.1, Email 0.1.2 and Forms 0.1.1 in the catalog; the website's docs.
 - **Left open:** MongoDB's first-user race (it fails closed), and signing the release feed.
 
-**Import takes a database (2026-11-02):** importing a gzipped SQLite file failed with only "tar exited 2". Import now also takes a single SQLite database (`.db`/`.sqlite`, gzipped or not): it replaces data/'s database of that name (or its only one) and leaves the rest. The job finds out what the file is after gunzip, as the app; a failing archive says tar's own reason, and a cut-off gzip is refused.
+**Import takes a database (2026-11-02):** importing a gzipped SQLite file failed with only "tar exited 2". Import now also takes a single SQLite database (`.db`/`.sqlite`, gzipped or not): it replaces data/'s database of that name (or its only one) and leaves the rest. The job finds out what the file is after gunzip, as the app; a failing archive says tar's own reason, and a cut-off gzip is refused. Published as panel 0.1.16 with the new project icons, and in the website's docs.
 
 **Launch-time tasks (not now):** choose the license plus CLA, make the repo public, and make `curl -fsSL https://get.selfhostlayer.com | bash` install: the root of get.selfhostlayer.com only says "isn't out yet" (`app/install.sh/route.ts` in the website), and the installer still needs `--from-tarball` (it should download the newest release from the feed).
