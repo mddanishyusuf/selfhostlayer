@@ -118,7 +118,7 @@ export async function phpAccess(ctx: Context, slug: string): Promise<void> {
  * Writes the site's FPM config and unit, gives Caddy read access to its
  * docroot, and (re)starts it. Type=notify: when this returns, the socket is up.
  */
-async function phpWrite(params: Params, ctx: Context) {
+export async function phpWrite(params: Params, ctx: Context) {
   const slug = assertSlug(params.slug);
   const s = assertPhpSettings(params);
   const app = appLayout(ctx, slug);

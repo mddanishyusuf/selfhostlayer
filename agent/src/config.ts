@@ -29,6 +29,10 @@ export interface Paths {
   phpRunRoot: string;
   /** Which PHP is installed: {version, fpm}. */
   phpState: string;
+  /** Downloaded WordPress and Ghost releases, checked (Sites). */
+  sitesCache: string;
+  /** wp-cli, a pinned phar and its sha512. */
+  wpCli: { version: string; url: string; sha512: string };
   /** Copies of every generated file, for `layer repair`. */
   managedDir: string;
   /** Releases downloaded for panel.update. */
@@ -75,6 +79,12 @@ export const DEFAULT_PATHS: Paths = {
   mongodbAdmin: "/var/lib/layer-agent/mongodb-admin.json",
   phpRunRoot: "/run/layer-php",
   phpState: "/var/lib/layer-agent/php.json",
+  sitesCache: "/var/cache/layer/sites",
+  wpCli: {
+    version: "2.12.0",
+    url: "https://github.com/wp-cli/wp-cli/releases/download/v2.12.0/wp-cli-2.12.0.phar",
+    sha512: "be928f6b8ca1e8dfb9d2f4b75a13aa4aee0896f8a9a0a1c45cd5d2c98605e6172e6d014dda2e27f88c98befc16c040cbb2bd1bfa121510ea5cdf5f6a30fe8832",
+  },
   managedDir: "/var/lib/layer-agent/managed",
   updatesDir: "/var/lib/layer-agent/updates",
   catalogDir: "/var/lib/layer-agent/catalog",

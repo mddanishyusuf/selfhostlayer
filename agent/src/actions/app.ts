@@ -11,6 +11,7 @@ import { unitName } from "../templates/app-unit.ts";
 import { parseLiveMarker } from "../templates/caddy-site.ts";
 import { cronNames, removeCronUnits } from "./cron.ts";
 import { removePhp } from "./php.ts";
+import { removeWordpress } from "./wordpress.ts";
 import { removeMongodb, removeMysql, removePostgres, removeRedis } from "./service.ts";
 
 export function appLayout(ctx: Context, slug: string) {
@@ -109,6 +110,7 @@ async function appDelete(params: Params, ctx: Context) {
   }
   for (const name of cronNames(ctx, slug)) await removeCronUnits(ctx, slug, name);
   await removePhp(ctx, slug);
+  await removeWordpress(ctx, slug);
   await removeRedis(ctx, slug, true);
   // Before the app's files go: with keepData its database is dumped to the archive.
   await removePostgres(ctx, slug, keepData);

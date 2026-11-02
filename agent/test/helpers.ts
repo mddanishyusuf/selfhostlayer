@@ -100,6 +100,8 @@ export function testEnv(): TestEnv {
     mongodbAdmin: join(root, "var", "lib", "layer-agent", "mongodb-admin.json"),
     phpRunRoot: join(root, "run", "layer-php"),
     phpState: join(root, "var", "lib", "layer-agent", "php.json"),
+    sitesCache: join(root, "var", "cache", "layer", "sites"),
+    wpCli: { version: "2.12.0", url: "https://example.invalid/wp-cli.phar", sha512: "0".repeat(128) },
     managedDir: join(root, "var", "lib", "layer-agent", "managed"),
     updatesDir: join(root, "var", "lib", "layer-agent", "updates"),
     catalogDir: join(root, "var", "lib", "layer-agent", "catalog"),
