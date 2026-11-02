@@ -88,6 +88,16 @@
 6. **Newsletters:** Ghost sends bulk email only through Mailgun, which is its own setting in Ghost's admin. The engine page says so, and links there.
 7. **Memory:** a Ghost site takes about 150–250 MB, far more than an idle WordPress. The default limit is 512 MB, and New site says how many more fit (from Health's numbers).
 
+## MySQL 8 as built (Day 3 notes)
+
+- **8.4.13 LTS**, Oracle's generic glibc 2.28 tarballs from `cdn.mysql.com/Downloads/MySQL-8.4/`:
+  - x86_64 has a `-minimal` tarball (80 MB);
+  - aarch64 has only the full one (824 MB, with debug binaries). Only `bin/{mysqld,mysql,mysqldump,mysqladmin}`, `lib/` and `share/` are unpacked.
+- **Checked with GPG:** each tarball's `.asc`, against Oracle's MySQL release key, pinned in the agent and checked with `gpgv`. Not the md5 on the download page.
+- **Libraries:** the binaries want `libaio.so.1`, which Ubuntu 24.04 and later only ship as `libaio.so.1t64`. A private `lib/` folder with that link comes first on the units' `LD_LIBRARY_PATH`; nothing in /usr is changed.
+- **First start: `--initialize-insecure` and `--skip-networking`** (socket only, in a folder only root and mysql8 can enter). In that window the agent gives root a random password (kept in `/var/lib/layer-agent/mysql8-admin.json`), then restarts with TCP on 127.0.0.1:3307. No app ever sees a passwordless root.
+- `performance_schema=OFF`, `mysqlx=OFF`, and a 128 MB buffer pool, to keep idle memory down.
+
 ## In the panel
 
 - **Sites** in the sidebar. `/sites` lists every site, with its engine's icon. Each row shows:
