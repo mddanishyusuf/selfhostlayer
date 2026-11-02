@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowUpRightIcon, BellIcon, BracesIcon, ChartColumnIcon, ChevronDownIcon, ChevronLeftIcon, CircleArrowUpIcon, ClipboardListIcon, ClockIcon, DatabaseBackupIcon, DatabaseIcon, FolderIcon, GlobeIcon, HistoryIcon, KeyRoundIcon, LayoutDashboardIcon, LinkIcon, LogOutIcon, MailIcon, MenuIcon, MoonIcon, PanelLeftOpenIcon, PuzzleIcon, RocketIcon, SearchIcon, ServerIcon, SettingsIcon, ShieldIcon, SquareTerminalIcon, SunIcon } from "lucide-react";
+import { AppWindowIcon, ArrowUpRightIcon, BellIcon, BracesIcon, ChartColumnIcon, ChevronDownIcon, ChevronLeftIcon, CircleArrowUpIcon, ClipboardListIcon, ClockIcon, DatabaseBackupIcon, DatabaseIcon, FolderIcon, GlobeIcon, HistoryIcon, KeyRoundIcon, LayoutDashboardIcon, LinkIcon, LogOutIcon, MailIcon, MenuIcon, MoonIcon, PanelLeftOpenIcon, PuzzleIcon, RocketIcon, SearchIcon, ServerIcon, SettingsIcon, ShieldIcon, SquareTerminalIcon, SunIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Fragment, useEffect, useState } from "react";
@@ -20,6 +20,8 @@ export interface SidebarProject {
   integration: boolean;
   /** The catalog app (links), whose own pages come first. */
   app: string | null;
+  /** A Sites WordPress or Ghost: its pages go back to Sites, and its engine's page comes first. */
+  site: "wordpress" | "ghost" | null;
   status: "ok" | "warn" | "err" | "idle";
   isStatic: boolean;
   url: string | null;
@@ -49,9 +51,11 @@ interface Item {
 
 function globalNav(p: SidebarProps): Item[][] {
   const integrations = p.projects.filter((x) => x.integration).length;
+  const sites = p.projects.filter((x) => x.site).length;
   return [
     [
-      { href: "/", label: "Projects", icon: FolderIcon, exact: true, count: p.projects.length - integrations },
+      { href: "/", label: "Projects", icon: FolderIcon, exact: true, count: p.projects.length - integrations - sites },
+      { href: "/sites", label: "Sites", icon: AppWindowIcon, ...(sites ? { count: sites } : {}) },
       { href: "/deployments", label: "Deployments", icon: RocketIcon, dot: p.deploying },
       { href: "/analytics", label: "Analytics", icon: ChartColumnIcon },
       { href: "/email", label: "Email", icon: MailIcon },
@@ -90,8 +94,11 @@ function appNav(p: SidebarProject, base: string): Item[][] {
 
 function projectNav(p: SidebarProject): Item[][] {
   const base = `/projects/${p.slug}`;
+  // WordPress: wp-config.php is generated and WP-Cron has its own timer.
+  const wordpress = p.site === "wordpress";
   return [
     ...appNav(p, base),
+    ...(p.site ? [[{ href: `${base}/site`, label: p.site === "wordpress" ? "WordPress" : "Ghost", icon: AppWindowIcon }]] : []),
     [
       { href: base, label: "Overview", icon: LayoutDashboardIcon, exact: true },
       { href: `${base}/deployments`, label: "Deployments", icon: RocketIcon },
@@ -102,9 +109,9 @@ function projectNav(p: SidebarProject): Item[][] {
         : [
             { href: `${base}/databases`, label: "Databases", icon: DatabaseIcon },
             { href: `${base}/backups`, label: "Backups", icon: DatabaseBackupIcon },
-            { href: `${base}/crons`, label: "Cron jobs", icon: ClockIcon },
+            ...(wordpress ? [] : [{ href: `${base}/crons`, label: "Cron jobs", icon: ClockIcon }]),
           ]),
-      { href: `${base}/env`, label: "Environment", icon: KeyRoundIcon },
+      ...(wordpress ? [] : [{ href: `${base}/env`, label: "Environment", icon: KeyRoundIcon }]),
       { href: `${base}/settings`, label: "Settings", icon: SettingsIcon },
     ],
     p.url ? [{ href: p.url, label: "Visit site", icon: ArrowUpRightIcon, external: true }] : [],
@@ -207,11 +214,11 @@ function Nav(props: SidebarProps & { onNavigate?: () => void }) {
 
       {project && (
         <>
-          <Link href={project.integration ? "/integrations" : "/"} onClick={props.onNavigate} className={cx(ITEM, "text-muted")}>
+          <Link href={project.site ? "/sites" : project.integration ? "/integrations" : "/"} onClick={props.onNavigate} className={cx(ITEM, "text-muted")}>
             <span className={ICON}>
               <Icon icon={ChevronLeftIcon} />
             </span>
-            {project.integration ? "Integrations" : "All projects"}
+            {project.site ? "Sites" : project.integration ? "Integrations" : "All projects"}
           </Link>
           <div className="my-1.5 flex items-center gap-2 px-[9px] py-1.5" title={`${project.repo} · ${project.branch}`}>
             <StatusDot status={project.status} pulse={project.status === "warn"} />

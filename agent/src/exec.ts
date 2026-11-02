@@ -23,6 +23,7 @@ export const BIN = {
   mongosh: "/usr/bin/mongosh",
   mongodump: "/usr/bin/mongodump",
   fail2banClient: "/usr/bin/fail2ban-client",
+  gpgv: "/usr/bin/gpgv",
 } as const;
 
 export interface ExecResult {

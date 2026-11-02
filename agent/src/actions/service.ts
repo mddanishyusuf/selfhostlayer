@@ -14,7 +14,7 @@ import { connect } from "node:net";
 import { tmpdir, totalmem } from "node:os";
 import { dirname, join } from "node:path";
 import { assertInt, assertSlug, ValidationError } from "@layer/protocol";
-import type { ActionTable, Context, Params } from "../context.ts";
+import type { ActionTable, CallIO, Context, Params } from "../context.ts";
 import { ActionError } from "../errors.ts";
 import { BIN } from "../exec.ts";
 import { ensureDir, lookupUser, removeManaged, writeFileAtomic } from "../fsutil.ts";
@@ -24,6 +24,8 @@ import { renderEnvFile } from "../templates/env-file.ts";
 import { MONGOD_CONF, MONGODB_KEYRING, MONGODB_SERIES, MONGODB_SIGNING_KEY, MONGODB_SOURCES, MONGOSH_CONF, mongodbSource, renderMongodConf, renderMongodDropin, renderMongoshConf } from "../templates/mongodb.ts";
 import { redisUnit, renderRedisConf, renderRedisUnit } from "../templates/redis.ts";
 import { appLayout } from "./app.ts";
+import { MYSQL8 } from "../templates/mysql8.ts";
+import { installMysql8 } from "./mysql8.ts";
 import { installPhp } from "./php.ts";
 
 export const REDIS_PORTS = { min: 6400, max: 6999 };
@@ -34,6 +36,8 @@ export interface ServicesState {
   postgres?: { database: string; user: string; password: string };
   mysql?: { database: string; user: string; password: string };
   mongodb?: { database: string; user: string; password: string };
+  /** MySQL 8 (Oracle's), for Ghost sites: Ghost supports no other database in production. */
+  mysql8?: { database: string; user: string; password: string };
 }
 
 const servicesFile = (ctx: Context, slug: string) => join(appLayout(ctx, slug).etcDir, "services.json");
@@ -60,10 +64,24 @@ export function serviceEnv(state: ServicesState): Record<string, string> {
     const m = state.mongodb;
     env.MONGODB_URI = `mongodb://${m.user}:${m.password}@127.0.0.1:27017/${m.database}`;
   }
+  // Ghost reads its config from env vars, nconf style (database__connection__host).
+  if (state.mysql8) {
+    const m = state.mysql8;
+    Object.assign(env, {
+      database__client: "mysql",
+      database__connection__host: "127.0.0.1",
+      database__connection__port: "3307",
+      database__connection__user: m.user,
+      database__connection__password: m.password,
+      database__connection__database: m.database,
+      // Where its tools are, for backups (not a secret).
+      LAYER_MYSQL8_HOME: `${MYSQL8.root}/${MYSQL8.version}`,
+    });
+  }
   return env;
 }
 
-function writeServices(ctx: Context, slug: string, state: ServicesState): void {
+export function writeServices(ctx: Context, slug: string, state: ServicesState): void {
   const app = appLayout(ctx, slug);
   writeFileAtomic(servicesFile(ctx, slug), JSON.stringify(state, null, 2) + "\n", 0o600);
   writeFileAtomic(join(app.etcDir, "services.env"), renderEnvFile(serviceEnv(state)), 0o600);
@@ -85,13 +103,14 @@ function apt(ctx: Context, args: string[], unit: string) {
   );
 }
 
-async function serviceInstall(params: Params, ctx: Context) {
+async function serviceInstall(params: Params, ctx: Context, io: CallIO) {
   const name = params.name;
   if (name === "postgres") return installPostgres(ctx);
   if (name === "mysql") return installMysql(ctx);
   if (name === "mongodb") return installMongodb(ctx);
   if (name === "php") return installPhp(ctx);
-  if (name !== "redis") throw new ValidationError("name", 'must be "redis", "postgres", "mysql", "mongodb" or "php"');
+  if (name === "mysql8") return installMysql8(ctx, io);
+  if (name !== "redis") throw new ValidationError("name", 'must be "redis", "postgres", "mysql", "mongodb", "php" or "mysql8"');
   if (redisBinary()) return { name, installed: true, binary: redisBinary(), already: true };
   await apt(ctx, ["update", "-q"], "layer-apt-update");
   // Some releases ship Valkey (the Redis fork) instead of Redis; both work the same here.

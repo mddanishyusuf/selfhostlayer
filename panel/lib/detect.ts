@@ -20,7 +20,9 @@ export type Framework =
 
 export type Runtime =
   | { kind: "node"; exec: string[]; writablePaths: string[]; healthPath: string }
-  | { kind: "static"; outputDir: string; spa: boolean };
+  | { kind: "static"; outputDir: string; spa: boolean }
+  /** A Sites WordPress: Caddy and the site's own PHP-FPM, files in data/<root>. */
+  | { kind: "php"; root: string };
 
 export interface Detected {
   framework: Framework;

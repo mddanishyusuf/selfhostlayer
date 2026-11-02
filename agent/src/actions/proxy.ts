@@ -10,7 +10,7 @@ import { assertDomains, assertRedirects, renderCaddySite, renderStaticSite } fro
 import { parseColorEnvPort } from "../templates/env-file.ts";
 import { assertBlocks, phpSocketDir, renderPhpSite } from "../templates/php.ts";
 import { appLayout } from "./app.ts";
-import { phpSettings } from "./php.ts";
+import { phpSettings, watchLogins } from "./php.ts";
 
 /**
  * Sends the app's domains to one color by rewriting its Caddy site and
@@ -64,6 +64,7 @@ async function proxySet(params: Params, ctx: Context) {
     await ctx.exec(BIN.systemctl, ["reload", "caddy"], { allowFail: true, timeoutMs: 120_000 });
     throw new ActionError("invalid_config", "Caddy refused the new config, so the previous one was kept (see journalctl -u caddy)");
   }
+  if (params.php === true) await watchLogins(ctx, slug);
   if (params.php !== true) pointCurrent(app.appDir, params.static === true ? staticSha(ctx, slug) : liveSha(app.appDir, String(params.color)));
   return { slug, domains, ...target };
 }

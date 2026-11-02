@@ -8,6 +8,7 @@ import { boxConfig } from "@/lib/box";
 import { installedVersion, listDeployments, liveDeployment } from "@/lib/deploy";
 import { listAllDomains, servingConfig } from "@/lib/domains";
 import { listProjects } from "@/lib/projects";
+import { ENGINES, engineOf } from "@/lib/sites";
 import { requireUser } from "@/lib/session";
 import { THEME_COOKIE, parseTheme } from "@/lib/theme";
 import { offeredUpdate, updateState } from "@/lib/updates";
@@ -21,12 +22,14 @@ function sidebarProjects(): SidebarProject[] {
     // A custom domain (not the free URL) is the one to visit, once it's live.
     const host = hosts.find((h) => h !== p.domains[0]) ?? hosts[0] ?? p.domains[0];
     const integration = p.source === "catalog";
+    const site = engineOf(p);
     return {
       slug: p.slug,
-      repo: integration ? (installedVersion(p.id)?.commitMessage ?? p.slug) : `${p.repoOwner}/${p.repoName}`,
-      branch: integration ? "from the catalog" : p.branch,
+      repo: site ? (latest?.version ? `${ENGINES[site].name} ${latest.version}` : ENGINES[site].name) : integration ? (installedVersion(p.id)?.commitMessage ?? p.slug) : `${p.repoOwner}/${p.repoName}`,
+      branch: site ? "a site" : integration ? "from the catalog" : p.branch,
       integration,
-      app: p.catalogApp,
+      app: integration ? p.catalogApp : null,
+      site,
       status: building ? "warn" : live ? "ok" : latest?.status === "failed" ? "err" : "idle",
       isStatic: p.runtime.kind === "static",
       url: live && host ? `https://${host}` : null,
@@ -42,6 +45,7 @@ const PAGES: PaletteItem[] = [
   { label: "Forms", href: "/forms", hint: "Page" },
   { label: "Firewall", href: "/firewall", hint: "Page" },
   { label: "Domains", href: "/domains", hint: "Page" },
+  { label: "Sites", href: "/sites", hint: "Page" },
   { label: "Integrations", href: "/integrations", hint: "Page" },
   { label: "Databases", href: "/databases", hint: "Page" },
   { label: "Health", href: "/health", hint: "Page" },

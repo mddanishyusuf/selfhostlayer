@@ -1,7 +1,7 @@
 // PHP for Sites (WordPress): PHP from the distro, installed once, and one
 // sandboxed PHP-FPM master per site, as the site's own user, on a socket only
 // Caddy can reach. See PLAN-SITES.md.
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { chownSync, existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { assertSlug } from "@layer/protocol";
 import type { ActionTable, Context, Params } from "../context.ts";
@@ -47,9 +47,54 @@ function apt(ctx: Context, args: string[], unit: string) {
   );
 }
 
+/**
+ * fail2ban for WordPress logins: Caddy's JSON access logs, a POST to
+ * wp-login.php that answers 200 (a failed sign-in; a good one redirects).
+ * 10 in 10 minutes from one address bans it for an hour.
+ */
+export const WP_FILTER = `# Managed by Self Host Layer: failed WordPress sign-ins, from Caddy's JSON access logs.
+[Definition]
+datepattern = "ts":{EPOCH}
+failregex = ^\{.*"client_ip":"<HOST>".*"method":"POST".*"uri":"/wp-login\.php[^"]*".*"status":200[,}]
+ignoreregex =
+`;
+export const WP_JAIL = `# Managed by Self Host Layer.
+[layer-wordpress]
+enabled = true
+backend = auto
+filter = layer-wordpress
+logpath = /var/log/caddy/*.log
+port = http,https
+maxretry = 10
+findtime = 10m
+bantime = 1h
+`;
+
+async function wordpressJail(ctx: Context): Promise<void> {
+  if (!existsSync("/etc/fail2ban/jail.d")) return;
+  writeFileAtomic("/etc/fail2ban/filter.d/layer-wordpress.conf", WP_FILTER, 0o644);
+  writeFileAtomic("/etc/fail2ban/jail.d/layer-wordpress.conf", WP_JAIL, 0o644);
+  await ctx.exec(BIN.systemctl, ["reload-or-restart", "fail2ban"], { allowFail: true });
+}
+
+/** A PHP site's access log exists before fail2ban looks (it only watches files that exist), then the jail reads it. */
+export async function watchLogins(ctx: Context, slug: string): Promise<void> {
+  if (!existsSync("/etc/fail2ban/jail.d/layer-wordpress.conf")) return;
+  const log = join(ctx.paths.caddyLogDir, `${slug}.log`);
+  const caddy = await lookupUser(ctx.exec, ctx.paths.staticGroup ?? "caddy");
+  if (!existsSync(log) && caddy) {
+    writeFileAtomic(log, "", 0o640);
+    chownSync(log, caddy.uid, caddy.gid);
+  }
+  await ctx.exec(BIN.fail2banClient, ["reload", "layer-wordpress"], { allowFail: true });
+}
+
 export async function installPhp(ctx: Context) {
   const already = phpInstalled(ctx);
-  if (already) return { name: "php", installed: true, version: already.version, already: true };
+  if (already) {
+    if (!existsSync("/etc/fail2ban/jail.d/layer-wordpress.conf")) await wordpressJail(ctx);
+    return { name: "php", installed: true, version: already.version, already: true };
+  }
   await apt(ctx, ["update", "-q"], "layer-apt-update");
   const r = await apt(ctx, ["install", "-y", "-q", "--no-install-recommends", ...PACKAGES], "layer-apt-install");
   const found = findFpm();
@@ -57,6 +102,7 @@ export async function installPhp(ctx: Context) {
   // The distro's shared FPM stays off: every site runs its own.
   await ctx.exec(BIN.systemctl, ["disable", "--now", `php${found.version}-fpm.service`], { allowFail: true });
   writeFileAtomic(ctx.paths.phpState, JSON.stringify(found) + "\n", 0o644);
+  await wordpressJail(ctx);
   return { name: "php", installed: true, version: found.version, already: false };
 }
 

@@ -10,6 +10,7 @@ import { parseColorEnvPort, renderColorEnv, renderEnvFile } from "../templates/e
 import { unitName } from "../templates/app-unit.ts";
 import { parseLiveMarker } from "../templates/caddy-site.ts";
 import { cronNames, removeCronUnits } from "./cron.ts";
+import { removeMysql8 } from "./mysql8.ts";
 import { removePhp } from "./php.ts";
 import { removeWordpress } from "./wordpress.ts";
 import { removeMongodb, removeMysql, removePostgres, removeRedis } from "./service.ts";
@@ -116,6 +117,7 @@ async function appDelete(params: Params, ctx: Context) {
   await removePostgres(ctx, slug, keepData);
   await removeMysql(ctx, slug, keepData);
   await removeMongodb(ctx, slug, keepData);
+  await removeMysql8(ctx, slug, keepData);
   const unitFile = join(ctx.paths.systemdDir, unitName(slug));
   if (existsSync(unitFile)) {
     removeManaged(unitFile);

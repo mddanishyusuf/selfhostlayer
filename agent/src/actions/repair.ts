@@ -9,15 +9,19 @@ import type { Paths } from "../config.ts";
 import type { ActionTable, Context } from "../context.ts";
 import { BIN } from "../exec.ts";
 import { listManaged, writeFileAtomic } from "../fsutil.ts";
+import { MYSQL8 } from "../templates/mysql8.ts";
+import { phpUnitName } from "../templates/php.ts";
 import { redisUnit } from "../templates/redis.ts";
 
-const AGENT_UNIT = /^(app-[a-z0-9-]+(@\.service|-cron-[a-z0-9-]+\.(service|timer))|layer-redis-[a-z0-9-]+\.service)$/;
+// Apps' colors and cron jobs, a Sites WordPress's PHP and WP-Cron, Redis per app, MySQL 8.
+const AGENT_UNIT = /^(app-[a-z0-9-]+(@\.service|-cron-[a-z0-9-]+\.(service|timer)|-php\.service|-wpcron\.(service|timer))|layer-redis-[a-z0-9-]+\.service|layer-mysql8\.service)$/;
 
 /** The files only the agent writes. The installer's own (layer-agent.service, config.json, …) are left to a re-run of it. */
 export function ownsPath(paths: Paths): (path: string) => boolean {
   return (path) =>
     (dirname(path) === paths.caddySitesDir && path.endsWith(".caddy")) ||
     path.startsWith(`${paths.appEtcRoot}/`) ||
+    path === MYSQL8.conf ||
     (dirname(path) === paths.systemdDir && AGENT_UNIT.test(basename(path)));
 }
 
@@ -62,11 +66,15 @@ async function systemRepair(_params: unknown, ctx: Context) {
     if (dirname(p) === paths.systemdDir && unit) {
       const app = /^app-([a-z0-9-]+)@\.service$/.exec(name);
       if (app) await appColors(app[1]!);
-      else if (name.endsWith(".timer") || name.startsWith("layer-redis-")) restart.add(name);
+      else if (name.endsWith(".timer") || name.startsWith("layer-redis-") || name.endsWith("-php.service") || name === MYSQL8.unit) restart.add(name);
     } else if (p.startsWith(`${paths.appEtcRoot}/`)) {
       const slug = relative(paths.appEtcRoot, p).split("/")[0]!;
       if (name === "redis.conf") restart.add(redisUnit(slug));
+      else if (name === "php-fpm.conf" || name === "php.json") restart.add(phpUnitName(slug));
+      else if (name === "wordpress.json") continue;
       else await appColors(slug);
+    } else if (p === MYSQL8.conf) {
+      restart.add(MYSQL8.unit);
     }
   }
   for (const unit of restart) await ctx.exec(BIN.systemctl, ["restart", unit], { allowFail: true });

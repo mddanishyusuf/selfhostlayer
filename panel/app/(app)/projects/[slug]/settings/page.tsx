@@ -84,7 +84,7 @@ export default async function SettingsPage({ params, searchParams }: { params: P
           branch: project.branch,
           installCommand: project.installCommand ?? "",
           buildCommand: project.buildCommand ?? "",
-          runtime: r.kind,
+          runtime: r.kind === "static" ? "static" : "node",
           startCommand: r.kind === "node" ? r.exec.join(" ") : "node server.js",
           healthPath: r.kind === "node" ? r.healthPath : "/",
           writablePaths: r.kind === "node" ? r.writablePaths.join(", ") : "",

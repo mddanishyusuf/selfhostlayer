@@ -106,6 +106,23 @@ function findDatabases(dir, rel, out) {
     mysql = { bytes: fs.statSync(dump).size };
   }
 
+  // A Ghost site's MySQL 8 (Oracle's, on 3307), as .layer-mysql8.sql, with its own tools.
+  let mysql8 = null;
+  if (process.env.LAYER_MYSQL8_HOME && process.env.database__connection__database) {
+    const home = process.env.LAYER_MYSQL8_HOME;
+    const dump = path.join(snap, ".layer-mysql8.sql");
+    const r = spawnSync(
+      home + "/bin/mysqldump",
+      ["--single-transaction", "--quick", "--routines", "--no-tablespaces", "--protocol=TCP", "--host=127.0.0.1", "--port=3307", "--user=" + process.env.database__connection__user, "--result-file=" + dump, process.env.database__connection__database],
+      { stdio: ["ignore", "ignore", "pipe"], encoding: "utf8", env: { ...process.env, MYSQL_PWD: process.env.database__connection__password, LD_LIBRARY_PATH: home + "/lib/compat" } },
+    );
+    if (r.status !== 0) {
+      console.error("layer: mysqldump (MySQL 8) failed: " + String(r.stderr || r.error).trim().split("\n").pop());
+      process.exit(5);
+    }
+    mysql8 = { bytes: fs.statSync(dump).size };
+  }
+
   // The app's MongoDB, the same way, as .layer-mongodb.archive. Its login goes
   // to mongodump in a file only this job can read, not in the arguments.
   let mongodb = null;
@@ -125,7 +142,7 @@ function findDatabases(dir, rel, out) {
 
   const excludes = path.join(stage, "excludes");
   const skip = databases.flatMap((rel) => ["", "-wal", "-shm", "-journal"].map((s) => "./" + rel + s));
-  skip.push("./.layer-postgres.dump", "./.layer-mysql.sql", "./.layer-mongodb.archive");
+  skip.push("./.layer-postgres.dump", "./.layer-mysql.sql", "./.layer-mysql8.sql", "./.layer-mongodb.archive");
   fs.writeFileSync(excludes, skip.join("\n") + "\n");
   const tar = spawn(
     "/usr/bin/tar",
@@ -146,7 +163,7 @@ function findDatabases(dir, rel, out) {
       console.error("layer: tar exited " + code);
       process.exit(4);
     }
-    console.error("LAYER-SNAPSHOT " + JSON.stringify({ sqlite: report, postgres, mysql, mongodb }));
+    console.error("LAYER-SNAPSHOT " + JSON.stringify({ sqlite: report, postgres, mysql, mysql8, mongodb }));
   });
 })().catch((err) => {
   console.error("layer: snapshot failed: " + (err && err.message ? err.message : err));
@@ -295,7 +312,7 @@ receive().then((database) => {
     const top = fs.readdirSync(work, { withFileTypes: true });
     const root = top.length === 1 && top[0].isDirectory() ? top[0].name : "";
     const base = root ? path.join(work, root) : work;
-    for (const [dump, engine] of [[".layer-postgres.dump", "Postgres"], [".layer-mysql.sql", "MySQL"], [".layer-mongodb.archive", "MongoDB"]]) {
+    for (const [dump, engine] of [[".layer-postgres.dump", "Postgres"], [".layer-mysql.sql", "MySQL"], [".layer-mysql8.sql", "MySQL 8"], [".layer-mongodb.archive", "MongoDB"]]) {
       if (!fs.existsSync(path.join(base, dump))) continue;
       fs.rmSync(path.join(base, dump));
       console.log("Skipped " + dump + ": " + engine + " data comes back through a backup restore.");
@@ -374,6 +391,18 @@ export const RESTORE_JOB = [
   '      rm -f -- "$dump"; echo "layer: MySQL database restored" ;;',
   '    *) rm -f -- "$dump"; echo "layer: the backup has a MySQL dump, but the app has no MySQL now; skipped it" ;;',
   '  esac',
+  'fi',
+  // A Ghost site's MySQL 8, like MySQL, with its own tools on its own port.
+  'dump="$app/data/.layer-mysql8.sql"',
+  'if [ -f "$dump" ]; then',
+  '  if [ -n "${LAYER_MYSQL8_HOME:-}" ] && [ -n "${database__connection__database:-}" ]; then',
+  '    MYSQL_PWD="$database__connection__password"; LD_LIBRARY_PATH="$LAYER_MYSQL8_HOME/lib/compat"; export MYSQL_PWD LD_LIBRARY_PATH',
+  '    set -- --protocol=TCP --host=127.0.0.1 --port=3307 --user="$database__connection__user"',
+  '    before="$app/data.before-restore-$stamp"; mkdir -p -m 700 -- "$before"',
+  '    if ! "$LAYER_MYSQL8_HOME/bin/mysqldump" "$@" --single-transaction --quick --routines --no-tablespaces --result-file="$before/.layer-mysql8.sql" "$database__connection__database"; then rm -f -- "$dump"; echo "layer: files restored, but the MySQL 8 database could not be saved first, so it was left as it was"; exit 2; fi',
+  '    if ! "$LAYER_MYSQL8_HOME/bin/mysql" "$@" --batch "$database__connection__database" <"$dump"; then rm -f -- "$dump"; echo "layer: files restored, but loading the MySQL 8 dump failed; the database as it was is in data.before-restore-$stamp/.layer-mysql8.sql"; exit 2; fi',
+  '    rm -f -- "$dump"; echo "layer: MySQL 8 database restored"',
+  '  else rm -f -- "$dump"; echo "layer: the backup has a MySQL 8 dump, but the site has no MySQL 8 now; skipped it"; fi',
   'fi',
   // The app's MongoDB, like MySQL: the database as it was is dumped next to the
   // replaced files, then the backup's dump replaces its collections. The login

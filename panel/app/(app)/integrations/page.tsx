@@ -35,7 +35,6 @@ const PLANNED = [
   { id: "email", name: "Email marketing", what: "Newsletters and campaigns through your own SMTP or SES." },
   { id: "forms", name: "Forms", what: "Forms and surveys, one page or one question at a time, on your own address." },
   { id: "scheduler", name: "Post scheduler", what: "Schedule posts to X, LinkedIn and Threads." },
-  { id: "blog", name: "Blog", what: "A fast blog with an editor, on your own domain." },
   { id: "status", name: "Status page", what: "A public uptime page fed by your apps' health checks." },
   { id: "waitlist", name: "Waitlist", what: "Collect sign-ups before launch and export them any time." },
   { id: "feedback", name: "Feedback board", what: "Let users suggest and vote on features." },

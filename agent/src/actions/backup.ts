@@ -64,7 +64,7 @@ async function backupSnapshot(params: Params, ctx: Context, io: CallIO) {
   removeStale(dir);
 
   const services = readServices(ctx, slug);
-  const hasDatabase = Boolean(services.postgres ?? services.mysql ?? services.mongodb);
+  const hasDatabase = Boolean(services.postgres ?? services.mysql ?? services.mysql8 ?? services.mongodb);
   const name = `${slug}-${stamp()}-${randomBytes(4).toString("hex")}.tar.gz`;
   const file = join(dir, name);
   const fd = openSync(file, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW, 0o640);
@@ -111,9 +111,9 @@ async function backupSnapshot(params: Params, ctx: Context, io: CallIO) {
   }
   const manifest = /^LAYER-SNAPSHOT (.+)$/m.exec(output);
   const parsed = manifest
-    ? (JSON.parse(manifest[1]!) as { sqlite: { path: string; bytes: number }[]; postgres?: { bytes: number } | null; mysql?: { bytes: number } | null; mongodb?: { bytes: number } | null })
+    ? (JSON.parse(manifest[1]!) as { sqlite: { path: string; bytes: number }[]; postgres?: { bytes: number } | null; mysql?: { bytes: number } | null; mysql8?: { bytes: number } | null; mongodb?: { bytes: number } | null })
     : null;
-  return { slug, file: name, path: file, bytes: statSync(file).size, sqlite: parsed?.sqlite ?? [], postgres: parsed?.postgres ?? null, mysql: parsed?.mysql ?? null, mongodb: parsed?.mongodb ?? null };
+  return { slug, file: name, path: file, bytes: statSync(file).size, sqlite: parsed?.sqlite ?? [], postgres: parsed?.postgres ?? null, mysql: parsed?.mysql ?? null, mysql8: parsed?.mysql8 ?? null, mongodb: parsed?.mongodb ?? null };
 }
 
 /**
@@ -189,7 +189,7 @@ async function backupRestore(params: Params, ctx: Context, io: CallIO) {
         envFiles: [join(app.etcDir, "services.env")],
         memoryMb: 512,
         timeoutSec: 3600,
-        network: services.postgres || services.mysql || services.mongodb ? "localhost" : false,
+        network: services.postgres || services.mysql || services.mysql8 || services.mongodb ? "localhost" : false,
         command: ["/bin/sh", "-c", RESTORE_JOB, "layer-restore", app.appDir, when],
       }),
       { onData: io.emit, stdin: createReadStream("", { fd }) },

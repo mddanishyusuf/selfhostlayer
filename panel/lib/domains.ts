@@ -2,6 +2,7 @@
 // Only active ones are served; a custom domain becomes active once public DNS
 // points it at this server.
 import { agent } from "./agent";
+import { getSite, wordpressBlocks } from "./sites";
 import { db, now } from "./db";
 import type { Project } from "./projects";
 
@@ -120,6 +121,13 @@ export function servingConfig(projectId: number): { domains: string[]; redirects
 export async function applyDomains(project: Project): Promise<void> {
   const { domains, redirects } = servingConfig(project.id);
   if (domains.length === 0) return;
+  if (project.runtime.kind === "php") {
+    const site = getSite(project.id);
+    await agent("proxy.set", { slug: project.slug, domains, redirects, php: true, block: wordpressBlocks(site?.xmlrpc ?? false) }).catch((err) => {
+      if (!/has no PHP yet/.test(String(err))) throw err;
+    });
+    return;
+  }
   if (project.runtime.kind === "static") {
     await agent("proxy.set", { slug: project.slug, domains, redirects, static: true, spa: project.runtime.spa }).catch((err) => {
       if (!/no published static site/.test(String(err))) throw err;

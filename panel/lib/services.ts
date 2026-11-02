@@ -48,7 +48,7 @@ export const engines = () => agent<Engines>("service.status");
  */
 export function restartWithNewEnv(project: Project): Deployment | null {
   const live = liveDeployment(project.id);
-  if (!live || activeDeployment(project.id) || project.runtime.kind === "static") return null;
+  if (!live || activeDeployment(project.id) || project.runtime.kind !== "node") return null;
   return rollbackTo(live);
 }
 

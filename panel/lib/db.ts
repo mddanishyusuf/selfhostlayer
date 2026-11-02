@@ -257,6 +257,17 @@ const MIGRATIONS = [
    DROP TABLE backups;
    ALTER TABLE backups_new RENAME TO backups;
    CREATE INDEX backups_by_slug ON backups (kind, slug, started_at);`,
+  // Sites (WordPress, Ghost): what the install needs, and the owner's first password until it's been seen.
+  `CREATE TABLE sites (
+     project_id INTEGER PRIMARY KEY REFERENCES projects(id) ON DELETE CASCADE,
+     engine TEXT NOT NULL CHECK (engine IN ('wordpress', 'ghost')),
+     title TEXT NOT NULL,
+     owner_name TEXT NOT NULL,
+     owner_email TEXT NOT NULL,
+     xmlrpc INTEGER NOT NULL DEFAULT 0,
+     password_enc TEXT,
+     installed INTEGER NOT NULL DEFAULT 0
+   );`,
 ];
 
 function open(): DatabaseSync {

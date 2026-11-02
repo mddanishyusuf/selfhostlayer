@@ -19,9 +19,9 @@ export interface Project {
   domains: string[];
   memoryMb: number;
   autoDeploy: boolean;
-  /** github: built from a repo; catalog: an integration, installed from the catalog (no repo, no build). */
-  source: "github" | "catalog";
-  /** The catalog app's id (links), for integrations. */
+  /** github: built from a repo; catalog: an integration, installed from the catalog (no repo, no build); site: a Sites WordPress or Ghost. */
+  source: "github" | "catalog" | "site";
+  /** The catalog app's id (links), for integrations; a site's engine (wordpress, ghost). */
   catalogApp: string | null;
 }
 

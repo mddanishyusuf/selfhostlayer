@@ -35,11 +35,12 @@ export function procStat(text = existsSync("/proc/stat") ? readFileSync("/proc/s
 async function metricsSample(params: Params, ctx: Context) {
   const slugs = assertSlugs(params.slugs);
   const apps: Record<string, { cpuNs: number; memoryMb: number }> = {};
-  const units = slugs.flatMap((s) => [`app-${s}@blue.service`, `app-${s}@green.service`]);
+  // A Sites WordPress runs as app-<slug>-php instead of the blue/green pair.
+  const units = slugs.flatMap((s) => [`app-${s}@blue.service`, `app-${s}@green.service`, `app-${s}-php.service`]);
   if (units.length) {
     const { stdout } = await ctx.exec(BIN.systemctl, ["show", ...units, "-p", "Id", "-p", "CPUUsageNSec", "-p", "MemoryCurrent"], { allowFail: true });
     for (const props of parseShowBlocks(stdout)) {
-      const unit = /^app-([a-z0-9-]+)@(?:blue|green)\.service$/.exec(props.Id ?? "");
+      const unit = /^app-([a-z0-9-]+)(?:@(?:blue|green)|-php)\.service$/.exec(props.Id ?? "");
       if (!unit) continue;
       const app = (apps[unit[1]!] ??= { cpuNs: 0, memoryMb: 0 });
       // "[not set]" for a stopped color: nothing to add.

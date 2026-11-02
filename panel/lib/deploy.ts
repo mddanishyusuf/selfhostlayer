@@ -6,6 +6,7 @@
 // fetches that version from the catalog instead of GitHub, with no build.
 // Any failure leaves the live version untouched. Logs go to a file and to
 // subscribers (the deployment page streams them).
+import { randomBytes } from "node:crypto";
 import { EventEmitter } from "node:events";
 import { appendFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -27,6 +28,7 @@ import { getApp } from "./github-store";
 import { BUILD_SLOTS, readState } from "./panel-state";
 import { latestCommit } from "./github-repo";
 import { getProject, listProjects, projectEnv, projectFiles, type Project } from "./projects";
+import { deploySite } from "./sites";
 
 export const BUN_VERSION = "1.3.9";
 const DRAIN_MS = 2000;
@@ -47,7 +49,7 @@ export interface Deployment {
   commitAuthor: string;
   trigger: "manual" | "push" | "rollback" | "import" | "install" | "update";
   status: DeployStatus;
-  color: "blue" | "green" | "static" | null;
+  color: "blue" | "green" | "static" | "php" | null;
   error: string | null;
   steps: Step[];
   createdAt: number;
@@ -227,11 +229,13 @@ export function createDeployment(
   trigger: Deployment["trigger"],
   commit: { sha: string; message: string; author: string },
   catalog?: { version: string; manifest: AppManifest },
+  /** A site's version to install (Ghost), when there's no catalog manifest. */
+  version?: string | null,
 ): Deployment {
   recover();
   const result = db()
     .prepare("INSERT INTO deployments (project_id, sha, commit_message, commit_author, trigger, status, version, manifest, created_at) VALUES (?, ?, ?, ?, ?, 'queued', ?, ?, ?)")
-    .run(project.id, commit.sha, commit.message, commit.author, trigger, catalog?.version ?? null, catalog ? JSON.stringify(catalog.manifest) : null, now());
+    .run(project.id, commit.sha, commit.message, commit.author, trigger, catalog?.version ?? version ?? null, catalog ? JSON.stringify(catalog.manifest) : null, now());
   const id = Number(result.lastInsertRowid);
   builds.add(id);
   return getDeployment(id)!;
@@ -249,6 +253,11 @@ export async function deployProject(project: Project, trigger: Deployment["trigg
     const from = installedVersion(project.id);
     if (!from) throw new Error("This integration has no version to deploy.");
     return createDeployment(project, trigger, { sha: from.sha, message: from.commitMessage, author: from.commitAuthor }, { version: from.version!, manifest: from.manifest! });
+  }
+  if (project.source === "site") {
+    // The version it runs now, put back as it should be.
+    const last = listDeployments(project.id, 30).find((x) => x.version && x.status === "ready");
+    return createDeployment(project, trigger, { sha: last?.sha ?? randomBytes(20).toString("hex"), message: `Redeploy ${project.catalogApp === "ghost" ? "Ghost" : "WordPress"}`, author: "" }, undefined, last?.version ?? null);
   }
   const token = await repoToken(project).catch(() => undefined);
   const commit = sha ? { sha, message: "", author: "" } : await latestCommit(project.repoOwner, project.repoName, project.branch, token);
@@ -392,8 +401,23 @@ async function run(id: number): Promise<void> {
     });
 
   update(id, { started_at: now() });
-  log(id, catalog ? `Deploying ${d.commitMessage} from the catalog (${d.trigger})\n` : `Deploying ${p.repoOwner}/${p.repoName}@${d.sha.slice(0, 7)}${d.commitMessage ? ` "${d.commitMessage}"` : ""} (${d.trigger})\n`);
+  log(id, catalog ? `Deploying ${d.commitMessage} from the catalog (${d.trigger})\n` : p.source === "site" ? `${d.commitMessage} (${d.trigger})\n` : `Deploying ${p.repoOwner}/${p.repoName}@${d.sha.slice(0, 7)}${d.commitMessage ? ` "${d.commitMessage}"` : ""} (${d.trigger})\n`);
   try {
+    // A site (WordPress, Ghost): its engine's own steps, then the same ending as any deploy.
+    if (p.source === "site") {
+      if (d.trigger === "update") await backUpBeforeUpdate(id, p);
+      const freed = await freeSpaceIfLow(p.id);
+      if (freed) log(id, freed);
+      const domains = serving(p).domains;
+      const done = await deploySite({ p, log: (t) => log(id, t), setStatus, stream, url: `https://${domains[0] ?? p.domains[0]}`, serving: serving(p), version: d.version });
+      if (done.version || done.release) db().prepare("UPDATE deployments SET version = COALESCE(?, version), sha = COALESCE(?, sha) WHERE id = ?").run(done.version, done.release, id);
+      await waitForCertificates(id, domains);
+      if (steps.length) steps[steps.length - 1]!.ms = Date.now() - stepStart;
+      update(id, { steps: JSON.stringify(steps) });
+      log(id, `\n\x1b[32m✓ Ready\x1b[0m at ${domains.map((h) => `https://${h}`).join(", ")}\n`);
+      finish(id, "ready", null, done.color);
+      return;
+    }
     if (catalog) {
       if (!d.version || !d.manifest) throw new Error("This deployment doesn't say which version to install.");
       // A new version may change its data (Links migrates its database at start): back it up first.
@@ -448,7 +472,7 @@ async function run(id: number): Promise<void> {
       await agent("static.publish", { slug: p.slug, sha: d.sha, rootDir: p.rootDir, outputDir: p.runtime.outputDir });
       await agent("proxy.set", { slug: p.slug, ...serving(p), static: true, spa: p.runtime.spa });
       color = "static";
-    } else {
+    } else if (p.runtime.kind === "node") {
       setStatus("starting", "start");
       await agent("unit.write", {
         slug: p.slug,
@@ -472,7 +496,7 @@ async function run(id: number): Promise<void> {
         await agent("unit.stop", { slug: p.slug, color: status.live });
       }
       color = idle;
-    }
+    } else throw new Error("This project's runtime can't be deployed this way.");
     await waitForCertificates(id, serving(p).domains);
     // Cron jobs follow the project's Node version and folder, and run from this release now.
     for (const problem of await syncCrons(p)) log(id, `Cron ${problem}\n`);

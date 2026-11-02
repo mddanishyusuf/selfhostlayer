@@ -62,6 +62,13 @@ curl_ -c "$work/jar" -b "wordpress_test_cookie=WP%20Cookie%20check" -o /dev/null
 curl_ -c "$work/jar" -b "$work/jar" -b "wordpress_test_cookie=WP%20Cookie%20check" -o /dev/null --data-urlencode "log=owner" --data-urlencode "pwd=$password" -d "testcookie=1&wp-submit=Log+In" "https://$host/wp-login.php"
 grep -q "Dashboard" <<<"$(curl_ -b "$work/jar" "https://$host/wp-admin/")" && pass "the owner signs in with the one-time password" || fail "sign-in failed"
 
+echo "Password guessing"
+for i in 1 2 3; do curl_ -o /dev/null --data-urlencode "log=owner" --data-urlencode "pwd=wrong$i" -d "testcookie=1" -b "wordpress_test_cookie=WP%20Cookie%20check" "https://$host/wp-login.php"; done
+sleep 2
+fail2ban-client status layer-wordpress >/dev/null 2>&1 && pass "the WordPress sign-in jail runs" || fail "no layer-wordpress jail" "$(fail2ban-client status 2>&1)"
+matches="$(fail2ban-regex "/var/log/caddy/$slug.log" /etc/fail2ban/filter.d/layer-wordpress.conf 2>/dev/null | sed -n 's/^Failregex: \([0-9]*\) total.*/\1/p')"
+[[ "${matches:-0}" -ge 3 ]] && pass "failed sign-ins are counted ($matches), the good one isn't" || fail "fail2ban counted ${matches:-0} failed sign-ins"
+
 echo "Media, served by Caddy"
 php -r '$i = imagecreatetruecolor(20, 20); imagepng($i, "/tmp/wp-e2e.png");' 2>/dev/null || printf '\x89PNG\r\n\x1a\n' >/tmp/wp-e2e.png
 install -o "app-$slug" -m 644 /tmp/wp-e2e.png "/srv/apps/$slug/data/wp-e2e.png"
