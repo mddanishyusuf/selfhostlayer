@@ -1527,6 +1527,57 @@ if (newAddress) {
 
 // TOUR_ACCESS=1: lock the panel to the address the tour comes from, refuse a list
 // that would lock it out, then open it to anyone again.
+// TOUR_SITES=1: a WordPress site through Sites → New site: the install's log,
+// the owner's one-time password on the site's page, the site on its free
+// address, wp-admin's sign-in page, its engine page; then delete it.
+if (process.env.TOUR_SITES === "1") {
+  console.log("Sites");
+  await setViewport(1280, 900);
+  await go("/sites");
+  await waitFor(`!!document.querySelector('[data-testid="new-wordpress"]')`, "the Sites page");
+  await screenshot("sites-empty");
+  await click('[data-testid="new-wordpress"]');
+  await waitFor(`location.pathname === "/sites/new" && !!document.querySelector("#title")`, "New site");
+  await hydrated("#title", "the New site form to come alive");
+  await setValue("#title", "Tour Blog");
+  await setValue("#name", "tour-blog");
+  await setValue("#ownerName", "Ada Lovelace");
+  await setValue("#ownerEmail", "ada@tour.test");
+  await screenshot("sites-new");
+  await click('form:has(#title) button[type=submit]');
+  await waitFor(`location.pathname.startsWith("/projects/tour-blog/deployments/")`, "the site's install", 60_000);
+  await waitForDeploy("installing WordPress");
+  console.log("  ✓ installed a WordPress site from Sites → New site");
+
+  await go("/projects/tour-blog/site");
+  await waitFor(`!!document.querySelector('[data-testid="site-password"]')`, "the owner's one-time password", 20_000);
+  const password = String(await evaluate(`document.querySelector('[data-testid="site-password"]').textContent`)).trim();
+  if (password.length < 20) throw new Error(`the owner's password: ${password}`);
+  await waitFor(`document.body.innerText.includes("Lock code")`, "WordPress's settings on the site's page", 60_000);
+  await screenshot("sites-wordpress");
+  await evaluate(`[...document.querySelectorAll("button")].find((b) => b.textContent.includes("I've saved it")).click(), true`);
+  await waitFor(`!document.querySelector('[data-testid="site-password"]')`, "the password forgotten");
+  console.log("  ✓ the owner's password, shown once, then forgotten");
+
+  const host = `tour-blog.${process.env.TOUR_APPS_DOMAIN ?? "internal"}`;
+  await visit(host, "/", "Tour Blog");
+  await visit(host, "/wp-login.php", "Username or Email Address");
+  const config = await boxRequest(`https://${host}/wp-config.php`);
+  if (config.status !== 404) throw new Error(`wp-config.php answered ${config.status}`);
+  console.log("  ✓ wp-config.php isn't served");
+
+  await go("/sites");
+  await waitFor(`(document.querySelector('[data-testid="site-list"]')?.innerText ?? "").includes("Tour Blog")`, "the site in the list");
+  await screenshot("sites-list");
+  await go("/projects/tour-blog/settings");
+  await click('[data-testid="delete-project"]');
+  await waitFor(`!!document.querySelector("#confirm")`, "the delete confirmation");
+  await evaluate(`(() => { const el = document.querySelector("#confirm"); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(el, "tour-blog"); el.dispatchEvent(new Event("input", { bubbles: true })); return true; })()`);
+  await click('form:has(#confirm) button[type=submit]');
+  await waitFor(`!location.pathname.startsWith("/projects/tour-blog")`, "the site deleted", 60_000);
+  console.log("  ✓ deleted the site");
+}
+
 if (process.env.TOUR_ACCESS === "1") {
   console.log("Access");
   const mode = (label: string) => evaluate(`[...document.querySelectorAll('[data-testid="access"] button[role=radio]')].find((b) => b.textContent === ${JSON.stringify(label)}).click(), true`);

@@ -8,7 +8,7 @@ The sidebar has two modes. Outside a project it lists the server's pages. Inside
 
 ## Projects
 
-All your projects, with their status, last deploy and address. Each project shows the logo of its stack (Next.js, Vite, Astro, Node.js…), in one color for all. Filter by status (All, Live, Building, Failed), search, or switch between the list and a grid of site previews. **New project** is at the top right.
+All your projects, with their status, last deploy and address. Each project shows an icon for what it is, picked from the words in its name (a camera for reduce-png-size, a book for docs), on a colored tile; hovering it names its stack. Filter by status (All, Live, Building, Failed), search, or switch between the list and a grid of site previews. **New project** is at the top right.
 
 ### New project
 1. Pick a repository from your GitHub App's installations, or paste a public GitHub URL.
@@ -18,6 +18,10 @@ All your projects, with their status, last deploy and address. Each project show
 5. **Deploy** builds it and puts it live at `https://<app>.<apps domain>`.
 
 Creating the project makes the app's Linux user and folders: `useradd --system --shell /usr/sbin/nologin --home /srv/apps/<app> app-<app>`.
+
+## Sites
+
+WordPress and Ghost, installed in one click, each its own sandboxed install with its own database. **New site** asks for the engine, a title and the owner, then shows the install's log. A site has a project's pages plus its engine's page (version and updates, Lock code and XML-RPC for WordPress, the owner's one-time password). Projects doesn't list sites. See [Sites](sites.md).
 
 ---
 

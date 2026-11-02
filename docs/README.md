@@ -4,6 +4,7 @@ Self Host Layer turns one Linux server into a place to deploy Node apps and stat
 
 - **[Install](install.md):** what you need, the one command, what it changes on the server, updating, repairing and removing.
 - **[The panel, page by page](panel.md):** what each page does, and what happens on the server when you press its buttons.
+- **[Sites](sites.md):** WordPress and Ghost in one click, as many as the server holds, each its own sandboxed install with its own database.
 - **[Links](links.md):** the link shortener in Integrations: short links on your own domain, with click stats and QR codes.
 - **[Email](email.md):** newsletters, transactional email (a Resend-compatible API) and automations, through your SMTP or Amazon SES.
 - **[Forms](forms.md):** forms and surveys like Typeform or Tally, one page or one question at a time, with logic, uploads, embeds and signed webhooks.

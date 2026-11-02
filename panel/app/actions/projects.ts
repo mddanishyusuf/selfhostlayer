@@ -153,7 +153,7 @@ export async function removeProject(_prev: SettingsState, form: FormData): Promi
   }
   deleteProject(project.id);
   removePreview(project.slug);
-  redirect(project.source === "catalog" ? "/integrations" : "/");
+  redirect(project.source === "catalog" ? "/integrations" : project.source === "site" ? "/sites" : "/");
 }
 
 export async function redeploy(form: FormData): Promise<void> {

@@ -51,8 +51,15 @@ async function downloadResumable(url: string, path: string, io: CallIO, maxBytes
   let lastShown = -1;
   for (let attempt = 1; attempt <= 12; attempt++) {
     const have = existsSync(path) ? statSync(path).size : 0;
+    // No bytes for 90 seconds: give up on this connection and resume on a new one.
+    const stall = new AbortController();
+    let idle = setTimeout(() => stall.abort(new Error("no data for 90 seconds")), 90_000);
+    const alive = () => {
+      clearTimeout(idle);
+      idle = setTimeout(() => stall.abort(new Error("no data for 90 seconds")), 90_000);
+    };
     try {
-      const res = await fetch(url, { headers: have ? { Range: `bytes=${have}-` } : {}, signal: AbortSignal.timeout(30 * 60_000) });
+      const res = await fetch(url, { headers: have ? { Range: `bytes=${have}-` } : {}, signal: stall.signal });
       if (res.status === 416) return; // Already whole.
       if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
       const resumed = res.status === 206;
@@ -61,6 +68,7 @@ async function downloadResumable(url: string, path: string, io: CallIO, maxBytes
       let got = resumed ? have : 0;
       const body = Readable.fromWeb(res.body as ReadableStream);
       body.on("data", (c: Buffer) => {
+        alive();
         got += c.length;
         const pct = total ? Math.floor((got / total) * 10) : -1;
         if (pct !== lastShown) {
@@ -73,6 +81,8 @@ async function downloadResumable(url: string, path: string, io: CallIO, maxBytes
     } catch (err) {
       if (err instanceof ActionError) throw err;
       io.emit(`  the download stopped (${(err as Error).message}), resuming…\n`);
+    } finally {
+      clearTimeout(idle);
     }
     await new Promise((r) => setTimeout(r, Math.min(30_000, 2000 * attempt)));
   }
