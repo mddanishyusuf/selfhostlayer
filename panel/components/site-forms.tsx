@@ -1,11 +1,11 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { createSiteAction, siteAction, type SiteActionState, type SiteFormState } from "@/app/actions/sites";
+import { createSiteAction, siteAction, siteMailAction, type SiteActionState, type SiteFormState, type SiteMailState } from "@/app/actions/sites";
 import { CopyButton, SubmitButton } from "./form";
 import { SettingsRow } from "./page";
 import { EngineTile } from "./sites";
-import { Field, FormError, Input, cx } from "./ui";
+import { Field, FormError, Input, SecretInput, cx } from "./ui";
 
 const ENGINE_CHOICES = [
   { id: "wordpress", name: "WordPress", note: "PHP and MariaDB · about 15 MB idle" },
@@ -162,5 +162,120 @@ export function WordpressImport({ slug }: { slug: string }) {
         </button>
       )}
     </div>
+  );
+}
+
+/** How a WordPress site sends email: Email's API, an alert channel's SMTP, SMTP typed here, or not at all. */
+export function SiteMailForm({
+  slug,
+  current,
+  brands,
+  channels,
+  host,
+  ip,
+}: {
+  slug: string;
+  current: { kind: "api" | "smtp"; from: string } | null;
+  /** The site's address, for the From and the SPF record. */
+  host: string;
+  ip: string | null;
+  brands: { id: number; name: string; fromEmail: string | null }[] | null;
+  channels: { id: number; name: string; host: string }[];
+}) {
+  const [state, action] = useActionState(siteMailAction, {} as SiteMailState);
+  const [via, setVia] = useState<"server" | "email" | "alerts" | "smtp">(current ? (current.kind === "api" ? "email" : "smtp") : "server");
+  const domain = host.replace(/^www\./, "");
+  type Via = "server" | "email" | "alerts" | "smtp";
+  const options: { id: Via; label: string }[] = [
+    { id: "server", label: "This server (built in)" },
+    ...(brands ? [{ id: "email" as const, label: "The Email integration" }] : []),
+    ...(channels.length ? [{ id: "alerts" as const, label: "An alert channel's SMTP" }] : []),
+    { id: "smtp", label: "An SMTP server" },
+  ];
+  return (
+    <form action={action} className="grid gap-3" data-testid="site-mail">
+      <input type="hidden" name="slug" value={slug} />
+      <input type="hidden" name="via" value={via === "server" ? "off" : via} />
+      <p className="text-[13px]">
+        {current ? (
+          <>
+            Sending from <b className="font-medium">{current.from}</b> ({current.kind === "api" ? "through Email" : "by SMTP"}).
+          </>
+        ) : (
+          <>
+            Sending from <b className="font-medium">wordpress@{domain}</b>, through this server&apos;s own mail: nothing to set up.
+          </>
+        )}
+      </p>
+      <div className="flex flex-wrap gap-1.5">
+        {options.map((o) => (
+          <button key={o.id} type="button" onClick={() => setVia(o.id)} aria-pressed={via === o.id} className={cx("border px-2.5 py-1 text-[12px]", via === o.id ? "border-accent bg-selected" : "border-border")}>
+            {o.label}
+          </button>
+        ))}
+      </div>
+      {via === "server" && ip && (
+        <p className="text-[12px] text-muted">
+          To keep it out of spam folders, add a TXT record at <code className="font-mono">{domain}</code>: <code className="font-mono text-foreground">v=spf1 ip4:{ip} ~all</code> (or add <code className="font-mono">ip4:{ip}</code> to the SPF record it has).
+          {/\.(sslip\.io|nip\.io|internal)$/.test(domain) ? " A free address can't have one: mail from it often lands in spam, so give the site its own domain." : ""}
+        </p>
+      )}
+      {via === "email" &&
+        (brands?.length ? (
+          <Field label="Brand" htmlFor="mail-brand" hint="The site sends as this brand, with a key of its own.">
+            <select id="mail-brand" name="brand" className="h-[39px] w-full max-w-[340px] border border-border bg-field px-2.5">
+              {brands.map((b) => (
+                <option key={b.id} value={b.id} disabled={!b.fromEmail}>
+                  {b.name} {b.fromEmail ? `(${b.fromEmail})` : "(no From address yet)"}
+                </option>
+              ))}
+            </select>
+          </Field>
+        ) : (
+          <p className="text-[12px] text-muted">Email has no brands yet: add one in Email first.</p>
+        ))}
+      {via === "alerts" && (
+        <Field label="Alert channel" htmlFor="mail-channel" hint="Its SMTP server and From address; the alerts keep using it too.">
+          <select id="mail-channel" name="channel" className="h-[39px] w-full max-w-[340px] border border-border bg-field px-2.5">
+            {channels.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name} ({c.host})
+              </option>
+            ))}
+          </select>
+        </Field>
+      )}
+      {via === "smtp" && (
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Field label="Host" htmlFor="mail-host">
+            <Input id="mail-host" name="host" placeholder="smtp.resend.com" />
+          </Field>
+          <Field label="Port" htmlFor="mail-port">
+            <Input id="mail-port" name="port" defaultValue="587" inputMode="numeric" />
+          </Field>
+          <Field label="Username" htmlFor="mail-user">
+            <Input id="mail-user" name="user" />
+          </Field>
+          <Field label="Password" htmlFor="mail-password">
+            <SecretInput id="mail-password" name="password" />
+          </Field>
+          <Field label="Connection" htmlFor="mail-secure">
+            <select id="mail-secure" name="secure" defaultValue="tls" className="h-[39px] w-full border border-border bg-field px-2.5">
+              <option value="tls">STARTTLS (587)</option>
+              <option value="ssl">TLS (465)</option>
+              <option value="">None (a relay on this server)</option>
+            </select>
+          </Field>
+          <Field label="From" htmlFor="mail-from">
+            <Input id="mail-from" name="from" placeholder="hello@example.com" />
+          </Field>
+        </div>
+      )}
+      <FormError message={state.error} />
+      {state.saved && <p className="text-[13px] text-teal">{state.saved}</p>}
+      <SubmitButton pending="Saving…" className="w-fit" size="sm">
+        Save
+      </SubmitButton>
+    </form>
   );
 }

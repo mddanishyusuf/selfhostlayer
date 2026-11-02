@@ -18,6 +18,7 @@ import { SYSTEMD_RUN } from "../sandbox.ts";
 import { MYSQL_SIGNING_KEY } from "../templates/mysql8-key.ts";
 import { MYSQL8, mysql8Bin, mysql8Compat, renderMysql8Conf, renderMysql8Unit } from "../templates/mysql8.ts";
 import { appLayout } from "./app.ts";
+import { ensureLocalMail } from "./php.ts";
 import { grantPattern, pgName, readServices, writeServices } from "./service.ts";
 
 interface Mysql8State {
@@ -126,6 +127,8 @@ function apt(ctx: Context, args: string[]) {
 }
 
 export async function installMysql8(ctx: Context, io: CallIO) {
+  // Ghost's sign-in and invite emails go out through the server's own send-only mail.
+  await ensureLocalMail(ctx);
   const already = mysql8State(ctx);
   if (already) return { name: "mysql8", installed: true, version: already.version, already: true };
   const version = MYSQL8.version;

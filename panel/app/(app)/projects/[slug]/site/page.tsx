@@ -4,12 +4,15 @@ import { Suspense } from "react";
 import { forgetPasswordAction } from "@/app/actions/sites";
 import { Icon } from "@/components/icon";
 import { CARD, KeyValues, Notice, PageHeader, PillLink, SettingsRow } from "@/components/page";
-import { Secret, SiteButton, WordpressImport } from "@/components/site-forms";
+import { Secret, SiteButton, SiteMailForm, WordpressImport } from "@/components/site-forms";
 import { EngineTile } from "@/components/sites";
 import { Button, Pill, Skeleton } from "@/components/ui";
 import { agent } from "@/lib/agent";
+import { boxConfig } from "@/lib/box";
+import { listChannels } from "@/lib/alerts/engine";
 import { listDeployments, liveDeployment } from "@/lib/deploy";
 import { servingConfig } from "@/lib/domains";
+import { emailInstall, listBrands } from "@/lib/email";
 import { getProjectBySlug, type Project } from "@/lib/projects";
 import { requireUser } from "@/lib/session";
 import { ENGINES, engineOf, getSite } from "@/lib/sites";
@@ -18,6 +21,7 @@ export const dynamic = "force-dynamic";
 export const metadata = { title: "Site" };
 
 interface WpStatus {
+  mail: { kind: "api" | "smtp"; from: string } | null;
   version: string | null;
   coreUpdate: string | null;
   plugins: { name: string; title: string; status: string; version: string; update: string | null }[];
@@ -28,10 +32,14 @@ interface WpStatus {
 }
 
 /** WordPress's own state, asked of the site (and wordpress.org, for updates). */
-async function WordpressDetails({ project }: { project: Project }) {
+async function WordpressDetails({ project, host }: { project: Project; host: string | undefined }) {
   const s = await agent<WpStatus>("wordpress.status", { slug: project.slug }).catch((err: Error) => err);
   if (s instanceof Error) return <SettingsRow title="WordPress">Couldn&apos;t read the site: {s.message}</SettingsRow>;
   const pluginUpdates = s.plugins.filter((p) => p.update);
+  // Where it can send from: Email's brands (when installed), and alert channels that send email.
+  const email = emailInstall();
+  const brands = email ? await listBrands(email).then((list) => list.map((b) => ({ id: b.id, name: b.name, fromEmail: b.fromEmail || null }))).catch(() => []) : null;
+  const channels = listChannels().flatMap((c) => (c.config.kind === "email" ? [{ id: c.id, name: c.name, host: c.config.host }] : []));
   const themeUpdates = s.themes.filter((t) => t.update);
   return (
     <>
@@ -50,6 +58,9 @@ async function WordpressDetails({ project }: { project: Project }) {
           {pluginUpdates.length > 0 && <SiteButton slug={project.slug} op="update-plugins" label="Update plugins" pending="Updating…" />}
           {themeUpdates.length > 0 && <SiteButton slug={project.slug} op="update-themes" label="Update themes" pending="Updating…" />}
         </div>
+      </SettingsRow>
+      <SettingsRow title="Email" description="Password resets, comment and order notifications, contact forms. Sent through this server's own mail unless you pick another way.">
+        <SiteMailForm slug={project.slug} current={s.mail} brands={brands} channels={channels} host={host ?? project.domains[0]!} ip={boxConfig().publicIp || null} />
       </SettingsRow>
       <SettingsRow title="Lock code" description="Locked, wp-admin can't install or update plugins, themes or WordPress: for a site that's done. Updates from here still work.">
         <div className="flex items-center gap-3">
@@ -172,7 +183,7 @@ export default async function SitePage({ params }: { params: Promise<{ slug: str
         </SettingsRow>
         {live && (
           <Suspense fallback={<SettingsRow title={info.name}><Skeleton className="h-16" /></SettingsRow>}>
-            {engine === "wordpress" ? <WordpressDetails project={project} /> : <GhostDetails project={project} version={version} />}
+            {engine === "wordpress" ? <WordpressDetails project={project} host={host} /> : <GhostDetails project={project} version={version} />}
           </Suspense>
         )}
       </section>

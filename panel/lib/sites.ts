@@ -207,8 +207,13 @@ async function deployGhost(r: SiteRun, site: Site) {
   await r.stream("service.install", { name: "mysql8" });
   await agent("app.create", { slug: p.slug });
   await agent("mysql8.add", { slug: p.slug });
-  // Ghost's address comes from its env; the rest of its env is the owner's.
-  setProjectEnv(p.id, { ...projectEnv(p.id), GHOST_URL: r.url });
+  // Ghost's address comes from its env, and its email (sign-in links, invites)
+  // goes through the server's own send-only mail unless the owner set their own.
+  const env = projectEnv(p.id);
+  const mail: Record<string, string> = Object.keys(env).some((k) => k.startsWith("GHOST_MAIL__"))
+    ? {}
+    : { GHOST_MAIL__TRANSPORT: "SMTP", GHOST_MAIL__OPTIONS__HOST: "127.0.0.1", GHOST_MAIL__OPTIONS__PORT: "25", GHOST_MAIL__FROM: `noreply@${new URL(r.url).hostname.replace(/^www\./, "")}` };
+  setProjectEnv(p.id, { ...env, ...mail, GHOST_URL: r.url });
   await agent("env.write", { slug: p.slug, vars: projectEnv(p.id) });
   const node = await agent<{ installed: boolean }>("node.install", { version: p.nodeVersion });
   r.log(`Node ${p.nodeVersion}${node.installed ? " (installed now)" : ""}\n`);

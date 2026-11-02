@@ -270,8 +270,17 @@ async function wordpressInstall(params: Params, ctx: Context, io: CallIO) {
 const assertMail = (v: unknown): WordpressMail | null => {
   if (v === null) return null;
   const m = (v ?? {}) as Record<string, unknown>;
+  if (m.kind === "api") {
+    // Email's API takes "Name <hello@example.com>" too.
+    const from = assertLine(m.from, "mail.from", 200);
+    if (!/^([^<>\r\n"']{1,100} )?<?[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+>?$/.test(from)) {
+      // The message apart: the bundle check would read `from", "…"` as an import.
+      const message = "must be an address, or Name <address>";
+      throw new ValidationError("mail.from", message);
+    }
+    return { kind: "api", url: assertSiteUrl(String(m.url ?? "").replace(/\/+$/, ""), "mail.url"), key: assertLine(m.key, "mail.key", 200), from };
+  }
   const from = assertEmail(m.from, "mail.from");
-  if (m.kind === "api") return { kind: "api", url: assertSiteUrl(String(m.url ?? "").replace(/\/+$/, ""), "mail.url"), key: assertLine(m.key, "mail.key", 200), from };
   if (m.kind === "smtp") {
     const secure = m.secure ?? "";
     if (secure !== "" && secure !== "tls" && secure !== "ssl") throw new ValidationError("mail.secure", 'must be "", "tls" or "ssl"');

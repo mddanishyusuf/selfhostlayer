@@ -74,7 +74,8 @@ export function renderWpConfig(state: WordpressState, db: { database: string; us
 }
 
 function mailLines(mail: WordpressMail | null): string[] {
-  if (!mail) return [];
+  // Nothing else set: the server's own send-only mail (Postfix on 127.0.0.1).
+  if (!mail) return ["define('LAYER_LOCAL_MAIL', true);"];
   if (mail.kind === "api") return [`define('LAYER_MAIL_API', ${q(mail.url)});`, `define('LAYER_MAIL_KEY', ${q(mail.key)});`, `define('LAYER_MAIL_FROM', ${q(mail.from)});`];
   return [
     `define('LAYER_SMTP_HOST', ${q(mail.host)});`,
@@ -88,13 +89,13 @@ function mailLines(mail: WordpressMail | null): string[] {
 
 /**
  * A must-use plugin: wp_mail through the Email integration's API (Resend's
- * shape) or SMTP, from the constants in wp-config.php. Without either, a
- * notice says WordPress can't send email.
+ * shape) or SMTP, from the constants in wp-config.php; by default, the
+ * server's own send-only Postfix on 127.0.0.1.
  */
 export const MAIL_PLUGIN = `<?php
 /*
  * Plugin Name: Self Host Layer mail
- * Description: Sends WordPress's email through the server's Email integration or SMTP, as set in the panel (Sites).
+ * Description: Sends WordPress's email through this server's own mail, or the Email integration or SMTP set in the panel (Sites).
  */
 if (defined('LAYER_MAIL_API') && defined('LAYER_MAIL_KEY')) {
 	add_filter('pre_wp_mail', function ($result, $atts) {
@@ -124,11 +125,17 @@ if (defined('LAYER_MAIL_API') && defined('LAYER_MAIL_KEY')) {
 		$mailer->SMTPSecure = LAYER_SMTP_SECURE;
 		$mailer->setFrom(LAYER_SMTP_FROM, get_bloginfo('name'), false);
 	});
-} else {
-	add_action('admin_notices', function () {
-		if (current_user_can('manage_options')) echo '<div class="notice notice-warning"><p>This site can\\'t send email yet: set up email for it in your Self Host Layer panel (Sites).</p></div>';
+} elseif (defined('LAYER_LOCAL_MAIL')) {
+	// The server's own send-only mail server, on this machine.
+	add_action('phpmailer_init', function ($mailer) {
+		$mailer->isSMTP();
+		$mailer->Host = '127.0.0.1';
+		$mailer->Port = 25;
+		$mailer->SMTPAuth = false;
+		$mailer->SMTPAutoTLS = false;
 	});
 }
+
 `;
 
 export const wpCronUnitName = (slug: string) => `app-${assertSlug(slug)}-wpcron`;

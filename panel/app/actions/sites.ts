@@ -4,8 +4,10 @@ import { randomBytes } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { agent } from "@/lib/agent";
+import { listChannels } from "@/lib/alerts/engine";
 import { activeDeployment, createDeployment, deploymentPath, deployProject } from "@/lib/deploy";
 import { applyDomains, servingConfig } from "@/lib/domains";
+import { emailApi, emailInstall, emailPublicUrl, type Brand } from "@/lib/email";
 import { getProjectBySlug } from "@/lib/projects";
 import { requireUser } from "@/lib/session";
 import { createSite, ENGINES, engineOf, forgetPassword, getSite, setXmlrpc, type SiteEngine } from "@/lib/sites";
@@ -110,4 +112,63 @@ export async function siteAction(_prev: SiteActionState, form: FormData): Promis
     return { error: err instanceof Error ? err.message : "That didn't work." };
   }
   return { error: "Unknown action." };
+}
+
+export interface SiteMailState {
+  error?: string;
+  saved?: string;
+}
+
+/** The address inside "Name <a@b.co>", or the string itself. */
+const addressOf = (from: string) => /<([^<>\s]+@[^<>\s]+)>/.exec(from)?.[1] ?? from.trim();
+
+/**
+ * How a WordPress site sends its email: through the Email integration (a key
+ * of one of its brands), the SMTP server of an alert channel, an SMTP server
+ * typed here, or not at all. wp-config.php is written again; nothing restarts.
+ */
+export async function siteMailAction(_prev: SiteMailState, form: FormData): Promise<SiteMailState> {
+  await requireUser();
+  const project = getProjectBySlug(field(form, "slug"));
+  if (!project || engineOf(project) !== "wordpress") redirect("/sites");
+  const via = field(form, "via");
+  let mail: Record<string, unknown> | null;
+  let saved: string;
+  try {
+    if (via === "email") {
+      const email = emailInstall();
+      if (!email) return { error: "Install the Email integration first, or use SMTP." };
+      const brandId = Number(field(form, "brand"));
+      const { brand } = await emailApi<{ brand: Brand }>(email, `brands/${brandId}?days=1`);
+      if (!brand.fromEmail) return { error: `${brand.name} has no From address: set it in Email first.` };
+      const { key } = await emailApi<{ key: string }>(email, `brands/${brandId}/keys`, { body: { name: `WordPress (${project.slug})` } });
+      mail = { kind: "api", url: emailPublicUrl(email), key, from: brand.fromName ? `${brand.fromName} <${brand.fromEmail}>` : brand.fromEmail };
+      saved = `Email goes out through Email's ${brand.name} brand, from ${brand.fromEmail}.`;
+    } else if (via === "alerts") {
+      const channel = listChannels().find((c) => c.id === Number(field(form, "channel")) && c.config.kind === "email");
+      if (!channel || channel.config.kind !== "email") return { error: "Pick one of the alert channels that send email." };
+      const c = channel.config;
+      mail = { kind: "smtp", host: c.host, port: c.port, user: c.user ?? "", password: c.pass ?? "", secure: c.security === "tls" ? "ssl" : c.security === "starttls" ? "tls" : "", from: addressOf(c.from) };
+      saved = `Email goes out through ${c.host}, from ${addressOf(c.from)}.`;
+    } else if (via === "smtp") {
+      const host = field(form, "host");
+      const port = Number(field(form, "port"));
+      const secure = field(form, "secure");
+      const from = field(form, "from");
+      if (!/^[a-z0-9.-]{1,253}$/i.test(host) || !host.includes(".")) return { error: "The SMTP server's host name, like smtp.resend.com." };
+      if (!Number.isInteger(port) || port < 1 || port > 65535) return { error: "The SMTP port: 587, or 465." };
+      if (!["", "tls", "ssl"].includes(secure)) return { error: "Pick how it connects." };
+      if (!/^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/.test(from)) return { error: "The address mail comes from, like hello@example.com." };
+      mail = { kind: "smtp", host, port, user: field(form, "user"), password: String(form.get("password") ?? ""), secure, from };
+      saved = `Email goes out through ${host}, from ${from}.`;
+    } else {
+      mail = null;
+      saved = "Email goes out through this server's own mail.";
+    }
+    await agent("wordpress.config", { slug: project.slug, mail });
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "That didn't work." };
+  }
+  revalidatePath(`/projects/${project.slug}/site`);
+  return { saved };
 }

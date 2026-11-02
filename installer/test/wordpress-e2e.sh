@@ -57,6 +57,15 @@ done
 [[ "$(stat -c '%U %a' "$docroot/wp-config.php")" == "app-$slug 600" ]] && pass "wp-config.php is the site's alone (600)" || fail "wp-config.php: $(stat -c '%U %a' "$docroot/wp-config.php")"
 grep -q "DISALLOW_FILE_EDIT', true" "$docroot/wp-config.php" && pass "no code editor in wp-admin" || fail "DISALLOW_FILE_EDIT missing"
 
+echo "Email out of the box: the server's own send-only Postfix"
+ss -ltn | grep -qE '127\.0\.0\.1:25 ' && pass "Postfix listens on 127.0.0.1:25" || fail "no Postfix on 127.0.0.1:25" "$(ss -ltn | grep ':25 ')"
+ss -ltn | grep -qE '(0\.0\.0\.0|\*|\[::\]):25 ' && fail "Postfix listens publicly" || pass "nothing public on port 25 (not an open relay)"
+grep -q "LAYER_LOCAL_MAIL', true" "$docroot/wp-config.php" && pass "the site sends through it by default" || fail "LAYER_LOCAL_MAIL missing"
+since="$(date '+%Y-%m-%d %H:%M:%S')"
+[[ "$(wp eval 'var_dump(wp_mail("reader@example.invalid", "Hello from WordPress", "It works."));')" == "bool(true)" ]] && pass "wp_mail() hands a message over" || fail "wp_mail() failed"
+sleep 2
+journalctl --since "$since" -o cat --no-pager | grep -qi "from=<wordpress@$host>" && pass "Postfix took it, from wordpress@$host" || fail "not in Postfix's log" "$(journalctl --since "$since" -o cat --no-pager | grep -i postfix | tail -5)"
+
 echo "Signing in"
 curl_ -c "$work/jar" -b "wordpress_test_cookie=WP%20Cookie%20check" -o /dev/null "https://$host/wp-login.php"
 curl_ -c "$work/jar" -b "$work/jar" -b "wordpress_test_cookie=WP%20Cookie%20check" -o /dev/null --data-urlencode "log=owner" --data-urlencode "pwd=$password" -d "testcookie=1&wp-submit=Log+In" "https://$host/wp-login.php"

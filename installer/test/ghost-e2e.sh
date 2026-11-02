@@ -54,7 +54,7 @@ LD_LIBRARY_PATH=/opt/layer/mysql/8.4.13/lib/compat MYSQL_PWD="$pw_other" /opt/la
 call app.delete "{\"slug\":\"$other\",\"keepData\":false}" >/dev/null
 
 echo "Ghost, the way the panel deploys it"
-expect "env (its address)" "$(call env.write "{\"slug\":\"$slug\",\"vars\":{\"GHOST_URL\":\"https://$host\"}}")" '.ok == true'
+expect "env (its address)" "$(call env.write "{\"slug\":\"$slug\",\"vars\":{\"GHOST_URL\":\"https://$host\",\"GHOST_MAIL__TRANSPORT\":\"SMTP\",\"GHOST_MAIL__OPTIONS__HOST\":\"127.0.0.1\",\"GHOST_MAIL__OPTIONS__PORT\":\"25\",\"GHOST_MAIL__FROM\":\"noreply@$host\"}}")" '.ok == true'
 expect "Node $node_version" "$(call node.install "{\"version\":\"$node_version\"}")" '.ok == true'
 out="$(call ghost.fetch "{\"slug\":\"$slug\"}")"
 expect "ghost.fetch (checked against the registry's integrity)" "$out" '.ok == true and (.result.release | test("^[0-9a-f]{40}$"))'
@@ -87,6 +87,14 @@ php -r '$i = imagecreatetruecolor(20, 20); imagepng($i, "/tmp/ghost-e2e.png");' 
 img="$(admin -F "file=@/tmp/ghost-e2e.png;type=image/png" -F "ref=e2e" "https://$host/ghost/api/admin/images/upload/" | jq -r '.images[0].url' 2>/dev/null)"
 [[ "$(code "${img#https://$host}")" == 200 ]] && pass "an uploaded image is served ($img)" || fail "image: $img"
 ls "/srv/apps/$slug/data/content/images" >/dev/null 2>&1 && pass "images land in data/content" || fail "no data/content/images"
+
+echo "Email out of the box (the server's own Postfix)"
+since="$(date '+%Y-%m-%d %H:%M:%S')"
+role="$(admin "https://$host/ghost/api/admin/roles/?permissions=assign" | jq -r '.roles[] | select(.name=="Author") | .id' 2>/dev/null)"
+code="$(admin -o /dev/null -w '%{http_code}' -H 'Content-Type: application/json' -d "{\"invites\":[{\"email\":\"invitee@example.invalid\",\"role_id\":\"$role\"}]}" "https://$host/ghost/api/admin/invites/")"
+[[ "$code" == 201 ]] && pass "Ghost sent an invite email (the API answered 201)" || fail "invite: HTTP $code"
+sleep 2
+journalctl --since "$since" -o cat --no-pager | grep -qi "from=<noreply@$host>" && pass "Postfix took it, from noreply@$host" || fail "not in Postfix's log" "$(journalctl --since "$since" -o cat --no-pager | grep -i postfix | tail -5)"
 
 echo "Back up and restore (with the MySQL 8 dump)"
 out="$(call backup.snapshot "{\"slug\":\"$slug\"}")"
