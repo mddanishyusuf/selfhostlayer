@@ -40,9 +40,14 @@
    - `open_basedir` to the site and its tmp folder;
    - it listens on a unix socket, `/run/layer/php/<slug>.sock` (`app-<slug>:caddy`, 660). Only Caddy can reach it: other apps can't connect, unlike a localhost port.
    - There's no blue/green: WordPress changes itself in place, so a restart is enough.
-4. **Files:** the site sits at `/srv/apps/<slug>/data/wordpress`, owned by the site's user.
-   - Folders are `2750 app-<slug>:caddy` (setgid) and the umask is 027, so Caddy can serve the static files WordPress writes but can't change them.
-   - `wp-config.php` is 600, so only PHP reads it.
+4. **Files:** the site sits at `/srv/apps/<slug>/data/wordpress`, owned by the site's user (as built, Day 1):
+   - **Caddy reads static files through POSIX ACLs, not a group.** Caddy gets `u:caddy:x` on the app's folder and `data/`, and `u:caddy:rX` plus the same default ACL on the docroot, so files WordPress writes later are readable too. Putting Caddy in a group per site would need a Caddy restart for every new site.
+   - A data folder with an ACL is `0710` instead of `0700`: chmod 0700 would set the ACL mask to nothing and cut Caddy off.
+   - **The ACLs are set by a sandboxed job running as the site's own user,** never by root walking a folder the app can write, so a symlink can't turn root's `setfacl` onto other files. They're set again after an import or restore.
+   - `wp-config.php` has no ACL for Caddy, and is blocked in Caddy too.
+   - **Known limit:** Caddy follows symlinks, so a site could symlink to another site's public files (themes, plugins, uploads: never `wp-config.php`) and serve them. Those files are public on their own site anyway.
+   - The FPM unit is `app-<slug>-php.service`. Its socket is `/run/layer-php/<slug>/php.sock`: the folder is `0710 app-<slug>:caddy` and the socket `0666`. Only Caddy can get through the folder, since apps aren't in the caddy group.
+   - Ubuntu 24.04 ships PHP 8.3 and 26.04 (the user's server) ships 8.5. PHP's install also adds `acl` (`setfacl` isn't on 24.04 cloud images).
 5. **Caddy:**
    - `php_fastcgi` to the socket, with static files served directly;
    - **blocked:** `wp-config.php` and dotfiles, PHP under `wp-content/uploads`, `xmlrpc.php` (a setting allows it), and the readme and license files.
