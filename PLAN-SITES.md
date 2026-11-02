@@ -64,7 +64,19 @@
    - its dependencies installed with npm, offline after the first fetch, through the npm cache;
    - started as `node current/index.js` under the usual blue/green unit, with the health check on `/ghost/api/admin/site/`.
    - Ghost's code isn't backed up, since it can be fetched again. Its content (`content/` with images, themes and the database) lives in `data/`.
-2. **Its database: MySQL 8 or SQLite. Your decision, see below.** Ghost supports only MySQL 8 in production. It doesn't support MariaDB, which is what our MySQL is. SQLite works through its optional `better-sqlite3`, but Ghost calls that development-only.
+2. **Its database is MySQL 8, the only one Ghost supports in production** (decided 2026-11-02: only what Ghost supports, so updates don't break). Not MariaDB, which is what our MySQL is, and not SQLite, which Ghost calls development-only.
+   - **One MySQL 8 server for all Ghost sites,** installed by the first Ghost site, with a user and database per site, as MariaDB has.
+   - **Installed from Oracle's own tarball** ("Linux – Generic", x86_64 or aarch64), not apt: Ubuntu's `mysql-server` and `mariadb-server` packages conflict, so the two can't both come from apt.
+     - The tarball is checked against its GPG signature, with Oracle's key shipped with the agent (as MongoDB's is).
+     - It's unpacked into read-only `/opt/layer/mysql/<version>/`, like Node.
+   - It runs as its own sandboxed unit, `layer-mysql8.service`, under user `mysql8`:
+     - data in `/var/lib/layer-mysql8`;
+     - port 3307 on 127.0.0.1;
+     - the buffer pool sized for a small box (128 MB);
+     - logs to the journal.
+   - The LTS line is pinned (8.4); patch updates come through `layer update` with the agent.
+   - **Backups** take each site's `mysqldump`, and restore loads it back (saving the database as it was first, as for MariaDB).
+   - About 350–450 MB idle, said on New site the first time.
 3. **Config:** `config.production.json` is written by the agent: the `url`, the database, `content` in `data/`, mail (Decisions 6), and listening on 127.0.0.1 and the live color's port. A domain change rewrites the `url` and restarts the site.
 4. **The owner is made at install** through Ghost's own setup API, the moment it first answers on 127.0.0.1 and before Caddy serves it (Decisions 3).
 5. **Updates:** the engine page offers a newer Ghost from npm (minor versions; a new major is announced with its notes). Updating means a backup first, then fetching and installing the new version into a new release, then **stop, start** rather than blue/green. Ghost migrates its database when it starts, and two versions mustn't share one database.
@@ -109,7 +121,11 @@
    - core download, checksum and cache; the pinned wp-cli;
    - `wp-config.php`, the install, the cron timer and the mail plugin;
    - an e2e: create a site, load home and wp-login, log in, upload an image (served by Caddy), install a plugin (and see it refused when locked), back up and restore, delete.
-3. **Ghost:**
+3. **MySQL 8 and Ghost:**
+   - `service.install mysql8`:
+     - Oracle's tarball checked against its signature, `/opt/layer/mysql/8.4.x/`, the `mysql8` user and unit, initialized with a root login only the agent knows (socket auth);
+     - a user and database per site, dumps in backups, and restore;
+     - an e2e like `mongodb-e2e.sh`: sites can't read or list each other's databases.
    - `site.create` for Ghost: the npm tarball and its integrity, the install as the site's user, the config, the owner through the setup API before it's public;
    - the update path;
    - an e2e: create, owner sign-in through the admin API, a post published and served, an image upload, backup and restore, update, delete.
@@ -120,7 +136,7 @@
 5. **Hardening and numbers:**
    - the wp-login jail and the XML-RPC setting;
    - a security score per site;
-   - **memory with 10 idle WordPress sites, 2 Ghost sites, and 3 sites under load** (target: under 15 MB per idle WordPress);
+   - **memory with 10 idle WordPress sites, 2 Ghost sites (and MySQL 8), and 3 sites under load** (target: under 15 MB per idle WordPress);
    - the browser tour (TOUR_SITES);
    - docs, and the homepage line.
 6. **Bringing sites in (later):**
@@ -141,15 +157,6 @@
 
 - **Plugins and themes are untrusted code by nature.** Per-site users, sandboxes and memory limits keep a bad one inside its own site. The docs say so plainly.
 - **PHP memory under load:** about 40–60 MB per worker. `MemoryMax` and at most 5 workers keep one busy site from taking the box. Day 5's numbers set the defaults.
-- **Ghost's database support** (see below), and Ghost moving fast: weekly releases, a new major about yearly. Majors aren't installed without the owner saying so.
+- **MySQL 8's memory:** 350–450 MB idle, on top of each Ghost site's own. On a 2 GB box, New site says so before the first Ghost.
+- **Ghost moving fast:** weekly releases, a new major about yearly. Majors aren't installed without the owner saying so.
 - **Distro PHP versions differ by OS.** WordPress supports them all. Plugins that need a newer PHP are the owner's call, and the engine page shows the version.
-
-## Open: Ghost's database
-
-- **MySQL 8 (Oracle's, from MySQL's own apt repository) next to MariaDB:**
-  - **For:** what Ghost supports, so no surprises on updates.
-  - **Against:** a second database server, about 350–450 MB idle, on its own port (3307), and another engine to back up and keep updated.
-- **SQLite (`better-sqlite3`):**
-  - **For:** no new server, the cheapest by far, and backups we already do well (SQLite-safe snapshots). It's fine for one-author blogs, and it's how most small self-hosted Ghosts run.
-  - **Against:** Ghost doesn't support it in production, so a future Ghost could break it or drop it.
-- **Recommended:** SQLite by default, with MySQL 8 as a choice on New site once a box has it installed (a later day). The docs say plainly what Ghost supports.
