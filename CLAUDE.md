@@ -1,6 +1,6 @@
 # Self Host Layer: "Vercel on your own VPS, without Docker"
 
-> Weeks 1–4 built, and the panel redesigned. Weeks 5–6 (combined) are planned in [PLAN-WEEK5.md](PLAN-WEEK5.md). The marketplace starts with Links, a link shortener built from scratch: [PLAN-LINKS.md](PLAN-LINKS.md). Planned next: **Sites**, one-click WordPress (on a PHP runtime, decided 2026-11-02) and Ghost sites: [PLAN-SITES.md](PLAN-SITES.md). Read [PLAN-WEEK4.md](PLAN-WEEK4.md) too. When you (Claude) open this folder, read this file, [PLAN-WEEK3.md](PLAN-WEEK3.md), [PLAN-WEEK2.md](PLAN-WEEK2.md), [PLAN-WEEK1.md](PLAN-WEEK1.md) and [RESEARCH.md](RESEARCH.md) before suggesting anything.
+> Weeks 1–4 built, and the panel redesigned. Weeks 5–6 (combined) are planned in [PLAN-WEEK5.md](PLAN-WEEK5.md). The marketplace starts with Links, a link shortener built from scratch: [PLAN-LINKS.md](PLAN-LINKS.md). **Sites** (one-click WordPress on a PHP runtime, and Ghost) is built: [PLAN-SITES.md](PLAN-SITES.md). Read [PLAN-WEEK4.md](PLAN-WEEK4.md) too. When you (Claude) open this folder, read this file, [PLAN-WEEK3.md](PLAN-WEEK3.md), [PLAN-WEEK2.md](PLAN-WEEK2.md), [PLAN-WEEK1.md](PLAN-WEEK1.md) and [RESEARCH.md](RESEARCH.md) before suggesting anything.
 >
 > **Name:** Self Host Layer. Domain **selfhostlayer.com** (owned). Repo: https://github.com/mddanishyusuf/selfhostlayer. The internal identifier is **`layer`**: CLI `layer`, Linux user `layer`, paths `/opt/layer`, `/etc/layer`, `/var/lib/layer`, units `layer-agent` / `layer-panel`, manifest `layer.yaml`.
 
@@ -138,7 +138,7 @@ The panel uses the design of our AgentOS app (`~/projects/agent-os/web/src/theme
 ## Decisions (2026-10-28)
 1. **Name:** Self Host Layer, selfhostlayer.com. Internal identifier `layer`.
 2. **Proxy:** Caddy (automatic TLS, on-demand certs with an `ask` endpoint, generated per-app files in `/etc/caddy/sites/`).
-3. **Scope:** Node + static only in v1. Package managers yarn/pnpm/npm/bun; the runtime is always Node. Marketplace Go apps use a `runtime: binary` manifest type (download, verify, run, no build).
+3. **Scope:** Node + static only in v1 (PHP added for Sites' WordPress on 2026-11-02). Package managers yarn/pnpm/npm/bun; the runtime is always Node. Marketplace Go apps use a `runtime: binary` manifest type (download, verify, run, no build).
 4. **License:** deferred while the repo is private (see Business model). Leaning AGPL-3.0 + CLA.
 5. **Topology:** panel on the same box for v1.
 6. **Process manager:** systemd unit per app. No pm2.
@@ -204,5 +204,7 @@ The panel uses the design of our AgentOS app (`~/projects/agent-os/web/src/theme
 **Import takes a database (2026-11-02):** importing a gzipped SQLite file failed with only "tar exited 2". Import now also takes a single SQLite database (`.db`/`.sqlite`, gzipped or not): it replaces data/'s database of that name (or its only one) and leaves the rest. The job finds out what the file is after gunzip, as the app; a failing archive says tar's own reason, and a cut-off gzip is refused. Published as panel 0.1.16 with the new project icons, and in the website's docs.
 
 **Private files (2026-11-02):** a project's Environment page takes files that aren't in Git (a Firebase `serviceAccountKey.json`): a path in the project and its contents, encrypted in the panel's DB (`project_files`) and never shown again. Each deploy, after the fetch and before the build (rollbacks too), `files.place` writes them into the release as the app's user in a sandboxed job, contents on stdin only (600; a symlink in the repo can't lead outside; the audit log keeps the paths). Published as panel 0.1.17, with the website's docs.
+
+**Sites (2026-11-02, [PLAN-SITES.md](PLAN-SITES.md)):** one-click WordPress and Ghost, as many as the box holds, each a project with `source: site` (engine in `catalog_app`), in the sidebar's **Sites**. WordPress runs on a new `php` runtime: the distro's PHP, one sandboxed PHP-FPM master per site as its user (ondemand, open_basedir, no shell functions; 16 MB idle) on a socket only Caddy reaches, files read by Caddy through ACLs set as the site, `wp-config.php` generated, WP-Cron from a timer, a fail2ban jail for wp-login. Ghost runs on Node with **MySQL 8** (Oracle's tarball checked with gpgv, on 127.0.0.1:3307 beside MariaDB; Ghost supports nothing else in production). The owner is made at install (password shown once). WordPress sites can be imported (wp-content and a .sql dump). The e2e suites and the tour pass on the VM.
 
 **Launch-time tasks (not now):** choose the license plus CLA, make the repo public, and make `curl -fsSL https://get.selfhostlayer.com | bash` install: the root of get.selfhostlayer.com only says "isn't out yet" (`app/install.sh/route.ts` in the website), and the installer still needs `--from-tarball` (it should download the newest release from the feed).

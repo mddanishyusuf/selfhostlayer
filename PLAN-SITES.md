@@ -175,3 +175,15 @@
 - **MySQL 8's memory:** 350–450 MB idle, on top of each Ghost site's own. On a 2 GB box, New site says so before the first Ghost.
 - **Ghost moving fast:** weekly releases, a new major about yearly. Majors aren't installed without the owner saying so.
 - **Distro PHP versions differ by OS.** WordPress supports them all. Plugins that need a newer PHP are the owner's call, and the engine page shows the version.
+
+## Result (2026-11-02)
+
+Built as planned, Days 1 to 6, all tested on the VM (Ubuntu 24.04, aarch64):
+
+- **Tests:** `installer/test/php-e2e.sh` (44 checks), `wordpress-e2e.sh` and `ghost-e2e.sh` (33 checks) pass, and the browser tour's TOUR_SITES (a WordPress site through New site, its one-time password, the site, delete) passes.
+- **Idle cost:** an idle WordPress site is 16 MB (PSS of its FPM master, no workers), and its first page takes 0.33 s.
+- **Ghost's settings** come in as `GHOST_*` env vars (`GHOST_URL`, `GHOST_DATABASE__CONNECTION__HOST`, `GHOST_MAIL__…`). The panel's env names are uppercase, and Ghost's starter turns them into Ghost's own lowercase names, so any Ghost setting can be set on the site's Environment page.
+- **MySQL 8's and PHP-FPM's configs** stay root's in `/etc/layer`, and reach their services as systemd credentials (`LoadCredential`, `%d`).
+- **WordPress import** reads the old address from the dump's options table, since `wp option get` would answer with `wp-config.php`'s `WP_SITEURL`.
+- **Ghost import** is Ghost's own Import/Export, with images copied over SSH. A single `content/` archive would be taken as the whole `data/` folder.
+

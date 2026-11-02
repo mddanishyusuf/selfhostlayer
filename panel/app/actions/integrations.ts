@@ -35,8 +35,9 @@ export interface IntegrationSettingsState {
 export async function saveIntegrationSettings(_prev: IntegrationSettingsState, form: FormData): Promise<IntegrationSettingsState> {
   await requireUser();
   const project = getProjectBySlug(String(form.get("slug") ?? ""));
-  if (!project || project.source !== "catalog") redirect("/integrations");
-  const min = installedVersion(project.id)?.manifest?.memory.min ?? 64;
+  if (!project || (project.source !== "catalog" && project.source !== "site")) redirect("/integrations");
+  // A site's floor: WordPress's PHP, or Ghost (which needs a few hundred MB).
+  const min = project.source === "site" ? (project.catalogApp === "ghost" ? 384 : 128) : (installedVersion(project.id)?.manifest?.memory.min ?? 64);
   const memoryMb = Number(form.get("memoryMb"));
   if (!Number.isInteger(memoryMb) || memoryMb < min || memoryMb > 16384) return { error: `Use ${min} to 16384 MB.` };
   setMemory(project.id, memoryMb);

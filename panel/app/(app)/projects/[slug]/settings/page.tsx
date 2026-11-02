@@ -24,6 +24,17 @@ export default async function SettingsPage({ params, searchParams }: { params: P
   await requireUser();
   const project = getProjectBySlug((await params).slug);
   if (!project) notFound();
+  if (project.source === "site") {
+    // A site's engine decides how it runs (its page is WordPress or Ghost); its memory limit is the owner's.
+    const name = project.catalogApp === "ghost" ? "Ghost" : "WordPress";
+    return (
+      <>
+        <PageHeader title={project.slug} crumb="Settings" meta={`A ${name} site`} />
+        <IntegrationSettingsForm slug={project.slug} name={project.slug} memoryMb={project.memoryMb} min={project.catalogApp === "ghost" ? 384 : 128} />
+        <DeleteProject slug={project.slug} />
+      </>
+    );
+  }
   if (project.source === "catalog") {
     // An integration's manifest decides how it builds and runs; its memory limit is the owner's.
     const version = installedVersion(project.id);

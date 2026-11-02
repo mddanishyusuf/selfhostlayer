@@ -1570,6 +1570,8 @@ if (process.env.TOUR_SITES === "1") {
   await waitFor(`(document.querySelector('[data-testid="site-list"]')?.innerText ?? "").includes("Tour Blog")`, "the site in the list");
   await screenshot("sites-list");
   await go("/projects/tour-blog/settings");
+  await waitFor(`!!document.querySelector('[data-testid="delete-project"]')`, "the site's settings");
+  await hydrated('[data-testid="delete-project"]', "the delete button to come alive");
   await click('[data-testid="delete-project"]');
   await waitFor(`!!document.querySelector("#confirm")`, "the delete confirmation");
   await evaluate(`(() => { const el = document.querySelector("#confirm"); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(el, "tour-blog"); el.dispatchEvent(new Event("input", { bubbles: true })); return true; })()`);
