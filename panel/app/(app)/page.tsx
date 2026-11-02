@@ -6,7 +6,7 @@ import { Icon } from "@/components/icon";
 import { CARD, Empty, Notice, PageHeader, PillLink, Segmented } from "@/components/page";
 import { SitePreviewFrame, SitePreviewSkeleton } from "@/components/site-preview";
 import { StatusChip, timeAgo } from "@/components/status";
-import { ShapeMark, cx } from "@/components/ui";
+import { ProjectMark, cx } from "@/components/ui";
 import { projectMarks } from "@/lib/avatar";
 import { frameworkLabel } from "@/lib/detect";
 import { FINISHED, listDeployments, liveDeployment, type Deployment } from "@/lib/deploy";
@@ -170,7 +170,7 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
               )}
               <Link href={`/projects/${p.slug}`} className="group grid gap-2.5 px-2">
                 <div className="flex min-w-0 items-center gap-3">
-                  <ShapeMark src={marks.get(p.slug)!} framework={p.framework} size="sm" />
+                  <ProjectMark src={marks.get(p.slug)!} framework={p.framework} size="sm" />
                   <div className="grid min-w-0 flex-1 gap-0.5">
                     <b className="truncate font-bold group-hover:underline">{p.slug}</b>
                     <span className="truncate text-[12px] text-muted">{live && host ? host : "Not live yet"}</span>
@@ -200,7 +200,7 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
                 href={`/projects/${p.slug}`}
                 className={cx("grid items-center gap-x-5 border-b border-border-soft px-3.5 py-2.5 transition-colors duration-150 last:border-b-0 hover:bg-hover", COLUMNS)}
               >
-                <ShapeMark src={marks.get(p.slug)!} framework={p.framework} />
+                <ProjectMark src={marks.get(p.slug)!} framework={p.framework} />
                 <div className="grid min-w-0 gap-[3px]">
                   <b className="truncate font-bold">{p.slug}</b>
                   <span className={cx("truncate text-[12px]", live && host ? "text-muted" : "text-dim")}>{live && host ? host : "Not live yet"}</span>

@@ -131,7 +131,6 @@
   --inverse-fg: #0e0e0e;
   --icon-tile: #ffffff;
   --icon-tile-fg: #0e0e0e;
-  --mark-filter: none;
   --code: #111111;
   --btn-hover: #1e1e1e;
   --btn-hover-line: #2a2a2a;
@@ -194,7 +193,6 @@
   --inverse-fg: #ffffff;
   --icon-tile: #000000;
   --icon-tile-fg: #ffffff;
-  --mark-filter: invert(1);
   --code: #111111;
   --btn-hover: #fafafa;
   --btn-hover-line: #d4d4d4;
@@ -258,7 +256,6 @@
     --inverse-fg: #ffffff;
     --icon-tile: #000000;
     --icon-tile-fg: #ffffff;
-    --mark-filter: invert(1);
     --code: #111111;
     --btn-hover: #fafafa;
     --btn-hover-line: #d4d4d4;
