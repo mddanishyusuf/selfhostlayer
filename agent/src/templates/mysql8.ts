@@ -63,7 +63,10 @@ Group=${MYSQL8.user}
 RuntimeDirectory=layer-mysql8
 RuntimeDirectoryMode=0750
 Environment=LD_LIBRARY_PATH=${mysql8Compat(version)}
-ExecStart=${mysql8Bin(version, "mysqld")} --defaults-file=${MYSQL8.conf} --console
+# The config is root's, in /etc/layer (which mysql8 can't enter): systemd hands
+# the service a private, read-only copy in its credentials folder (%d).
+LoadCredential=mysql8.cnf:${MYSQL8.conf}
+ExecStart=${mysql8Bin(version, "mysqld")} --defaults-file=%d/mysql8.cnf --console
 Restart=on-failure
 RestartSec=5
 TimeoutStopSec=300
