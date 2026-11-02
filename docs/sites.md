@@ -40,9 +40,20 @@ A site has a project's pages: Overview, Deployments, Logs, Domains, Databases, B
 **Ghost:**
 
 - **The version, with Update.** It's backed up first, when backups are on. Then the new version is installed beside the running one. Ghost stops for a moment while it moves its database to the new version.
-- **Email:** Ghost sends sign-in and invite emails over SMTP, and newsletters only through Mailgun. Set both in Ghost's own settings.
 
 **Domains** work as for any project: add yours on the site's Domains page. For WordPress, the site's address changes with it.
+
+## Email
+
+**Sites send email with nothing to set up**: password resets, new-user and comment notifications, contact forms, Ghost's sign-in links and invites.
+
+- **How:** the server runs its own send-only mail (Postfix), installed with the first site. It listens on 127.0.0.1 only, so nothing outside can send through it. It delivers straight to each recipient's mail server.
+- **From:** WordPress sends from `wordpress@<site's domain>` and Ghost from `noreply@<site's domain>`.
+- **Limit:** at most 60 messages an hour from one sender, so a hacked plugin can't turn the server into a spam machine.
+
+**To keep it out of spam folders,** give the site its own domain, and add the SPF record its WordPress page shows: a TXT record like `v=spf1 ip4:<server's IP> ~all`. Mail from a free address (`*.sslip.io`) often lands in spam. Some hosts block outgoing port 25 on new accounts. Hetzner does for some; ask them to unblock it.
+
+**For newsletters or high volume,** send through a real provider instead. On a WordPress site's page, **Email** can switch to the Email integration (one of its brands), an alert channel's SMTP server, or any SMTP server. A Ghost site takes Ghost's own settings as `GHOST_MAIL__…` env vars on its Environment page. Ghost's newsletters need Mailgun, set in Ghost's own settings.
 
 ## Bringing a site in
 
