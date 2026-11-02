@@ -97,7 +97,8 @@ systemctl is-enabled --quiet "app-$slug-wpcron.timer" && pass "the timer is on" 
 systemctl start "app-$slug-wpcron.service" && pass "WP-Cron runs as the site" || fail "WP-Cron failed" "$(journalctl -u "app-$slug-wpcron" -n 5 --no-pager)"
 
 echo "Bringing a site in (wp-content and a .sql dump, another table prefix and address)"
-mkdir -p "$work/old/site/wp-content/uploads"
+mkdir -p "$work/old/site"
+cp -a "$docroot/wp-content" "$work/old/site/wp-content"
 echo "old upload" >"$work/old/site/wp-content/uploads/old.txt"
 wp db export - --skip-plugins --skip-themes 2>/dev/null | sed -e 's/`wp_/`old_/g' -e "s#https://$host#https://old.example.com#g" >"$work/old/site/backup.sql"
 tar -czf "$work/old.tar.gz" -C "$work/old" site

@@ -417,7 +417,8 @@ const IMPORT_UNPACK = [
   'sql="$(find "$work/x" -maxdepth 4 -type f -name "*.sql" | head -n 1)"',
   'if [ -z "$content" ]; then echo "layer: the archive has no wp-content folder"; exit 3; fi',
   'if [ -z "$sql" ]; then echo "layer: the archive has no .sql dump of the database"; exit 3; fi',
-  'prefix="$(grep -m 1 -oE "CREATE TABLE (IF NOT EXISTS )?`[A-Za-z0-9_]+options`" "$sql" | sed -E "s/.*`([A-Za-z0-9_]*)options`/\\1/")"',
+  // Single quotes: in double quotes the dump's backticks would run as commands.
+  "prefix=\"$(grep -m 1 -oE 'CREATE TABLE (IF NOT EXISTS )?.[A-Za-z0-9_]+options.' \"$sql\" | sed -E 's/^CREATE TABLE (IF NOT EXISTS )?.([A-Za-z0-9_]*)options.$/\\2/')\"",
   'echo "LAYER-IMPORT content=$content"',
   'echo "LAYER-IMPORT sql=$sql"',
   'echo "LAYER-IMPORT prefix=${prefix:-wp_}"',
@@ -470,7 +471,8 @@ async function wordpressImport(params: Params, ctx: Context, io: CallIO) {
       await writeConfig(ctx, slug, state);
       throw new ActionError("import_failed", `the dump didn't load: ${lastLine(loaded.output)}`);
     }
-    const oldUrl = lastLine((await wp(ctx, slug, ["option", "get", "siteurl", "--skip-plugins", "--skip-themes"])).output).replace(/\/+$/, "");
+    // From the table, not `wp option get`: wp-config.php's WP_SITEURL would answer instead.
+    const oldUrl = lastLine((await wp(ctx, slug, ["db", "query", `SELECT option_value FROM ${prefix}options WHERE option_name = 'siteurl'`, "--skip-column-names", "--skip-plugins", "--skip-themes"])).output).replace(/\/+$/, "");
 
     io.emit("Putting its wp-content in place…\n");
     const docroot = join(app.data, DOCROOT);
