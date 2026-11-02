@@ -208,7 +208,7 @@ async function deployGhost(r: SiteRun, site: Site) {
   await agent("app.create", { slug: p.slug });
   await agent("mysql8.add", { slug: p.slug });
   // Ghost's address comes from its env; the rest of its env is the owner's.
-  setProjectEnv(p.id, { ...projectEnv(p.id), url: r.url });
+  setProjectEnv(p.id, { ...projectEnv(p.id), GHOST_URL: r.url });
   await agent("env.write", { slug: p.slug, vars: projectEnv(p.id) });
   const node = await agent<{ installed: boolean }>("node.install", { version: p.nodeVersion });
   r.log(`Node ${p.nodeVersion}${node.installed ? " (installed now)" : ""}\n`);

@@ -53,6 +53,8 @@ export function renderMysql8Unit(version: string): string {
 [Unit]
 Description=layer MySQL 8 (for Ghost sites)
 After=network-online.target
+StartLimitIntervalSec=120
+StartLimitBurst=5
 
 [Service]
 Type=exec
@@ -64,8 +66,6 @@ Environment=LD_LIBRARY_PATH=${mysql8Compat(version)}
 ExecStart=${mysql8Bin(version, "mysqld")} --defaults-file=${MYSQL8.conf} --console
 Restart=on-failure
 RestartSec=5
-StartLimitIntervalSec=120
-StartLimitBurst=5
 TimeoutStopSec=300
 LimitNOFILE=10000
 SyslogIdentifier=layer-mysql8

@@ -113,6 +113,14 @@ async function waitFor(ctx: Context, password: string | null): Promise<void> {
   throw new ActionError("start_failed", `MySQL 8 didn't come up: ${log.stdout.trim().split("\n").slice(-2).join(" ")}`);
 }
 
+/** (Re)starts the server; when it won't, says why, from its own log. */
+async function startOrSay(ctx: Context): Promise<void> {
+  const r = await ctx.exec(BIN.systemctl, ["restart", MYSQL8.unit], { allowFail: true, timeoutMs: 300_000 });
+  if (r.code === 0) return;
+  const log = await ctx.exec(BIN.journalctl, ["-u", MYSQL8.unit, "-n", "8", "--no-pager", "-o", "cat"], { allowFail: true });
+  throw new ActionError("start_failed", `MySQL 8 didn't start: ${log.stdout.trim().split("\n").filter((l) => !/^(Started|Starting|Stopped|layer-mysql8\.service:)/.test(l)).slice(-3).join(" ")}`);
+}
+
 function apt(ctx: Context, args: string[]) {
   return ctx.exec(SYSTEMD_RUN, ["--quiet", "--wait", "--pipe", "--collect", "--unit=layer-apt-install", "--setenv=DEBIAN_FRONTEND=noninteractive", "--", BIN.aptGet, ...args], { timeoutMs: 600_000, allowFail: true });
 }
@@ -168,7 +176,8 @@ export async function installMysql8(ctx: Context, io: CallIO) {
       break;
     }
   }
-  await ctx.exec(BIN.chmod, ["-R", "go-w", tmp]);
+  // Read-only for everyone but root: the mysql8 user runs these, nobody changes them.
+  await ctx.exec(BIN.chmod, ["-R", "u=rwX,go=rX", tmp]);
   rmSync(target, { recursive: true, force: true });
   renameSync(tmp, target);
   // The big tarball isn't kept: an update downloads the new one.
@@ -194,7 +203,7 @@ export async function installMysql8(ctx: Context, io: CallIO) {
 
   // First start with networking off: root has no password until the next line.
   await ctx.exec(BIN.systemctl, ["daemon-reload"]);
-  await ctx.exec(BIN.systemctl, ["restart", MYSQL8.unit]);
+  await startOrSay(ctx);
   const password = randomBytes(24).toString("hex");
   await waitFor(ctx, fresh ? null : (mysql8StateRaw(ctx)?.password ?? null));
   if (fresh) await admin(ctx, `ALTER USER 'root'@'localhost' IDENTIFIED BY '${password}'; DROP DATABASE IF EXISTS test;`, { password: null });
@@ -203,7 +212,7 @@ export async function installMysql8(ctx: Context, io: CallIO) {
   // Now on 127.0.0.1:3307.
   writeFileAtomic(MYSQL8.conf, renderMysql8Conf(version, false, total), 0o644);
   await ctx.exec(BIN.systemctl, ["enable", MYSQL8.unit], { allowFail: true });
-  await ctx.exec(BIN.systemctl, ["restart", MYSQL8.unit]);
+  await startOrSay(ctx);
   await waitFor(ctx, mysql8State(ctx)!.password);
   const v = (await admin(ctx, "SELECT VERSION()")).stdout.trim();
   return { name: "mysql8", installed: true, version: v, already: false };

@@ -54,7 +54,7 @@ LD_LIBRARY_PATH=/opt/layer/mysql/8.4.13/lib/compat MYSQL_PWD="$pw_other" /opt/la
 call app.delete "{\"slug\":\"$other\",\"keepData\":false}" >/dev/null
 
 echo "Ghost, the way the panel deploys it"
-expect "env (its address)" "$(call env.write "{\"slug\":\"$slug\",\"vars\":{\"url\":\"https://$host\"}}")" '.ok == true'
+expect "env (its address)" "$(call env.write "{\"slug\":\"$slug\",\"vars\":{\"GHOST_URL\":\"https://$host\"}}")" '.ok == true'
 expect "Node $node_version" "$(call node.install "{\"version\":\"$node_version\"}")" '.ok == true'
 out="$(call ghost.fetch "{\"slug\":\"$slug\"}")"
 expect "ghost.fetch (checked against the registry's integrity)" "$out" '.ok == true and (.result.release | test("^[0-9a-f]{40}$"))'

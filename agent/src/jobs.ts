@@ -108,13 +108,13 @@ function findDatabases(dir, rel, out) {
 
   // A Ghost site's MySQL 8 (Oracle's, on 3307), as .layer-mysql8.sql, with its own tools.
   let mysql8 = null;
-  if (process.env.LAYER_MYSQL8_HOME && process.env.database__connection__database) {
+  if (process.env.LAYER_MYSQL8_HOME && process.env.GHOST_DATABASE__CONNECTION__DATABASE) {
     const home = process.env.LAYER_MYSQL8_HOME;
     const dump = path.join(snap, ".layer-mysql8.sql");
     const r = spawnSync(
       home + "/bin/mysqldump",
-      ["--single-transaction", "--quick", "--routines", "--no-tablespaces", "--protocol=TCP", "--host=127.0.0.1", "--port=3307", "--user=" + process.env.database__connection__user, "--result-file=" + dump, process.env.database__connection__database],
-      { stdio: ["ignore", "ignore", "pipe"], encoding: "utf8", env: { ...process.env, MYSQL_PWD: process.env.database__connection__password, LD_LIBRARY_PATH: home + "/lib/compat" } },
+      ["--single-transaction", "--quick", "--routines", "--no-tablespaces", "--protocol=TCP", "--host=127.0.0.1", "--port=3307", "--user=" + process.env.GHOST_DATABASE__CONNECTION__USER, "--result-file=" + dump, process.env.GHOST_DATABASE__CONNECTION__DATABASE],
+      { stdio: ["ignore", "ignore", "pipe"], encoding: "utf8", env: { ...process.env, MYSQL_PWD: process.env.GHOST_DATABASE__CONNECTION__PASSWORD, LD_LIBRARY_PATH: home + "/lib/compat" } },
     );
     if (r.status !== 0) {
       console.error("layer: mysqldump (MySQL 8) failed: " + String(r.stderr || r.error).trim().split("\n").pop());
@@ -395,12 +395,12 @@ export const RESTORE_JOB = [
   // A Ghost site's MySQL 8, like MySQL, with its own tools on its own port.
   'dump="$app/data/.layer-mysql8.sql"',
   'if [ -f "$dump" ]; then',
-  '  if [ -n "${LAYER_MYSQL8_HOME:-}" ] && [ -n "${database__connection__database:-}" ]; then',
-  '    MYSQL_PWD="$database__connection__password"; LD_LIBRARY_PATH="$LAYER_MYSQL8_HOME/lib/compat"; export MYSQL_PWD LD_LIBRARY_PATH',
-  '    set -- --protocol=TCP --host=127.0.0.1 --port=3307 --user="$database__connection__user"',
+  '  if [ -n "${LAYER_MYSQL8_HOME:-}" ] && [ -n "${GHOST_DATABASE__CONNECTION__DATABASE:-}" ]; then',
+  '    MYSQL_PWD="$GHOST_DATABASE__CONNECTION__PASSWORD"; LD_LIBRARY_PATH="$LAYER_MYSQL8_HOME/lib/compat"; export MYSQL_PWD LD_LIBRARY_PATH',
+  '    set -- --protocol=TCP --host=127.0.0.1 --port=3307 --user="$GHOST_DATABASE__CONNECTION__USER"',
   '    before="$app/data.before-restore-$stamp"; mkdir -p -m 700 -- "$before"',
-  '    if ! "$LAYER_MYSQL8_HOME/bin/mysqldump" "$@" --single-transaction --quick --routines --no-tablespaces --result-file="$before/.layer-mysql8.sql" "$database__connection__database"; then rm -f -- "$dump"; echo "layer: files restored, but the MySQL 8 database could not be saved first, so it was left as it was"; exit 2; fi',
-  '    if ! "$LAYER_MYSQL8_HOME/bin/mysql" "$@" --batch "$database__connection__database" <"$dump"; then rm -f -- "$dump"; echo "layer: files restored, but loading the MySQL 8 dump failed; the database as it was is in data.before-restore-$stamp/.layer-mysql8.sql"; exit 2; fi',
+  '    if ! "$LAYER_MYSQL8_HOME/bin/mysqldump" "$@" --single-transaction --quick --routines --no-tablespaces --result-file="$before/.layer-mysql8.sql" "$GHOST_DATABASE__CONNECTION__DATABASE"; then rm -f -- "$dump"; echo "layer: files restored, but the MySQL 8 database could not be saved first, so it was left as it was"; exit 2; fi',
+  '    if ! "$LAYER_MYSQL8_HOME/bin/mysql" "$@" --batch "$GHOST_DATABASE__CONNECTION__DATABASE" <"$dump"; then rm -f -- "$dump"; echo "layer: files restored, but loading the MySQL 8 dump failed; the database as it was is in data.before-restore-$stamp/.layer-mysql8.sql"; exit 2; fi',
   '    rm -f -- "$dump"; echo "layer: MySQL 8 database restored"',
   '  else rm -f -- "$dump"; echo "layer: the backup has a MySQL 8 dump, but the site has no MySQL 8 now; skipped it"; fi',
   'fi',

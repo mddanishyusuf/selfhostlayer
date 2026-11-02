@@ -64,16 +64,17 @@ export function serviceEnv(state: ServicesState): Record<string, string> {
     const m = state.mongodb;
     env.MONGODB_URI = `mongodb://${m.user}:${m.password}@127.0.0.1:27017/${m.database}`;
   }
-  // Ghost reads its config from env vars, nconf style (database__connection__host).
+  // Ghost reads its config from env vars named like database__connection__host;
+  // its starter turns every GHOST_* variable into that (layer-ghost.js).
   if (state.mysql8) {
     const m = state.mysql8;
     Object.assign(env, {
-      database__client: "mysql",
-      database__connection__host: "127.0.0.1",
-      database__connection__port: "3307",
-      database__connection__user: m.user,
-      database__connection__password: m.password,
-      database__connection__database: m.database,
+      GHOST_DATABASE__CLIENT: "mysql",
+      GHOST_DATABASE__CONNECTION__HOST: "127.0.0.1",
+      GHOST_DATABASE__CONNECTION__PORT: "3307",
+      GHOST_DATABASE__CONNECTION__USER: m.user,
+      GHOST_DATABASE__CONNECTION__PASSWORD: m.password,
+      GHOST_DATABASE__CONNECTION__DATABASE: m.database,
       // Where its tools are, for backups (not a secret).
       LAYER_MYSQL8_HOME: `${MYSQL8.root}/${MYSQL8.version}`,
     });

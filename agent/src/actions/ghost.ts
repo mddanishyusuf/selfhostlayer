@@ -21,10 +21,15 @@ const assertGhostVersion = (v: unknown): string => {
 };
 
 /**
- * Started by the unit instead of index.js: the color's PORT becomes Ghost's
- * server port, on 127.0.0.1 only, before Ghost reads its config.
+ * Started by the unit instead of index.js: GHOST_* env vars become Ghost's
+ * own names, and the color's PORT its server port, on 127.0.0.1 only.
  */
 const STARTER = `// Written by Self Host Layer: starts Ghost on the port of its color, on 127.0.0.1.
+// GHOST_URL, GHOST_DATABASE__CONNECTION__HOST, GHOST_MAIL__TRANSPORT…: every
+// GHOST_* variable becomes the name Ghost reads (url, database__connection__host…).
+for (const [key, value] of Object.entries(process.env)) {
+  if (key.startsWith("GHOST_") && key.length > 6) process.env[key.slice(6).toLowerCase()] = value;
+}
 process.env.server__port = process.env.PORT;
 process.env.server__host = "127.0.0.1";
 process.env.NODE_ENV = "production";
