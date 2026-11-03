@@ -103,9 +103,12 @@ describe("isNewer", () => {
 
 describe("update.check", () => {
   it("compares the feed's newest release with this server's", async () => {
-    expect(await run("update.check")).toEqual({ current: "0.1.0", latest: { version: "0.2.0", date: "2026-11-01", notes: "Faster deploys." }, available: true, running: false });
+    expect(await run("update.check")).toEqual({ current: "0.1.0", latest: { version: "0.2.0", date: "2026-11-01", notes: "Faster deploys." }, available: true, running: false, release: null });
     feed = JSON.stringify({ releases: [release({ version: "0.1.0" })] });
-    expect((await run("update.check")).available).toBe(false);
+    const same = await run("update.check");
+    expect(same.available).toBe(false);
+    // This version's own files, for a new agent-only server (Settings → Servers).
+    expect(same.release).toMatchObject({ url: expect.stringContaining("layer-"), sha256: expect.stringMatching(/^[0-9a-f]{64}$/), installer: { sha256: expect.stringMatching(/^[0-9a-f]{64}$/) } });
   });
 
   it("offers nothing older than this server", async () => {
