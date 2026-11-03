@@ -92,6 +92,8 @@ export function detectPackageManager(files: ProjectFiles, pkg: PackageJson | nul
 
 export const runScript = (pm: PackageManager, script: string) => `${pm} run ${script}`;
 
+const PLAIN_NODE = /^node\s+[^;&|`$<>()'"\\]+$/;
+
 /**
  * A start script that is just `node <file> [args]` runs as node directly; npm
  * as a process manager writes to a home folder the sandbox keeps read-only,
@@ -99,7 +101,14 @@ export const runScript = (pm: PackageManager, script: string) => `${pm} run ${sc
  */
 export function startCommand(pkg: PackageJson): { exec: string[]; warning?: string } {
   const script = pkg.scripts?.start?.trim();
-  if (script && /^node\s+[^;&|`$<>()'"\\]+$/.test(script)) return { exec: script.split(/\s+/) };
+  if (script && PLAIN_NODE.test(script)) return { exec: script.split(/\s+/) };
+  // `NODE_ENV=production node server.js`: the node part runs; the variables
+  // belong on the Environment page (NODE_ENV=production is set for every app).
+  const prefixed = script ? /^((?:[A-Za-z_][A-Za-z0-9_]*=[^\s;&|`$<>()'"\\]*\s+)+)(node\s.+)$/.exec(script) : null;
+  if (prefixed && PLAIN_NODE.test(prefixed[2]!)) {
+    const vars = prefixed[1]!.trim().split(/\s+/).filter((v) => v !== "NODE_ENV=production");
+    return { exec: prefixed[2]!.split(/\s+/), ...(vars.length ? { warning: `The start script sets ${vars.join(" ")}: add ${vars.length === 1 ? "it" : "them"} on the Environment page.` } : {}) };
+  }
   if (pkg.main) return { exec: ["node", pkg.main], ...(script ? { warning: `The start script "${script}" isn't a plain node command, so the "main" file runs instead. Set a start command if that's wrong.` } : {}) };
   if (script) return { exec: ["npm", "start"], warning: `The start script "${script}" runs through npm. A start command that begins with node starts faster and more reliably.` };
   return { exec: ["node", "index.js"], warning: "No start script or main file, so index.js is assumed. Set a start command." };

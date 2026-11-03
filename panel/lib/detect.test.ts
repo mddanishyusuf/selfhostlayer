@@ -121,9 +121,15 @@ describe("startCommand", () => {
   });
 
   it("falls back to main, then npm start, with a warning", () => {
-    expect(startCommand({ main: "app.js", scripts: { start: "NODE_ENV=production node app.js" } }).exec).toEqual(["node", "app.js"]);
+    expect(startCommand({ main: "app.js", scripts: { start: "PORT=$PORT node app.js" } }).exec).toEqual(["node", "app.js"]);
     expect(startCommand({ scripts: { start: "tsx src/index.ts" } })).toMatchObject({ exec: ["npm", "start"], warning: expect.stringContaining("npm") });
     expect(startCommand({}).exec).toEqual(["node", "index.js"]);
+  });
+
+  it("runs node after leading variables, which belong on the Environment page", () => {
+    // kagaz-api's: main says index.js, which doesn't exist.
+    expect(startCommand({ main: "index.js", scripts: { start: "NODE_ENV=production node server.js" } })).toEqual({ exec: ["node", "server.js"] });
+    expect(startCommand({ scripts: { start: "NODE_ENV=production TZ=UTC node dist/main.js" } })).toEqual({ exec: ["node", "dist/main.js"], warning: "The start script sets TZ=UTC: add it on the Environment page." });
   });
 
   it("never treats shell syntax as a plain node command", () => {
