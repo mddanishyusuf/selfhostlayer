@@ -23,6 +23,7 @@ import { backUpProject } from "./backup/runner";
 import { applyManifest } from "./catalog";
 import { checkCertificate } from "./cert";
 import { syncCrons } from "./crons";
+import { hasProcesses, listWorkers, syncWorkers } from "./workers";
 import { servingConfig } from "./domains";
 import { getApp } from "./github-store";
 import { BUILD_SLOTS, readState } from "./panel-state";
@@ -349,7 +350,7 @@ async function waitForCertificates(id: number, hosts: string[]): Promise<void> {
 }
 
 /** A read-only token for exactly this repo, valid for an hour. undefined for public repos without the app. */
-async function repoToken(project: Project): Promise<string | undefined> {
+export async function repoToken(project: Project): Promise<string | undefined> {
   if (!project.installationId) return undefined;
   const app = getApp();
   if (!app) throw new Error("This project needs the GitHub App, which isn't connected anymore.");
@@ -513,6 +514,12 @@ async function runHere(id: number): Promise<void> {
     await waitForCertificates(id, serving(p).domains);
     // Cron jobs follow the project's Node version and folder, and run from this release now.
     for (const problem of await syncCrons(p)) log(id, `Cron ${problem}\n`);
+    // Workers too, restarted on this release (PLAN-PROCESSES.md).
+    if (hasProcesses(p)) {
+      const workers = listWorkers(p.id);
+      if (workers.length) log(id, `Restarting ${workers.length === 1 ? "worker" : "workers"} ${workers.map((w) => w.name).join(", ")}…\n`);
+      for (const problem of await syncWorkers(p)) log(id, `Worker ${problem}\n`);
+    }
     await agent("release.prune", { slug: p.slug, keep: 5 }).catch((err) => log(id, `Pruning old releases failed: ${(err as Error).message}\n`));
 
     if (steps.length) steps[steps.length - 1]!.ms = Date.now() - stepStart;

@@ -287,6 +287,16 @@ const MIGRATIONS = [
      moved_from INTEGER,
      at INTEGER NOT NULL
    );`,
+  // Workers: long-running processes beside a project's web server (lib/workers.ts, PLAN-PROCESSES.md).
+  `CREATE TABLE project_workers (
+     id INTEGER PRIMARY KEY,
+     project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+     name TEXT NOT NULL,
+     command TEXT NOT NULL,
+     memory_mb INTEGER NOT NULL DEFAULT 512,
+     created_at INTEGER NOT NULL,
+     UNIQUE (project_id, name)
+   );`,
 ];
 
 function open(): DatabaseSync {

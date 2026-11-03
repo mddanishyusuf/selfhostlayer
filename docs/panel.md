@@ -159,6 +159,27 @@ journalctl -u 'app-<app>-cron-<name>'
 
 **Run now** starts it at once. The job's page lists its recent runs with their output and exit codes. A failing job raises an alert.
 
+### Processes
+For projects from GitHub that run on Node. It has two parts.
+
+**Workers** are processes that keep running beside the app, like a queue consumer (`node worker.js`). They're what pm2 ran as extra apps in an `ecosystem.config.js`. Give one a name, a command and a memory limit:
+
+- It runs from the live release as the app's user, with its env vars, databases, Redis and `DATA_DIR`, and `NODE_ENV=production`, in the same sandbox as the app.
+- If it exits, it's started again 2 seconds later. After 5 exits in a minute it stays stopped, and the page shows its exit code. **Start** gives it another try.
+- Every deploy and rollback restarts it on the new release, so it always runs the code that's live.
+- Its output is on the project's **Logs** page, each line under its own name.
+
+The list shows each worker's status, its memory against its limit, and **Restart**, **Stop** or **Start**, and **Delete**. Each worker is a plain systemd service:
+
+```sh
+systemctl status 'app-<app>-worker-*'
+journalctl -u app-<app>-worker-<name> -f
+```
+
+**Run a command** runs something once, like a migration (`npm run migrate`) or a script (`node scripts/fix.js`). The project's package.json scripts are offered as suggestions. It runs in the live release, as the app, with its env vars, and its output streams onto the page. It stops when you press **Stop**, when you leave the page, or after an hour. Each project runs one command at a time, and Activity keeps a record of every command.
+
+Commands begin with `node`, `npm` or `npx`, so they run on the project's Node version. Run package scripts as `npm run <script>`, whatever package manager the project uses.
+
 ### Environment
 Your variables, encrypted in the panel's database. On deploy they're written to `/etc/layer/apps/<app>/app.env` (root-only), which systemd hands to the app's process. **Save and restart** loads changes without a rebuild and without downtime. Variables read at build time, like `NEXT_PUBLIC_*`, need a redeploy.
 

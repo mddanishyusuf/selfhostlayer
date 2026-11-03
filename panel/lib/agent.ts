@@ -107,6 +107,17 @@ const FAKE: Partial<Record<ActionName, unknown>> = {
       },
     ],
   },
+  "worker.list": {
+    slug: "piqo",
+    workers: [
+      { name: "queue", state: "active", subState: "running", result: "success", restarts: 0, memoryBytes: 61_865_984, since: systemdTime(Date.now() - 3 * 3600_000), exitStatus: 0 },
+      { name: "mailer", state: "failed", subState: "failed", result: "exit-code", restarts: 5, memoryBytes: null, since: null, exitStatus: 1 },
+    ],
+  },
+  "worker.write": { started: true },
+  "worker.control": {},
+  "worker.delete": { deleted: true },
+  "app.run-stop": { stopped: true },
   "metrics.sample": {
     at: Date.now(),
     box: { cpu: { busy: 1000, total: 10000 }, cpus: 2, memoryMb: { used: 610, total: 3800 }, diskGb: { used: 8, total: 38 } },
@@ -320,6 +331,16 @@ function fakeServiceStatus(p: Record<string, unknown>) {
   return { slug: p.slug, ...engines, ...(apps[String(p.slug)] ?? {}) };
 }
 
+/** A command's output, a line at a time, like app.run streams it. */
+async function fakeRun(onChunk?: (chunk: string) => void) {
+  const lines = ["$ node migrations/mongo-to-sqlite.js", "Connecting to MongoDB…", "Copied 1,204 documents from users", "Copied 88 documents from teams", "\x1b[32mDone\x1b[0m in 2.1s"];
+  for (const line of lines) {
+    await new Promise((r) => setTimeout(r, 400));
+    onChunk?.(`${line}\n`);
+  }
+  return { code: 0, ms: 2100, timedOut: false };
+}
+
 function fakeBrowse(p: Record<string, unknown>) {
   if (p.engine === "sqlite" && !p.file) return { files: FAKE_SQLITE[String(p.slug)] ?? [], tables: [] };
   const settings = JSON.stringify({ theme: "dark", publicDashboard: true, excludePaths: ["/admin", "/preview"], goals: [{ name: "Signup", path: "/thanks" }] });
@@ -402,6 +423,7 @@ export async function agent<T>(action: ActionName, params: Record<string, unknow
   if (config.fakeAgent && action === "db.browse") return fakeBrowse(params) as T;
   if (config.fakeAgent && (action === "db.count" || action === "db.update")) return fakeEdit(action, params) as T;
   if (config.fakeAgent && action === "service.status") return fakeServiceStatus(params) as T;
+  if (config.fakeAgent && action === "app.run") return fakeRun(callOpts.onChunk) as T;
   if (config.fakeAgent && action in FAKE) return FAKE[action] as T;
   return callAgent<T>(action, params, { ...callOpts, socket: config.agentSocket });
 }

@@ -14,7 +14,7 @@ import { phpUnitName } from "../templates/php.ts";
 import { redisUnit } from "../templates/redis.ts";
 
 // Apps' colors and cron jobs, a Sites WordPress's PHP and WP-Cron, Redis per app, MySQL 8.
-const AGENT_UNIT = /^(app-[a-z0-9-]+(@\.service|-cron-[a-z0-9-]+\.(service|timer)|-php\.service|-wpcron\.(service|timer))|layer-redis-[a-z0-9-]+\.service|layer-mysql8\.service)$/;
+const AGENT_UNIT = /^(app-[a-z0-9-]+(@\.service|-cron-[a-z0-9-]+\.(service|timer)|-worker-[a-z0-9-]+\.service|-php\.service|-wpcron\.(service|timer))|layer-redis-[a-z0-9-]+\.service|layer-mysql8\.service)$/;
 
 /** The files only the agent writes. The installer's own (layer-agent.service, config.json, …) are left to a re-run of it. */
 export function ownsPath(paths: Paths): (path: string) => boolean {

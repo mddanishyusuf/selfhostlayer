@@ -7,6 +7,8 @@ Import it from GitHub as usual (New project), same branch. Its data lives in `DA
 
 - If your app reads `process.env.DATA_DIR`, there's nothing to change.
 - If it reads its own variable (say `DB_PATH`), set it on the app's **Environment** page to a path inside the data folder, like `/srv/apps/<app>/data/app.db`.
+- If its `ecosystem.config.js` runs more than the web server (a `worker.js`, say), add each extra process on the app's **Processes** page as a worker. Workers get the app's env vars and restart with every deploy.
+- If its start script sets variables (`NODE_ENV=production node server.js`), set the start command on **Settings** to `node server.js` and put the variables on **Environment**. Workers and commands get `NODE_ENV=production` already.
 
 ## 2. Copy the databases safely on the old server
 Never `cp` a database file while the app is running: you can get a half-written copy. Ask SQLite for a consistent one instead:

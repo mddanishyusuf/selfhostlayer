@@ -1,6 +1,6 @@
 "use client";
 
-import { AppWindowIcon, ArrowUpRightIcon, BellIcon, BracesIcon, ChartColumnIcon, ChevronDownIcon, ChevronLeftIcon, CircleArrowUpIcon, ClipboardListIcon, ClockIcon, DatabaseBackupIcon, DatabaseIcon, FolderIcon, GlobeIcon, HistoryIcon, KeyRoundIcon, LayoutDashboardIcon, LinkIcon, LogOutIcon, MailIcon, MenuIcon, MoonIcon, PanelLeftOpenIcon, PuzzleIcon, RocketIcon, SearchIcon, ServerCogIcon, ServerIcon, SettingsIcon, ShieldIcon, SquareTerminalIcon, SunIcon } from "lucide-react";
+import { AppWindowIcon, ArrowUpRightIcon, BellIcon, BracesIcon, ChartColumnIcon, ChevronDownIcon, ChevronLeftIcon, CircleArrowUpIcon, ClipboardListIcon, ClockIcon, CpuIcon, DatabaseBackupIcon, DatabaseIcon, FolderIcon, GlobeIcon, HistoryIcon, KeyRoundIcon, LayoutDashboardIcon, LinkIcon, LogOutIcon, MailIcon, MenuIcon, MoonIcon, PanelLeftOpenIcon, PuzzleIcon, RocketIcon, SearchIcon, ServerCogIcon, ServerIcon, SettingsIcon, ShieldIcon, SquareTerminalIcon, SunIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Fragment, useEffect, useState } from "react";
@@ -24,6 +24,8 @@ export interface SidebarProject {
   site: "wordpress" | "ghost" | null;
   status: "ok" | "warn" | "err" | "idle";
   isStatic: boolean;
+  /** A GitHub project on Node: it has a Processes page (workers, Run a command). */
+  processes: boolean;
   url: string | null;
 }
 
@@ -111,6 +113,7 @@ function projectNav(p: SidebarProject): Item[][] {
             { href: `${base}/databases`, label: "Databases", icon: DatabaseIcon },
             { href: `${base}/backups`, label: "Backups", icon: DatabaseBackupIcon },
             ...(wordpress ? [] : [{ href: `${base}/crons`, label: "Cron jobs", icon: ClockIcon }]),
+            ...(p.processes ? [{ href: `${base}/processes`, label: "Processes", icon: CpuIcon }] : []),
           ]),
       ...(wordpress ? [] : [{ href: `${base}/env`, label: "Environment", icon: KeyRoundIcon }]),
       { href: `${base}/settings`, label: "Settings", icon: SettingsIcon },

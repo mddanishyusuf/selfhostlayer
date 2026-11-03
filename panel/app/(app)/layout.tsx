@@ -12,6 +12,7 @@ import { ENGINES, engineOf } from "@/lib/sites";
 import { requireUser } from "@/lib/session";
 import { THEME_COOKIE, parseTheme } from "@/lib/theme";
 import { offeredUpdate, updateState } from "@/lib/updates";
+import { hasProcesses } from "@/lib/workers";
 
 function sidebarProjects(): SidebarProject[] {
   return listProjects().map((p) => {
@@ -32,6 +33,7 @@ function sidebarProjects(): SidebarProject[] {
       site,
       status: building ? "warn" : live ? "ok" : latest?.status === "failed" ? "err" : "idle",
       isStatic: p.runtime.kind === "static",
+      processes: hasProcesses(p),
       url: live && host ? `https://${host}` : null,
     };
   });

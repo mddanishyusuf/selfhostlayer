@@ -6,7 +6,7 @@
 
 ## Each app is fenced in
 
-**Its own Linux user.** Every app runs as `app-<app>`: no password, no shell, no SSH login. Its folder (`/srv/apps/<app>`) belongs to that user and nobody else can read it. Builds run as that user too, inside the same kind of sandbox, so a malicious `postinstall` script is contained the same way the app is.
+**Its own Linux user.** Every app runs as `app-<app>`: no password, no shell, no SSH login. Its folder (`/srv/apps/<app>`) belongs to that user and nobody else can read it. Builds run as that user too, inside the same kind of sandbox, so a malicious `postinstall` script is contained the same way the app is. Cron jobs, workers and commands from the Processes page run the same way.
 
 **A sandboxed systemd unit.** Each app's unit (`/etc/systemd/system/app-<app>@.service`) turns on:
 

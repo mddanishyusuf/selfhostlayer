@@ -390,6 +390,39 @@ if (process.env.TOUR_DEPLOY === "1") {
   console.log("  ✓ Run now: succeeded as the app, with its env var in the output");
   await screenshot("cron-runs");
 
+  console.log("Processes");
+  await go("/projects/next/processes");
+  await waitForPath("/projects/next/processes");
+  await fill("#worker-name", "ticker");
+  await fill("#worker-command", 'node -e setInterval(()=>console.log("tick",process.env.GREETING),1000)');
+  await click('[data-testid="worker-form"] button[type=submit]');
+  await waitFor(`document.body.innerText.includes("Saved ticker. It's running.")`, "worker saved", 60_000);
+  let worker = "";
+  for (let i = 0; i < 10 && !worker.startsWith("Running"); i++) {
+    await sleep(1500);
+    await go("/projects/next/processes");
+    await waitForPath("/projects/next/processes");
+    worker = String(await evaluate(`document.querySelector('[data-testid="worker-status"]')?.innerText ?? ""`));
+  }
+  if (!worker.startsWith("Running")) throw new Error(`the worker isn't running: ${worker}`);
+  console.log("  ✓ added a worker; systemd runs it beside the app");
+  await screenshot("processes");
+  await go("/projects/next/logs");
+  await waitFor(`(document.querySelector('[role=log]')?.innerText ?? "").includes("tick hello from the panel")`, "the worker's lines in the logs", 30_000);
+  console.log("  ✓ its output is on the project's Logs page, with the app's env var");
+  await go("/projects/next/processes");
+  await waitForPath("/projects/next/processes");
+  await setValue('[data-testid="run-command"] input', 'node -e console.log("ran",process.env.GREETING,process.cwd())');
+  await click('[data-testid="run-command"] button[type=submit]');
+  await waitFor(`(document.querySelector('[data-testid="run-command"]')?.innerText ?? "").includes("Done in")`, "the command finished", 60_000);
+  const ran = String(await evaluate(`document.querySelector('[data-testid="run-command"] [role=log]')?.innerText ?? ""`));
+  if (!/ran hello from the panel \/srv\/apps\/next\/releases\/[0-9a-f]{40}/.test(ran)) throw new Error(`Run a command didn't run in the live release with the app's env:\n${ran}`);
+  console.log("  ✓ Run a command: its output streamed back, run in the live release with the app's env");
+  await screenshot("processes-run");
+  await click('[data-testid="worker"] button[title="Delete"]');
+  await waitFor(`!document.querySelector('[data-testid="worker-list"]')`, "worker deleted", 30_000);
+  console.log("  ✓ deleted the worker");
+
   // TOUR_ALERTS=1: needs the test receiver (installer/test/alert-receiver.sh) at https://hook.internal.
   if (process.env.TOUR_ALERTS === "1") {
     console.log("Alerts");
@@ -809,7 +842,7 @@ if (process.env.TOUR_DEPLOY === "1") {
     await go("/projects/next");
     await waitForPath("/projects/next");
     const scoped = await navText();
-    for (const label of ["Overview", "Deployments", "Domains", "Databases", "Backups", "Cron jobs", "Settings"]) {
+    for (const label of ["Overview", "Deployments", "Domains", "Databases", "Backups", "Cron jobs", "Processes", "Settings"]) {
       if (!scoped.includes(label)) throw new Error(`the project sidebar has no ${label}: ${scoped}`);
     }
     if (scoped.includes("Firewall")) throw new Error("the project sidebar still shows global sections");

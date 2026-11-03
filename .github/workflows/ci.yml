@@ -81,6 +81,8 @@ jobs:
         run: sudo bash installer/test/build-e2e.sh
       - name: cron jobs as systemd timers
         run: sudo bash installer/test/cron-e2e.sh
+      - name: workers and one-off commands (Processes)
+        run: sudo bash installer/test/processes-e2e.sh
       - name: SQLite-safe backup snapshots and restore
         run: sudo bash installer/test/backup-e2e.sh
       - name: a Redis per app

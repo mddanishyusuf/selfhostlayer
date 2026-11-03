@@ -56,7 +56,7 @@ export function allowedSourceRedirect(location: string | null): URL | null {
 /** Unit names for one app's jobs, so build.cancel can find them. */
 export const jobUnits = (slug: string) => ({ fetch: `layer-fetch-${slug}.service`, build: `layer-build-${slug}.service` });
 
-async function requireAppUser(ctx: Context, slug: string) {
+export async function requireAppUser(ctx: Context, slug: string) {
   const app = appLayout(ctx, slug);
   const user = await lookupUser(ctx.exec, app.user);
   if (!user || !existsSync(app.etcDir)) throw new ActionError("not_found", `app ${slug} doesn't exist`);
@@ -82,7 +82,7 @@ export function diskGuard(ctx: Context): void {
 }
 
 /** Runs one sandboxed job, streaming its output. Returns the exit code. */
-async function runJob(ctx: Context, io: CallIO, opts: SandboxOptions, stdin?: Readable): Promise<number> {
+export async function runJob(ctx: Context, io: CallIO, opts: SandboxOptions, stdin?: Readable): Promise<number> {
   await ctx.exec(BIN.systemctl, ["reset-failed", opts.unit], { allowFail: true });
   const stop = () => void ctx.exec(BIN.systemctl, ["stop", opts.unit], { allowFail: true });
   // The client went away: stopping systemd-run alone wouldn't stop the unit.

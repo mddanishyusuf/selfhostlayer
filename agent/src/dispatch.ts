@@ -7,6 +7,7 @@ import { buildActions } from "./actions/build.ts";
 import { catalogActions } from "./actions/catalog.ts";
 import { backupActions } from "./actions/backup.ts";
 import { cronActions } from "./actions/cron.ts";
+import { workerActions } from "./actions/worker.ts";
 import { firewallActions } from "./actions/firewall.ts";
 import { serviceActions } from "./actions/service.ts";
 import { envActions } from "./actions/env.ts";
@@ -49,6 +50,7 @@ export const ACTION_TABLE: ActionTable = {
   ...toolActions,
   ...staticActions,
   ...cronActions,
+  ...workerActions,
   ...backupActions,
   ...serviceActions,
   ...firewallActions,

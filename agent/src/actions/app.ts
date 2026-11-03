@@ -10,6 +10,7 @@ import { parseColorEnvPort, renderColorEnv, renderEnvFile } from "../templates/e
 import { unitName } from "../templates/app-unit.ts";
 import { parseLiveMarker } from "../templates/caddy-site.ts";
 import { cronNames, removeCronUnits } from "./cron.ts";
+import { removeWorkerUnit, workerNames } from "./worker.ts";
 import { removeMysql8 } from "./mysql8.ts";
 import { removePhp } from "./php.ts";
 import { removeWordpress } from "./wordpress.ts";
@@ -110,6 +111,7 @@ async function appDelete(params: Params, ctx: Context) {
     await ctx.exec(BIN.systemctl, ["disable", unit], { allowFail: true });
   }
   for (const name of cronNames(ctx, slug)) await removeCronUnits(ctx, slug, name);
+  for (const name of workerNames(ctx, slug)) await removeWorkerUnit(ctx, slug, name);
   await removePhp(ctx, slug);
   await removeWordpress(ctx, slug);
   await removeRedis(ctx, slug, true);

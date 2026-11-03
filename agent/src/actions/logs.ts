@@ -17,7 +17,9 @@ async function logsTail(params: Params, ctx: Context, io: CallIO) {
   const follow = params.follow ?? false;
   if (typeof follow !== "boolean") throw new ValidationError("follow", "must be true or false");
 
-  const args = ["--no-pager", "--output=short-iso", `--lines=${lines}`, ...colors.map((c) => `--unit=app-${slug}@${c}.service`)];
+  // The app's workers too, unless one color was asked for (each line names its unit).
+  const workers = params.color === undefined ? [`--unit=app-${slug}-worker-*.service`] : [];
+  const args = ["--no-pager", "--output=short-iso", `--lines=${lines}`, ...colors.map((c) => `--unit=app-${slug}@${c}.service`), ...workers];
   if (!follow) {
     const { stdout } = await ctx.exec(BIN.journalctl, args);
     return { slug, lines: stdout.split("\n").filter((l) => l && l !== "-- No entries --") };
