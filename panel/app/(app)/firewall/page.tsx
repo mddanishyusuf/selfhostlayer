@@ -1,8 +1,9 @@
 import { ShieldIcon } from "lucide-react";
-import { ComingSoon, Empty, Notice, PageHeader, Section, TableHead, TableRow } from "@/components/page";
+import { ComingSoon, Empty, Notice, PageHeader, Section, Segmented, TableHead, TableRow } from "@/components/page";
 import { Icon } from "@/components/icon";
 import { StatusText } from "@/components/status";
 import { agent } from "@/lib/agent";
+import { listServers } from "@/lib/servers";
 import { requireUser } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
@@ -15,9 +16,13 @@ interface FirewallStatus {
 
 const SERVICE: Record<string, string> = { "22": "SSH", "80": "HTTP → HTTPS (Caddy)", "443": "HTTPS: apps and this panel (Caddy)" };
 
-export default async function FirewallPage() {
+export default async function FirewallPage({ searchParams }: { searchParams: Promise<{ server?: string }> }) {
   await requireUser();
-  const status = await agent<FirewallStatus>("firewall.status").catch(() => null);
+  // This server's, or another one's (?server=).
+  const asked = (await searchParams).server;
+  const servers = listServers().filter((s) => s.seenAt);
+  const serverId = servers.find((s) => String(s.id) === asked)?.id ?? null;
+  const status = await agent<FirewallStatus>("firewall.status", {}, { server: serverId }).catch(() => null);
   // The same rule for IPv4 and IPv6 is one row.
   const rules = new Map<string, FirewallStatus["ufw"]["rules"][number] & { both: boolean }>();
   for (const r of status?.ufw.rules ?? []) {
@@ -31,6 +36,7 @@ export default async function FirewallPage() {
   return (
     <>
       <PageHeader title="Firewall" meta={status ? `ufw ${status.ufw.enabled ? "active" : "off"} · fail2ban ${status.fail2ban.running ? "running" : "not running"}` : undefined} />
+      {servers.length > 0 && <Segmented items={[{ href: "/firewall", label: "This server", active: serverId === null }, ...servers.map((s) => ({ href: `/firewall?server=${s.id}`, label: s.name, active: serverId === s.id }))]} />}
       {!status ? (
         <Notice lead="Unavailable" tone="err">
           Couldn&apos;t ask the agent about the firewall.

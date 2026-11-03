@@ -1,7 +1,7 @@
 import { ServerIcon } from "lucide-react";
 import { Icon } from "@/components/icon";
 import { KeyValues, Notice, PageHeader, Section, SettingsRow, TileIcon } from "@/components/page";
-import { AddServerForm, CheckServerButton, InstallCommand, RemoveServer } from "@/components/servers";
+import { AddServerForm, CheckServerButton, InstallCommand, RemoveServer, UpdateServerButton } from "@/components/servers";
 import { StatusChip, timeAgo } from "@/components/status";
 import { agent } from "@/lib/agent";
 import { boxConfig } from "@/lib/box";
@@ -86,7 +86,13 @@ export default async function ServersPage() {
                 ) : (
                   <p className="text-[12px] text-muted">This panel&apos;s version isn&apos;t in its release feed, so there&apos;s no command to copy: install a release from the feed first.</p>
                 ))}
+              {s.info && s.info.version && s.info.version !== box.version && (
+                <Notice lead="Another version">
+                  It runs {s.info.version}; this panel runs {box.version}. The same version on both keeps every action the same.
+                </Notice>
+              )}
               <div className="flex flex-wrap items-start gap-2">
+                {s.info && s.info.version && s.info.version !== box.version && <UpdateServerButton id={s.id} version={box.version} />}
                 <CheckServerButton id={s.id} />
                 <RemoveServer id={s.id} name={s.name} />
               </div>

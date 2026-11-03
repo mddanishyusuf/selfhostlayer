@@ -15,6 +15,7 @@ import { allRepos } from "@/lib/github-repos";
 import { getApp } from "@/lib/github-store";
 import { latestUsage } from "@/lib/metrics";
 import { listProjects, type Project } from "@/lib/projects";
+import { listServers } from "@/lib/servers";
 import { requireUser } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
@@ -74,9 +75,13 @@ function StateWord({ state }: { state: State }) {
   return <StatusChip status={STATE[state].dot} label={STATE[state].label} pulse={state === "building"} />;
 }
 
-export default async function ProjectsPage({ searchParams }: { searchParams: Promise<{ q?: string; status?: string; view?: string }> }) {
+export default async function ProjectsPage({ searchParams }: { searchParams: Promise<{ q?: string; status?: string; view?: string; server?: string }> }) {
   await requireUser();
-  const { q, status, view } = await searchParams;
+  const { q, status, view, server } = await searchParams;
+  // With other servers: each row names its server, and tabs pick one.
+  const servers = listServers();
+  const serverName = (id: number | null) => (id === null ? "This server" : (servers.find((x) => x.id === id)?.name ?? "?"));
+  const onServer = server === "here" ? null : servers.find((x) => String(x.id) === server)?.id;
   // Warm the New project list in the background, so it opens without waiting on GitHub.
   if (getApp()) void allRepos().catch(() => {});
   // Integrations have their own page.
@@ -98,7 +103,8 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
     return { p, latest, live, host, hosts, state };
   });
   const filter: Filter = FILTERS.some(([k]) => k === status) ? (status as Filter) : "all";
-  const shown = filter === "all" ? rows : rows.filter((r) => r.state === filter);
+  const byServer = server === undefined || onServer === undefined ? rows : rows.filter((r) => r.p.serverId === onServer);
+  const shown = filter === "all" ? byServer : byServer.filter((r) => r.state === filter);
   const grid = view === "grid";
   const deploying = rows.find((r) => r.state === "building");
   const href = (next: { status?: Filter; view?: "grid" | "list" }) => {
@@ -132,6 +138,15 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
       {all.length > 0 && (
         <div className="flex flex-wrap items-center gap-2.5">
           <Segmented items={FILTERS.map(([k, label]) => ({ href: href({ status: k }), label, count: k === "all" ? rows.length : rows.filter((r) => r.state === k).length, active: filter === k }))} />
+          {servers.length > 0 && (
+            <Segmented
+              items={[
+                { href: `/?${new URLSearchParams({ ...(status ? { status } : {}), ...(view ? { view } : {}) })}`, label: "All servers", active: server === undefined || onServer === undefined },
+                { href: `/?${new URLSearchParams({ ...(status ? { status } : {}), ...(view ? { view } : {}), server: "here" })}`, label: "This server", active: onServer === null },
+                ...servers.map((x) => ({ href: `/?${new URLSearchParams({ ...(status ? { status } : {}), ...(view ? { view } : {}), server: String(x.id) })}`, label: x.name, active: onServer === x.id })),
+              ]}
+            />
+          )}
           <FilterBox placeholder="Search projects, domains, repos" className="order-last min-w-full flex-1 sm:order-none sm:ml-auto sm:min-w-[220px] sm:max-w-[340px]" />
           <Segmented
             items={[
@@ -223,7 +238,7 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
                 <div className="grid min-w-0 justify-items-end gap-1 md:justify-items-start">
                   <StateWord state={state} />
                   <span className="max-w-full truncate text-[12px] text-muted max-sm:hidden">
-                    {state === "failed" && live ? `Still serving ${live.sha.slice(0, 7)}` : `${frameworkLabel(p.framework)} · ${isStatic ? "static" : `Node ${p.nodeVersion}`}`}
+                    {state === "failed" && live ? `Still serving ${live.sha.slice(0, 7)}` : `${servers.length ? `${serverName(p.serverId)} · ` : ""}${frameworkLabel(p.framework)} · ${isStatic ? "static" : `Node ${p.nodeVersion}`}`}
                   </span>
                 </div>
               </Link>

@@ -16,6 +16,7 @@ import { FINISHED, listDeployments, liveDeployment } from "@/lib/deploy";
 import { servingConfig } from "@/lib/domains";
 import { history, latestDisk, type Point, type Range } from "@/lib/metrics";
 import { getProjectBySlug } from "@/lib/projects";
+import { getServer, listServers } from "@/lib/servers";
 import { requireUser } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
@@ -145,6 +146,9 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
           <KeyValues
             flush
             items={[
+              ...(project.serverId !== null || listServers().length
+                ? [["Server", project.serverId === null ? "This server" : (getServer(project.serverId)?.name ?? "?")] as [string, string]]
+                : []),
               [
                 "Domains",
                 <span key="d" className="flex flex-wrap gap-x-3 gap-y-1">

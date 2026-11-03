@@ -7,6 +7,7 @@ import { EngineTile } from "@/components/sites";
 import { FINISHED, listDeployments, liveDeployment } from "@/lib/deploy";
 import { servingConfig } from "@/lib/domains";
 import type { Project } from "@/lib/projects";
+import { getServer } from "@/lib/servers";
 import { requireUser } from "@/lib/session";
 import { ENGINES, engineOf, getSite, listSites, type SiteEngine } from "@/lib/sites";
 
@@ -38,7 +39,10 @@ function SiteRow({ project }: { project: Project }) {
         <Link href={`/projects/${project.slug}/site`} className="truncate font-medium hover:underline">
           {site?.title ?? project.slug}
         </Link>
-        <span className="truncate text-[12px] text-muted">{host}</span>
+        <span className="truncate text-[12px] text-muted">
+          {host}
+          {project.serverId !== null ? ` · ${getServer(project.serverId)?.name ?? "?"}` : ""}
+        </span>
       </div>
       <div className="grid gap-px max-md:hidden">
         <span>

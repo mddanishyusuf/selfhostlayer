@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { agent } from "@/lib/agent";
+import { boxConfig } from "@/lib/box";
 import { requireUser } from "@/lib/session";
 import { addServer, getServer, recordCheck, removeServer, type ServerInfo } from "@/lib/servers";
 
@@ -55,4 +56,19 @@ export async function removeServerAction(_prev: ServerFormState, form: FormData)
   }
   revalidatePath("/servers");
   return { saved: `${server.name} is removed from the panel. Its apps and agent are still on it.` };
+}
+
+/** Updates another server to this panel's own version (its agent runs the installer from its feed, staying agent-only). */
+export async function updateServerAction(_prev: ServerFormState, form: FormData): Promise<ServerFormState> {
+  await requireUser();
+  const server = getServer(Number(field(form, "id")));
+  if (!server) return { error: "That server isn't here any more." };
+  const version = boxConfig().version;
+  try {
+    const r = await agent<{ to: string }>("update.start", { version }, { server: server.id });
+    revalidatePath("/servers");
+    return { saved: `Updating ${server.name} to ${r.to}: check the connection again in a minute or two.` };
+  } catch (err) {
+    return { error: (err as Error).message };
+  }
 }

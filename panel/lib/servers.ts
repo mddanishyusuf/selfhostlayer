@@ -38,6 +38,8 @@ export interface ServerInfo {
   diskGb: { total: number; free: number };
   publicIp?: string;
   appsDomain?: string;
+  /** The release it runs (from its /etc/layer/config.json). */
+  version?: string;
 }
 
 interface Row {

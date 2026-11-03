@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { addServerAction, checkServerAction, removeServerAction, type ServerFormState } from "@/app/actions/servers";
+import { addServerAction, checkServerAction, removeServerAction, updateServerAction, type ServerFormState } from "@/app/actions/servers";
 import { CopyButton, SubmitButton } from "./form";
 import { Modal } from "./modal";
 import { Button, Field, FormError, Input } from "./ui";
@@ -77,5 +77,19 @@ export function RemoveServer({ id, name }: { id: number; name: string }) {
         </form>
       </Modal>
     </>
+  );
+}
+
+export function UpdateServerButton({ id, version }: { id: number; version: string }) {
+  const [state, action] = useActionState(updateServerAction, {} as ServerFormState);
+  return (
+    <form action={action} className="grid justify-items-start gap-1.5">
+      <input type="hidden" name="id" value={id} />
+      <SubmitButton pending="Starting…" size="sm" className="w-auto">
+        Update to {version}
+      </SubmitButton>
+      <FormError message={state.error} />
+      {state.saved && <p className="text-[12px] text-teal">{state.saved}</p>}
+    </form>
   );
 }
