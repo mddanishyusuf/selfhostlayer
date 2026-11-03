@@ -3,6 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { agent } from "@/lib/agent";
 import { boxConfig } from "@/lib/box";
+import { moveProject, removeOldCopy } from "@/lib/move";
+import { getProjectBySlug } from "@/lib/projects";
 import { requireUser } from "@/lib/session";
 import { addServer, getServer, recordCheck, removeServer, type ServerInfo } from "@/lib/servers";
 
@@ -71,4 +73,40 @@ export async function updateServerAction(_prev: ServerFormState, form: FormData)
   } catch (err) {
     return { error: (err as Error).message };
   }
+}
+
+export interface MoveState {
+  error?: string;
+  log?: string;
+  done?: boolean;
+}
+
+/** Moves a project to another server (lib/move.ts): made, deployed and filled with its data there; the old copy keeps running. */
+export async function moveProjectAction(_prev: MoveState, form: FormData): Promise<MoveState> {
+  await requireUser();
+  const project = getProjectBySlug(field(form, "slug"));
+  if (!project) return { error: "Project not found." };
+  const raw = field(form, "server");
+  const target = raw === "here" ? null : Number(raw) || null;
+  let log = "";
+  try {
+    await moveProject(project, target, (line) => (log += line));
+  } catch (err) {
+    return { error: (err as Error).message, log };
+  }
+  revalidatePath(`/projects/${project.slug}/settings`);
+  return { done: true, log };
+}
+
+export async function removeOldCopyAction(_prev: MoveState, form: FormData): Promise<MoveState> {
+  await requireUser();
+  const project = getProjectBySlug(field(form, "slug"));
+  if (!project) return { error: "Project not found." };
+  try {
+    await removeOldCopy(project);
+  } catch (err) {
+    return { error: (err as Error).message };
+  }
+  revalidatePath(`/projects/${project.slug}/settings`);
+  return { done: true, log: "The old copy is removed (its data is archived on that server)." };
 }

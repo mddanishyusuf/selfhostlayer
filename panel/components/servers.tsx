@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { addServerAction, checkServerAction, removeServerAction, updateServerAction, type ServerFormState } from "@/app/actions/servers";
+import { addServerAction, checkServerAction, moveProjectAction, removeOldCopyAction, removeServerAction, updateServerAction, type MoveState, type ServerFormState } from "@/app/actions/servers";
 import { CopyButton, SubmitButton } from "./form";
 import { Modal } from "./modal";
 import { Button, Field, FormError, Input } from "./ui";
@@ -91,5 +91,45 @@ export function UpdateServerButton({ id, version }: { id: number; version: strin
       <FormError message={state.error} />
       {state.saved && <p className="text-[12px] text-teal">{state.saved}</p>}
     </form>
+  );
+}
+
+/** A project's server, and moving it to another one (its Settings page). */
+export function MoveProject({ slug, current, servers, oldCopy }: { slug: string; current: string; servers: { value: string; name: string }[]; oldCopy: string | null }) {
+  const [state, action] = useActionState(moveProjectAction, {} as MoveState);
+  const [removed, removeAction] = useActionState(removeOldCopyAction, {} as MoveState);
+  return (
+    <div className="grid gap-3" data-testid="move-project">
+      {oldCopy && !removed.done && (
+        <form action={removeAction} className="grid gap-2 border border-border p-3">
+          <input type="hidden" name="slug" value={slug} />
+          <p className="text-[13px]">Its old copy still runs on {oldCopy}. Once its own domains point at its new server (Domains shows them live), remove it.</p>
+          <SubmitButton pending="Removing…" variant="secondary" size="sm" className="w-auto">
+            Remove the old copy
+          </SubmitButton>
+          <FormError message={removed.error} />
+        </form>
+      )}
+      {removed.log && <p className="text-[13px] text-teal">{removed.log}</p>}
+      <form action={action} className="grid gap-2">
+        <input type="hidden" name="slug" value={slug} />
+        <div className="flex flex-wrap items-end gap-2">
+          <Field label="Move to" htmlFor="move-server">
+            <select id="move-server" name="server" className="h-[39px] w-full min-w-[200px] border border-border bg-field px-2.5">
+              {servers.filter((x) => x.name !== current).map((x) => (
+                <option key={x.value} value={x.value}>
+                  {x.name}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <SubmitButton pending="Moving… (a few minutes)" variant="secondary" className="w-auto">
+            Move
+          </SubmitButton>
+        </div>
+        <FormError message={state.error} />
+        {state.log && <pre className="whitespace-pre-wrap border border-border bg-code p-2.5 font-mono text-[12px] text-[#e5e5e5]">{state.log}</pre>}
+      </form>
+    </div>
   );
 }

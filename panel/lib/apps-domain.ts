@@ -8,7 +8,8 @@ import { listProjects, setFreeHost } from "./projects";
 export async function moveFreeUrls(from: string, to: string): Promise<{ moved: number; failed: string[] }> {
   let moved = 0;
   const failed: string[] = [];
-  for (const project of listProjects()) {
+  // This server's apps only: another server has its own apps domain.
+  for (const project of listProjects().filter((p) => p.serverId === null)) {
     const domains = listDomains(project.id);
     const free = domains.find((d) => d.role === "free");
     const next = `${project.slug}.${to}`;

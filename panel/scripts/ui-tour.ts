@@ -1625,6 +1625,47 @@ if (process.env.TOUR_SERVERS) {
   await click('form:has(#confirm) button[type=submit]');
   await waitFor(`!location.pathname.startsWith("/projects/tour-remote")`, "the remote site deleted", 120_000);
   console.log("  ✓ deleted it, there");
+
+  // Moving a project: express from GitHub, deployed here, then moved there with its data.
+  const box2 = (cmd: string) => execFileSync("bash", ["-c", `${process.env.TOUR_BOX2_CMD ?? "false"} '${cmd.replace(/'/g, `'\\''`)}'`], { encoding: "utf8" });
+  await go("/new");
+  await waitFor(`!!document.querySelector("#repo")`, "New project");
+  await hydrated("#repo", "New project's form to come alive");
+  await evaluate(`document.querySelectorAll("details").forEach((d) => (d.open = true)), true`);
+  await setValue("#repo", "https://github.com/mddanishyusuf/selfhostlayer-examples");
+  await setValue("#rootDir", "express");
+  await click("form:has(#repo) button[type=submit]");
+  await waitFor(`location.pathname === "/projects/express/settings"`, "express's configure page", 60_000);
+  await hydrated('button[value="deploy"]', "Deploy to come alive");
+  await click('button[value="deploy"]');
+  await waitFor(`/\\/deployments\\/\\d+$/.test(location.pathname)`, "express's deployment", 60_000);
+  await waitForDeploy("deploying express here");
+  if (!box(`curl -sk --resolve express.internal:443:127.0.0.1 https://express.internal/`).includes("example-express")) throw new Error("express doesn't answer here");
+  box(`echo moved-with-it > /srv/apps/express/data/marker.txt && chown app-express:app-express /srv/apps/express/data/marker.txt`);
+  console.log("  ✓ express runs here, with a file in its data/");
+
+  await go("/projects/express/settings");
+  await waitFor(`!!document.querySelector('[data-testid="move-project"] #move-server')`, "the Move section");
+  await hydrated("#move-server", "the Move form to come alive");
+  await evaluate(`(() => { const el = document.querySelector("#move-server"); el.value = [...el.options].find((o) => o.textContent === "tour-two").value; el.dispatchEvent(new Event("change", { bubbles: true })); return true; })()`);
+  await screenshot("servers-move");
+  await click('[data-testid="move-project"] form:has(#move-server) button[type=submit]');
+  await waitFor(`document.body.innerText.includes("Moved. It answers at") || !!document.querySelector('[data-testid="move-project"] [role=alert], [data-testid="move-project"] .text-rose')`, "the move", 20 * 60_000);
+  const moveText = String(await evaluate(`document.querySelector('[data-testid="move-project"]').innerText`));
+  if (!moveText.includes("Moved. It answers at")) throw new Error(`the move: ${moveText}`);
+  await screenshot("servers-moved");
+  if (!box2(`curl -sk --resolve express.internal:443:127.0.0.1 https://express.internal/`).includes("example-express")) throw new Error("express doesn't answer on the other server");
+  if (box2(`cat /srv/apps/express/data/marker.txt`).trim() !== "moved-with-it") throw new Error("its data didn't come along");
+  if (!box(`ls -d /srv/apps/express 2>&1`).includes("/srv/apps/express")) throw new Error("the old copy is gone before it was removed");
+  console.log("  ✓ moved to the other server: it answers there, with its data; the old copy still runs here");
+
+  await go("/projects/express/settings");
+  await waitFor(`[...document.querySelectorAll("button")].some((b) => b.textContent.includes("Remove the old copy"))`, "Remove the old copy");
+  await hydrated('[data-testid="move-project"] button', "the old copy's button to come alive");
+  await evaluate(`[...document.querySelectorAll("button")].find((b) => b.textContent.includes("Remove the old copy")).click(), true`);
+  await waitFor(`document.body.innerText.includes("The old copy is removed")`, "the old copy removed", 120_000);
+  if (!box(`ls -d /srv/apps/express 2>&1 || true`).includes("No such file")) throw new Error("the old copy is still here");
+  console.log("  ✓ removed the old copy here");
 }
 
 if (process.env.TOUR_ACCESS === "1") {

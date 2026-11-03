@@ -281,6 +281,12 @@ const MIGRATIONS = [
      created_at INTEGER NOT NULL
    );
    ALTER TABLE projects ADD COLUMN server_id INTEGER REFERENCES servers(id);`,
+  // A move to another server (lib/move.ts): where its old copy runs until it's removed (NULL: the panel's own).
+  `CREATE TABLE project_moves (
+     project_id INTEGER PRIMARY KEY REFERENCES projects(id) ON DELETE CASCADE,
+     moved_from INTEGER,
+     at INTEGER NOT NULL
+   );`,
 ];
 
 function open(): DatabaseSync {

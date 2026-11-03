@@ -12,7 +12,10 @@ import { installedVersion, listDeployments } from "@/lib/deploy";
 import { emailApi } from "@/lib/email";
 import { isLinks, linksApi, shortDomain, type LinksSettings } from "@/lib/links";
 import { getProjectBySlug, projectEnv } from "@/lib/projects";
+import { movedFrom } from "@/lib/move";
+import { listServers } from "@/lib/servers";
 import { requireUser } from "@/lib/session";
+import { MoveProject } from "@/components/servers";
 
 export const dynamic = "force-dynamic";
 
@@ -71,6 +74,9 @@ export default async function SettingsPage({ params, searchParams }: { params: P
     );
   }
   const isNew = (await searchParams).new === "1" && listDeployments(project.id, 1).length === 0;
+  const servers = listServers();
+  const serverName = (id: number | null) => (id === null ? "This server" : (servers.find((x) => x.id === id)?.name ?? "another server"));
+  const moved = movedFrom(project.id);
   const r = project.runtime;
 
   return (
@@ -107,6 +113,11 @@ export default async function SettingsPage({ params, searchParams }: { params: P
           env: Object.entries(projectEnv(project.id)),
         }}
       />
+      {!isNew && servers.length > 0 && (
+        <SettingsRow title="Server" description={`It runs on ${serverName(project.serverId)}. Moving it builds it on the other server, copies its data (files and databases) there and moves its free address; its own domains wait for DNS to point at the new server. The old copy keeps running until you remove it.`}>
+          <MoveProject slug={project.slug} current={serverName(project.serverId)} servers={[{ value: "here", name: "This server" }, ...servers.filter((x) => x.seenAt).map((x) => ({ value: String(x.id), name: x.name }))]} oldCopy={moved === undefined ? null : serverName(moved)} />
+        </SettingsRow>
+      )}
       {!isNew && <DeleteProject slug={project.slug} />}
     </>
   );
