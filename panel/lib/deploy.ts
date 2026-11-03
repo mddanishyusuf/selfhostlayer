@@ -17,7 +17,7 @@ import { db, now } from "./db";
 import { installationToken } from "./github";
 import { raise, resolve } from "./alerts/engine";
 import { boxConfig } from "./box";
-import { BuildQueue } from "./build-queue";
+import { BuildQueue, buildMemoryFor } from "./build-queue";
 import { getBackupSettings } from "./backup/settings";
 import { backUpProject } from "./backup/runner";
 import { applyManifest } from "./catalog";
@@ -194,6 +194,11 @@ async function freeSpaceIfLow(self: number): Promise<string | null> {
   return cleaned.length
     ? `Only ${pct}% disk free: emptied the package caches of ${cleaned.join(", ")} (${(freedMb / 1024).toFixed(1)} GB). They refill on each app's next build.\n`
     : `Only ${pct}% disk free, and no package cache was big enough to help. Old builds and app data use the rest.\n`;
+}
+
+async function buildMemoryMb(appMb: number): Promise<number> {
+  const info = await agent<SystemInfo>("system.info").catch(() => null);
+  return buildMemoryFor(appMb, info?.memoryMb.total, buildSlots());
 }
 
 // --- queue -------------------------------------------------------------------
@@ -466,7 +471,7 @@ async function runHere(id: number): Promise<void> {
           nodeVersion: p.nodeVersion,
           packageManager: p.packageManager,
           rootDir: p.rootDir,
-          memoryMb: Math.max(1024, p.memoryMb * 2),
+          memoryMb: await buildMemoryMb(p.memoryMb),
           ...(p.installCommand ? { installCommand: p.installCommand } : {}),
           ...(p.buildCommand ? { buildCommand: p.buildCommand } : {}),
         });

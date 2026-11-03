@@ -5,6 +5,7 @@ import { appActions } from "../src/actions/app.ts";
 import { allowedSourceRedirect, BUILD_SCRIPT, buildActions, pickPrunable, tarballUrl } from "../src/actions/build.ts";
 import { bunAsset } from "../src/actions/tool.ts";
 import { NO_IO, type CallIO } from "../src/context.ts";
+import { BIN } from "../src/exec.ts";
 import { sandboxArgs, SYSTEMD_RUN } from "../src/sandbox.ts";
 import { testEnv, type TestEnv } from "./helpers.ts";
 
@@ -176,6 +177,15 @@ describe("build.run", () => {
     await expect(build({ buildCommand: "npm run build" })).rejects.toMatchObject({ code: "build_failed" });
     env.spawner.respond = (_f, args) => (args.at(-1) === "install" ? { code: 1 } : undefined);
     await expect(build({ buildCommand: "npm run build" })).rejects.toMatchObject({ code: "install_failed" });
+  });
+
+  it("says when the build ran out of memory", async () => {
+    env.spawner.respond = (_f, args) => (args.at(-1) === "build" ? { code: 1 } : undefined);
+    env.fake.respond = (f, args) =>
+      f === BIN.journalctl && args.includes("--unit=layer-build-hello.service")
+        ? { code: 0, stdout: "layer-build-hello.service: A process of this unit has been killed by the OOM killer.\nlayer-build-hello.service: Failed with result 'oom-kill'.\n", stderr: "" }
+        : undefined;
+    await expect(build({ buildCommand: "npm run build" })).rejects.toMatchObject({ code: "build_failed", message: "the build ran out of memory (its limit is 1536 MB)" });
   });
 
   it("needs a fetched release, an installed Node, and bun for bun projects", async () => {

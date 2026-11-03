@@ -50,3 +50,14 @@ export class BuildQueue {
     }
   }
 }
+
+/**
+ * A build's memory limit: 60% of its server's RAM shared by the builds that may
+ * run at once, up to 4 GB, never under 1 GB or twice the app's own limit.
+ * A flat 1 GB passed on servers with swap (a build may use 2 GB of it), but
+ * killed every Next.js build on an 8 GB server, which the installer gives none.
+ */
+export function buildMemoryFor(appMb: number, serverMb: number | undefined, slots: number): number {
+  const share = serverMb ? Math.min(4096, Math.floor((serverMb * 0.6) / slots)) : 0;
+  return Math.max(1024, appMb * 2, share);
+}

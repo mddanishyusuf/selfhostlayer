@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BuildQueue } from "./build-queue";
+import { BuildQueue, buildMemoryFor } from "./build-queue";
 
 /** A queue whose builds finish when the test says so. */
 function setup(limit: number, projects: Record<number, number>) {
@@ -63,5 +63,16 @@ describe("BuildQueue", () => {
     setSlots(3);
     queue.pump();
     expect(started).toEqual([1, 3]);
+  });
+});
+
+describe("buildMemoryFor", () => {
+  it("gives builds a share of the server's memory", () => {
+    expect(buildMemoryFor(512, 7941, 1)).toBe(4096);
+    expect(buildMemoryFor(512, 3860, 1)).toBe(2316);
+    expect(buildMemoryFor(512, 7941, 4)).toBe(1191);
+    expect(buildMemoryFor(512, 961, 1)).toBe(1024);
+    expect(buildMemoryFor(1536, 3860, 2)).toBe(3072);
+    expect(buildMemoryFor(512, undefined, 1)).toBe(1024);
   });
 });

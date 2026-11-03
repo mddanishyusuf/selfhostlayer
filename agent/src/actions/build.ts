@@ -95,6 +95,16 @@ async function runJob(ctx: Context, io: CallIO, opts: SandboxOptions, stdin?: Re
   }
 }
 
+/** Whether systemd says the job's unit, run since `sinceMs`, ended killed for memory. */
+async function outOfMemory(ctx: Context, unit: string, sinceMs: number): Promise<boolean> {
+  const { stdout } = await ctx.exec(
+    BIN.journalctl,
+    ["--no-pager", "--output=cat", `--unit=${unit}`, `--since=@${Math.floor(sinceMs / 1000)}`, "--lines=200"],
+    { allowFail: true },
+  );
+  return /result 'oom-kill'|killed by the OOM killer/.test(stdout);
+}
+
 // Builds stopped through build.cancel, so their failure reads "cancelled".
 const cancelled = new Set<string>();
 
@@ -388,7 +398,12 @@ async function buildRun(params: Params, ctx: Context, io: CallIO) {
     if (cancelled.delete(slug)) throw new ActionError("cancelled", "build cancelled");
     if (code !== 0) {
       if (Date.now() >= deadline - 1000) throw new ActionError("timeout", `build timed out after ${timeoutSec}s`);
-      throw new ActionError(`${step}_failed`, `${step === "install" ? "installing dependencies" : "the build"} failed (exit ${code})`);
+      const what = step === "install" ? "installing dependencies" : "the build";
+      // The kernel kills a worker (Next.js's next-build), and its parent just exits 1.
+      if (await outOfMemory(ctx, jobUnits(slug).build, started)) {
+        throw new ActionError(`${step}_failed`, `${what} ran out of memory (its limit is ${memoryMb} MB)`);
+      }
+      throw new ActionError(`${step}_failed`, `${what} failed (exit ${code})`);
     }
   }
   return { slug, sha, steps };
