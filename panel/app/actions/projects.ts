@@ -11,6 +11,7 @@ import { removePreview } from "@/lib/preview";
 import { parseEnvVars, parseSettings } from "@/lib/project-settings";
 import { deleteProject, deleteProjectFile, getProject, getProjectBySlug, projectFiles, setProjectEnv, setProjectFile, updateProjectSettings } from "@/lib/projects";
 import { restartWithNewEnv } from "@/lib/services";
+import { getServer } from "@/lib/servers";
 import { requireUser } from "@/lib/session";
 
 export interface ImportState {
@@ -27,7 +28,9 @@ export async function importAndDeploy(_prev: ImportState, form: FormData): Promi
   const installationId = Number(field(form, "installationId")) || null;
   let slug: string;
   try {
-    const { project } = await importRepo({ ...parsed, installationId, rootDir: field(form, "rootDir"), branch: field(form, "branch") });
+    const server = Number(field(form, "server")) || null;
+    if (server !== null && !getServer(server)) return { error: "That server isn't in the panel any more." };
+    const { project } = await importRepo({ ...parsed, installationId, rootDir: field(form, "rootDir"), branch: field(form, "branch"), serverId: server });
     slug = project.slug;
   } catch (err) {
     return { error: err instanceof Error ? err.message : "Import failed." };

@@ -3,23 +3,43 @@ import Link from "next/link";
 import { PublicRepoForm } from "@/components/deploy";
 import { RepoPicker } from "@/components/github-connect";
 import { Icon } from "@/components/icon";
-import { CARD, Empty, PageHeader, PillLink, SettingsRow } from "@/components/page";
+import { CARD, Empty, PageHeader, PillLink, Segmented, SettingsRow } from "@/components/page";
 import { FormError } from "@/components/ui";
 import { GITHUB_WEB } from "@/lib/github";
 import { getApp, listInstallations } from "@/lib/github-store";
+import { listServers } from "@/lib/servers";
 import { requireUser } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "New project" };
 
-export default async function NewProjectPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
+/** Where the new project goes: this server, or another one from Servers (?server=). */
+function ServerPick({ servers, current }: { servers: { id: number; name: string }[]; current: string }) {
+  if (servers.length === 0) return null;
+  return (
+    <SettingsRow title="Server" description="Where it runs. Each server keeps its own apps, databases and certificates.">
+      <Segmented
+        items={[
+          { href: "/new", label: "This server", active: current === "" },
+          ...servers.map((s) => ({ href: `/new?server=${s.id}`, label: s.name, active: current === String(s.id) })),
+        ]}
+      />
+    </SettingsRow>
+  );
+}
+
+export default async function NewProjectPage({ searchParams }: { searchParams: Promise<{ error?: string; server?: string }> }) {
   await requireUser();
   const app = getApp();
-  const { error } = await searchParams;
+  const { error, server } = await searchParams;
+  const servers = listServers().filter((s) => s.seenAt);
+  const picked = servers.some((s) => String(s.id) === server) ? String(server) : "";
+  const pick = <ServerPick servers={servers} current={picked} />;
   if (!app) {
     return (
       <>
         <PageHeader title="New project" back="/" meta="Deploy a repository on this server" />
+        {pick}
         <SettingsRow title="Your repositories" description="Creates a private GitHub App owned by you: private repositories, deploys on every push, commit statuses.">
           <div>
             <PillLink href="/github/connect" primary>
@@ -51,6 +71,7 @@ export default async function NewProjectPage({ searchParams }: { searchParams: P
           </a>
         }
       />
+      {pick}
       {message && (
         <div className="border-b border-border px-3.5 py-4">
           <FormError message={message} />

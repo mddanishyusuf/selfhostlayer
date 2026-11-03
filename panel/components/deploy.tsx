@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 import { importAndDeploy, type ImportState } from "@/app/actions/projects";
 import { SubmitButton } from "./form";
@@ -10,8 +10,11 @@ import { CARD } from "./page";
 /** Import button for one repo in the list. */
 export function ImportButton({ repo, installationId }: { repo: string; installationId: number }) {
   const [state, action] = useActionState(importAndDeploy, {} as ImportState);
+  // The server picked at the top of New project (?server=).
+  const server = useSearchParams().get("server") ?? "";
   return (
     <form action={action} className="grid justify-items-end gap-1">
+      <input type="hidden" name="server" value={server} />
       <input type="hidden" name="repo" value={repo} />
       <input type="hidden" name="installationId" value={installationId} />
       <SubmitButton pending="Importing…" size="sm" className="w-auto">
@@ -25,8 +28,10 @@ export function ImportButton({ repo, installationId }: { repo: string; installat
 /** Any public repo by URL, with an optional folder and branch. */
 export function PublicRepoForm() {
   const [state, action] = useActionState(importAndDeploy, {} as ImportState);
+  const server = useSearchParams().get("server") ?? "";
   return (
     <form action={action} className="grid gap-4">
+      <input type="hidden" name="server" value={server} />
       <Field label="Public repository" htmlFor="repo">
         <Input id="repo" name="repo" required placeholder="https://github.com/owner/name" autoComplete="off" spellCheck={false} />
       </Field>

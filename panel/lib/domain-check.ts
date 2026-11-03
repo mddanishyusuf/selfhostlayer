@@ -1,11 +1,11 @@
 // Checking a custom domain's DNS and putting it live. The Domains page does it
 // (Check again, Keep the proxy), and so does the monitor: a domain added while
 // its record was still spreading goes live by itself once DNS points here.
-import { boxConfig } from "./box";
 import { db } from "./db";
 import { canGoLive, checkDomain } from "./dns";
 import { applyDomains, getDomain, setDomainProxied, setDomainStatus } from "./domains";
 import { getProject } from "./projects";
+import { serverIp } from "./servers";
 
 /**
  * Checks DNS for a domain; once it points here, it goes live (Caddy gets it
@@ -19,7 +19,8 @@ export async function verifyDomain(domainId: number, keepProxy = false): Promise
   if (keepProxy) setDomainProxied(domain.id, true);
   let result: Awaited<ReturnType<typeof checkDomain>>;
   try {
-    result = await checkDomain(domain.host, boxConfig().publicIp);
+    // The project's own server: another server's IP for a project there.
+    result = await checkDomain(domain.host, serverIp(getProject(domain.projectId)?.serverId ?? null));
   } catch {
     setDomainStatus(domain.id, domain.status, "Couldn't reach the public DNS resolvers. Try again.");
     return { ok: false, message: "Couldn't reach the public DNS resolvers." };

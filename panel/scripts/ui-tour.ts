@@ -1580,6 +1580,53 @@ if (process.env.TOUR_SITES === "1") {
   console.log("  ✓ deleted the site");
 }
 
+// TOUR_SERVERS=<another server's IP>: it ran install.sh --agent-only with this
+// panel's key (/var/lib/layer/ssh). Add it on Servers, check the connection,
+// put a WordPress site there through New site, visit it on that server, delete it.
+if (process.env.TOUR_SERVERS) {
+  console.log("Servers");
+  await setViewport(1280, 900);
+  await go("/servers");
+  await waitFor(`!!document.querySelector('[data-testid="add-server"] #server-host')`, "the Servers page");
+  await hydrated("#server-host", "the add-server form to come alive");
+  await setValue("#server-name", "tour-two");
+  await setValue("#server-host", process.env.TOUR_SERVERS);
+  await click('[data-testid="add-server"] button[type=submit]');
+  await waitFor(`!!document.querySelector('[data-testid="server-install-command"]') || document.body.innerText.includes("tour-two")`, "the server added", 20_000);
+  await screenshot("servers-added");
+  await waitFor(`[...document.querySelectorAll("button")].some((b) => b.textContent.includes("Check connection"))`, "Check connection");
+  await evaluate(`[...document.querySelectorAll("button")].find((b) => b.textContent.includes("Check connection")).click(), true`);
+  await waitFor(`document.body.innerText.includes("Connected: ")`, "the connection checked", 60_000);
+  await screenshot("servers-connected");
+  console.log("  ✓ added a server and reached its agent over the link");
+
+  await go("/sites/new?engine=wordpress");
+  await waitFor(`!!document.querySelector('[data-testid="site-server"]')`, "New site with a server to pick");
+  await hydrated("#title", "the New site form to come alive");
+  await evaluate(`(() => { const el = document.querySelector('[data-testid="site-server"]'); el.value = [...el.options].find((o) => o.textContent === "tour-two").value; el.dispatchEvent(new Event("change", { bubbles: true })); return true; })()`);
+  await setValue("#title", "Remote Blog");
+  await setValue("#name", "tour-remote");
+  await setValue("#ownerName", "Ada Lovelace");
+  await setValue("#ownerEmail", "ada@tour.test");
+  await click('form:has(#title) button[type=submit]');
+  await waitFor(`location.pathname.startsWith("/projects/tour-remote/deployments/")`, "the remote site's install", 60_000);
+  await waitForDeploy("installing WordPress on the other server");
+  console.log("  ✓ installed a WordPress site on the other server");
+  await visit("tour-remote.internal", "/", "Remote Blog");
+  const onOther = box(`ls /srv/apps/tour-remote 2>&1 | head -1`);
+  if (!/No such file/.test(onOther)) throw new Error(`the site is on this server too: ${onOther}`);
+  console.log("  ✓ it runs there, not here");
+  await go("/projects/tour-remote/settings");
+  await waitFor(`!!document.querySelector('[data-testid="delete-project"]')`, "the site's settings");
+  await hydrated('[data-testid="delete-project"]', "the delete button to come alive");
+  await click('[data-testid="delete-project"]');
+  await waitFor(`!!document.querySelector("#confirm")`, "the delete confirmation");
+  await evaluate(`(() => { const el = document.querySelector("#confirm"); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(el, "tour-remote"); el.dispatchEvent(new Event("input", { bubbles: true })); return true; })()`);
+  await click('form:has(#confirm) button[type=submit]');
+  await waitFor(`!location.pathname.startsWith("/projects/tour-remote")`, "the remote site deleted", 120_000);
+  console.log("  ✓ deleted it, there");
+}
+
 if (process.env.TOUR_ACCESS === "1") {
   console.log("Access");
   const mode = (label: string) => evaluate(`[...document.querySelectorAll('[data-testid="access"] button[role=radio]')].find((b) => b.textContent === ${JSON.stringify(label)}).click(), true`);

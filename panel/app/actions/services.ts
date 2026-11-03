@@ -107,7 +107,7 @@ export async function installMongodbAction(_prev: ServiceState, form: FormData):
   const project = slug ? getProjectBySlug(slug) : null;
   if (slug && !project) return { error: "Project not found." };
   try {
-    await installMongodb();
+    await installMongodb(project?.serverId ?? null);
   } catch (err) {
     return { error: (err as Error).message };
   }

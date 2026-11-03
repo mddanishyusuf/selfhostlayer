@@ -1,4 +1,5 @@
-import { rmSync } from "node:fs";
+import { mkdirSync, rmSync } from "node:fs";
+import { dirname } from "node:path";
 import { Audit } from "./audit.ts";
 import { AGENT_VERSION, DEFAULT_PATHS } from "./config.ts";
 import { createDispatcher } from "./dispatch.ts";
@@ -24,6 +25,10 @@ async function main(): Promise<void> {
       process.exit(1);
     }
   }
+
+  // The agent's own state (managed files, PHP's and MySQL 8's state, archives)
+  // lives here; a fresh agent-only server has nothing in /var/lib yet.
+  mkdirSync(dirname(paths.managedDir), { recursive: true, mode: 0o700 });
 
   // Generated files are recorded as they're written, for `layer repair`; ones
   // from before this version are recorded as they are now.

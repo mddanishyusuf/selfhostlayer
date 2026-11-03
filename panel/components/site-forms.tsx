@@ -13,7 +13,7 @@ const ENGINE_CHOICES = [
 ] as const;
 
 /** New site: the engine, a title, and the owner, who's made during the install. */
-export function NewSiteForm({ engine: initial }: { engine: "wordpress" | "ghost" }) {
+export function NewSiteForm({ engine: initial, servers = [] }: { engine: "wordpress" | "ghost"; servers?: { id: number; name: string }[] }) {
   const [state, action] = useActionState(createSiteAction, {} as SiteFormState);
   const [engine, setEngine] = useState(initial);
   const err = state.errors ?? {};
@@ -40,6 +40,18 @@ export function NewSiteForm({ engine: initial }: { engine: "wordpress" | "ghost"
           ))}
         </div>
       </SettingsRow>
+      {servers.length > 0 && (
+        <SettingsRow title="Server" description="Where it runs. Each server keeps its own sites, databases and certificates.">
+          <select name="server" defaultValue="" className="h-[39px] w-full max-w-[340px] border border-border bg-field px-2.5" data-testid="site-server">
+            <option value="">This server</option>
+            {servers.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}
+              </option>
+            ))}
+          </select>
+        </SettingsRow>
+      )}
       <SettingsRow title="The site" description="Its title shows on the site. The name is its folder and Linux user on the server, and its free address.">
         <Field label="Title" htmlFor="title">
           <Input id="title" name="title" placeholder="My blog" aria-invalid={!!err.title} />

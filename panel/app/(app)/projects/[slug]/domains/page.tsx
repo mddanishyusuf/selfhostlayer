@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { serverIp } from "@/lib/servers";
 import { restoreFreeDomainAction } from "@/app/actions/domains";
 import { AddDomainForm } from "@/components/domains";
 import { DomainRow } from "@/components/domain-row";
@@ -35,7 +36,7 @@ export default async function DomainsPage({ params }: { params: Promise<{ slug: 
       </SettingsRow>
       <section className={CARD} data-testid="domain-list">
         {domains.map((d) => (
-          <DomainRow key={d.id} d={d} serverIp={box.publicIp} removable={canRemove(d)} />
+          <DomainRow key={d.id} d={d} serverIp={serverIp(project.serverId)} removable={canRemove(d)} />
         ))}
         {!domains.some((d) => d.role === "free") && (
           <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-t border-border px-3.5 py-3.5 text-[12px] text-muted" data-testid="free-off">

@@ -55,7 +55,7 @@ export function restartWithNewEnv(project: Project): Deployment | null {
 export async function addRedis(project: Project, memoryMb: number): Promise<Deployment | null> {
   const status = await serviceStatus(project.slug);
   // The first Redis on the box installs the package (about a minute).
-  if (!status.installed.redis) await agent("service.install", { name: "redis" });
+  if (!status.installed.redis) await agent("service.install", { name: "redis" }, { server: project.serverId });
   await agent("redis.add", { slug: project.slug, memoryMb });
   return restartWithNewEnv(project);
 }
@@ -66,8 +66,8 @@ export async function removeRedis(project: Project, keepData: boolean): Promise<
 }
 
 /** MongoDB runs once on the server, shared by every project: installing it is its own step (a minute or two). */
-export async function installMongodb(): Promise<void> {
-  await agent("service.install", { name: "mongodb" });
+export async function installMongodb(serverId: number | null = null): Promise<void> {
+  await agent("service.install", { name: "mongodb" }, { server: serverId });
 }
 
 export async function addDatabase(project: Project, kind: DatabaseKind): Promise<Deployment | null> {
@@ -75,7 +75,7 @@ export async function addDatabase(project: Project, kind: DatabaseKind): Promise
   if (!status.installed[kind]) {
     if (kind === "mongodb") throw new Error("MongoDB isn't installed on this server yet. Install it first, once for every project.");
     // The first SQL database of its kind installs the server (PostgreSQL or MariaDB, a minute or two).
-    await agent("service.install", { name: kind });
+    await agent("service.install", { name: kind }, { server: project.serverId });
   }
   await agent(`${kind}.add` as const, { slug: project.slug });
   return restartWithNewEnv(project);

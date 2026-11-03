@@ -9,6 +9,7 @@ import { execFileSync, spawn } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { Duplex } from "node:stream";
+import { boxConfig } from "./box";
 import { config } from "./config";
 import { db, now } from "./db";
 
@@ -184,4 +185,21 @@ export function installCommand(release: { url: string; sha256: string; installer
     `echo "${release.installer.sha256}  layer-install.sh" | sha256sum -c -`,
     `bash layer-install.sh --from-tarball layer.tar.gz --agent-only --panel-key '${key}'${appsDomain ? ` --apps-domain ${appsDomain}` : ""}`,
   ].join(" && \\\n  ");
+}
+
+// ------------------------------------------------------------- per server
+
+/** The address DNS must point at for a project on this server (null: the panel's own). */
+export function serverIp(serverId: number | null): string {
+  if (serverId === null) return boxConfig().publicIp;
+  const s = getServer(serverId);
+  return s?.info?.publicIp || s?.host || boxConfig().publicIp;
+}
+
+/** A new app's free address on its server: <slug>.<that server's apps domain>. */
+export function freeHostOn(slug: string, serverId: number | null): string {
+  if (serverId === null) return `${slug}.${boxConfig().appsDomain}`;
+  const s = getServer(serverId);
+  if (!s?.info?.appsDomain) throw new Error(`Check the connection to ${s?.name ?? "that server"} first: the panel doesn't know its addresses yet.`);
+  return `${slug}.${s.info.appsDomain}`;
 }

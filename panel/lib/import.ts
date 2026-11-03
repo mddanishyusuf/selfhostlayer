@@ -1,6 +1,6 @@
 // Importing a repository: read its files, detect how to build and run it,
 // and create the project with those settings (each can be changed later).
-import { boxConfig, freeHost } from "./box";
+import { boxConfig } from "./box";
 import { detect, type Detected } from "./detect";
 import { installationToken } from "./github";
 import { getApp } from "./github-store";
@@ -8,6 +8,7 @@ import { latestCommit, projectFiles, repoInfo } from "./github-repo";
 import { pickNodeVersion } from "./node-releases";
 import { addDomain } from "./domains";
 import { createProject, slugFor, slugTaken, type Project } from "./projects";
+import { freeHostOn } from "./servers";
 
 const ROOT_DIR = /^(?:[A-Za-z0-9._-]+\/)*[A-Za-z0-9._-]+$/;
 
@@ -17,6 +18,8 @@ export interface ImportInput {
   installationId?: number | null;
   rootDir?: string;
   branch?: string;
+  /** Another server (Servers); empty: the panel's own. */
+  serverId?: number | null;
 }
 
 export async function importRepo(input: ImportInput): Promise<{ project: Project; detected: Detected; warnings: string[] }> {
@@ -53,7 +56,8 @@ export async function importRepo(input: ImportInput): Promise<{ project: Project
     installCommand: null,
     buildCommand: detected.buildCommand,
     runtime: detected.runtime,
-    domains: [freeHost(slug, box)],
+    domains: [freeHostOn(slug, input.serverId ?? null)],
+    serverId: input.serverId ?? null,
     memoryMb: 512,
     autoDeploy: true,
   });

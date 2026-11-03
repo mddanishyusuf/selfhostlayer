@@ -5,11 +5,12 @@
 // seen, then forgotten.
 import { randomBytes } from "node:crypto";
 import { agent } from "./agent";
-import { boxConfig, freeHost } from "./box";
+import { boxConfig } from "./box";
 import { decrypt, encrypt } from "./crypto";
 import { db } from "./db";
 import { addDomain } from "./domains";
 import { nodeReleases } from "./node-releases";
+import { freeHostOn } from "./servers";
 import { createProject, listProjects, projectEnv, setProjectEnv, slugFor, slugTaken, type Project } from "./projects";
 
 export type SiteEngine = "wordpress" | "ghost";
@@ -101,6 +102,8 @@ export interface NewSite {
   title: string;
   ownerName: string;
   ownerEmail: string;
+  /** Another server (Servers); null: the panel's own. */
+  serverId?: number | null;
 }
 
 /** Makes the project and its site row; deploying it (trigger install) does the rest. */
@@ -121,11 +124,12 @@ export async function createSite(s: NewSite): Promise<Project> {
     installCommand: s.engine === "ghost" ? "pnpm install --prod --frozen-lockfile" : null,
     buildCommand: null,
     runtime: s.engine === "ghost" ? { kind: "node", exec: ["node", "layer-ghost.js"], writablePaths: [], healthPath: "/ghost/api/admin/site/" } : { kind: "php", root: "wordpress" },
-    domains: [freeHost(slug, box)],
+    domains: [freeHostOn(slug, s.serverId ?? null)],
     memoryMb: engine.memoryMb,
     autoDeploy: false,
     source: "site",
     catalogApp: s.engine,
+    serverId: s.serverId ?? null,
   });
   addDomain(project.id, project.domains[0]!, "free", null, "active");
   db()

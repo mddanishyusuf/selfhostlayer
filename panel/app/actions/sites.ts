@@ -28,6 +28,7 @@ export async function createSiteAction(_prev: SiteFormState, form: FormData): Pr
   const ownerName = field(form, "ownerName");
   const ownerEmail = field(form, "ownerEmail");
   const name = field(form, "name");
+  const serverId = Number(field(form, "server")) || null;
   const errors: Record<string, string> = {};
   if (!title || title.length > 120 || /[\r\n]/.test(title)) errors.title = "Give it a title (up to 120 characters).";
   if (!ownerName || ownerName.length > 100) errors.ownerName = "Your name, as it shows on posts.";
@@ -36,7 +37,7 @@ export async function createSiteAction(_prev: SiteFormState, form: FormData): Pr
   if (Object.keys(errors).length) return { errors };
   let path: string;
   try {
-    const project = await createSite({ engine, name, title, ownerName, ownerEmail });
+    const project = await createSite({ engine, name, title, ownerName, ownerEmail, serverId });
     const d = createDeployment(project, "install", { sha: randomBytes(20).toString("hex"), message: `Install ${ENGINES[engine].name}`, author: "" });
     path = deploymentPath(project.slug, d.id);
   } catch (err) {

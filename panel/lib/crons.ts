@@ -77,7 +77,7 @@ export function deleteCron(projectId: number, name: string): void {
 export async function writeCron(project: Project, cron: Cron): Promise<{ nextRun: string }> {
   const v = validateCron(cron);
   if (!v.ok) throw new Error(Object.values(v.errors)[0]);
-  await agent("node.install", { version: project.nodeVersion });
+  await agent("node.install", { version: project.nodeVersion }, { server: project.serverId });
   return agent<{ nextRun: string }>("cron.write", {
     slug: project.slug,
     name: cron.name,
