@@ -19,6 +19,10 @@ All your projects, with their status, last deploy and address. Each project show
 
 Creating the project makes the app's Linux user and folders: `useradd --system --shell /usr/sbin/nologin --home /srv/apps/<app> app-<app>`.
 
+## Servers
+
+Other servers this panel deploys to. **Add a server** shows the one command to run on a fresh VPS (an agent-only install), then **Check connection**. New project and New site pick a server; a project's Settings moves it to another one. See [Servers](servers.md).
+
 ## Sites
 
 WordPress and Ghost, installed in one click, each its own sandboxed install with its own database. **New site** asks for the engine, a title and the owner, then shows the install's log. A site has a project's pages plus its engine's page (version and updates, Lock code and XML-RPC for WordPress, the owner's one-time password). Projects doesn't list sites. See [Sites](sites.md).
