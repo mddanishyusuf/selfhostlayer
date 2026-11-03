@@ -28,6 +28,7 @@ import { getApp } from "./github-store";
 import { BUILD_SLOTS, readState } from "./panel-state";
 import { latestCommit } from "./github-repo";
 import { getProject, listProjects, projectEnv, projectFiles, type Project } from "./projects";
+import { onServer } from "./servers";
 import { deploySite } from "./sites";
 
 export const BUN_VERSION = "1.3.9";
@@ -366,7 +367,14 @@ async function backUpBeforeUpdate(id: number, p: Project): Promise<void> {
   log(id, `Backed up (${((backup.bytes ?? 0) / 1024 / 1024).toFixed(1)} MB). Its Backups page can restore it.\n`);
 }
 
+/** A deployment runs on its project's server: every agent call in it, with or without a slug, goes there. */
 async function run(id: number): Promise<void> {
+  const d = getDeployment(id);
+  const p = d ? getProject(d.projectId) : null;
+  return onServer(p?.serverId ?? null, () => runHere(id));
+}
+
+async function runHere(id: number): Promise<void> {
   const d = getDeployment(id);
   if (!d || d.status !== "queued") return;
   let p = getProject(d.projectId);

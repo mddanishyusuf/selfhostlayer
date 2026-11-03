@@ -1,4 +1,5 @@
 import { connect } from "node:net";
+import type { Duplex } from "node:stream";
 import { randomUUID } from "node:crypto";
 import type { ActionName, Response } from "./index.ts";
 
@@ -16,6 +17,8 @@ export class AgentError extends Error {
 
 export interface CallOptions {
   socket?: string;
+  /** Another way to the agent (another server, over SSH): a stream already open to it. */
+  transport?: () => Duplex;
   /** Receives streamed output (logs.tail with follow). */
   onChunk?: (chunk: string) => void;
   signal?: AbortSignal;
@@ -29,7 +32,7 @@ export function callAgent<T = unknown>(
 ): Promise<T> {
   const id = randomUUID().replaceAll("-", "");
   return new Promise((resolve, reject) => {
-    const socket = connect(opts.socket ?? AGENT_SOCKET);
+    const socket = opts.transport ? opts.transport() : connect(opts.socket ?? AGENT_SOCKET);
     let buffer = "";
     let settled = false;
     const finish = (fn: () => void) => {
@@ -40,7 +43,10 @@ export function callAgent<T = unknown>(
     };
     opts.signal?.addEventListener("abort", () => finish(() => reject(new AgentError("aborted", "aborted"))));
     socket.setEncoding("utf8");
-    socket.on("connect", () => socket.write(JSON.stringify({ id, action, params }) + "\n"));
+    const request = JSON.stringify({ id, action, params }) + "\n";
+    // A transport is open already; a socket says when it's connected.
+    if (opts.transport) socket.write(request);
+    else socket.on("connect", () => socket.write(request));
     socket.on("data", (data: string) => {
       buffer += data;
       let i: number;

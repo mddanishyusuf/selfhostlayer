@@ -79,7 +79,8 @@ write_config() {
   install -m 640 -o root -g "$LAYER_USER" /dev/null /etc/layer/config.json.new
   jq -n --argjson old "$old" --arg panelHost "$LAYER_PANEL_HOST" --arg appsDomain "$apps_domain" --arg publicIp "$LAYER_PUBLIC_IP" \
     --arg version "$LAYER_INSTALLED_VERSION" --arg node "$LAYER_NODE_DEFAULT" --argjson internalTls "$internal" --arg updatesUrl "$updates" \
-    '$old + {panelHost: $panelHost, appsDomain: $appsDomain, publicIp: $publicIp, version: $version, defaultNode: $node, internalTls: $internalTls, updatesUrl: $updatesUrl}' \
+    --argjson agentOnly "$([[ "${LAYER_AGENT_ONLY:-0}" == 1 ]] && echo true || echo false)" \
+    '$old + {panelHost: $panelHost, appsDomain: $appsDomain, publicIp: $publicIp, version: $version, defaultNode: $node, internalTls: $internalTls, updatesUrl: $updatesUrl, agentOnly: $agentOnly}' \
     >/etc/layer/config.json.new
   mv /etc/layer/config.json.new /etc/layer/config.json
   ok "Apps get free URLs at https://<app>.$apps_domain"

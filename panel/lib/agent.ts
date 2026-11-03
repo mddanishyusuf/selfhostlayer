@@ -1,5 +1,6 @@
-import { callAgent, type ActionName, type CallOptions } from "@layer/protocol";
+import { AgentError, callAgent, type ActionName, type CallOptions } from "@layer/protocol";
 import { config } from "./config";
+import { currentServer, getServer, serverOfSlug, sshTransport } from "./servers";
 
 export interface SystemInfo {
   agentVersion: string;
@@ -382,10 +383,25 @@ function fakeEdit(action: "db.count" | "db.update", p: Record<string, unknown>) 
   return action === "db.count" ? { matches } : { updated: Number(p.expect ?? matches) };
 }
 
-export async function agent<T>(action: ActionName, params: Record<string, unknown> = {}, opts: Omit<CallOptions, "socket"> = {}): Promise<T> {
+/**
+ * Calls an agent: the panel's own, or another server's over SSH
+ * (lib/servers.ts). Which one: the server asked for (opts.server), else the
+ * server of the app the call is about (its slug), else the server the work in
+ * progress is for (a deploy, onServer), else the panel's own.
+ */
+export async function agent<T>(action: ActionName, params: Record<string, unknown> = {}, opts: Omit<CallOptions, "socket" | "transport"> & { server?: number | null } = {}): Promise<T> {
+  const { server: asked, ...callOpts } = opts;
+  // A known slug decides (null: the panel's own server); an unknown one (a new app) follows the work in progress.
+  const ofSlug = typeof params.slug === "string" ? serverOfSlug(params.slug) : undefined;
+  const serverId = asked !== undefined ? asked : ofSlug !== undefined ? ofSlug : (currentServer() ?? null);
+  if (serverId !== null) {
+    const server = getServer(serverId);
+    if (!server) throw new AgentError("not_found", "that server isn't in the panel any more");
+    return callAgent<T>(action, params, { ...callOpts, transport: sshTransport(server) });
+  }
   if (config.fakeAgent && action === "db.browse") return fakeBrowse(params) as T;
   if (config.fakeAgent && (action === "db.count" || action === "db.update")) return fakeEdit(action, params) as T;
   if (config.fakeAgent && action === "service.status") return fakeServiceStatus(params) as T;
   if (config.fakeAgent && action in FAKE) return FAKE[action] as T;
-  return callAgent<T>(action, params, { ...opts, socket: config.agentSocket });
+  return callAgent<T>(action, params, { ...callOpts, socket: config.agentSocket });
 }

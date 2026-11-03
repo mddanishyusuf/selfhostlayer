@@ -92,11 +92,14 @@ async function updateCheck(_params: Params, ctx: Context) {
   const releases = await readFeed(ctx);
   const current = readBox(ctx).version;
   const latest = releases[0] ?? null;
+  // This version's own files: what a new agent-only server installs (Settings → Servers).
+  const mine = releases.find((r) => r.version === current);
   return {
     current,
     latest: latest && { version: latest.version, date: latest.date, notes: latest.notes },
     available: latest !== null && isNewer(latest.version, current),
     running: await running(ctx),
+    release: mine ? { url: mine.tarball.url, sha256: mine.tarball.sha256, installer: { url: mine.installer.url, sha256: mine.installer.sha256 } } : null,
   };
 }
 

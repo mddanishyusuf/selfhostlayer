@@ -268,6 +268,19 @@ const MIGRATIONS = [
      password_enc TEXT,
      installed INTEGER NOT NULL DEFAULT 0
    );`,
+  // Servers this panel deploys to (PLAN-SERVERS.md); a project's server_id is NULL on the panel's own.
+  `CREATE TABLE servers (
+     id INTEGER PRIMARY KEY,
+     name TEXT NOT NULL,
+     host TEXT NOT NULL UNIQUE,
+     port INTEGER NOT NULL DEFAULT 22,
+     info TEXT,
+     seen_at INTEGER,
+     checked_at INTEGER,
+     error TEXT,
+     created_at INTEGER NOT NULL
+   );
+   ALTER TABLE projects ADD COLUMN server_id INTEGER REFERENCES servers(id);`,
 ];
 
 function open(): DatabaseSync {

@@ -1,6 +1,6 @@
 "use client";
 
-import { AppWindowIcon, ArrowUpRightIcon, BellIcon, BracesIcon, ChartColumnIcon, ChevronDownIcon, ChevronLeftIcon, CircleArrowUpIcon, ClipboardListIcon, ClockIcon, DatabaseBackupIcon, DatabaseIcon, FolderIcon, GlobeIcon, HistoryIcon, KeyRoundIcon, LayoutDashboardIcon, LinkIcon, LogOutIcon, MailIcon, MenuIcon, MoonIcon, PanelLeftOpenIcon, PuzzleIcon, RocketIcon, SearchIcon, ServerIcon, SettingsIcon, ShieldIcon, SquareTerminalIcon, SunIcon } from "lucide-react";
+import { AppWindowIcon, ArrowUpRightIcon, BellIcon, BracesIcon, ChartColumnIcon, ChevronDownIcon, ChevronLeftIcon, CircleArrowUpIcon, ClipboardListIcon, ClockIcon, DatabaseBackupIcon, DatabaseIcon, FolderIcon, GlobeIcon, HistoryIcon, KeyRoundIcon, LayoutDashboardIcon, LinkIcon, LogOutIcon, MailIcon, MenuIcon, MoonIcon, PanelLeftOpenIcon, PuzzleIcon, RocketIcon, SearchIcon, ServerCogIcon, ServerIcon, SettingsIcon, ShieldIcon, SquareTerminalIcon, SunIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Fragment, useEffect, useState } from "react";
@@ -67,6 +67,7 @@ function globalNav(p: SidebarProps): Item[][] {
     ],
     [
       { href: "/health", label: "Health", icon: ServerIcon },
+      { href: "/servers", label: "Servers", icon: ServerCogIcon },
       { href: "/settings/backups", label: "Backups", icon: DatabaseBackupIcon },
       { href: "/settings/alerts", label: "Alerts", icon: BellIcon, dot: p.openIncidents > 0 },
       { href: "/settings/activity", label: "Activity", icon: HistoryIcon },

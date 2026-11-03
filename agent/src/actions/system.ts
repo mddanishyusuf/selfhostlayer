@@ -51,7 +51,19 @@ async function systemInfo(_params: unknown, ctx: Context) {
     uptimeSec: Math.round(os.uptime()),
     nodeVersions,
     caddy: caddy.stdout.trim() || "unknown",
+    // What a panel managing this server from elsewhere needs (Settings → Servers).
+    ...boxFacts(ctx),
   };
+}
+
+function boxFacts(ctx: Context): { publicIp?: string; appsDomain?: string; defaultNode?: string; version?: string; agentOnly?: boolean } {
+  try {
+    const box = JSON.parse(readFileSync(ctx.paths.boxConfig, "utf8")) as Record<string, unknown>;
+    const pick = (k: string) => (typeof box[k] === "string" ? (box[k] as string) : undefined);
+    return { publicIp: pick("publicIp"), appsDomain: pick("appsDomain"), defaultNode: pick("defaultNode"), version: pick("version"), agentOnly: box.agentOnly === true };
+  } catch {
+    return {};
+  }
 }
 
 export const systemActions: ActionTable = {

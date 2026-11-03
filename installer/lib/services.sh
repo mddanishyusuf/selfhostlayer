@@ -28,3 +28,16 @@ wait_for() {
   journalctl -u layer-agent -u layer-panel -n 30 --no-pager >>"$LAYER_LOG" 2>&1 || true
   die "$what didn't come up within 60s (see $LAYER_LOG and journalctl -u layer-panel)"
 }
+
+# An agent-only server: the agent, no panel (another server's panel manages it).
+start_agent() {
+  step "Starting the agent"
+  install -m 644 /opt/layer/current/system/layer-agent.service /etc/systemd/system/layer-agent.service
+  run systemctl daemon-reload
+  run systemctl enable layer-agent
+  run systemctl restart layer-agent
+  wait_for "agent socket" test -S /run/layer/agent.sock
+  # A panel left from an earlier full install would have no one to sign in.
+  if systemctl is-enabled --quiet layer-panel 2>/dev/null; then run systemctl disable --now layer-panel; fi
+  ok "layer-agent running"
+}

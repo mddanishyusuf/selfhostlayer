@@ -9,7 +9,7 @@ CADDY_LIST="/etc/apt/sources.list.d/caddy-stable.list"
 # build-essential (make, g++): npm compiles native modules like better-sqlite3
 # with node-gyp when no prebuilt binary matches the app's Node version.
 PACKAGES=(
-  ca-certificates curl gnupg xz-utils unzip jq sqlite3
+  ca-certificates curl gnupg xz-utils unzip jq sqlite3 socat
   ufw fail2ban python3-systemd unattended-upgrades
   build-essential
   caddy

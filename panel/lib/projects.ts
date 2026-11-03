@@ -23,6 +23,8 @@ export interface Project {
   source: "github" | "catalog" | "site";
   /** The catalog app's id (links), for integrations; a site's engine (wordpress, ghost). */
   catalogApp: string | null;
+  /** The server it runs on (Settings → Servers); null: the panel's own. */
+  serverId: number | null;
 }
 
 interface Row {
@@ -44,6 +46,7 @@ interface Row {
   auto_deploy: number;
   source: Project["source"];
   catalog_app: string | null;
+  server_id: number | null;
 }
 
 const fromRow = (r: Row): Project => ({
@@ -65,6 +68,7 @@ const fromRow = (r: Row): Project => ({
   autoDeploy: r.auto_deploy === 1,
   source: r.source,
   catalogApp: r.catalog_app,
+  serverId: r.server_id ?? null,
 });
 
 /** An app slug from a repo (and folder) name: lowercase, a-z0-9 and single hyphens, unique. */
@@ -78,17 +82,17 @@ export function slugFor(base: string, taken: (slug: string) => boolean): string 
 
 export const slugTaken = (slug: string) => !!db().prepare("SELECT 1 FROM projects WHERE slug = ?").get(slug);
 
-export type NewProject = Omit<Project, "id" | "source" | "catalogApp"> & Partial<Pick<Project, "source" | "catalogApp">>;
+export type NewProject = Omit<Project, "id" | "source" | "catalogApp" | "serverId"> & Partial<Pick<Project, "source" | "catalogApp" | "serverId">>;
 
 export function createProject(p: NewProject): Project {
   const result = db()
     .prepare(
       `INSERT INTO projects (slug, repo_owner, repo_name, installation_id, branch, root_dir, framework, package_manager, node_version,
-         install_command, build_command, runtime, domains, memory_mb, auto_deploy, source, catalog_app, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         install_command, build_command, runtime, domains, memory_mb, auto_deploy, source, catalog_app, server_id, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .run(p.slug, p.repoOwner, p.repoName, p.installationId, p.branch, p.rootDir, p.framework, p.packageManager, p.nodeVersion,
-      p.installCommand, p.buildCommand, JSON.stringify(p.runtime), JSON.stringify(p.domains), p.memoryMb, p.autoDeploy ? 1 : 0, p.source ?? "github", p.catalogApp ?? null, now());
+      p.installCommand, p.buildCommand, JSON.stringify(p.runtime), JSON.stringify(p.domains), p.memoryMb, p.autoDeploy ? 1 : 0, p.source ?? "github", p.catalogApp ?? null, p.serverId ?? null, now());
   return getProject(Number(result.lastInsertRowid))!;
 }
 
