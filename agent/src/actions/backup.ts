@@ -3,7 +3,7 @@
 // uploads; and restores one the panel downloaded. Bucket credentials and the
 // encryption key never reach the agent.
 import { randomBytes } from "node:crypto";
-import { closeSync, constants, createReadStream, existsSync, fchmodSync, fchownSync, fstatSync, lstatSync, openSync, readdirSync, readSync, renameSync, rmSync, statSync } from "node:fs";
+import { closeSync, constants, createReadStream, existsSync, fchmodSync, fchownSync, fstatSync, lstatSync, openSync, readdirSync, readSync, renameSync, rmSync, statSync, writeSync } from "node:fs";
 import { join } from "node:path";
 import { assertSlug, ValidationError } from "@layer/protocol";
 import type { ActionTable, CallIO, Context, Params } from "../context.ts";
@@ -370,12 +370,64 @@ async function backupDiscard(params: Params, ctx: Context) {
   return { file: name, discarded: existed };
 }
 
+/**
+ * A staged snapshot to a panel on another server (Servers): the file, in
+ * base64 chunks of 192 KB, as streamed output. The panel there encrypts and
+ * uploads it as it does its own.
+ */
+async function backupFetch(params: Params, ctx: Context, io: CallIO) {
+  const name = assertStagedName(params.file, "file");
+  const file = childOf(ctx.paths.stagingDir, name);
+  const fd = openSync(file, constants.O_RDONLY | constants.O_NOFOLLOW);
+  let bytes = 0;
+  try {
+    // A multiple of 3 bytes: each chunk is base64 on its own.
+    for await (const chunk of createReadStream("", { fd, autoClose: false, highWaterMark: 3 * 65536 })) {
+      bytes += (chunk as Buffer).length;
+      io.emit((chunk as Buffer).toString("base64"));
+    }
+  } finally {
+    closeSync(fd);
+  }
+  return { file: name, bytes };
+}
+
+/**
+ * A file from a panel on another server, for backup.restore, data.import or
+ * wordpress.import: written into the restore folder in pieces (base64, at
+ * most 512 KB each, in order), owned by the panel's user, as the panel there
+ * would have written it itself.
+ */
+async function backupPut(params: Params, ctx: Context) {
+  const name = assertStagedName(params.file, "file");
+  const offset = params.offset;
+  if (typeof offset !== "number" || !Number.isInteger(offset) || offset < 0) throw new ValidationError("offset", "must be a byte offset");
+  if (typeof params.data !== "string" || params.data.length > 700_000) throw new ValidationError("data", "must be base64, at most 512 KB");
+  const data = Buffer.from(params.data, "base64");
+  const panel = ctx.paths.panelUser ? await lookupUser(ctx.exec, ctx.paths.panelUser) : null;
+  ensureDir(ctx.paths.restoreDir, 0o700, panel ? { uid: panel.uid, gid: panel.gid } : undefined);
+  const file = childOf(ctx.paths.restoreDir, name);
+  // The first piece makes the file (never over an existing one); the rest go after it, in order.
+  const fd = openSync(file, offset === 0 ? constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW : constants.O_WRONLY | constants.O_NOFOLLOW, 0o600);
+  try {
+    if (fstatSync(fd).size !== offset) throw new ActionError("bad_offset", `the file has ${fstatSync(fd).size} bytes, not ${offset}`);
+    if (offset === 0 && panel) fchownSync(fd, panel.uid, panel.gid);
+    writeSync(fd, data, 0, data.length, offset);
+  } finally {
+    closeSync(fd);
+  }
+  return { file: name, size: offset + data.length };
+}
+
 export const backupActions: ActionTable = {
   // The build lock: a snapshot is heavy on disk, so it queues behind builds
   // instead of competing with them, and never blocks proxy or unit changes.
   "backup.snapshot": { mutates: true, lock: "build", run: backupSnapshot },
   "backup.restore": { mutates: true, run: backupRestore },
   "backup.discard": { mutates: true, run: backupDiscard },
+  "backup.fetch": { mutates: false, run: backupFetch },
+  // The data stays out of the audit log.
+  "backup.put": { mutates: true, run: backupPut, redact: (p) => ({ file: p.file, offset: p.offset }) },
   // Heavy on disk like a snapshot, so it queues behind builds too.
   "data.import": { mutates: true, lock: "build", run: dataImport },
 };

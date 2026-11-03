@@ -10,9 +10,10 @@ import { DatabaseSync, backup as sqliteBackup } from "node:sqlite";
 import { agent } from "../agent";
 import { raise, resolve } from "../alerts/engine";
 import { boxConfig } from "../box";
+import { fetchStaged, putFile } from "../servers";
 import { config } from "../config";
 import { db } from "../db";
-import { listProjects, type Project } from "../projects";
+import { getProject, listProjects, type Project } from "../projects";
 import { decryptStream, encryptStream } from "./crypt";
 import { getBackupSettings, pinServerFolder, recoveryKeyBytes, storage, type BackupSettings } from "./settings";
 import { tarGz } from "./tar";
@@ -186,11 +187,21 @@ async function backupApp(project: Project, trigger: Backup["trigger"]): Promise<
   const settings = requireSettings();
   const id = begin("app", project.slug, project.id, trigger);
   let staged: string | null = null;
+  let fetched: string | null = null;
   try {
     const snap = await agent<{ file: string; path: string; bytes: number; sqlite: { path: string; bytes: number }[]; postgres: { bytes: number } | null; mysql: { bytes: number } | null; mongodb: { bytes: number } | null }>("backup.snapshot", { slug: project.slug });
     staged = snap.file;
     const key = `${serverPrefix(settings)}${project.slug}/${stamp(Date.now())}-${id}.tar.gz.enc`;
-    const bytes = await encryptAndUpload(settings, key, createReadStream(join(STAGING_DIR, snap.file)));
+    // On another server, the snapshot comes over the link first.
+    let source = join(STAGING_DIR, snap.file);
+    if (project.serverId !== null) {
+      const dir = join(config.dataDir, "fetched");
+      mkdirSync(dir, { recursive: true, mode: 0o700 });
+      fetched = join(dir, snap.file);
+      await fetchStaged(project.serverId, snap.file, fetched);
+      source = fetched;
+    }
+    const bytes = await encryptAndUpload(settings, key, createReadStream(source));
     finish(id, { ok: true, objectKey: key, bytes, contents: { sqlite: snap.sqlite, postgres: snap.postgres, mysql: snap.mysql, mongodb: snap.mongodb, archiveBytes: snap.bytes } });
     await resolve(`backup:${project.slug}`, "The latest backup worked.");
     await prune(settings, "app", project.slug);
@@ -199,7 +210,8 @@ async function backupApp(project: Project, trigger: Backup["trigger"]): Promise<
     finish(id, { ok: false, error: message });
     await raise(`backup:${project.slug}`, { title: `Backup failed: ${project.slug}`, detail: message, link: panelLink(`/projects/${project.slug}/backups`), projectId: project.id });
   } finally {
-    if (staged) await agent("backup.discard", { file: staged }).catch(() => {});
+    if (staged) await agent("backup.discard", { file: staged }, { server: project.serverId }).catch(() => {});
+    if (fetched) rmSync(fetched, { force: true });
   }
   return getBackup(id)!;
 }
@@ -299,6 +311,9 @@ export function restoreBackup(id: number): Promise<{ previous: string }> {
       const res = await storage(settings.destination).get(b.objectKey);
       if (!res.body) throw new Error("The storage returned an empty backup.");
       await pipeline(Readable.fromWeb(res.body as import("node:stream/web").ReadableStream), decryptStream(recoveryKeyBytes(settings)), createWriteStream(path, { mode: 0o600 }));
+      // A project on another server: the file goes over the link to its restore folder.
+      const serverId = b.projectId !== null ? (getProject(b.projectId)?.serverId ?? null) : null;
+      if (serverId !== null) await putFile(serverId, path, file);
       const result = await agent<{ previous: string }>("backup.restore", { slug: b.slug, file });
       return { previous: result.previous };
     } finally {

@@ -5,8 +5,9 @@ import { Mark, StatusDot, cx } from "@/components/ui";
 import { agent, type SystemInfo } from "@/lib/agent";
 import { boxConfig } from "@/lib/box";
 import { FINISHED, listDeployments, liveDeployment } from "@/lib/deploy";
-import { history, latestUsage, type Range } from "@/lib/metrics";
+import { boxTarget, history, latestUsage, type Range } from "@/lib/metrics";
 import { listProjects } from "@/lib/projects";
+import { listServers } from "@/lib/servers";
 import { requireUser } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
@@ -28,10 +29,14 @@ function Meter({ value }: { value: number }) {
   );
 }
 
-export default async function HealthPage({ searchParams }: { searchParams: Promise<{ range?: string }> }) {
+export default async function HealthPage({ searchParams }: { searchParams: Promise<{ range?: string; server?: string }> }) {
   await requireUser();
-  const range: Range = (await searchParams).range === "7d" ? "7d" : "24h";
-  const info = await agent<SystemInfo>("system.info").catch(() => null);
+  const params = await searchParams;
+  const range: Range = params.range === "7d" ? "7d" : "24h";
+  // This server, or another one (?server=).
+  const servers = listServers().filter((s) => s.seenAt);
+  const serverId = servers.find((s) => String(s.id) === params.server)?.id ?? null;
+  const info = await agent<SystemInfo>("system.info", {}, { server: serverId }).catch(() => null);
   let version = "dev";
   try {
     ({ version } = boxConfig());
@@ -39,12 +44,12 @@ export default async function HealthPage({ searchParams }: { searchParams: Promi
     // dev: no box config
   }
   const now = Date.now();
-  const usage = history("box", range, now);
+  const usage = history(boxTarget(serverId), range, now);
   const from = now - (range === "24h" ? 86_400_000 : 7 * 86_400_000);
   const gapMs = range === "24h" ? 15 * 60_000 : 3 * 3_600_000;
   const latest = latestUsage(now);
   const apps = listProjects()
-    .filter((p) => p.runtime.kind !== "static")
+    .filter((p) => p.runtime.kind !== "static" && p.serverId === serverId)
     .map((p) => {
       const last = listDeployments(p.id, 1)[0];
       const building = last && !FINISHED.includes(last.status);
@@ -56,6 +61,14 @@ export default async function HealthPage({ searchParams }: { searchParams: Promi
   return (
     <>
       <PageHeader title="Health" meta={info ? `${info.hostname} · ${info.os.name}` : undefined} />
+      {servers.length > 0 && (
+        <Segmented
+          items={[
+            { href: `/health${range === "7d" ? "?range=7d" : ""}`, label: "This server", active: serverId === null },
+            ...servers.map((s) => ({ href: `/health?server=${s.id}${range === "7d" ? "&range=7d" : ""}`, label: s.name, active: serverId === s.id })),
+          ]}
+        />
+      )}
       {!info ? (
         <Notice lead="Unreachable" tone="err">
           The panel can&apos;t reach the server agent. On the server: <code className="font-mono text-[13px]">systemctl status layer-agent</code>
@@ -102,8 +115,8 @@ export default async function HealthPage({ searchParams }: { searchParams: Promi
         aside={
           <Segmented
             items={[
-              { href: "/health", label: "24 hours", active: range === "24h" },
-              { href: "/health?range=7d", label: "7 days", active: range === "7d" },
+              { href: serverId === null ? "/health" : `/health?server=${serverId}`, label: "24 hours", active: range === "24h" },
+              { href: `/health?range=7d${serverId === null ? "" : `&server=${serverId}`}`, label: "7 days", active: range === "7d" },
             ]}
           />
         }

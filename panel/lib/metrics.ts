@@ -1,10 +1,11 @@
 // Usage history for the charts: CPU and memory for every app and for the
 // box, sampled by the monitor once a minute. A day is kept at one-minute
 // steps, then a week of hourly averages. Disk is measured every 15 minutes.
-// Target "box" is the server; anything else is an app's slug.
+// Target "box" is the panel's server, "server:<id>" another one; anything else is an app's slug.
 import { agent } from "./agent";
 import { db } from "./db";
 import { listProjects } from "./projects";
+import { listServers } from "./servers";
 
 const MINUTE = 60_000;
 const HOUR = 60 * MINUTE;
@@ -23,8 +24,9 @@ export interface Point {
   memoryMb: number | null;
 }
 
-// On globalThis: Next loads modules twice, and the previous sample must be shared.
-const state: { last: Sample | null; lastDisk: number } = ((globalThis as { layerMetrics?: { last: Sample | null; lastDisk: number } }).layerMetrics ??= { last: null, lastDisk: 0 });
+// On globalThis: Next loads modules twice, and the previous samples must be shared (one per server).
+const state: { last: Map<string, Sample>; lastDisk: number } = ((globalThis as { layerMetrics?: { last: Map<string, Sample>; lastDisk: number } }).layerMetrics ??= { last: new Map(), lastDisk: 0 });
+if (!(state.last instanceof Map)) state.last = new Map();
 
 const round = (n: number) => Math.round(n * 10) / 10;
 
@@ -34,14 +36,35 @@ export function cpuPercent(before: number | undefined, now: number, wallMs: numb
   return round(Math.min(100, (100 * (now - before)) / (wallMs * 1e6) / Math.max(1, cpus)));
 }
 
-/** One sample for every app and the box. The monitor calls it every minute. */
+/** The metrics target for a server's whole box: "box" for the panel's own, "server:<id>" for another. */
+export const boxTarget = (serverId: number | null) => (serverId === null ? "box" : `server:${serverId}`);
+
+/**
+ * One sample for every app and every server's box. The monitor calls it every
+ * minute. Each server answers for its own apps; one that doesn't answer is
+ * skipped (the monitor's server check raises that).
+ */
 export async function sampleMetrics(now = Date.now()): Promise<void> {
-  const slugs = listProjects()
-    .filter((p) => p.runtime.kind !== "static")
-    .map((p) => p.slug);
-  const s = await agent<Sample>("metrics.sample", { slugs });
-  const prev = state.last;
-  state.last = s;
+  const projects = listProjects().filter((p) => p.runtime.kind !== "static");
+  const servers: (number | null)[] = [null, ...listServers().filter((s) => s.seenAt).map((s) => s.id)];
+  const diskDue = now - state.lastDisk >= 15 * MINUTE;
+  if (diskDue) state.lastDisk = now;
+  for (const server of servers) {
+    const slugs = projects.filter((p) => p.serverId === server).map((p) => p.slug);
+    try {
+      await sampleServer(server, slugs, diskDue);
+    } catch (err) {
+      if (server === null) throw err;
+    }
+  }
+  rollUp(now);
+}
+
+async function sampleServer(server: number | null, slugs: string[], diskDue: boolean): Promise<void> {
+  const s = await agent<Sample>("metrics.sample", { slugs }, { server });
+  const key = boxTarget(server);
+  const prev = state.last.get(key) ?? null;
+  state.last.set(key, s);
   const minute = Math.floor(s.at / MINUTE) * MINUTE;
   // Two samples in one minute (a restart): the later one wins, but keeps what it didn't measure.
   const insert = db().prepare(
@@ -49,17 +72,15 @@ export async function sampleMetrics(now = Date.now()): Promise<void> {
      ON CONFLICT (target, step, at) DO UPDATE SET cpu = COALESCE(excluded.cpu, cpu), memory_mb = excluded.memory_mb, disk_mb = COALESCE(excluded.disk_mb, disk_mb)`,
   );
   const box = prev && s.box.cpu.total > prev.box.cpu.total ? round((100 * (s.box.cpu.busy - prev.box.cpu.busy)) / (s.box.cpu.total - prev.box.cpu.total)) : null;
-  insert.run("box", minute, box, s.box.memoryMb.used, Math.round(s.box.diskGb.used * 1024));
+  insert.run(key, minute, box, s.box.memoryMb.used, Math.round(s.box.diskGb.used * 1024));
   for (const [slug, a] of Object.entries(s.apps)) {
     insert.run(slug, minute, cpuPercent(prev?.apps[slug]?.cpuNs, a.cpuNs, prev ? s.at - prev.at : 0, s.box.cpus), a.memoryMb, null);
   }
-  if (now - state.lastDisk >= 15 * MINUTE) {
-    state.lastDisk = now;
-    const disk = await agent<{ apps: Record<string, number> }>("metrics.disk", { slugs }).catch(() => null);
+  if (diskDue) {
+    const disk = await agent<{ apps: Record<string, number> }>("metrics.disk", { slugs }, { server }).catch(() => null);
     const update = db().prepare("UPDATE metrics SET disk_mb = ? WHERE target = ? AND step = 'minute' AND at = ?");
     for (const [slug, mb] of Object.entries(disk?.apps ?? {})) update.run(mb, slug, minute);
   }
-  rollUp(now);
 }
 
 /** Hourly averages for every finished hour that has none yet, then old rows out. */

@@ -6,7 +6,7 @@
 // is pinned at the first connection.
 import { AsyncLocalStorage } from "node:async_hooks";
 import { execFileSync, spawn } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync } from "node:fs";
+import { closeSync, createWriteStream, existsSync, mkdirSync, openSync, readFileSync, readSync } from "node:fs";
 import { join } from "node:path";
 import { Duplex } from "node:stream";
 import { boxConfig } from "./box";
@@ -202,4 +202,36 @@ export function freeHostOn(slug: string, serverId: number | null): string {
   const s = getServer(serverId);
   if (!s?.info?.appsDomain) throw new Error(`Check the connection to ${s?.name ?? "that server"} first: the panel doesn't know its addresses yet.`);
   return `${slug}.${s.info.appsDomain}`;
+}
+
+// ------------------------------------------------------------- files to and from a server
+
+/** A staged snapshot from another server into a local file (backup.fetch's base64 chunks). */
+export async function fetchStaged(serverId: number, file: string, dest: string): Promise<void> {
+  const { agent } = await import("./agent");
+  const out = createWriteStream(dest, { mode: 0o600, flags: "wx" });
+  try {
+    await agent("backup.fetch", { file }, { server: serverId, onChunk: (c) => out.write(Buffer.from(c, "base64")) });
+  } finally {
+    await new Promise<void>((done) => out.end(done));
+  }
+}
+
+/** A local file into another server's restore folder, in pieces (backup.put), for restore or import there. */
+export async function putFile(serverId: number, path: string, name: string): Promise<void> {
+  const { agent } = await import("./agent");
+  const fd = openSync(path, "r");
+  try {
+    const piece = Buffer.alloc(512 * 1024);
+    let offset = 0;
+    for (;;) {
+      const n = readSync(fd, piece, 0, piece.length, offset);
+      if (n === 0 && offset > 0) break;
+      await agent("backup.put", { file: name, offset, data: piece.subarray(0, n).toString("base64") }, { server: serverId });
+      offset += n;
+      if (n === 0) break;
+    }
+  } finally {
+    closeSync(fd);
+  }
 }

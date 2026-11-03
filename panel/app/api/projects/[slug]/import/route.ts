@@ -9,6 +9,7 @@ import { agent } from "@/lib/agent";
 import { config } from "@/lib/config";
 import { panelOrigin } from "@/lib/origin";
 import { getProjectBySlug } from "@/lib/projects";
+import { putFile } from "@/lib/servers";
 import { getSession } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
@@ -63,6 +64,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
     await pipeline(Readable.fromWeb(request.body as WebReadableStream), limit, createWriteStream(path, { mode: 0o600, flags: "wx" }));
     if (received !== length) return fail("The upload was cut off. Nothing changed.", 400);
     const search = new URL(request.url).searchParams;
+    // A project on another server: the upload goes over the link to its restore folder first.
+    if (project.serverId !== null) await putFile(project.serverId, path, file);
     // A Sites WordPress brought in from another server: its wp-content and a .sql dump.
     if (search.get("kind") === "wordpress") {
       if (project.source !== "site" || project.catalogApp !== "wordpress") return fail("Only a WordPress site takes a WordPress import.", 400);

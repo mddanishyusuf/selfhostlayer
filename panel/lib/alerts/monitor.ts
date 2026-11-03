@@ -13,6 +13,7 @@ import { resumeDeployments } from "../deploy";
 import { listDomains } from "../domains";
 import { backupProjects, markInterrupted, overdueSlugs, scheduledTick } from "../backup/runner";
 import { listProjects } from "../projects";
+import { listServers, recordCheck, type ServerInfo } from "../servers";
 import { checkForUpdates, updateCheckDue } from "../updates";
 import { configureAlerts, openIncident, raise, resolve } from "./engine";
 import { certVerdict, crashVerdict, cronVerdict, diskVerdict, type UnitSnapshot, type Verdict } from "./rules";
@@ -45,6 +46,45 @@ async function checkDisk(): Promise<void> {
     detail: `${info.diskGb.free} GB free of ${info.diskGb.total} GB. Package caches are emptied automatically before a build when under 25% is free, and builds stop below 15%. Old builds and app data use the rest.`,
     link: panelUrl("/"),
   }), `Disk back to ${Math.round(used * 100)}%.`);
+}
+
+/** Missed checks in a row, per server, before it counts as down (about 3 minutes). */
+const DOWN_AFTER = 3;
+const missed = new Map<number, number>();
+
+/**
+ * Every other server (Servers): asked about itself each minute. Its answer is
+ * kept for the Servers page; three misses in a row raise an alert (its apps
+ * keep running: they don't need the panel). Its disk is watched like this one's.
+ */
+async function checkServers(): Promise<void> {
+  for (const s of listServers()) {
+    if (!s.seenAt) continue; // not installed yet
+    const key = `server:${s.id}`;
+    let info: ServerInfo;
+    try {
+      info = await agent<ServerInfo>("system.info", {}, { server: s.id });
+    } catch (err) {
+      const message = (err as Error).message;
+      recordCheck(s.id, { error: message });
+      const n = (missed.get(s.id) ?? 0) + 1;
+      missed.set(s.id, n);
+      if (n >= DOWN_AFTER && !openIncident(key)) {
+        await raise(key, { title: `${s.name} doesn't answer`, detail: `The panel couldn't reach its agent for ${n} minutes: ${message}. Its apps keep running on their own; deploys to it fail until it answers.`, link: panelUrl("/servers") });
+      }
+      continue;
+    }
+    missed.set(s.id, 0);
+    recordCheck(s.id, { info });
+    if (openIncident(key)) await resolve(key, `${s.name} answers again.`);
+    const used = (info.diskGb.total - info.diskGb.free) / info.diskGb.total;
+    const disk = `disk:${s.id}`;
+    await apply(diskVerdict(used, !!openIncident(disk)), disk, () => ({
+      title: `Disk ${Math.round(used * 100)}% full on ${s.name}`,
+      detail: `${info.diskGb.free} GB free of ${info.diskGb.total} GB.`,
+      link: panelUrl("/servers"),
+    }), `Disk on ${s.name} back to ${Math.round(used * 100)}%.`);
+  }
 }
 
 async function checkApps(): Promise<void> {
@@ -123,7 +163,7 @@ export async function tick(): Promise<void> {
   if (state.running) return;
   state.running = true;
   try {
-    for (const [name, check] of [["disk", checkDisk], ["apps", checkApps], ["crons", checkCrons]] as const) {
+    for (const [name, check] of [["disk", checkDisk], ["servers", checkServers], ["apps", checkApps], ["crons", checkCrons]] as const) {
       await check().catch((err) => console.error(`monitor: ${name} check failed:`, (err as Error).message));
     }
     await checkBackups().catch((err) => console.error("monitor: backup check failed:", (err as Error).message));

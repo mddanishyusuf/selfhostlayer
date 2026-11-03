@@ -1,6 +1,7 @@
 import { CARD, Empty, PageHeader, TableHead, TableRow } from "@/components/page";
 import { StatusText, timeAgo } from "@/components/status";
 import { agent } from "@/lib/agent";
+import { listServers } from "@/lib/servers";
 import { requireUser } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
@@ -38,6 +39,8 @@ const LABELS: Record<string, string> = {
   "cron.run": "Ran a cron job",
   "backup.snapshot": "Took a backup snapshot",
   "backup.restore": "Restored a backup",
+  "backup.fetch": "Sent a backup to the panel",
+  "backup.put": "Received a file from the panel",
   "backup.discard": "Cleared a backup snapshot",
   "data.import": "Imported data",
   "service.install": "Installed a service",
@@ -71,11 +74,20 @@ function target(params: Record<string, unknown> | null): string {
 export default async function ActivityPage() {
   await requireUser();
   const result = await agent<{ entries: Entry[] }>("audit.tail", { limit: 300 }).catch(() => null);
-  const entries = result?.entries ?? [];
+  // Every other server keeps its own log: read them all, newest first.
+  const servers = listServers().filter((s) => s.seenAt);
+  const others = await Promise.all(
+    servers.map((s) =>
+      agent<{ entries: Entry[] }>("audit.tail", { limit: 300 }, { server: s.id })
+        .then((r) => r.entries.map((e) => ({ ...e, server: s.name })))
+        .catch(() => [] as (Entry & { server?: string })[]),
+    ),
+  );
+  const entries: (Entry & { server?: string })[] = [...(result?.entries ?? []), ...others.flat()].sort((x, y) => Date.parse(y.ts) - Date.parse(x.ts)).slice(0, 300);
   const columns = "minmax(220px,1.4fr) minmax(140px,1fr) 120px 70px 80px";
   return (
     <>
-      <PageHeader title="Activity" meta="Every change the agent made, from its root-only log" />
+      <PageHeader title="Activity" meta="Every change the agents made, from their root-only logs (each server keeps its own)" />
       <section className={CARD} data-testid="activity">
         <TableHead columns={columns}>
           <span>What</span>
@@ -89,7 +101,10 @@ export default async function ActivityPage() {
         {entries.map((e) => (
           <TableRow key={e.id} columns={columns} data-action={e.action}>
             <span className="font-medium">{LABELS[e.action] ?? e.action}</span>
-            <span className="truncate font-mono text-[12px] text-muted">{target(e.params)}</span>
+            <span className="truncate font-mono text-[12px] text-muted">
+              {e.server ? `${e.server} · ` : ""}
+              {target(e.params)}
+            </span>
             <span>{e.ok === null ? <StatusText status="warn" label="Running" pulse /> : e.ok ? <StatusText status="ok" label="Done" /> : <span title={e.code ?? undefined}><StatusText status="err" label="Failed" /></span>}</span>
             <span className="text-right tabular-nums text-muted">{e.ms === null ? "…" : e.ms < 1000 ? `${e.ms} ms` : `${(e.ms / 1000).toFixed(1)} s`}</span>
             <span className="text-right tabular-nums text-muted" title={e.ts}>
