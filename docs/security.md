@@ -83,3 +83,8 @@ The recovery key is shown once, when you turn backups on. The panel keeps an enc
 - **Apps can reach each other's ports on 127.0.0.1.** Databases are covered by per-app passwords, but an app's own HTTP port is reachable from the other apps on the box.
 - **The panel can decrypt your secrets.** It needs to, to write them for your apps. Someone who takes over the panel gets your env vars too, which is why it runs unprivileged, needs 2FA, and can be locked to your addresses.
 - **The agent is root.** It's kept small and only takes listed actions, but a bug in it would matter. It's sandboxed by systemd as far as its work allows.
+
+## Other servers
+
+A panel that deploys to other servers reaches each one's agent over SSH as `layer-link`, with a key locked to one command: a pipe to that agent's socket. There's no shell, no other command and no forwarding. So a compromised panel can do on another server only what it can do on its own: the agent's allowlisted actions. Each server's host key is pinned at the first connection. See [Servers](servers.md).
+

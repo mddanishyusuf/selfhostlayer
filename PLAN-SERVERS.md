@@ -66,3 +66,22 @@
 - **SSH from the panel's sandbox:** the panel's unit must be able to run `ssh` to port 22 of the servers. Its own folder holds the key (`/var/lib/layer/ssh`, `0700`).
 - **A server's sslip.io addresses need its own IP.** Its Caddy gets certificates as the panel's does.
 - **Latency:** a deploy makes many agent calls, which `ControlMaster` keeps cheap.
+
+## Result (2026-11-03)
+
+Built as planned, Days 1 to 5, tested between two VMs (layer-dev and layer-dev2):
+
+- **`installer/test/servers-e2e.sh`:** a call over the link works; a command, a terminal and forwarding over that key are all refused; a 1.2 MB file round-trips both ways (`backup.put` in pieces, `backup.fetch` in chunks).
+- **The browser tour's TOUR_SERVERS:**
+  - adds the second VM on Servers and checks it;
+  - installs a WordPress site there through New site and finds it there, not here, then deletes it;
+  - deploys express here with a file in its `data/` and moves it there: it answers there, its data came along, and the old copy still runs here until **Remove the old copy**.
+- **Found on the way:**
+  - A fresh agent-only server has no `/var/lib/layer-agent`, so the agent now makes it at start.
+  - `grep -w layer` matched `layer-link`'s own group, so the user wasn't added to the agent's socket group.
+- **Not in v1:**
+  - moving Sites and integrations;
+  - integrations on another server;
+  - the Databases page's engines card per server (each app's databases already route to their server);
+  - a panel moved to another server.
+
