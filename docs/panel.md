@@ -242,7 +242,7 @@ Tools every product needs, built for Self Host Layer and installed in one click.
 - **[Analytics](analytics.md):** cookie-free web analytics for your sites, on the sidebar's Analytics page.
 - **[Email](email.md):** newsletters, transactional email and automations, on the sidebar's Email page.
 - **[Forms](forms.md):** forms and surveys, on the sidebar's Forms page.
-- **Coming soon:** a post scheduler, a blog, a status page, a waitlist and a feedback board.
+- **Coming soon:** a feedback board.
 
 ### Databases
 - **Engines:** SQLite, PostgreSQL, Redis, MongoDB and MySQL (MariaDB), each with its version, whether it runs (PostgreSQL, MySQL and MongoDB as systemd sees their server) and how much the apps use. MongoDB has its Install button here, and Start when it's stopped, which tells you why if it can't start.

@@ -1,4 +1,4 @@
-import { ActivityIcon, ArrowUpRightIcon, CalendarIcon, ChartColumnIcon, ClipboardListIcon, ClockIcon, HandIcon, LinkIcon, MailIcon, MessageSquareIcon, PencilIcon, PuzzleIcon } from "lucide-react";
+import { ArrowUpRightIcon, ChartColumnIcon, ClipboardListIcon, HandIcon, LinkIcon, MailIcon, MessageSquareIcon, PuzzleIcon } from "lucide-react";
 import Link from "next/link";
 import { Icon, type IconSvgElement } from "@/components/icon";
 import { CheckCatalogButton, InstallButton, UpdateButton } from "@/components/integrations";
@@ -21,10 +21,6 @@ const LOOKS: Record<string, { icon: IconSvgElement; tone: TileTone }> = {
   analytics: { icon: ChartColumnIcon, tone: "blue" },
   email: { icon: MailIcon, tone: "coral" },
   forms: { icon: ClipboardListIcon, tone: "rose" },
-  scheduler: { icon: CalendarIcon, tone: "blue" },
-  blog: { icon: PencilIcon, tone: "teal" },
-  status: { icon: ActivityIcon, tone: "teal" },
-  waitlist: { icon: ClockIcon, tone: "gold" },
   feedback: { icon: MessageSquareIcon, tone: "coral" },
 };
 
@@ -34,9 +30,6 @@ const PLANNED = [
   { id: "analytics", name: "Analytics", what: "Cookie-free web analytics for every project you deploy." },
   { id: "email", name: "Email marketing", what: "Newsletters and campaigns through your own SMTP or SES." },
   { id: "forms", name: "Forms", what: "Forms and surveys, one page or one question at a time, on your own address." },
-  { id: "scheduler", name: "Post scheduler", what: "Schedule posts to X, LinkedIn and Threads." },
-  { id: "status", name: "Status page", what: "A public uptime page fed by your apps' health checks." },
-  { id: "waitlist", name: "Waitlist", what: "Collect sign-ups before launch and export them any time." },
   { id: "feedback", name: "Feedback board", what: "Let users suggest and vote on features." },
 ];
 
