@@ -188,6 +188,73 @@ function startScan(ctx: AdminContext, brandId: number): Scan {
 
 const scanView = (s: Scan | undefined) => (s ? { state: s.state, checked: s.checked, total: s.total, startedAt: s.startedAt, finishedAt: s.finishedAt, error: s.error, byCheck: s.byCheck, examples: s.examples } : null);
 
+/** The hour (0-23) a moment falls on in a time zone; the server's (UTC) when there's none. */
+function hourIn(at: number, tz: string | null): number {
+  if (!tz) return new Date(at).getUTCHours();
+  try {
+    return Number(new Intl.DateTimeFormat("en-US", { timeZone: tz, hour: "numeric", hourCycle: "h23" }).format(at)) % 24;
+  } catch {
+    return new Date(at).getUTCHours();
+  }
+}
+
+const sourceKind = (s: string) => (s.startsWith("sync:") ? "sync" : ["form", "api", "import", "panel", "event"].includes(s) ? s : "other");
+
+/**
+ * A brand's Insights: where its contacts are, on what, how engaged, where they
+ * came from week by week, when they click (in their own time zones), and the
+ * list's health.
+ */
+function insights(ctx: AdminContext, brandId: number, now = Date.now()) {
+  const DAY = 86_400_000;
+  const db = ctx.db;
+  const live = "brand_id = ? AND status IN ('subscribed', 'unconfirmed')";
+  const group = (column: string, limit: number) => db.prepare(`SELECT ${column} k, count(*) n FROM contacts WHERE ${live} GROUP BY k ORDER BY n DESC LIMIT ${limit}`).all(brandId) as { k: string | null; n: number }[];
+  const e = db
+    .prepare(
+      `SELECT count(*) total,
+         sum(CASE WHEN max(coalesce(last_open_at, 0), coalesce(last_click_at, 0)) >= ? THEN 1 ELSE 0 END) active,
+         sum(CASE WHEN max(coalesce(last_open_at, 0), coalesce(last_click_at, 0)) BETWEEN ? AND ? THEN 1 ELSE 0 END) cooling,
+         sum(CASE WHEN max(coalesce(last_open_at, 0), coalesce(last_click_at, 0)) BETWEEN 1 AND ? THEN 1 ELSE 0 END) inactive
+       FROM contacts WHERE brand_id = ? AND status = 'subscribed'`,
+    )
+    .get(now - 30 * DAY, now - 90 * DAY, now - 30 * DAY - 1, now - 90 * DAY - 1, brandId) as { total: number; active: number | null; cooling: number | null; inactive: number | null };
+  const engagement = { active: e.active ?? 0, cooling: e.cooling ?? 0, inactive: e.inactive ?? 0, none: e.total - (e.active ?? 0) - (e.cooling ?? 0) - (e.inactive ?? 0) };
+
+  // New contacts by week and source, over 12 weeks.
+  const WEEK = 7 * DAY;
+  const from = Math.floor(now / WEEK) * WEEK - 11 * WEEK;
+  const weeks = Array.from({ length: 12 }, (_, i) => ({ at: from + i * WEEK, form: 0, sync: 0, api: 0, import: 0, panel: 0, event: 0, other: 0 }));
+  for (const r of db.prepare(`SELECT created_at at, source FROM contacts WHERE brand_id = ? AND created_at >= ?`).all(brandId, from) as { at: number; source: string }[]) {
+    const w = weeks[Math.floor((r.at - from) / WEEK)];
+    if (w) w[sourceKind(r.source) as "form"]++;
+  }
+
+  // Clicks by hour in each contact's own time zone, over 90 days.
+  const hours = Array.from({ length: 24 }, () => 0);
+  const clicks = db
+    .prepare(`SELECT e.at, c.timezone FROM events e JOIN messages m ON m.id = e.message_id JOIN contacts c ON c.id = m.contact_id WHERE m.brand_id = ? AND e.kind = 'click' AND e.at >= ? LIMIT 200000`)
+    .all(brandId, now - 90 * DAY) as { at: number; timezone: string | null }[];
+  for (const c of clicks) hours[hourIn(c.at, c.timezone)]!++;
+  const withZone = clicks.filter((c) => c.timezone).length;
+
+  const m = db
+    .prepare(`SELECT count(*) sent, sum(status = 'bounced') bounced, sum(status = 'complained') complained FROM messages WHERE brand_id = ? AND sent_at >= ? AND kind IN ('campaign', 'automation', 'transactional')`)
+    .get(brandId, now - 30 * DAY) as { sent: number; bounced: number | null; complained: number | null };
+  const counts = ctx.contacts.counts(brandId);
+  return {
+    contacts: counts.subscribed + counts.unconfirmed,
+    countries: group("country", 30),
+    devices: group("device", 10),
+    clients: group("client", 10),
+    engagement,
+    growth: weeks,
+    hours,
+    clicks: { total: clicks.length, withZone },
+    health: { flagged: counts.flagged, sent30d: m.sent, bounced30d: m.bounced ?? 0, complained30d: m.complained ?? 0, shield: ctx.shield.stats(brandId, 30) },
+  };
+}
+
 const ROUTES: [string, string, Handler][] = [
   ["GET", "info", ({ ctx }) => ({ version: ctx.version, publicUrl: ctx.publicUrl(), brands: ctx.brands.list().length, queue: ctx.db.prepare("SELECT count(*) queued FROM messages WHERE status IN ('queued', 'sending')").get() })],
   ["GET", "settings", ({ ctx }) => readSettings(ctx.db)],
@@ -278,6 +345,7 @@ const ROUTES: [string, string, Handler][] = [
       return ctx.brands.get(b.id);
     },
   ],
+  ["GET", "brands/:b/insights", ({ ctx, p }) => insights(ctx, ctx.brands.must(num(p.b, "brand")).id)],
   ["GET", "brands/:b/stats", ({ ctx, p, q }) => brandStats(ctx.db, ctx.brands.must(num(p.b, "brand")).id, Math.min(90, Math.max(1, Number(q.get("days")) || 30)))],
 
   // Domains

@@ -318,4 +318,35 @@ describe("Shield in Email", () => {
     expect(readerApp("Mozilla/5.0 (Macintosh; Intel Mac OS X 14_5) AppleWebKit/605.1.15 (KHTML, like Gecko)")).toEqual({ device: "desktop", client: "Apple Mail on macOS" });
     expect(readerApp("curl/8.0")).toBeNull();
   });
+
+  it("Insights: countries, engagement, growth by source, and click hours in each contact's own time zone", async () => {
+    await start();
+    const b = await brand();
+    const now = Date.now();
+    const DAY = 86_400_000;
+    const add = (email: string, o: { country?: string; timezone?: string; source?: string; open?: number }) => {
+      const { contact } = app.contacts.upsert(b, { email }, { source: o.source ?? "form", profile: { country: o.country, timezone: o.timezone } });
+      if (o.open) app.db.prepare("UPDATE contacts SET last_open_at = ? WHERE id = ?").run(now - o.open * DAY, contact.id);
+      return contact.id;
+    };
+    const berlin = add("a@piqo.test", { country: "DE", timezone: "Europe/Berlin", open: 2 });
+    add("b@piqo.test", { country: "DE", open: 45 });
+    add("c@piqo.test", { country: "IN", source: "sync:kagaz-api", open: 200 });
+    add("d@piqo.test", { source: "import" });
+    // A click at 12:00 UTC: 13:00 or 14:00 in Berlin, 12:00 for a contact without a time zone.
+    const noon = Math.floor(now / DAY) * DAY - DAY + 12 * 3_600_000;
+    app.db.prepare("INSERT INTO messages (id, brand_id, kind, contact_id, to_email, from_email, status, send_at, created_at, sent_at) VALUES (?, ?, 'campaign', ?, 'a@piqo.test', 'x@piqo.app', 'sent', ?, ?, ?)").run("b".repeat(24), b, berlin, noon, noon, noon);
+    app.db.prepare("INSERT INTO events (message_id, at, kind, detail) VALUES (?, ?, 'click', 'https://piqo.app')").run("b".repeat(24), noon);
+    const i = (await admin(`brands/${b}/insights`)).body;
+    expect(i.contacts).toBe(4);
+    // Most first; contacts with no known country count as null.
+    expect(i.countries[0]).toEqual({ k: "DE", n: 2 });
+    expect(i.countries.slice(1)).toEqual(expect.arrayContaining([{ k: "IN", n: 1 }, { k: null, n: 1 }]));
+    expect(i.engagement).toEqual({ active: 1, cooling: 1, inactive: 1, none: 1 });
+    expect(i.growth.at(-1)).toMatchObject({ form: 2, sync: 1, import: 1 });
+    const berlinHour = Number(new Intl.DateTimeFormat("en-US", { timeZone: "Europe/Berlin", hour: "numeric", hourCycle: "h23" }).format(noon));
+    expect(i.hours[berlinHour]).toBe(1);
+    expect(i.clicks).toEqual({ total: 1, withZone: 1 });
+    expect(i.health).toMatchObject({ flagged: 0, sent30d: 1, bounced30d: 0 });
+  });
 });

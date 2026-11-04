@@ -351,6 +351,20 @@ export const countryName = (code: string | null) => {
   }
 };
 
+export interface Insights {
+  contacts: number;
+  countries: { k: string | null; n: number }[];
+  devices: { k: string | null; n: number }[];
+  clients: { k: string | null; n: number }[];
+  engagement: { active: number; cooling: number; inactive: number; none: number };
+  growth: { at: number; form: number; sync: number; api: number; import: number; panel: number; event: number; other: number }[];
+  /** Clicks by hour of day, in each contact's own time zone (UTC without one), over 90 days. */
+  hours: number[];
+  clicks: { total: number; withZone: number };
+  health: { flagged: number; sent30d: number; bounced30d: number; complained30d: number; shield: ShieldInfo["stats"] };
+}
+
+export const insightsOf = (p: Project, brand: number) => emailApi<Insights>(p, `brands/${brand}/insights`);
 export const shieldOf = (p: Project, brand: number) => emailApi<ShieldInfo>(p, `brands/${brand}/shield`);
 export const suppressionsOf = (p: Project, brand: number, page = 1) => emailApi<{ items: { email: string; reason: string; detail: string; createdAt: number }[]; total: number }>(p, `brands/${brand}/suppressions${qs({ page: page > 1 ? page : undefined })}`);
 export const campaignsOf = async (p: Project, brand: number) => (await emailApi<{ campaigns: Campaign[] }>(p, `brands/${brand}/campaigns`)).campaigns;
