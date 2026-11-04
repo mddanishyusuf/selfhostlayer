@@ -26,7 +26,7 @@ export default async function BrandLayout({ children, params }: { children: Reac
   }
   const brand = brands.find((b) => String(b.id) === id);
   if (!brand) redirect("/email");
-  const nav = brands.map((b) => ({ id: b.id, name: b.name, contacts: b.contacts ?? 0 }));
+  const nav = brands.map((b) => ({ id: b.id, name: b.name, contacts: b.contacts ?? 0, domain: b.domain ?? null }));
   const current = nav.find((b) => b.id === brand.id)!;
   return (
     // Out to the main area's edges (its padding in app/(app)/layout.tsx), then the same padding inside.

@@ -13,7 +13,7 @@ if (token.length < 32 || secret.length < 32) {
 }
 const port = Number(process.env.PORT ?? 3000);
 const host = process.env.HOST ?? "127.0.0.1";
-const app = createApp({ dataDir: process.env.DATA_DIR ?? "data", token, secret, version });
+const app = createApp({ dataDir: process.env.DATA_DIR ?? "data", releaseDir: import.meta.dirname, token, secret, version });
 app.server.listen(port, host, () => console.log(`Email ${version} on ${host}:${port}: ${app.brands.list().length} brands, links on ${app.publicUrl()}`));
 
 let stopping = false;

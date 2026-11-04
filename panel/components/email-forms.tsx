@@ -96,6 +96,19 @@ export function AddBrandDialog({ onClose }: { onClose: () => void }) {
   );
 }
 
+/** New brand, for the brands list's header. */
+export function NewBrandButton() {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <Button onClick={() => setOpen(true)} data-testid="new-brand-button">
+        New brand
+      </Button>
+      {open && <AddBrandDialog onClose={() => setOpen(false)} />}
+    </>
+  );
+}
+
 export function FirstBrand() {
   const [state, run] = useActionState(A.addBrand, initial);
   return (

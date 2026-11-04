@@ -3,11 +3,12 @@
 // Email's own sidebar, beside the panel's (shrunk to its icons): the brand
 // picker at the top, then the brand's pages. On phones it's a picker and a row
 // of tabs above the page.
-import { BookTextIcon, CheckIcon, ChevronsUpDownIcon, FileCode2Icon, GlobeIcon, KeyRoundIcon, LayoutDashboardIcon, ListIcon, PlusIcon, PuzzleIcon, ScrollTextIcon, SendIcon, SettingsIcon, UsersIcon, WorkflowIcon } from "lucide-react";
+import { BookTextIcon, CheckIcon, ChevronsUpDownIcon, FileCode2Icon, GlobeIcon, KeyRoundIcon, LayoutDashboardIcon, LayoutGridIcon, ListIcon, PlusIcon, PuzzleIcon, ScrollTextIcon, SendIcon, SettingsIcon, UsersIcon, WorkflowIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import { AddBrandDialog } from "./email-forms";
+import { BrandLogo } from "./email-logo";
 import { Icon, type IconSvgElement } from "./icon";
 import { Dropdown, MENU_ITEM } from "./menu";
 import { cx } from "./ui";
@@ -16,6 +17,7 @@ export interface NavBrand {
   id: number;
   name: string;
   contacts: number;
+  domain: string | null;
 }
 
 const SECTIONS: { path: string; label: string; icon: IconSvgElement }[] = [
@@ -55,7 +57,7 @@ function BrandPicker({ brands, current, wide }: { brands: NavBrand[]; current: N
         buttonClassName="flex w-full items-center gap-2 p-2 text-left transition-colors duration-150 hover:bg-card"
         trigger={
           <>
-            <span className="grid size-7 shrink-0 place-items-center bg-icon-tile text-[13px] font-black uppercase text-icon-tile-fg">{current.name.slice(0, 1)}</span>
+            <BrandLogo name={current.name} domain={current.domain} size={28} />
             <span className="grid min-w-0 flex-1 leading-tight">
               <b className="truncate font-bold" data-testid="brand-picker">
                 {current.name}
@@ -81,14 +83,21 @@ function BrandPicker({ brands, current, wide }: { brands: NavBrand[]; current: N
                   router.push(`/email/${b.id}${section}`);
                 }}
               >
-                <span className="grid w-4 shrink-0 place-items-center">{b.id === current.id && <Icon icon={CheckIcon} size={14} />}</span>
+                <BrandLogo name={b.name} domain={b.domain} size={18} />
                 <span className="min-w-0 flex-1 truncate">{b.name}</span>
+                {b.id === current.id && <Icon icon={CheckIcon} size={14} />}
                 <span className="text-[12px] tabular-nums text-dim" title="Subscribed contacts">
                   {b.contacts.toLocaleString("en")}
                 </span>
               </button>
             ))}
             <div className="my-1 h-px bg-border" />
+            <Link role="menuitem" href="/email" className={MENU_ITEM} onClick={close} data-testid="all-brands">
+              <span className="grid w-4 shrink-0 place-items-center">
+                <Icon icon={LayoutGridIcon} size={14} />
+              </span>
+              All brands
+            </Link>
             <button
               type="button"
               role="menuitem"

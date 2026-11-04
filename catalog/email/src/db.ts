@@ -202,6 +202,31 @@ export const MIGRATIONS = [
      key TEXT PRIMARY KEY,
      value TEXT NOT NULL
    );`,
+  // 2 (PLAN-EMAIL-2.md): Shield's settings per brand, flags on contacts (kept
+  // but skipped by sends until approved) and its log of refusals and flags,
+  // never with the address; what a contact's sign-up, opens and clicks told us.
+  `ALTER TABLE brands ADD COLUMN shield TEXT NOT NULL DEFAULT '{}';
+   ALTER TABLE contacts ADD COLUMN flags TEXT;
+   ALTER TABLE contacts ADD COLUMN approved INTEGER NOT NULL DEFAULT 0;
+   ALTER TABLE contacts ADD COLUMN country TEXT;
+   ALTER TABLE contacts ADD COLUMN timezone TEXT;
+   ALTER TABLE contacts ADD COLUMN device TEXT;
+   ALTER TABLE contacts ADD COLUMN client TEXT;
+   ALTER TABLE contacts ADD COLUMN opens INTEGER NOT NULL DEFAULT 0;
+   ALTER TABLE contacts ADD COLUMN clicks INTEGER NOT NULL DEFAULT 0;
+   ALTER TABLE contacts ADD COLUMN last_open_at INTEGER;
+   ALTER TABLE contacts ADD COLUMN last_click_at INTEGER;
+   CREATE INDEX contacts_flagged ON contacts (brand_id) WHERE flags IS NOT NULL;
+   CREATE TABLE shield_log (
+     id INTEGER PRIMARY KEY,
+     brand_id INTEGER NOT NULL,
+     at INTEGER NOT NULL,
+     outcome TEXT NOT NULL CHECK (outcome IN ('refused', 'flagged')),
+     checks TEXT NOT NULL,
+     source TEXT NOT NULL,
+     country TEXT
+   );
+   CREATE INDEX shield_log_brand ON shield_log (brand_id, at);`,
 ];
 
 /** email.db, migrated. */

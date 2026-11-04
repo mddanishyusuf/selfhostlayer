@@ -33,6 +33,9 @@ export interface Brand {
   /** In the brand list: subscribed contacts, and emails sent in 30 days. */
   contacts?: number;
   sent30d?: number;
+  /** The domain its logo comes from (its website's, else a sending domain), and whether it has a verified sending domain. */
+  domain?: string | null;
+  verified?: boolean;
 }
 
 export interface DnsRecord {

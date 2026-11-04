@@ -206,7 +206,7 @@ export class Automations {
     if (input.data !== undefined && (typeof input.data !== "object" || input.data === null || Array.isArray(input.data))) throw new InputError("data", "must be an object");
     if (JSON.stringify(input.data ?? {}).length > 10_000) throw new InputError("data", "must be under 10 KB");
     const { contact } = this.#contacts.upsert(brandId, { email: input.email }, { source: "event" });
-    if (contact.status !== "subscribed") return { started: 0, contactId: contact.id };
+    if (contact.status !== "subscribed" || contact.flags) return { started: 0, contactId: contact.id };
     const now = Date.now();
     let started = 0;
     for (const a of this.#db.prepare("SELECT id FROM automations WHERE brand_id = ? AND status = 'active' AND trigger = 'event' AND trigger_value = ?").all(brandId, name) as { id: number }[]) {
@@ -238,8 +238,8 @@ export class Automations {
     const a = this.#db.prepare("SELECT * FROM automations WHERE id = ?").get(run.automation_id) as unknown as Row;
     const steps = JSON.parse(a.steps) as Step[];
     for (let i = run.step; i < steps.length; i++) {
-      const contact = this.#db.prepare("SELECT id, email, name, fields, status FROM contacts WHERE id = ?").get(run.contact_id) as { id: number; email: string; name: string; fields: string; status: string } | undefined;
-      if (!contact || contact.status !== "subscribed") return this.#finish(run.id, "exited", now);
+      const contact = this.#db.prepare("SELECT id, email, name, fields, status, flags FROM contacts WHERE id = ?").get(run.contact_id) as { id: number; email: string; name: string; fields: string; status: string; flags: string | null } | undefined;
+      if (!contact || contact.status !== "subscribed" || contact.flags) return this.#finish(run.id, "exited", now);
       const s = steps[i]!;
       try {
         if (s.type === "wait") {

@@ -216,7 +216,8 @@ export class Campaigns {
 
   #audienceSql(brandId: number, lists: number[], exclude: number[]): { sql: string; args: SQLInputValue[] } {
     const marks = (n: number) => Array(n).fill("?").join(", ");
-    const parts = ["c.brand_id = ?", "c.status = 'subscribed'", `EXISTS (SELECT 1 FROM list_members m WHERE m.contact_id = c.id AND m.list_id IN (${marks(lists.length)}))`, "NOT EXISTS (SELECT 1 FROM suppressions s WHERE s.brand_id = c.brand_id AND s.email = c.email)"];
+    // Flagged by Shield: kept, but not sent to until approved.
+    const parts = ["c.brand_id = ?", "c.status = 'subscribed'", "c.flags IS NULL", `EXISTS (SELECT 1 FROM list_members m WHERE m.contact_id = c.id AND m.list_id IN (${marks(lists.length)}))`, "NOT EXISTS (SELECT 1 FROM suppressions s WHERE s.brand_id = c.brand_id AND s.email = c.email)"];
     if (exclude.length) parts.push(`NOT EXISTS (SELECT 1 FROM list_members m WHERE m.contact_id = c.id AND m.list_id IN (${marks(exclude.length)}))`);
     return { sql: parts.join(" AND "), args: [brandId, ...lists, ...exclude] };
   }

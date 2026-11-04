@@ -4,6 +4,7 @@
 //   GET  /u/<id>.<sig>          unsubscribe: asks first
 //   POST /u/<id>.<sig>          unsubscribes (the button, or RFC 8058's one-click from the inbox)
 //   POST /subscribe/<list key>  a site's signup form (form or JSON), with double opt-in when the list has it
+//   GET  /subscribe.js          the optional form snippet: Shield's honeypot, timing and time zone
 //   GET  /confirm/<token>       the double opt-in link: asks first (mail scanners open every link)
 //   POST /confirm/<token>       confirms, or brings back someone who unsubscribed and asked to rejoin
 //   POST /webhooks/ses          SNS: SES's bounces, complaints and deliveries, signature checked
@@ -17,6 +18,8 @@ import { checkEmail, type Contacts } from "./contacts.ts";
 import type { Domains } from "./domains.ts";
 import type { Mailer } from "./mailer.ts";
 import { escapeHtml } from "./render.ts";
+import { decide, type Shield } from "./shield.ts";
+import { readAgent } from "../../lib/ua.ts";
 import type { Secrets } from "../../lib/secrets.ts";
 import { verifySns, type SnsMessage } from "./ses.ts";
 
@@ -27,6 +30,9 @@ export interface PublicContext {
   contacts: Contacts;
   mailer: Mailer;
   secrets: Secrets;
+  shield: Shield;
+  /** A visitor's country from their IP, in memory (DB-IP's list). */
+  country: (ip: string | null) => string | null;
   publicUrl: () => string;
   fetch?: typeof fetch;
   /** SNS's signing certificate in tests, instead of fetching it. */
@@ -68,6 +74,48 @@ function redirectTo(value: unknown, req: IncomingMessage, brand: { website: stri
   return sites.some((s) => host === s || host.endsWith(`.${s}`)) ? value : undefined;
 }
 
+/**
+ * The form snippet (<script src=".../subscribe.js" defer>): every form posting to
+ * /subscribe/ gets a hidden honeypot field, and on submit how long the page was
+ * open, whether a script drives the browser, and the visitor's time zone.
+ */
+const SNIPPET = `(function () {
+  var t0 = Date.now();
+  function field(f, name, value) {
+    var i = f.querySelector('input[name="' + name + '"]');
+    if (!i) { i = document.createElement("input"); i.type = "hidden"; i.name = name; f.appendChild(i); }
+    i.value = value;
+  }
+  function setup() {
+    document.querySelectorAll('form[action*="/subscribe/"]').forEach(function (f) {
+      if (!f.querySelector('input[name="_hp"]')) {
+        var hp = document.createElement("input");
+        hp.name = "_hp"; hp.tabIndex = -1; hp.autocomplete = "off"; hp.setAttribute("aria-hidden", "true");
+        hp.style.cssText = "position:absolute;left:-9999px;width:1px;height:1px;opacity:0";
+        f.appendChild(hp);
+      }
+      f.addEventListener("submit", function () {
+        field(f, "_el", String(Date.now() - t0));
+        field(f, "_wd", String(!!navigator.webdriver));
+        try { field(f, "_tz", Intl.DateTimeFormat().resolvedOptions().timeZone); } catch (e) {}
+      });
+    });
+  }
+  if (document.readyState !== "loading") setup(); else document.addEventListener("DOMContentLoaded", setup);
+})();
+`;
+
+/** An IANA time zone this Node knows (Europe/Berlin), from the form snippet. */
+function validTimeZone(tz: string): boolean {
+  if (tz.length > 64 || !/^[A-Za-z_]+(\/[A-Za-z0-9_+-]+){0,2}$/.test(tz)) return false;
+  try {
+    new Intl.DateTimeFormat("en", { timeZone: tz });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 async function form(req: IncomingMessage): Promise<Record<string, unknown>> {
   const raw = (await readBody(req, 64 * 1024)).toString("utf8");
   if (String(req.headers["content-type"] ?? "").includes("application/json")) {
@@ -92,6 +140,11 @@ function recordOpen(ctx: PublicContext, id: string, now: number): boolean {
 export async function handlePublic(req: IncomingMessage, res: ServerResponse, ctx: PublicContext, url: URL): Promise<boolean> {
   const p = url.pathname;
   const now = Date.now();
+
+  if (p === "/subscribe.js" && (req.method === "GET" || req.method === "HEAD")) {
+    send(res, 200, SNIPPET, { "Content-Type": "text/javascript; charset=utf-8", "Cache-Control": "public, max-age=3600", "Access-Control-Allow-Origin": "*" });
+    return true;
+  }
 
   let m = /^\/t\/o\/([0-9a-f]{24})\.gif$/.exec(p);
   if (m) {
@@ -169,14 +222,31 @@ export async function handlePublic(req: IncomingMessage, res: ServerResponse, ct
     const body = await form(req);
     const brand = ctx.brands.must(list.brandId);
     const redirect = redirectTo(body.redirect, req, brand);
-    // A filled-in honeypot is a bot: it's told all went well.
-    if (body._hp) {
-      answer(200, "subscribed", "Thanks!", redirect);
-      return true;
-    }
+    const ip = clientIp(req);
+    const ua = req.headers["user-agent"];
     let contact;
     try {
-      const was = ctx.contacts.byEmail(list.brandId, checkEmail(body.email));
+      const email = checkEmail(body.email);
+      const was = ctx.contacts.byEmail(list.brandId, email);
+      // Shield, for a new address: a refused sign-up is told all went well, so a bot learns nothing.
+      let flags: string[] | null = null;
+      if (!was) {
+        const elapsed = Number(body._el);
+        const d = decide(
+          await ctx.shield.checkSignup(list.brandId, { email, ip, userAgent: ua, honeypot: Boolean(body._hp), webdriver: body._wd === "true" || body._wd === true, elapsedMs: body._el !== undefined && Number.isFinite(elapsed) ? elapsed : undefined }),
+          ctx.shield.settings(list.brandId),
+        );
+        ctx.shield.log(list.brandId, d.outcome, d.verdicts.map((v) => v.check), "form", ctx.country(ip));
+        if (d.outcome === "refuse") {
+          answer(200, list.doubleOptIn ? "confirm" : "subscribed", list.doubleOptIn ? "Check your inbox: we sent a link to confirm." : "You're subscribed. Thanks!", redirect);
+          return true;
+        }
+        if (d.outcome === "flag") flags = d.verdicts.map((v) => v.check);
+      } else if (body._hp) {
+        // A filled-in honeypot on a known address: still a bot, still told all went well.
+        answer(200, "subscribed", "Thanks!", redirect);
+        return true;
+      }
       if (was) {
         // Someone already here only joins the list. A form anyone can send never
         // changes their name, fields or status: an unsubscribe stands, and a
@@ -185,7 +255,14 @@ export async function handlePublic(req: IncomingMessage, res: ServerResponse, ct
         contact = ctx.contacts.get(list.brandId, was.id);
       } else {
         const fields = Object.fromEntries(Object.entries(body).filter(([k, v]) => /^[a-z][a-z0-9_]{0,39}$/.test(k) && !["email", "name", "redirect"].includes(k) && typeof v === "string"));
-        contact = ctx.contacts.upsert(list.brandId, { email: body.email, name: body.name, fields, lists: [list.id], status: list.doubleOptIn ? "unconfirmed" : "subscribed" }, { source: "form" }).contact;
+        // What the sign-up says about them (PLAN-EMAIL-2.md): the country of the IP, never the IP.
+        const agent = readAgent(ua);
+        const timezone = typeof body._tz === "string" && validTimeZone(body._tz) ? body._tz : null;
+        contact = ctx.contacts.upsert(
+          list.brandId,
+          { email, name: body.name, fields, lists: [list.id], status: list.doubleOptIn ? "unconfirmed" : "subscribed" },
+          { source: "form", flags, profile: { country: ctx.country(ip), timezone, device: agent.bot ? null : agent.device, client: agent.bot ? null : `${agent.browser} on ${agent.os}` } },
+        ).contact;
       }
     } catch (err) {
       if (err instanceof InputError) {
@@ -198,7 +275,8 @@ export async function handlePublic(req: IncomingMessage, res: ServerResponse, ct
     // with double opt-in, one that was never confirmed, or one that unsubscribed
     // and asks to come back (only the link brings them back).
     const rejoin = contact.status === "unsubscribed";
-    if (contact.status === "unconfirmed" || rejoin) {
+    // A flagged address gets nothing from us, a confirmation included, until it's approved.
+    if ((contact.status === "unconfirmed" || rejoin) && !contact.flags) {
       const parts = rejoin ? [String(list.brandId), String(contact.id), String(now)] : [String(list.brandId), String(contact.id)];
       const link = `${ctx.publicUrl()}/confirm/${parts.join(".")}.${ctx.secrets.sign(rejoin ? "rejoin" : "confirm", ...parts)}`;
       // Nothing goes to a suppressed address, or twice a day to one, but the form says the same either way.

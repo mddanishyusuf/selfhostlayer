@@ -94,7 +94,7 @@ const TOPICS: [icons: IconName[], words: string][] = [
 /** For names that say nothing: icons that fit anything. */
 const ANYTHING: IconName[] = ["star", "gem", "lightbulb", "compass", "flag", "sun", "moonStars", "flower1", "heart", "key", "gift", "award", "magic", "trophy", "lightning", "puzzle"];
 /** Tiles bright enough to read as colors in both themes, each dark enough for a white icon (3:1 or more). */
-const COLORS = ["#3b82f6", "#6366f1", "#8b5cf6", "#a855f7", "#d946ef", "#ec4899", "#f43f5e", "#ea580c", "#d97706", "#65a30d", "#059669", "#0d9488", "#0891b2", "#0284c7"];
+export const COLORS = ["#3b82f6", "#6366f1", "#8b5cf6", "#a855f7", "#d946ef", "#ec4899", "#f43f5e", "#ea580c", "#d97706", "#65a30d", "#059669", "#0d9488", "#0891b2", "#0284c7"];
 
 const TABLE = TOPICS.map(([icons, words]) => [icons, words.split(" ")] as const);
 const fits = (part: string, word: string) =>

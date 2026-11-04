@@ -17,11 +17,15 @@ import { getSetting, openDb, setSetting } from "./db.ts";
 import { Domains, type Dns } from "./domains.ts";
 import { Mailer } from "./mailer.ts";
 import { handlePublic, publicLimits, type PublicContext } from "./public.ts";
+import { loadGeo } from "../../lib/geo.ts";
 import { Secrets } from "../../lib/secrets.ts";
+import { Shield, type ShieldOptions } from "./shield.ts";
 import { Templates } from "./templates.ts";
 
 export interface AppOptions {
   dataDir: string;
+  /** The release folder: its geo.bin, for contacts' countries (data/geo.bin, from the monthly job, when fresher). */
+  releaseDir?: string;
   /** The admin API's token (EMAIL_ADMIN_TOKEN); secrets at rest are encrypted under a key made from it. */
   token: string;
   /** Signs links in emails (EMAIL_SECRET). */
@@ -35,6 +39,7 @@ export interface AppOptions {
   smtpCa?: string;
   dns?: Dns;
   snsCertificate?: string;
+  shieldDns?: ShieldOptions["dns"];
 }
 
 export interface App {
@@ -48,6 +53,7 @@ export interface App {
   automations: Automations;
   mailer: Mailer;
   keys: ApiKeys;
+  shield: Shield;
   publicUrl: () => string;
   close: () => Promise<void>;
 }
@@ -72,10 +78,14 @@ export function createApp(o: AppOptions): App {
   const automations = new Automations({ db, brands, domains, contacts, mailer });
   contacts.hooks.joined = (brandId, listId, contactId) => automations.onListJoin(brandId, listId, contactId);
   const keys = new ApiKeys(db);
+  const geoPaths = [join(o.dataDir, "geo.bin"), ...(o.releaseDir ? [join(o.releaseDir, "geo.bin")] : [])];
+  let geo = loadGeo(geoPaths);
+  const country = (ip: string | null) => (ip && geo ? geo.geo.country(ip) : null);
+  const shield = new Shield({ db, secrets, dir: join(o.dataDir, "shield"), fetch: o.fetch, dns: o.shieldDns });
 
-  const admin: AdminContext = { db, brands, domains, contacts, campaigns, templates, automations, mailer, keys, token: o.token, version: o.version, publicUrl: () => publicUrl, setPublicUrl, smtpCa: o.smtpCa };
-  const api: ApiContext = { db, brands, domains, contacts, templates, automations, mailer, keys };
-  const pub: PublicContext = { db, brands, domains, contacts, mailer, secrets, publicUrl: () => publicUrl, fetch: o.fetch, snsCertificate: o.snsCertificate, limits: publicLimits() };
+  const admin: AdminContext = { db, brands, domains, contacts, campaigns, templates, automations, mailer, keys, shield, token: o.token, version: o.version, publicUrl: () => publicUrl, setPublicUrl, smtpCa: o.smtpCa };
+  const api: ApiContext = { db, brands, domains, contacts, templates, automations, mailer, keys, shield };
+  const pub: PublicContext = { db, brands, domains, contacts, mailer, secrets, shield, country, publicUrl: () => publicUrl, fetch: o.fetch, snsCertificate: o.snsCertificate, limits: publicLimits() };
 
   const timers: NodeJS.Timeout[] = [];
   if (o.background !== false) {
@@ -93,6 +103,14 @@ export function createApp(o: AppOptions): App {
     };
     every(5000, () => campaigns.tick(), "starting campaigns");
     every(15_000, () => automations.tick(), "moving automations along");
+    // Shield's lists: a minute after start, then whichever are due, hourly.
+    const refresh = () => void shield.refresh().catch((err: unknown) => console.error(`Shield's lists: ${(err as Error).message}`));
+    const first = setTimeout(refresh, 60_000);
+    first.unref();
+    timers.push(first);
+    every(3_600_000, refresh, "refreshing Shield's lists");
+    // A fresher list of countries from the monthly job.
+    every(3_600_000, () => (geo = loadGeo(geoPaths) ?? geo), "reloading the country list");
   }
 
   const server = createServer((req, res) => {
@@ -120,6 +138,7 @@ export function createApp(o: AppOptions): App {
     automations,
     mailer,
     keys,
+    shield,
     publicUrl: () => publicUrl,
     close: async () => {
       for (const t of timers) clearInterval(t);

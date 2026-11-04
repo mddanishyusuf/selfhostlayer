@@ -19,12 +19,20 @@ let dir = "";
 let smtp: FakeSmtp;
 const dnsRecords = new Map<string, string[]>();
 const dns: Dns = { txt: async (n) => dnsRecords.get(n) ?? [], cname: async () => [] };
+// Shield's mail-server lookups: every domain takes mail, but nomail.test (a null MX) and gone.test (no records).
+const notFound = () => Object.assign(new Error("not found"), { code: "ENOTFOUND" });
+const shieldDns = {
+  resolveMx: async (d: string) => (d === "gone.test" ? Promise.reject(notFound()) : d === "nomail.test" ? [{ exchange: ".", priority: 0 }] : [{ exchange: `mx.${d}`, priority: 10 }]),
+  resolve4: async () => Promise.reject(notFound()),
+  resolve6: async () => Promise.reject(notFound()),
+} as never;
+const BROWSER = "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_5) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Safari/605.1.15";
 
 beforeEach(async () => {
   dir = mkdtempSync(join(tmpdir(), "email-"));
   dnsRecords.clear();
   smtp = await fakeSmtp({ security: "starttls", user: "u", pass: "p", refuse: (to) => (to.startsWith("nobody@") ? "550 5.1.1 no such user" : null) });
-  app = createApp({ dataDir: dir, token: TOKEN, secret: "s".repeat(64), version: "test", background: false, smtpCa: TEST_CERT, dns, snsCertificate: TEST_CERT });
+  app = createApp({ dataDir: dir, token: TOKEN, secret: "s".repeat(64), version: "test", background: false, smtpCa: TEST_CERT, dns, snsCertificate: TEST_CERT, shieldDns });
   await new Promise<void>((r) => app.server.listen(0, "127.0.0.1", r));
   base = `http://127.0.0.1:${(app.server.address() as AddressInfo).port}`;
 });
@@ -267,7 +275,7 @@ describe("signup forms", () => {
     const id = await readyBrand();
     const open = (await admin(`brands/${id}/lists`, { body: { name: "Open" } })).body;
     const confirmed = (await admin(`brands/${id}/lists`, { body: { name: "Confirmed", doubleOptIn: true } })).body;
-    const post = (key: string, body: string, headers: Record<string, string> = {}) => fetch(`${base}/subscribe/${key}`, { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded", ...headers }, body, redirect: "manual" });
+    const post = (key: string, body: string, headers: Record<string, string> = {}) => fetch(`${base}/subscribe/${key}`, { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded", "User-Agent": BROWSER, ...headers }, body, redirect: "manual" });
     expect(await (await post(open.publicKey, "email=ada%40example.com&name=Ada&company=Analytical", { Accept: "application/json" })).json()).toEqual({ ok: true, status: "subscribed" });
     expect((await admin(`brands/${id}/contacts?q=ada`)).body.contacts[0]).toMatchObject({ status: "subscribed", fields: { company: "Analytical" }, source: "form" });
     const redirected = await post(open.publicKey, "email=bob%40example.com&redirect=https%3A%2F%2Fpiqo.app%2Fthanks");
@@ -294,7 +302,7 @@ describe("signup forms", () => {
     const id = await readyBrand();
     const open = (await admin(`brands/${id}/lists`, { body: { name: "Open" } })).body;
     const confirmed = (await admin(`brands/${id}/lists`, { body: { name: "Confirmed", doubleOptIn: true } })).body;
-    const post = (key: string, body: string, headers: Record<string, string> = {}) => fetch(`${base}/subscribe/${key}`, { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded", ...headers }, body, redirect: "manual" });
+    const post = (key: string, body: string, headers: Record<string, string> = {}) => fetch(`${base}/subscribe/${key}`, { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded", "User-Agent": BROWSER, ...headers }, body, redirect: "manual" });
     const contact = async (q: string) => (await admin(`brands/${id}/contacts?q=${q}`)).body.contacts[0];
     // A name and fields come only with a new address, however it's written.
     await post(open.publicKey, "email=dee%40example.com&name=Dee&plan=pro");

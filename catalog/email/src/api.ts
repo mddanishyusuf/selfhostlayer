@@ -18,10 +18,11 @@ import type { DatabaseSync } from "node:sqlite";
 import { bearer, InputError, json, readJson } from "../../lib/http.ts";
 import type { Automations } from "./automations.ts";
 import { text, type Brands } from "./brands.ts";
-import type { Contacts } from "./contacts.ts";
+import { checkEmail, type Contacts } from "./contacts.ts";
 import type { Domains } from "./domains.ts";
 import type { Mailer, Payload } from "./mailer.ts";
 import { checkHeaders, domainOf, formatAddress, parseAddress, parseAddresses } from "./mime.ts";
+import { CHECK_LABELS, decide, type Shield } from "./shield.ts";
 import type { Templates } from "./templates.ts";
 
 export interface KeyInfo {
@@ -78,6 +79,7 @@ export interface ApiContext {
   automations: Automations;
   mailer: Mailer;
   keys: ApiKeys;
+  shield: Shield;
 }
 
 /** Resend's error names, by status. */
@@ -260,7 +262,16 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse, ctx: 
     if (resource === "contacts" && method === "POST" && !rest) {
       const body = await readJson(req);
       const status = body.unsubscribed === true ? "unsubscribed" : body.unsubscribed === false ? "subscribed" : undefined;
-      const r = ctx.contacts.upsert(brandId, { email: body.email, name: body.name, fields: body.fields, lists: body.lists, status }, { resubscribe: body.unsubscribed === false, source: "api" });
+      // Shield's address checks for a new address (an app's sign-up passing it on): refused with a reason the app can show.
+      let flags: string[] | null = null;
+      const email = checkEmail(body.email);
+      if (!ctx.contacts.byEmail(brandId, email)) {
+        const d = decide(await ctx.shield.checkAddress(brandId, email), ctx.shield.settings(brandId));
+        ctx.shield.log(brandId, d.outcome, d.verdicts.map((v) => v.check), "api");
+        if (d.outcome === "refuse") throw new InputError("email", `Shield refused this address: ${d.verdicts.filter((v) => v.action === "refuse").map((v) => CHECK_LABELS[v.check].toLowerCase()).join(", ")}`, 422);
+        if (d.outcome === "flag") flags = d.verdicts.map((v) => v.check);
+      }
+      const r = ctx.contacts.upsert(brandId, { email, name: body.name, fields: body.fields, lists: body.lists, status }, { resubscribe: body.unsubscribed === false, source: "api", flags });
       json(res, r.created ? 201 : 200, { object: "contact", id: r.contact.id, email: r.contact.email, status: r.contact.status, created: r.created });
       return true;
     }

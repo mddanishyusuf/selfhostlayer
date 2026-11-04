@@ -27,6 +27,19 @@ export interface Contact {
   createdAt: number;
   updatedAt: number;
   unsubscribedAt: number | null;
+  /** Shield's checks it failed (PLAN-EMAIL-2.md): kept, but skipped by sends until approved. null when clean. */
+  flags: string[] | null;
+  /** Approved after a flag: Clean the list leaves it alone. */
+  approved: boolean;
+  /** What its sign-up, opens and clicks told us. */
+  country: string | null;
+  timezone: string | null;
+  device: string | null;
+  client: string | null;
+  opens: number;
+  clicks: number;
+  lastOpenAt: number | null;
+  lastClickAt: number | null;
 }
 
 export interface List {
@@ -54,7 +67,28 @@ interface ContactRow {
   created_at: number;
   updated_at: number;
   unsubscribed_at: number | null;
+  flags: string | null;
+  approved: number;
+  country: string | null;
+  timezone: string | null;
+  device: string | null;
+  client: string | null;
+  opens: number;
+  clicks: number;
+  last_open_at: number | null;
+  last_click_at: number | null;
 }
+
+/** What a sign-up says about who it was: the country of its IP, its time zone, device and browser. */
+export interface Profile {
+  country?: string | null;
+  timezone?: string | null;
+  device?: string | null;
+  client?: string | null;
+}
+
+/** Shield's verdict for an address, for imports and syncs: refused ones are skipped, flagged ones come in flagged. */
+export type Verdicts = Map<string, { outcome: "ok" | "flag" | "refuse"; checks: string[]; labels: string[] }>;
 
 const FIELD = /^[a-z][a-z0-9_]{0,39}$/;
 export const MAX_IMPORT = 100_000;
@@ -167,7 +201,29 @@ export class Contacts {
 
   #from(r: ContactRow): Contact {
     const lists = (this.#db.prepare("SELECT list_id FROM list_members WHERE contact_id = ? ORDER BY list_id").all(r.id) as { list_id: number }[]).map((x) => x.list_id);
-    return { id: r.id, brandId: r.brand_id, email: r.email, name: r.name, fields: JSON.parse(r.fields), status: r.status, source: r.source, lists, createdAt: r.created_at, updatedAt: r.updated_at, unsubscribedAt: r.unsubscribed_at };
+    return {
+      id: r.id,
+      brandId: r.brand_id,
+      email: r.email,
+      name: r.name,
+      fields: JSON.parse(r.fields),
+      status: r.status,
+      source: r.source,
+      lists,
+      createdAt: r.created_at,
+      updatedAt: r.updated_at,
+      unsubscribedAt: r.unsubscribed_at,
+      flags: r.flags ? (JSON.parse(r.flags) as string[]) : null,
+      approved: r.approved === 1,
+      country: r.country,
+      timezone: r.timezone,
+      device: r.device,
+      client: r.client,
+      opens: r.opens,
+      clicks: r.clicks,
+      lastOpenAt: r.last_open_at,
+      lastClickAt: r.last_click_at,
+    };
   }
 
   get(brandId: number, id: number): Contact {
@@ -193,7 +249,8 @@ export class Contacts {
       parts.push("EXISTS (SELECT 1 FROM list_members m WHERE m.contact_id = c.id AND m.list_id = ?)");
       args.push(o.list);
     }
-    if (o.status && (STATUSES as string[]).includes(o.status)) {
+    if (o.status === "flagged") parts.push("c.flags IS NOT NULL");
+    else if (o.status && (STATUSES as string[]).includes(o.status)) {
       parts.push("c.status = ?");
       args.push(o.status);
     }
@@ -212,7 +269,7 @@ export class Contacts {
    * choice), never from an import. Joining lists fires the hook for subscribed
    * contacts only.
    */
-  upsert(brandId: number, input: Record<string, unknown>, o: { resubscribe?: boolean; source?: string } = {}): { contact: Contact; created: boolean } {
+  upsert(brandId: number, input: Record<string, unknown>, o: { resubscribe?: boolean; source?: string; flags?: string[] | null; profile?: Profile } = {}): { contact: Contact; created: boolean } {
     const email = checkEmail(input.email);
     const name = input.name === undefined ? undefined : text(input.name, "name", 200).replace(/[\r\n]+/g, " ");
     const fields = checkFields(input.fields);
@@ -227,8 +284,23 @@ export class Contacts {
         if (this.#db.prepare("SELECT 1 FROM suppressions WHERE brand_id = ? AND email = ?").get(brandId, email) && (status === undefined || status === "subscribed")) status = "unsubscribed";
         id = Number(
           this.#db
-            .prepare("INSERT INTO contacts (brand_id, email, name, fields, status, source, created_at, updated_at, unsubscribed_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
-            .run(brandId, email, name ?? "", JSON.stringify(fields), status ?? "subscribed", o.source ?? "", now, now, status === "unsubscribed" ? now : null).lastInsertRowid,
+            .prepare("INSERT INTO contacts (brand_id, email, name, fields, status, source, created_at, updated_at, unsubscribed_at, flags, country, timezone, device, client) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+            .run(
+              brandId,
+              email,
+              name ?? "",
+              JSON.stringify(fields),
+              status ?? "subscribed",
+              o.source ?? "",
+              now,
+              now,
+              status === "unsubscribed" ? now : null,
+              o.flags?.length ? JSON.stringify(o.flags) : null,
+              o.profile?.country ?? null,
+              o.profile?.timezone ?? null,
+              o.profile?.device ?? null,
+              o.profile?.client ?? null,
+            ).lastInsertRowid,
         );
       } else {
         id = was.id;
@@ -247,8 +319,8 @@ export class Contacts {
   #join(brandId: number, contactId: number, listId: number, now = Date.now(), hook = true): boolean {
     const added = Number(this.#db.prepare("INSERT OR IGNORE INTO list_members (list_id, contact_id, added_at) VALUES (?, ?, ?)").run(listId, contactId, now).changes) > 0;
     if (added && hook) {
-      const status = (this.#db.prepare("SELECT status FROM contacts WHERE id = ?").get(contactId) as { status: string }).status;
-      if (status === "subscribed") this.hooks.joined?.(brandId, listId, contactId);
+      const c = this.#db.prepare("SELECT status, flags FROM contacts WHERE id = ?").get(contactId) as { status: string; flags: string | null };
+      if (c.status === "subscribed" && c.flags === null) this.hooks.joined?.(brandId, listId, contactId);
     }
     return added;
   }
@@ -288,12 +360,43 @@ export class Contacts {
     });
   }
 
+  /** Approved after Shield flagged it: it gets sends again, and joins its lists' automations if subscribed. */
+  approve(brandId: number, id: number): Contact {
+    const c = this.get(brandId, id);
+    if (!c.flags && c.approved) return c;
+    this.#db.prepare("UPDATE contacts SET flags = NULL, approved = 1, updated_at = ? WHERE id = ?").run(Date.now(), id);
+    if (c.flags && c.status === "subscribed") for (const listId of c.lists) this.hooks.joined?.(brandId, listId, id);
+    return this.get(brandId, id);
+  }
+
+  /** Clean the list: flags contacts (their checks merged in), or unsubscribes them. Approved contacts are left alone. Returns how many changed. */
+  applyFlags(brandId: number, flags: Map<number, string[]>, action: "flag" | "unsubscribe"): number {
+    const now = Date.now();
+    let changed = 0;
+    tx(this.#db, () => {
+      for (const [id, checks] of flags) {
+        const r = this.#db.prepare("SELECT flags, status, email FROM contacts WHERE id = ? AND brand_id = ? AND approved = 0").get(id, brandId) as { flags: string | null; status: string; email: string } | undefined;
+        if (!r) continue;
+        if (action === "unsubscribe") {
+          if (r.status !== "subscribed" && r.status !== "unconfirmed") continue;
+          this.unsubscribe(brandId, r.email, now);
+        } else {
+          const merged = [...new Set([...(r.flags ? (JSON.parse(r.flags) as string[]) : []), ...checks])];
+          this.#db.prepare("UPDATE contacts SET flags = ?, updated_at = ? WHERE id = ?").run(JSON.stringify(merged), now, id);
+          this.#db.prepare("UPDATE automation_runs SET status = 'exited', finished_at = ? WHERE status = 'active' AND contact_id = ?").run(now, id);
+        }
+        changed++;
+      }
+    });
+    return changed;
+  }
+
   /** A contact confirmed (double opt-in): subscribed now, and the lists they're in start their automations. */
   confirm(brandId: number, id: number): Contact {
     const c = this.get(brandId, id);
     if (c.status !== "unconfirmed") return c;
     this.#db.prepare("UPDATE contacts SET status = 'subscribed', updated_at = ? WHERE id = ?").run(Date.now(), id);
-    for (const listId of c.lists) this.hooks.joined?.(brandId, listId, id);
+    if (!c.flags) for (const listId of c.lists) this.hooks.joined?.(brandId, listId, id);
     return this.get(brandId, id);
   }
 
@@ -348,12 +451,11 @@ export class Contacts {
   // CSV
 
   /**
-   * Contacts from a CSV: email (or e-mail, email address), name (or first and
-   * last name), and every other column as a custom field. Existing contacts
-   * get the new name and fields; nobody who left is resubscribed, and nobody
-   * imported starts an automation.
+   * A CSV's contacts: email (or e-mail, email address), name (or first and last
+   * name), and every other column as a custom field. Rows without an address are
+   * skipped with their line number.
    */
-  importCsv(brandId: number, csv: string, o: { lists?: unknown; status?: unknown } = {}): { created: number; updated: number; skipped: { line: number; reason: string }[] } {
+  parseCsv(csv: string): { rows: { line: number; email: string; name: string; fields: Record<string, string> }[]; skipped: { line: number; reason: string }[] } {
     const [header, ...raw] = parseCsv(csv);
     if (!header) throw new InputError("csv", "the file is empty");
     const rows = raw.map((r) => r.map(csvValue));
@@ -367,41 +469,81 @@ export class Contacts {
     const lastAt = at(["last name", "last_name", "lastname", "surname", "family name"]);
     const skip = new Set([emailAt, nameAt, firstAt, lastAt, at(["status", "lists", "created_at"])]);
     const fieldCols = names.map((n, i) => ({ i, key: n.replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "").replace(/^(\d)/, "f_$1").slice(0, 40) })).filter((c) => !skip.has(c.i) && FIELD.test(c.key));
+    const out: { line: number; email: string; name: string; fields: Record<string, string> }[] = [];
+    const skipped: { line: number; reason: string }[] = [];
+    rows.forEach((row, i) => {
+      const email = row[emailAt]?.trim() ?? "";
+      if (!isEmail(email)) return void skipped.push({ line: i + 2, reason: email ? `${email.slice(0, 80)} isn't an email address` : "no email" });
+      const name = nameAt >= 0 ? (row[nameAt] ?? "").trim() : [firstAt >= 0 ? row[firstAt] : "", lastAt >= 0 ? row[lastAt] : ""].map((v) => (v ?? "").trim()).filter(Boolean).join(" ");
+      const fields = Object.fromEntries(fieldCols.slice(0, 30).map((c) => [c.key, (row[c.i] ?? "").trim().slice(0, 500)]).filter(([, v]) => v));
+      out.push({ line: i + 2, email: email.toLowerCase(), name: name.slice(0, 200), fields });
+    });
+    return { rows: out, skipped };
+  }
+
+  /**
+   * Contacts from a CSV (parseCsv). Existing contacts get the new name and
+   * fields; nobody who left is resubscribed, and nobody imported starts an
+   * automation. With Shield's verdicts, refused addresses are skipped and new
+   * flagged ones come in flagged.
+   */
+  importCsv(brandId: number, csv: string, o: { lists?: unknown; status?: unknown; verdicts?: Verdicts } = {}): { created: number; updated: number; refused: number; flagged: number; skipped: { line: number; reason: string }[] } {
+    return this.importRows(brandId, this.parseCsv(csv), { ...o, source: "import" });
+  }
+
+  /** Rows from a CSV or a sync, in one transaction. */
+  importRows(
+    brandId: number,
+    parsed: { rows: { line: number; email: string; name: string; fields: Record<string, string> }[]; skipped: { line: number; reason: string }[] },
+    o: { lists?: unknown; status?: unknown; verdicts?: Verdicts; source: string },
+  ): { created: number; updated: number; refused: number; flagged: number; skipped: { line: number; reason: string }[] } {
     const lists = this.resolveLists(brandId, o.lists);
-    const status = o.status === "unsubscribed" ? "unsubscribed" : undefined;
+    const status = o.status === "unsubscribed" ? "unsubscribed" : o.status === "unconfirmed" ? "unconfirmed" : undefined;
     let created = 0;
     let updated = 0;
-    const skipped: { line: number; reason: string }[] = [];
+    let refused = 0;
+    let flagged = 0;
+    const skipped = [...parsed.skipped];
     tx(this.#db, () => {
-      rows.forEach((row, i) => {
-        const email = row[emailAt]?.trim() ?? "";
-        if (!isEmail(email)) return void skipped.push({ line: i + 2, reason: email ? `${email.slice(0, 80)} isn't an email address` : "no email" });
-        const name = nameAt >= 0 ? (row[nameAt] ?? "").trim() : [firstAt >= 0 ? row[firstAt] : "", lastAt >= 0 ? row[lastAt] : ""].map((s) => (s ?? "").trim()).filter(Boolean).join(" ");
-        const fields = Object.fromEntries(fieldCols.slice(0, 30).map((c) => [c.key, (row[c.i] ?? "").trim().slice(0, 500)]).filter(([, v]) => v));
-        try {
-          const r = this.#upsertInTx(brandId, { email: email.toLowerCase(), name: name.slice(0, 200), fields, status, lists });
-          if (r) created++;
-          else updated++;
-        } catch (err) {
-          skipped.push({ line: i + 2, reason: (err as Error).message });
+      for (const row of parsed.rows) {
+        const v = o.verdicts?.get(row.email);
+        if (v?.outcome === "refuse") {
+          refused++;
+          skipped.push({ line: row.line, reason: `Shield refused it: ${v.labels.join(", ")}` });
+          continue;
         }
-      });
+        try {
+          const r = this.#upsertInTx(brandId, { ...row, status, lists, flags: v?.outcome === "flag" ? v.checks : null, source: o.source });
+          if (r) {
+            created++;
+            if (v?.outcome === "flag") flagged++;
+          } else updated++;
+        } catch (err) {
+          skipped.push({ line: row.line, reason: (err as Error).message });
+        }
+      }
     });
-    return { created, updated, skipped: skipped.slice(0, 200) };
+    return { created, updated, refused, flagged, skipped: skipped.slice(0, 200) };
   }
 
   /** upsert's work for imports, inside their one transaction; true when created. */
-  #upsertInTx(brandId: number, c: { email: string; name: string; fields: Record<string, string>; status?: ContactStatus; lists: number[] }): boolean {
+  #upsertInTx(brandId: number, c: { email: string; name: string; fields: Record<string, string>; status?: ContactStatus; lists: number[]; flags?: string[] | null; source?: string }): boolean {
     const now = Date.now();
     const was = this.#db.prepare("SELECT id, name, fields FROM contacts WHERE brand_id = ? AND email = ?").get(brandId, c.email) as { id: number; name: string; fields: string } | undefined;
     let id: number;
     if (was) {
       id = was.id;
-      this.#db.prepare("UPDATE contacts SET name = ?, fields = ?, updated_at = ?, status = CASE WHEN ? IS NOT NULL THEN ? ELSE status END WHERE id = ?").run(c.name || was.name, JSON.stringify({ ...JSON.parse(was.fields), ...c.fields }), now, c.status ?? null, c.status ?? null, id);
+      // Only an import of unsubscribes changes someone's status: unconfirmed is for new addresses.
+      const next = c.status === "unsubscribed" ? c.status : null;
+      this.#db.prepare("UPDATE contacts SET name = ?, fields = ?, updated_at = ?, status = CASE WHEN ? IS NOT NULL THEN ? ELSE status END WHERE id = ?").run(c.name || was.name, JSON.stringify({ ...JSON.parse(was.fields), ...c.fields }), now, next, next, id);
     } else {
       const suppressed = this.#db.prepare("SELECT 1 FROM suppressions WHERE brand_id = ? AND email = ?").get(brandId, c.email) !== undefined;
       const status = c.status ?? (suppressed ? "unsubscribed" : "subscribed");
-      id = Number(this.#db.prepare("INSERT INTO contacts (brand_id, email, name, fields, status, source, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 'import', ?, ?)").run(brandId, c.email, c.name, JSON.stringify(c.fields), status, now, now).lastInsertRowid);
+      id = Number(
+        this.#db
+          .prepare("INSERT INTO contacts (brand_id, email, name, fields, status, source, created_at, updated_at, flags) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
+          .run(brandId, c.email, c.name, JSON.stringify(c.fields), status, c.source ?? "import", now, now, c.flags?.length ? JSON.stringify(c.flags) : null).lastInsertRowid,
+      );
     }
     // Importing a list someone already has shouldn't send everyone the welcome series.
     for (const listId of c.lists) this.#join(brandId, id, listId, now, false);
@@ -432,12 +574,13 @@ export class Contacts {
   }
 
   /** Counts for a brand's Overview. */
-  counts(brandId: number): Record<ContactStatus | "total", number> {
-    const out = { total: 0, subscribed: 0, unconfirmed: 0, unsubscribed: 0, bounced: 0, complained: 0 };
+  counts(brandId: number): Record<ContactStatus | "total" | "flagged", number> {
+    const out = { total: 0, subscribed: 0, unconfirmed: 0, unsubscribed: 0, bounced: 0, complained: 0, flagged: 0 };
     for (const r of this.#db.prepare("SELECT status, count(*) n FROM contacts WHERE brand_id = ? GROUP BY status").all(brandId) as { status: ContactStatus; n: number }[]) {
       out[r.status] = r.n;
       out.total += r.n;
     }
+    out.flagged = (this.#db.prepare("SELECT count(*) n FROM contacts WHERE brand_id = ? AND flags IS NOT NULL").get(brandId) as { n: number }).n;
     return out;
   }
 }

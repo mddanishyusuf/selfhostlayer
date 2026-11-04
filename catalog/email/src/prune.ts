@@ -12,5 +12,7 @@ export function prune(db: DatabaseSync, now = Date.now()): { bodies: number; mes
   db.prepare("DELETE FROM events WHERE message_id IN (SELECT id FROM messages WHERE created_at < ? AND status NOT IN ('queued', 'sending'))").run(cutoff);
   const messages = Number(db.prepare("DELETE FROM messages WHERE created_at < ? AND status NOT IN ('queued', 'sending')").run(cutoff).changes);
   db.prepare("DELETE FROM idempotency WHERE created_at < ?").run(now - DAY);
+  // Shield's log of refusals and flags: 90 days is enough for its page.
+  db.prepare("DELETE FROM shield_log WHERE at < ?").run(now - 90 * DAY);
   return { bodies, messages };
 }

@@ -23,4 +23,8 @@ cron:
   - name: prune
     schedule: "20 4 * * *"
     command: node --disable-warning=ExperimentalWarning cron.js prune
+  # DB-IP's newest country list, a few days into each month (contacts' countries).
+  - name: geo
+    schedule: "25 5 3 * *"
+    command: node --disable-warning=ExperimentalWarning cron.js geo
 backup: [data]
