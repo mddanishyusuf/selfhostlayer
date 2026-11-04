@@ -51,7 +51,8 @@ done
 [[ -z "$min_panel" || "$min_panel" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]] || die "--min-panel must be a version like 0.2.0"
 
 # Like a release, a commit everyone can find: nothing uncommitted, and already on GitHub.
-[[ -z "$(git -C "$root" status --porcelain)" ]] || die "commit or stash your changes first"
+# Untracked files (a scratch database beside the code) aren't built, so only changes to tracked ones stop it.
+[[ -z "$(git -C "$root" status --porcelain --untracked-files=no)" ]] || die "commit or stash your changes first"
 git -C "$root" merge-base --is-ancestor HEAD origin/main || die "push $(git -C "$root" rev-parse --short HEAD) to origin/main first"
 
 echo "Building $app from $(git -C "$root" rev-parse --short HEAD)"
