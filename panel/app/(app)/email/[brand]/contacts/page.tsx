@@ -1,10 +1,11 @@
-import { DownloadIcon, SearchIcon } from "lucide-react";
+import { DownloadIcon } from "lucide-react";
 import Link from "next/link";
 import { ContactButtons, SuppressForm, UnsuppressButton } from "@/components/email-forms";
+import { ContactFilters } from "@/components/email-filters";
 import { StatusPill, when } from "@/components/email-ui";
 import { Icon } from "@/components/icon";
 import { CARD, Empty, Notice, PageHeader, Section, Segmented } from "@/components/page";
-import { NO_AUTOFILL, buttonClass } from "@/components/ui";
+import { buttonClass } from "@/components/ui";
 import { brandFor, checkLabel, contactsOf, listsOf, suppressionsOf, type List } from "@/lib/email";
 import { requireUser } from "@/lib/session";
 
@@ -42,7 +43,7 @@ export default async function ContactsPage({ params, searchParams }: { params: P
   return (
     <>
       <PageHeader title={brand.name} crumb="Contacts" meta={data ? `${data.total.toLocaleString("en")} contact${data.total === 1 ? "" : "s"}` : "Who you email"} actions={<ContactButtons brandId={brand.id} lists={lists} />} />
-      <div className="flex flex-wrap items-center gap-2.5">
+      <div className="flex flex-wrap items-center justify-between gap-2.5">
         <Segmented
           items={[
             { label: "Contacts", href: href({ view: undefined }), active: sp.view !== "suppressed" },
@@ -50,24 +51,12 @@ export default async function ContactsPage({ params, searchParams }: { params: P
           ]}
         />
         {sp.view !== "suppressed" && (
-          <>
-            <form action={path} className="flex min-w-[200px] flex-1 items-center gap-2 border border-border bg-field px-2.5 sm:max-w-[280px]" role="search">
-              {sp.list && <input type="hidden" name="list" value={sp.list} />}
-              {sp.status && <input type="hidden" name="status" value={sp.status} />}
-              <Icon icon={SearchIcon} size={14} className="text-muted" />
-              <input name="q" defaultValue={sp.q} placeholder="Email or name" className="h-[33px] min-w-0 flex-1 bg-transparent outline-none placeholder:text-placeholder" {...NO_AUTOFILL} />
-            </form>
-            <Segmented items={[{ label: "All lists", href: href({ list: undefined }), active: !sp.list }, ...lists.slice(0, 6).map((l) => ({ label: l.name, href: href({ list: String(l.id) }), active: sp.list === String(l.id) }))]} />
-            <Segmented
-              className="sm:ml-auto"
-              items={[{ label: "Any status", href: href({ status: undefined }), active: !sp.status }, ...(["subscribed", "unsubscribed", "bounced", "flagged"] as const).map((s) => ({ label: s[0]!.toUpperCase() + s.slice(1), href: href({ status: s }), active: sp.status === s }))]}
-            />
-            <a href={exportHref} className={buttonClass("secondary", "sm")} data-testid="export-contacts">
-              <Icon icon={DownloadIcon} size={13} /> CSV
-            </a>
-          </>
+          <a href={exportHref} className={buttonClass("secondary", "sm")} data-testid="export-contacts" title="Download the contacts shown as CSV">
+            <Icon icon={DownloadIcon} size={13} /> Export CSV
+          </a>
         )}
       </div>
+      {sp.view !== "suppressed" && <ContactFilters path={path} q={sp.q} list={sp.list} status={sp.status} lists={lists.map((l) => ({ id: l.id, name: l.name, total: l.total }))} />}
       {problem && (
         <Notice lead="Not reachable" tone="err">
           {problem}
