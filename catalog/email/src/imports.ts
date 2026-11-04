@@ -117,8 +117,8 @@ export function guessMapping(headers: string[]): Mapping {
   };
   const email = at(["email", "e-mail", "email address", "email_address", "mail"]) ?? names.findIndex((n) => n.includes("mail"));
   const name = at(["name", "full name", "full_name", "fullname"]);
-  const first = name === null ? at(["first name", "first_name", "firstname", "given name"]) : null;
-  const last = name === null ? at(["last name", "last_name", "lastname", "surname", "family name"]) : null;
+  const first = name === null ? at(["first name", "first_name", "firstname", "first", "fname", "given name", "given_name"]) : null;
+  const last = name === null ? at(["last name", "last_name", "lastname", "last", "lname", "surname", "family name", "family_name"]) : null;
   const taken = new Set([email, name, first, last, at(["status", "lists", "created_at"])]);
   const fields = headers
     .map((h, column) => ({ column, key: fieldKey(h) }))

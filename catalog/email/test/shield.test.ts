@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { gzipSync } from "node:zlib";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createApp, type App } from "../src/app.ts";
+import { guessMapping } from "../src/imports.ts";
 import { openSource, readerApp } from "../src/public.ts";
 import { decide, DEFAULT_SETTINGS, normalizeIpv6, readShieldSettings } from "../src/shield.ts";
 import { Secrets } from "../../lib/secrets.ts";
@@ -364,6 +365,7 @@ describe("imports as background jobs", () => {
     expect(up.body).toMatchObject({ status: "mapping", filename: "people.csv", headers: ["Work Email", "Given name", "Surname", "Company", "Ignore me"] });
     expect(up.body.sample[0]).toEqual(["p0@piqo.test", "P0", "Last", "Acme 0", "_"]);
     expect(up.body.guess).toMatchObject({ email: 0, first: 1, last: 2 });
+    expect(guessMapping(["E-mail", "First", "Last", "Plan"])).toMatchObject({ email: 0, name: null, first: 1, last: 2, fields: [{ column: 3, key: "plan" }] });
 
     const mapping = { email: 0, name: null, first: 1, last: 2, fields: [{ column: 3, key: "company" }] };
     expect((await admin(`brands/${b}/imports/${up.body.id}/start`, { body: { mapping: { ...mapping, email: 9 } } })).status).toBe(400);
