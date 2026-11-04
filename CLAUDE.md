@@ -223,6 +223,7 @@ The panel uses the design of our AgentOS app (`~/projects/agent-os/web/src/theme
 - **Sync** (`panel/lib/email-sync.ts`): a project's table read through `db.browse`, paged by its primary key, into a list every 15 minutes from the monitor.
 - **Enrichment:** country (Email ships `geo.bin` with a monthly geo cron), time zone, device and email app from sign-ups, clicks and direct opens. Proxied and Apple opens are counted only.
 - **Insights:** a page per brand.
+- **Imports as background jobs (Email 0.2.1):** a CSV up to 1 GB streams to Email's disk (`catalog/email/src/imports.ts`). Its columns are mapped in the panel, then it's imported 1,000 rows at a time with progress saved per batch: it outlives the page and resumes after a restart, with an optional Shield review first. Clean the list runs in batches too (`cleanup.ts`, findings in `shield_hits`).
 - **Tests:** the tour's Email section covers all of it on the VM.
 
 **Launch-time tasks (not now):** choose the license plus CLA, make the repo public, and make `curl -fsSL https://get.selfhostlayer.com | bash` install: the root of get.selfhostlayer.com only says "isn't out yet" (`app/install.sh/route.ts` in the website), and the installer still needs `--from-tarball` (it should download the newest release from the feed).
