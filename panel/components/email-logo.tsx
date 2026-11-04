@@ -1,31 +1,51 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { COLORS } from "@/lib/avatar";
 import { cx } from "./ui";
 
+/** Icons already fetched in this tab, by domain: null when there's none. */
+const found = new Map<string, string | null>();
+
 /**
- * A brand's logo: its domain's icon from Google's favicon service (the browser
- * asks Google for it, so Google sees the domain and nothing else), or its
- * initial on a color of its own when there's no domain or no icon.
+ * A brand's logo: its initial on a color of its own, replaced by its domain's
+ * icon from Google's favicon service once that has loaded (the browser asks
+ * Google, so Google sees the domain and nothing else). The icon is fetched
+ * after the page is up, never by the page itself: a slow or blocked Google
+ * neither holds up the page nor leaves an empty box. Google answers a domain
+ * without an icon with a 16px globe, which counts as none.
  */
 export function BrandLogo({ name, domain, size = 28, className }: { name: string; domain?: string | null; size?: number; className?: string }) {
-  const [failed, setFailed] = useState(false);
+  // The server and the first render show the initial: the icon comes after hydration.
+  const [icon, setIcon] = useState<string | null>(null);
+  useEffect(() => {
+    if (!domain) return setIcon(null);
+    if (found.has(domain)) return setIcon(found.get(domain)!);
+    const url = `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=64`;
+    const img = new Image();
+    img.referrerPolicy = "no-referrer";
+    let done = false;
+    const settle = (ok: boolean) => {
+      if (done) return;
+      done = true;
+      found.set(domain, ok ? url : null);
+      setIcon(ok ? url : null);
+    };
+    img.onload = () => settle(img.naturalWidth > 16);
+    img.onerror = () => settle(false);
+    const timer = setTimeout(() => settle(false), 4000);
+    img.src = url;
+    return () => {
+      done = true;
+      clearTimeout(timer);
+    };
+  }, [domain]);
   const box = { width: size, height: size };
-  if (domain && !failed) {
+  if (icon) {
     return (
       <span className={cx("grid shrink-0 place-items-center overflow-hidden bg-white", className)} style={box}>
-        {/* eslint-disable-next-line @next/next/no-img-element -- a remote icon, sized here */}
-        <img
-          src={`https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=64`}
-          alt=""
-          width={Math.round(size * 0.72)}
-          height={Math.round(size * 0.72)}
-          referrerPolicy="no-referrer"
-          onError={() => setFailed(true)}
-          // Google answers a default globe with a 16px image; a real icon at sz=64 is bigger.
-          onLoad={(e) => e.currentTarget.naturalWidth <= 16 && setFailed(true)}
-        />
+        {/* eslint-disable-next-line @next/next/no-img-element -- a remote icon, already loaded */}
+        <img src={icon} alt="" width={Math.round(size * 0.72)} height={Math.round(size * 0.72)} referrerPolicy="no-referrer" />
       </span>
     );
   }
