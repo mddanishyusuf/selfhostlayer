@@ -117,7 +117,7 @@ The panel uses the design of our AgentOS app (`~/projects/agent-os/web/src/theme
 
 ## Business model
 - **License: deferred until the tool works (decided 2026-10-28).** The repo is private and has one author, so there's no LICENSE file (all rights reserved). Leading option: an **AGPL-3.0** core plus a **CLA** (CLA-assistant), so Pro can ship as a separate proprietary package, and an **MIT** manifest spec. **Decide before** making the repo public or accepting any outside contribution.
-- **Sold as one license (decided 2026-10-31):** Self Host Layer is sold as a license, and the license includes every tool in Integrations (links, analytics, email, scheduler, …). Tools are never sold separately. This replaces the earlier plan of a free open-core panel with paid marketplace apps and a Pro tier. Still to decide: the price and its shape (per panel, monthly or lifetime), and whether any part stays open source (see License above).
+- **Sold as one license (decided 2026-10-31):** Self Host Layer is sold as a license, and the license includes every tool in Integrations (links, analytics, email, scheduler, …). Tools are never sold separately. This replaces the earlier plan of a free open-core panel with paid marketplace apps and a Pro tier. **Price (decided 2026-11-04):** a lifetime license for one server, with lifetime support and free updates. It's $29 for the first 100 supporters, then $89. It's sold on selfhostlayer.com through Stripe Checkout (licenses in the shl site's SQLite, `/licence` to manage them). The install command checks the key once, at install. Still to decide: whether any part stays open source (see License above).
 - Distribution: every install gets the whole toolkit (analytics, email, scheduler, …) one click away, which is the reason to buy.
 
 ## Biggest risks
@@ -227,5 +227,11 @@ The panel uses the design of our AgentOS app (`~/projects/agent-os/web/src/theme
 - **Tests:** the tour's Email section covers all of it on the VM.
 
 **Website redesign (2026-11-04, in ~/projects/shl):** selfhostlayer.com keeps its light colors (near-white page, white cards on fine gray lines, near-black text and dark buttons) in the panel's shapes: outlined cards, 2px corners and status pills. The panel's screenshots stay dark. The homepage's numbers are one card of cells, its features and integrations outlined cards, and the rest of the toolkit rows in one card. The headline's icons stand without tiles and name WordPress and Ghost sites, and the logo has no tile. A dark-only version was tried and undone the same day. Committed in shl, not pushed (a push deploys the site).
+
+**Pricing and licenses (2026-11-04, in ~/projects/shl):**
+- **What a buyer sees:** a pricing section ($29 supporters, then $89) leads to Stripe Checkout. `lib/stripe.ts` uses the REST API, and the webhook is checked by its signature. The license is made once (`lib/licenses.ts`, `DATA_DIR/licenses.db`) and emailed through a Resend-compatible API. `/licence` signs in with a 15-minute email link and shows the key and the server it's on, with Remove.
+- **The install script** (`app/install.sh/route.ts`, the root of get.selfhostlayer.com) asks for the key and activates it by a hash of `/etc/machine-id` (one server per license). Then it installs the newest release from `/api/install/latest`, sha256 checked.
+- **What the site needs:** STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET (endpoint `/api/stripe/webhook`, events `checkout.session.completed` and `checkout.session.async_payment_succeeded`), EMAIL_API_URL, EMAIL_API_KEY and EMAIL_FROM.
+- **Testing:** tested against a production build with signed webhooks and a fake email API. Committed in shl, not pushed.
 
 **Launch-time tasks (not now):** choose the license plus CLA, make the repo public, and make `curl -fsSL https://get.selfhostlayer.com | bash` install: the root of get.selfhostlayer.com only says "isn't out yet" (`app/install.sh/route.ts` in the website), and the installer still needs `--from-tarball` (it should download the newest release from the feed).
