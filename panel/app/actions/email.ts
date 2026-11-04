@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { emailApi, EmailError, emailInstall, type Brand, type Campaign, type Step } from "@/lib/email";
+import { emailApi, EmailError, emailInstall, SHIELD_CHECKS, type Brand, type Campaign, type ImportCheck, type Step } from "@/lib/email";
 import { markdownEmail } from "@/lib/markdown";
 import { requireUser } from "@/lib/session";
 
@@ -207,17 +207,96 @@ export async function removeContact(_prev: FormState, form: FormData): Promise<F
   redirect(`/email/${num(form, "brand")}/contacts`);
 }
 
-export async function importContacts(_prev: FormState, form: FormData): Promise<FormState> {
-  await requireUser();
+/** The CSV from a form, or an error to show. */
+async function csvOf(form: FormData): Promise<string | { error: string }> {
   const file = form.get("file");
   if (!(file instanceof File) || !file.size) return { error: "Choose a CSV file." };
   if (file.size > 50 * 1024 * 1024) return { error: "The file is over 50 MB: split it." };
-  const csv = await file.text();
-  const r = await attempt(() => api<{ created: number; updated: number; skipped: { line: number; reason: string }[] }>(`brands/${num(form, "brand")}/import`, { body: { csv, lists: ids(form, "lists") }, timeoutMs: 120_000 }));
+  return file.text();
+}
+
+/** What Shield makes of an import's addresses, before anything is added. */
+export async function checkImport(form: FormData): Promise<{ ok: ImportCheck } | { error: string }> {
+  await requireUser();
+  const csv = await csvOf(form);
+  if (typeof csv !== "string") return csv;
+  const r = await attempt(() => api<ImportCheck>(`brands/${num(form, "brand")}/import/check`, { body: { csv }, timeoutMs: 300_000 }));
+  return "error" in r ? { error: r.error } : r;
+}
+
+/**
+ * Imports a CSV. shield: "off" skips Shield; include: "flagged" lets refused
+ * addresses in as flagged instead of leaving them out.
+ */
+export async function importContacts(_prev: FormState, form: FormData): Promise<FormState> {
+  await requireUser();
+  const csv = await csvOf(form);
+  if (typeof csv !== "string") return csv;
+  const body = { csv, lists: ids(form, "lists"), shield: text(form, "shield") !== "off", include: text(form, "include") === "flagged" ? "flagged" : undefined };
+  const r = await attempt(() => api<{ created: number; updated: number; refused?: number; flagged?: number; skipped: { line: number; reason: string }[] }>(`brands/${num(form, "brand")}/import`, { body, timeoutMs: 300_000 }));
   if ("error" in r) return r;
   refresh();
-  const { created, updated, skipped } = r.ok;
-  return { saved: `${created.toLocaleString("en")} added, ${updated.toLocaleString("en")} updated${skipped.length ? `, ${skipped.length} skipped (line ${skipped[0]!.line}: ${skipped[0]!.reason}${skipped.length > 1 ? ", …" : ""})` : ""}.` };
+  const { created, updated, refused = 0, flagged = 0, skipped } = r.ok;
+  const other = skipped.filter((x) => !x.reason.startsWith("Shield refused"));
+  const parts = [`${created.toLocaleString("en")} added`, `${updated.toLocaleString("en")} updated`];
+  if (flagged) parts.push(`${flagged.toLocaleString("en")} of them flagged`);
+  if (refused) parts.push(`${refused.toLocaleString("en")} refused by Shield`);
+  if (other.length) parts.push(`${other.length} skipped (line ${other[0]!.line}: ${other[0]!.reason}${other.length > 1 ? ", …" : ""})`);
+  return { saved: `${parts.join(", ")}.` };
+}
+
+// Shield
+
+export async function saveShield(_prev: FormState, form: FormData): Promise<FormState> {
+  await requireUser();
+  const checks = Object.fromEntries(SHIELD_CHECKS.map((c) => [c.id, text(form, `check-${c.id}`) || "off"]));
+  const r = await attempt(() => api(`brands/${num(form, "brand")}/shield`, { method: "PUT", body: { checks, allowDatacenter: form.get("allowDatacenter") === "on" } }));
+  if ("error" in r) return r;
+  refresh();
+  return { saved: "Saved. New sign-ups, imports and syncs follow these from now on." };
+}
+
+export async function saveAbuseKey(_prev: FormState, form: FormData): Promise<FormState> {
+  await requireUser();
+  const remove = text(form, "intent") === "remove";
+  const r = await attempt(() => api("shield/abuseipdb", { method: "PUT", body: { key: remove ? null : text(form, "key") } }));
+  if ("error" in r) return r;
+  refresh();
+  return { saved: remove ? "Removed. AbuseIPDB isn't asked any more." : "Saved. Sign-ups are checked against AbuseIPDB too." };
+}
+
+export async function refreshShieldLists(_prev: FormState): Promise<FormState> {
+  await requireUser();
+  const r = await attempt(() => api<{ lists: { name: string; error: string | null }[] }>("shield/refresh", { method: "POST", timeoutMs: 300_000 }));
+  if ("error" in r) return r;
+  refresh();
+  const failed = r.ok.lists.filter((l) => l.error);
+  return failed.length ? { error: `${failed.map((l) => `${l.name}: ${l.error}`).join("; ")}. The last copies stay in use.` } : { saved: "Every list is up to date." };
+}
+
+export async function startCleanList(form: FormData): Promise<void> {
+  await requireUser();
+  await api(`brands/${num(form, "brand")}/shield/scan`, { method: "POST" });
+  refresh();
+}
+
+export async function applyCleanList(_prev: FormState, form: FormData): Promise<FormState> {
+  await requireUser();
+  const checks = form.getAll("checks").map(String);
+  if (!checks.length) return { error: "Pick at least one check." };
+  const action = text(form, "action") === "unsubscribe" ? "unsubscribe" : "flag";
+  const r = await attempt(() => api<{ changed: number }>(`brands/${num(form, "brand")}/shield/scan/apply`, { body: { checks, action } }));
+  if ("error" in r) return r;
+  refresh();
+  return { saved: `${r.ok.changed.toLocaleString("en")} contact${r.ok.changed === 1 ? "" : "s"} ${action === "flag" ? "flagged: campaigns skip them until you approve them" : "unsubscribed"}.` };
+}
+
+export async function approveContact(_prev: FormState, form: FormData): Promise<FormState> {
+  await requireUser();
+  const r = await attempt(() => api(`brands/${num(form, "brand")}/contacts/${num(form, "contact")}/approve`, { method: "POST" }));
+  if ("error" in r) return r;
+  refresh();
+  return { saved: "Approved: it gets your emails again." };
 }
 
 export async function suppress(_prev: FormState, form: FormData): Promise<FormState> {

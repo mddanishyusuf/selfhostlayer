@@ -5,7 +5,7 @@ import { StatusPill, when } from "@/components/email-ui";
 import { Icon } from "@/components/icon";
 import { CARD, Empty, Notice, PageHeader, Section, Segmented } from "@/components/page";
 import { NO_AUTOFILL, buttonClass } from "@/components/ui";
-import { brandFor, contactsOf, listsOf, suppressionsOf, type List } from "@/lib/email";
+import { brandFor, checkLabel, contactsOf, listsOf, suppressionsOf, type List } from "@/lib/email";
 import { requireUser } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
@@ -60,7 +60,7 @@ export default async function ContactsPage({ params, searchParams }: { params: P
             <Segmented items={[{ label: "All lists", href: href({ list: undefined }), active: !sp.list }, ...lists.slice(0, 6).map((l) => ({ label: l.name, href: href({ list: String(l.id) }), active: sp.list === String(l.id) }))]} />
             <Segmented
               className="sm:ml-auto"
-              items={[{ label: "Any status", href: href({ status: undefined }), active: !sp.status }, ...(["subscribed", "unsubscribed", "bounced"] as const).map((s) => ({ label: s[0]!.toUpperCase() + s.slice(1), href: href({ status: s }), active: sp.status === s }))]}
+              items={[{ label: "Any status", href: href({ status: undefined }), active: !sp.status }, ...(["subscribed", "unsubscribed", "bounced", "flagged"] as const).map((s) => ({ label: s[0]!.toUpperCase() + s.slice(1), href: href({ status: s }), active: sp.status === s }))]}
             />
             <a href={exportHref} className={buttonClass("secondary", "sm")} data-testid="export-contacts">
               <Icon icon={DownloadIcon} size={13} /> CSV
@@ -81,7 +81,7 @@ export default async function ContactsPage({ params, searchParams }: { params: P
             <span>Status</span>
             <span className="text-right">Added</span>
           </div>
-          {data.contacts.length === 0 && <Empty>{sp.q || sp.list || sp.status ? "Nobody matches." : "No contacts yet: add them, import a CSV, or point a signup form at a list."}</Empty>}
+          {data.contacts.length === 0 && <Empty>{sp.status === "flagged" ? "Nobody is flagged: Shield's flags show here, to approve or unsubscribe." : sp.q || sp.list || sp.status ? "Nobody matches." : "No contacts yet: add them, import a CSV, or point a signup form at a list."}</Empty>}
           {data.contacts.map((c) => (
             <Link key={c.id} href={`/email/${brand.id}/contacts/${c.id}`} className="flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-border-soft px-3.5 py-2.5 text-[13px] last:border-b-0 hover:bg-hover md:grid" style={{ gridTemplateColumns: GRID }} data-testid="contact-row">
               <span className="grid min-w-0 basis-full md:basis-auto">
@@ -89,8 +89,13 @@ export default async function ContactsPage({ params, searchParams }: { params: P
                 {c.name && <span className="truncate text-[12px] text-muted">{c.name}</span>}
               </span>
               <span className="truncate text-[12px] text-muted">{c.lists.map((id) => lists.find((l) => l.id === id)?.name).filter(Boolean).join(", ") || "–"}</span>
-              <span>
+              <span className="flex flex-wrap items-center gap-1">
                 <StatusPill status={c.status} />
+                {c.flags && (
+                  <span title={`Shield: ${c.flags.map(checkLabel).join(", ")}`}>
+                    <StatusPill status="flagged" testId="flagged" />
+                  </span>
+                )}
               </span>
               <span className="text-right text-[12px] text-muted">{when(c.createdAt)}</span>
             </Link>

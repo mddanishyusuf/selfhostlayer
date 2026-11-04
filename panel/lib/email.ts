@@ -10,6 +10,9 @@ import { config } from "./config";
 import { servingConfig } from "./domains";
 import { integrationFor, projectEnv, type Project } from "./projects";
 import { requireUser } from "./session";
+import type { ShieldAction, ShieldCheck } from "./shield-checks";
+
+export { checkLabel, SHIELD_CHECKS, type ShieldAction, type ShieldCheck } from "./shield-checks";
 
 export const emailInstall = () => integrationFor("email");
 
@@ -73,6 +76,37 @@ export interface Contact {
   createdAt: number;
   updatedAt: number;
   unsubscribedAt: number | null;
+  /** Shield's checks it failed: kept, but skipped by sends until approved. */
+  flags: ShieldCheck[] | null;
+  approved: boolean;
+  country: string | null;
+  timezone: string | null;
+  device: string | null;
+  client: string | null;
+  opens: number;
+  clicks: number;
+  lastOpenAt: number | null;
+  lastClickAt: number | null;
+}
+
+export interface ShieldInfo {
+  settings: { checks: Record<ShieldCheck, ShieldAction>; allowDatacenter: boolean };
+  lists: { name: string; entries: number; updatedAt: number | null; error: string | null }[];
+  abuseipdb: boolean;
+  stats: { refused: number; flagged: number; byCheck: Partial<Record<ShieldCheck, { refused: number; flagged: number }>>; bySource: Record<string, number> };
+  flagged: number;
+  scan: { state: "running" | "done" | "failed"; checked: number; total: number; startedAt: number; finishedAt: number | null; error: string | null; byCheck: Partial<Record<ShieldCheck, number>>; examples: Partial<Record<ShieldCheck, { email: string; detail: string }[]>> } | null;
+}
+
+export interface ImportCheck {
+  rows: number;
+  unreadable: number;
+  total: number;
+  ok: number;
+  flag: number;
+  refuse: number;
+  byCheck: Partial<Record<ShieldCheck, { action: "refuse" | "flag"; count: number }>>;
+  examples: Partial<Record<ShieldCheck, { email: string; detail: string }[]>>;
 }
 
 export interface List {
@@ -299,6 +333,25 @@ export const contactsOf = (p: Project, brand: number, o: { q?: string; list?: st
   emailApi<{ contacts: Contact[]; total: number; page: number; pageSize: number }>(p, `brands/${brand}/contacts${qs({ q: o.q, list: o.list, status: o.status, page: o.page && o.page > 1 ? o.page : undefined })}`);
 export const contactOf = (p: Project, brand: number, id: number) =>
   emailApi<{ contact: Contact; suppressed: boolean; messages: { id: string; kind: string; subject: string; status: string; createdAt: number; sentAt: number | null; openedAt: number | null; clickedAt: number | null; campaignId: number | null; campaign: string | null }[] }>(p, `brands/${brand}/contacts/${id}`);
+/** How engaged a contact is: opened or clicked in 30 days, in 30 to 90, or not since (Apple's automatic opens don't count). */
+export function engagement(c: Pick<Contact, "lastOpenAt" | "lastClickAt">, now = Date.now()): "active" | "cooling" | "inactive" | "new" {
+  const last = Math.max(c.lastOpenAt ?? 0, c.lastClickAt ?? 0);
+  if (!last) return "new";
+  const days = (now - last) / 86_400_000;
+  return days <= 30 ? "active" : days <= 90 ? "cooling" : "inactive";
+}
+
+/** A country's name from its code (DE → Germany). */
+export const countryName = (code: string | null) => {
+  if (!code) return null;
+  try {
+    return new Intl.DisplayNames(["en"], { type: "region" }).of(code) ?? code;
+  } catch {
+    return code;
+  }
+};
+
+export const shieldOf = (p: Project, brand: number) => emailApi<ShieldInfo>(p, `brands/${brand}/shield`);
 export const suppressionsOf = (p: Project, brand: number, page = 1) => emailApi<{ items: { email: string; reason: string; detail: string; createdAt: number }[]; total: number }>(p, `brands/${brand}/suppressions${qs({ page: page > 1 ? page : undefined })}`);
 export const campaignsOf = async (p: Project, brand: number) => (await emailApi<{ campaigns: Campaign[] }>(p, `brands/${brand}/campaigns`)).campaigns;
 export const campaignOf = (p: Project, brand: number, id: number) => emailApi<{ campaign: Campaign; links: { url: string; clicks: number; people: number }[]; audience: number; problems: string[] }>(p, `brands/${brand}/campaigns/${id}`);

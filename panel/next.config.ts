@@ -16,6 +16,8 @@ const base: NextConfig = {
   transpilePackages: ["@layer/protocol"],
   // Local `next dev` state (DB, key, setup token) must never ship in a release.
   outputFileTracingExcludes: { "*": [".dev/**", "scripts/**", "**/*.test.ts"] },
+  // Email's contact import posts the CSV (up to 50 MB) to a server action; the default is 1 MB.
+  experimental: { serverActions: { bodySizeLimit: "52mb" } },
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
   },

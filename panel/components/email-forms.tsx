@@ -4,9 +4,10 @@
 // campaigns, templates and automation emails share (Markdown or HTML, with a
 // preview as a contact would see it), and API keys.
 import { ArrowDownIcon, ArrowUpIcon, PlusIcon, TrashIcon, UploadIcon } from "lucide-react";
-import { useActionState, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useActionState, useEffect, useMemo, useState, useTransition, type ReactNode } from "react";
 import * as A from "@/app/actions/email";
-import type { Automation, Brand, Campaign, List, Step, Template } from "@/lib/email";
+import type { Automation, Brand, Campaign, ImportCheck, List, Step, Template } from "@/lib/email";
+import { checkLabel, type ShieldCheck } from "@/lib/shield-checks";
 import { markdownEmail, sampleMerge } from "@/lib/markdown";
 import { isSesRegion, SES_REGIONS } from "@/lib/ses-regions";
 import { CopyButton, SubmitButton } from "./form";
@@ -475,7 +476,6 @@ export function ListActions({ brandId, list }: { brandId: number; list: List }) 
 export function ContactButtons({ brandId, lists }: { brandId: number; lists: List[] }) {
   const [adding, setAdding] = useState(false);
   const [importing, setImporting] = useState(false);
-  const [state, run] = useActionState(A.importContacts, initial);
   return (
     <>
       <Button variant="secondary" onClick={() => setImporting(true)} data-testid="import-contacts">
@@ -498,30 +498,154 @@ export function ContactButtons({ brandId, lists }: { brandId: number; lists: Lis
           </Group>
         </DialogForm>
       )}
-      {importing && (
-        <Modal open onClose={() => setImporting(false)} title="Import contacts" description="From a CSV with an email column">
-          <form action={run} className="grid gap-4 px-[18px] py-5" data-testid="import-form">
-            <Hidden values={{ brand: brandId }} />
-            <Field label="CSV file" htmlFor="i-file" hint="Columns: email, name (or first and last name); every other column becomes a field">
-              <input id="i-file" name="file" type="file" accept=".csv,text/csv" required className="text-[13px]" />
-            </Field>
-            <Group label="Add them to">
-              <ListChecks lists={lists} name="lists" none="No lists yet: they're added as contacts only." />
-            </Group>
-            <p className="text-[12px] text-muted">Import only people who asked for your emails. Nobody who unsubscribed is subscribed again, and imports start no automation.</p>
-            <Saved state={state} />
-            <div className="flex justify-end gap-2">
-              <Button type="button" variant="secondary" onClick={() => setImporting(false)}>
-                Close
-              </Button>
-              <SubmitButton pending="Importing…" className="w-auto">
-                Import
-              </SubmitButton>
-            </div>
-          </form>
-        </Modal>
-      )}
+      {importing && <ImportDialog brandId={brandId} lists={lists} onClose={() => setImporting(false)} />}
     </>
+  );
+}
+
+/** Approve a contact Shield flagged: it gets sends again. */
+export function ApproveContact({ brandId, contactId }: { brandId: number; contactId: number }) {
+  const [state, run] = useActionState(A.approveContact, initial);
+  return (
+    <form action={run} className="flex flex-wrap items-center gap-2" data-testid="approve-contact">
+      <Hidden values={{ brand: brandId, contact: contactId }} />
+      <SubmitButton pending="Approving…" variant="secondary" size="sm" className="w-auto">
+        Approve
+      </SubmitButton>
+      <FormError message={state.error} />
+    </form>
+  );
+}
+
+/**
+ * Importing a CSV: Shield checks the addresses first (on by default), and shows
+ * what it would do before anything is added. The file stays in memory between
+ * the check and the import.
+ */
+function ImportDialog({ brandId, lists, onClose }: { brandId: number; lists: List[]; onClose: () => void }) {
+  const [file, setFile] = useState<File | null>(null);
+  const [picked, setPicked] = useState<number[]>([]);
+  const [shield, setShield] = useState(true);
+  const [include, setInclude] = useState<"clean" | "flagged">("clean");
+  const [check, setCheck] = useState<ImportCheck | null>(null);
+  const [state, setState] = useState<A.FormState>(initial);
+  const [pending, start] = useTransition();
+  const data = () => {
+    const fd = new FormData();
+    fd.set("brand", String(brandId));
+    if (file) fd.set("file", file);
+    for (const id of picked) fd.append("lists", String(id));
+    fd.set("shield", shield ? "on" : "off");
+    fd.set("include", include);
+    return fd;
+  };
+  const runCheck = () =>
+    start(async () => {
+      setState(initial);
+      const r = await A.checkImport(data());
+      if ("error" in r) setState({ error: r.error });
+      else setCheck(r.ok);
+    });
+  const runImport = () =>
+    start(async () => {
+      setState(await A.importContacts(initial, data()));
+    });
+  const refused = check ? Object.entries(check.byCheck).filter(([, v]) => v.action === "refuse") : [];
+  return (
+    <Modal open onClose={onClose} title="Import contacts" description="From a CSV with an email column">
+      <div className="grid gap-4 px-[18px] py-5" data-testid="import-form">
+        <Field label="CSV file" htmlFor="i-file" hint="Columns: email, name (or first and last name); every other column becomes a field">
+          <input
+            id="i-file"
+            type="file"
+            accept=".csv,text/csv"
+            className="text-[13px]"
+            onChange={(e) => {
+              setFile(e.target.files?.[0] ?? null);
+              setCheck(null);
+              setState(initial);
+            }}
+          />
+        </Field>
+        <Group label="Add them to">
+          {lists.length ? (
+            <div className="flex flex-wrap gap-x-4 gap-y-2">
+              {lists.map((l) => (
+                <label key={l.id} className="flex items-center gap-2 text-[13px]">
+                  <input type="checkbox" checked={picked.includes(l.id)} onChange={(e) => setPicked(e.target.checked ? [...picked, l.id] : picked.filter((x) => x !== l.id))} />
+                  {l.name}
+                </label>
+              ))}
+            </div>
+          ) : (
+            <p className="text-[12px] text-muted">No lists yet: they&apos;re added as contacts only.</p>
+          )}
+        </Group>
+        <label className="flex items-start gap-2 text-[13px]">
+          <input
+            type="checkbox"
+            checked={shield}
+            onChange={(e) => {
+              setShield(e.target.checked);
+              setCheck(null);
+            }}
+            className="mt-[3px]"
+            data-testid="import-shield"
+          />
+          <span>
+            Check the addresses with Shield first
+            <span className="block text-[12px] text-muted">Invalid, temporary and spam-listed addresses, and any that bounced with another brand, by this brand&apos;s Shield settings.</span>
+          </span>
+        </label>
+        {check && (
+          <div className="grid gap-2.5 border border-border bg-field px-3.5 py-3 text-[13px]" data-testid="import-check">
+            <p>
+              <b>{check.total.toLocaleString("en")}</b> address{check.total === 1 ? "" : "es"}: <span className="text-ok">{check.ok.toLocaleString("en")} fine</span>
+              {check.flag > 0 && <span className="text-warn">, {check.flag.toLocaleString("en")} flagged</span>}
+              {check.refuse > 0 && <span className="text-err">, {check.refuse.toLocaleString("en")} refused</span>}
+              {check.unreadable > 0 && <span className="text-muted">, and {check.unreadable.toLocaleString("en")} row{check.unreadable === 1 ? "" : "s"} without an address</span>}.
+            </p>
+            {Object.entries(check.byCheck).map(([id, v]) => (
+              <div key={id} className="grid gap-0.5">
+                <span>
+                  <b>{checkLabel(id)}</b>: {v.count.toLocaleString("en")} <span className={v.action === "refuse" ? "text-err" : "text-warn"}>{v.action === "refuse" ? "refused" : "flagged"}</span>
+                </span>
+                <span className="truncate text-[12px] text-muted">{check.examples[id as ShieldCheck]?.map((x) => `${x.email} (${x.detail})`).join(", ")}</span>
+              </div>
+            ))}
+            {refused.length > 0 && (
+              <div className="grid gap-1.5 pt-1">
+                <label className="flex items-center gap-2">
+                  <input type="radio" name="include" checked={include === "clean"} onChange={() => setInclude("clean")} />
+                  Leave the refused ones out
+                </label>
+                <label className="flex items-center gap-2">
+                  <input type="radio" name="include" checked={include === "flagged"} onChange={() => setInclude("flagged")} />
+                  Import them too, flagged: kept, but sent nothing until you approve them
+                </label>
+              </div>
+            )}
+          </div>
+        )}
+        <p className="text-[12px] text-muted">Import only people who asked for your emails. Nobody who unsubscribed is subscribed again, and imports start no automation.</p>
+        <FormError message={state.error} />
+        {state.saved && <p className="text-[13px] text-ok" data-testid="import-saved">{state.saved}</p>}
+        <div className="flex justify-end gap-2">
+          <Button type="button" variant="secondary" onClick={onClose}>
+            Close
+          </Button>
+          {shield && !check ? (
+            <Button type="button" onClick={runCheck} disabled={!file || pending} data-testid="import-check-button">
+              {pending ? "Checking…" : "Check"}
+            </Button>
+          ) : (
+            <Button type="button" onClick={runImport} disabled={!file || pending || !!state.saved} data-testid="import-button">
+              {pending ? "Importing…" : "Import"}
+            </Button>
+          )}
+        </div>
+      </div>
+    </Modal>
   );
 }
 

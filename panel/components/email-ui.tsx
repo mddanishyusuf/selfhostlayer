@@ -18,7 +18,7 @@ const TONES = {
 export function StatusPill({ status, testId }: { status: string; testId?: string }) {
   const tone: keyof typeof TONES = ["sent", "delivered", "verified", "subscribed", "active", "done"].includes(status)
     ? "green"
-    : ["sending", "scheduled", "queued", "pending", "unconfirmed", "paused", "deferred"].includes(status)
+    : ["sending", "scheduled", "queued", "pending", "unconfirmed", "paused", "deferred", "flagged"].includes(status)
       ? "gold"
       : ["failed", "bounced", "complained", "cancelled", "exited"].includes(status)
         ? "red"

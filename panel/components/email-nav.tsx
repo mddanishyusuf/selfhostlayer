@@ -3,7 +3,7 @@
 // Email's own sidebar, beside the panel's (shrunk to its icons): the brand
 // picker at the top, then the brand's pages. On phones it's a picker and a row
 // of tabs above the page.
-import { BookTextIcon, CheckIcon, ChevronsUpDownIcon, FileCode2Icon, GlobeIcon, KeyRoundIcon, LayoutDashboardIcon, LayoutGridIcon, ListIcon, PlusIcon, PuzzleIcon, ScrollTextIcon, SendIcon, SettingsIcon, UsersIcon, WorkflowIcon } from "lucide-react";
+import { BookTextIcon, CheckIcon, ChevronsUpDownIcon, FileCode2Icon, GlobeIcon, KeyRoundIcon, LayoutDashboardIcon, LayoutGridIcon, ListIcon, PlusIcon, PuzzleIcon, ScrollTextIcon, SendIcon, SettingsIcon, ShieldCheckIcon, UsersIcon, WorkflowIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
@@ -25,6 +25,7 @@ const SECTIONS: { path: string; label: string; icon: IconSvgElement }[] = [
   { path: "/campaigns", label: "Campaigns", icon: SendIcon },
   { path: "/automations", label: "Automations", icon: WorkflowIcon },
   { path: "/contacts", label: "Contacts", icon: UsersIcon },
+  { path: "/shield", label: "Shield", icon: ShieldCheckIcon },
   { path: "/lists", label: "Lists", icon: ListIcon },
   { path: "/templates", label: "Templates", icon: FileCode2Icon },
   { path: "/logs", label: "Logs", icon: ScrollTextIcon },

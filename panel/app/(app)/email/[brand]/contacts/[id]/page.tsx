@@ -1,9 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ContactForm } from "@/components/email-forms";
+import { ApproveContact, ContactForm } from "@/components/email-forms";
 import { StatusPill, when } from "@/components/email-ui";
-import { CARD, Empty, Notice, PageHeader, Section } from "@/components/page";
-import { brandFor, contactOf, EmailError, listsOf } from "@/lib/email";
+import { CARD, Empty, KeyValues, Notice, PageHeader, Section } from "@/components/page";
+import { brandFor, checkLabel, contactOf, countryName, EmailError, engagement, listsOf } from "@/lib/email";
 import { requireUser } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
@@ -36,6 +36,26 @@ export default async function ContactPage({ params }: { params: Promise<{ brand:
           Nothing is sent to this address: it bounced, complained or was added by hand. The Suppressed tab on Contacts can remove it.
         </Notice>
       )}
+      {c.flags && (
+        <Notice lead="Flagged">
+          <span className="inline-flex flex-wrap items-center gap-3">
+            Shield flagged it ({c.flags.map(checkLabel).join(", ")}): it&apos;s kept, but campaigns and automations skip it until you approve it.
+            <ApproveContact brandId={brand.id} contactId={c.id} />
+          </span>
+        </Notice>
+      )}
+      <Section title="Profile" description="What its sign-up, opens and clicks told us. Opens through Gmail's and Apple's image proxies give no location or device: only clicks do.">
+        <KeyValues
+          inset
+          items={[
+            ["Engagement", { active: "Active: opened or clicked in the last 30 days", cooling: "Cooling: last opened or clicked 30 to 90 days ago", inactive: "Inactive: nothing in 90 days", new: "No opens or clicks yet" }[engagement(c)]],
+            ["Country", countryName(c.country) ?? "Not known yet"],
+            ["Time zone", c.timezone ?? "Not known yet"],
+            ["Device", c.device ? `${c.device[0]!.toUpperCase()}${c.device.slice(1)}${c.client ? `, ${c.client}` : ""}` : "Not known yet"],
+            ["Opens and clicks", `${c.opens.toLocaleString("en")} open${c.opens === 1 ? "" : "s"}, ${c.clicks.toLocaleString("en")} click${c.clicks === 1 ? "" : "s"}${c.lastClickAt ? `, last click ${when(c.lastClickAt)}` : c.lastOpenAt ? `, last open ${when(c.lastOpenAt)}` : ""}`],
+          ]}
+        />
+      </Section>
       <section className={`${CARD} p-3.5`}>
         <ContactForm brandId={brand.id} contact={c} lists={lists} />
       </section>
