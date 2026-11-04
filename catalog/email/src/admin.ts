@@ -11,7 +11,8 @@ import type { ApiKeys } from "./api.ts";
 import type { Automations } from "./automations.ts";
 import type { Brands } from "./brands.ts";
 import type { Campaigns } from "./campaigns.ts";
-import { checkEmail, type Contacts, type Verdicts } from "./contacts.ts";
+import { checkEmail, checkFields, type Contacts, type Verdicts } from "./contacts.ts";
+import { isEmail } from "./mime.ts";
 import { getSetting, setSetting } from "./db.ts";
 import type { Domains } from "./domains.ts";
 import type { Mailer } from "./mailer.ts";
@@ -333,6 +334,34 @@ const ROUTES: [string, string, Handler][] = [
       const r = ctx.contacts.importRows(b, parsed, { lists: input.lists, status: input.status, verdicts, source: "import" });
       for (const v of verdicts.values()) ctx.shield.log(b, v.outcome, v.checks, "import");
       return r;
+    },
+  ],
+  [
+    // A page of rows from one of the panel's projects (Sync from an app): Shield's address checks, then in like an import.
+    "POST",
+    "brands/:b/sync",
+    async ({ ctx, p, req }) => {
+      const b = ctx.brands.must(num(p.b, "brand")).id;
+      const input = await readJson(req, 8 * 1024 * 1024);
+      if (!Array.isArray(input.rows) || input.rows.length > 5000) throw new InputError("rows", "must be a list of at most 5,000 rows");
+      const source = typeof input.source === "string" && /^sync:[a-z0-9-]{1,63}$/.test(input.source) ? input.source : "sync";
+      const parsed = { rows: [] as { line: number; email: string; name: string; fields: Record<string, string> }[], skipped: [] as { line: number; reason: string }[] };
+      input.rows.forEach((raw: unknown, i: number) => {
+        const r = (raw ?? {}) as Record<string, unknown>;
+        const email = typeof r.email === "string" ? r.email.trim().toLowerCase() : "";
+        if (!isEmail(email)) return void parsed.skipped.push({ line: i + 1, reason: email ? `${email.slice(0, 80)} isn't an email address` : "no email" });
+        let fields: Record<string, string> = {};
+        try {
+          fields = checkFields(r.fields);
+        } catch {
+          fields = {};
+        }
+        parsed.rows.push({ line: i + 1, email, name: typeof r.name === "string" ? r.name.trim().replace(/[\r\n]+/g, " ").slice(0, 200) : "", fields });
+      });
+      const { verdicts } = await shieldVerdicts(ctx, b, parsed.rows.map((r) => r.email));
+      for (const v of verdicts.values()) ctx.shield.log(b, v.outcome, v.checks, "sync");
+      // Subscribed: they signed up on the brand's own site. Nobody who left comes back.
+      return ctx.contacts.importRows(b, parsed, { lists: input.lists, verdicts, source });
     },
   ],
   [

@@ -297,6 +297,26 @@ const MIGRATIONS = [
      created_at INTEGER NOT NULL,
      UNIQUE (project_id, name)
    );`,
+  // Email's Sync from an app (lib/email-sync.ts, PLAN-EMAIL-2.md): a project's table, read page by page, into a brand's list.
+  `CREATE TABLE email_syncs (
+     id INTEGER PRIMARY KEY,
+     brand_id INTEGER NOT NULL,
+     project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+     engine TEXT NOT NULL,
+     file TEXT,
+     source_table TEXT NOT NULL,
+     email_column TEXT NOT NULL,
+     name_column TEXT,
+     field_columns TEXT NOT NULL DEFAULT '[]',
+     list_id INTEGER,
+     cursor_column TEXT,
+     cursor TEXT,
+     running INTEGER NOT NULL DEFAULT 0,
+     last_run_at INTEGER,
+     last_result TEXT,
+     totals TEXT NOT NULL DEFAULT '{}',
+     created_at INTEGER NOT NULL
+   );`,
 ];
 
 function open(): DatabaseSync {

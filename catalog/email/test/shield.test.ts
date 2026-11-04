@@ -233,6 +233,27 @@ describe("Shield in Email", () => {
     expect((await admin(`brands/${b}/contacts?status=flagged`)).body.total).toBe(3);
   });
 
+  it("a sync's page of rows: checked by Shield, subscribed, fields kept, nobody who left comes back", async () => {
+    await start();
+    const b = await brand();
+    const list = (await admin(`brands/${b}/lists`, { body: { name: "Users" } })).body;
+    await admin(`brands/${b}/import`, { body: { csv: "email\ngone@piqo.test\n", shield: false } });
+    const gone = (await admin(`brands/${b}/contacts?q=gone`)).body.contacts[0];
+    await admin(`brands/${b}/contacts/${gone.id}`, { method: "PATCH", body: { status: "unsubscribed" } });
+    const rows = [
+      { email: "Ada@Piqo.test", name: "Ada", fields: { plan: "pro" } },
+      { email: "x@mailinator.com", name: "Spam" },
+      { email: "not an address" },
+      { email: "gone@piqo.test", name: "Gone" },
+    ];
+    const r = (await admin(`brands/${b}/sync`, { body: { rows, lists: [list.id], source: "sync:kagaz-api" } })).body;
+    expect(r).toMatchObject({ created: 1, updated: 1, refused: 1 });
+    expect((await admin(`brands/${b}/contacts?q=ada`)).body.contacts[0]).toMatchObject({ email: "ada@piqo.test", status: "subscribed", source: "sync:kagaz-api", fields: { plan: "pro" }, lists: [list.id] });
+    expect((await admin(`brands/${b}/contacts?q=gone`)).body.contacts[0].status).toBe("unsubscribed");
+    expect((await admin(`brands/${b}/shield`)).body.stats.bySource).toEqual({ sync: 1 });
+    expect((await admin(`brands/${b}/sync`, { body: { rows: "nope" } })).status).toBe(400);
+  });
+
   it("Clean the list: counts by check in the background, then flags or unsubscribes what you pick, leaving approved contacts alone", async () => {
     await start();
     const b = await brand();

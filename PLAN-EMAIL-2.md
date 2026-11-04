@@ -25,7 +25,7 @@ On a brand's **Contacts → Sync from an app**, add a source:
 2. **Map the columns:**
    - which column is the **email**, and optionally which one is the **name**;
    - up to 10 more columns, which become contact fields (plan, signed-up date…).
-3. **Pick the target:** the list it fills, and whether new contacts are **subscribed** (the default, since they signed up on your site) or **unconfirmed** (they get the list's double opt-in email).
+3. **Pick the target:** the list it fills. New contacts come in subscribed, since they signed up on your own site.
 
 **How it reads:**
 - **As the app, read-only:** through the database viewer's job (`db.browse`), as the app's own user with its own logins, so no database password leaves the agent.

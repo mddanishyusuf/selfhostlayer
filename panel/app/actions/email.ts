@@ -3,7 +3,10 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { emailApi, EmailError, emailInstall, SHIELD_CHECKS, type Brand, type Campaign, type ImportCheck, type Step } from "@/lib/email";
+import type { Engine } from "@/lib/browse";
+import { addSync, deleteSync, getSync, runSync } from "@/lib/email-sync";
 import { markdownEmail } from "@/lib/markdown";
+import { getProjectBySlug } from "@/lib/projects";
 import { requireUser } from "@/lib/session";
 
 export interface FormState {
@@ -467,4 +470,54 @@ export async function saveEmailSettings(_prev: FormState, form: FormData): Promi
   const r = await attempt(() => api("settings", { method: "PUT", body: { keepBodiesDays: Number(form.get("keepBodiesDays")), keepDays: Number(form.get("keepDays")) } }));
   if ("error" in r) return r;
   return { saved: "Saved. The next daily clean-up uses it." };
+}
+
+// Sync from an app
+
+export async function addEmailSync(_prev: FormState, form: FormData): Promise<FormState> {
+  await requireUser();
+  const project = getProjectBySlug(text(form, "project"));
+  if (!project) return { error: "Pick a project." };
+  const [engine, ...rest] = text(form, "db").split(":");
+  const email = text(form, "emailColumn");
+  if (!email) return { error: "Pick the column with the email address.", field: "emailColumn" };
+  const fields = form.getAll("fieldColumns").map(String).filter((c) => c && c !== email);
+  if (fields.length > 10) return { error: "Pick up to 10 more columns." };
+  try {
+    const s = addSync({
+      brandId: num(form, "brand"),
+      projectId: project.id,
+      engine: engine as Engine,
+      file: rest.join(":") || null,
+      table: text(form, "table"),
+      emailColumn: email,
+      nameColumn: text(form, "nameColumn") || null,
+      fieldColumns: fields,
+      listId: num(form, "list") || null,
+      cursorColumn: text(form, "cursorColumn") || null,
+    });
+    // The first sync starts now, in the background; the page shows it running.
+    void runSync(s.id).catch(() => {});
+  } catch (err) {
+    return { error: (err as Error).message };
+  }
+  redirect(`/email/${num(form, "brand")}/sync`);
+}
+
+export async function runEmailSync(form: FormData): Promise<void> {
+  await requireUser();
+  const s = getSync(num(form, "id"));
+  if (!s) return;
+  void runSync(s.id).catch(() => {});
+  // Long enough for it to show as running.
+  await new Promise((r) => setTimeout(r, 300));
+  revalidatePath(`/email/${s.brandId}/sync`);
+}
+
+export async function deleteEmailSync(form: FormData): Promise<void> {
+  await requireUser();
+  const s = getSync(num(form, "id"));
+  if (!s) return;
+  deleteSync(s.id);
+  revalidatePath(`/email/${s.brandId}/sync`);
 }
