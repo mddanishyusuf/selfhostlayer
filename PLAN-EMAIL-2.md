@@ -111,3 +111,24 @@ Nothing new leaves the server: the lookups use lists stored on it, and AbuseIPDB
 - Sharing bounces across other people's installs: there's no central service.
 - City-level location: DB-IP's free list is countries.
 - Two-way sync, where Email writes back to the app.
+
+## Result (2026-11-04)
+
+Built as planned (Email 0.2.0), with the import check added at the user's request. Synced contacts always come in subscribed: an unconfirmed option would have needed confirmation emails that imports don't send.
+
+- **Email's tests:** 42 pass (14 new for Shield, sync, enrichment and Insights).
+  - Every check, including a null MX and a DNS timeout that refuses nobody.
+  - The list downloads: StopForumSpam's gzipped IPs, and a failed or nearly empty download keeping the last copy.
+  - AbuseIPDB cached and its key sealed.
+  - Sign-up forms, the API, imports with their check, Clean the list, syncs.
+  - Proxied and Apple opens, and click hours in each contact's own time zone.
+- **The browser tour** passes on the VM (TOUR_DEPLOY and TOUR_EMAIL):
+  - the brands list;
+  - Shield's real lists downloaded, a temporary address thanked and kept out, then set to Flag, flagged and approved;
+  - the next example's SQLite signups synced ("2 rows read, 1 new, 1 refused");
+  - an open in Outlook filling in a contact;
+  - Insights counting it active.
+- **Found on the way:**
+  - **Memory:** the lists take about 10 MB of heap, but parsing them in steps left tens of MB behind, so they now load in one pass. Email's default memory is 256 MB, for new installs.
+  - **Uploads over 1 MB:** server actions refused bodies over 1 MB, so a CSV import over 1 MB had always failed. The limit is now 52 MB.
+  - **Two stale tour steps, unrelated to Email:** the database viewer opens on its builder now, and the phone menu needed React to hydrate before the click.

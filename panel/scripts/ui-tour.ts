@@ -766,6 +766,11 @@ if (process.env.TOUR_DEPLOY === "1") {
     await waitFor(`/42 rows/.test(document.querySelector("main").innerText) && document.querySelectorAll('[data-testid="data-grid"] tbody tr').length === 42`, "the visits rows", 60_000);
     await screenshot("database-viewer");
     const runQuery = async (sql: string) => {
+      // SQL tables open on the visual builder: the SQL box is its own tab.
+      if (!(await evaluate(`!!document.querySelector('[data-testid="db-query"] textarea')`))) {
+        await evaluate(`[...document.querySelectorAll("nav[aria-label=Filter] a")].find((a) => a.textContent === "SQL").click(), true`);
+        await waitFor(`!!document.querySelector('[data-testid="db-query"] textarea')`, "the SQL tab");
+      }
       // An uncontrolled textarea: setting its value is all the form needs.
       await fill('[data-testid="db-query"] textarea', sql);
       await evaluate(`document.querySelector('[data-testid="db-query"]').requestSubmit(), true`);
@@ -853,6 +858,8 @@ if (process.env.TOUR_DEPLOY === "1") {
     await setViewport(390, 844);
     await go("/");
     await waitForPath("/");
+    // A click before React has hydrated the button does nothing.
+    await waitFor(`Object.keys(document.querySelector('button[aria-label="Open menu"]') ?? {}).some((k) => k.startsWith("__reactFiber"))`, "the phone menu's button to come alive");
     await click('button[aria-label="Open menu"]');
     await waitFor(`!!document.querySelector('[role=dialog] nav')`, "the phone menu");
     await screenshot("nav-phone-menu");
@@ -1375,9 +1382,10 @@ if (process.env.TOUR_EMAIL === "1") {
   await evaluate(`document.querySelector('[data-testid="shield-disposable"] button[role=radio]:nth-child(2)').click(), true`);
   await click('[data-testid="shield-form"] button[type=submit]');
   await waitFor(`document.body.innerText.includes("New sign-ups, imports and syncs follow these")`, "Shield's settings saved");
-  await signup("y@mailinator.com");
+  // 0-mail.com is a temporary domain StopForumSpam doesn't list (mailinator.com is on both, so it stays refused).
+  await signup("y@0-mail.com");
   await go(`${brand}/contacts?status=flagged`);
-  await waitFor(`(document.querySelector('[data-testid="contacts"]')?.innerText ?? "").includes("y@mailinator.com")`, "the flagged contact");
+  await waitFor(`(document.querySelector('[data-testid="contacts"]')?.innerText ?? "").includes("y@0-mail.com")`, "the flagged contact");
   await click('[data-testid="contact-row"]');
   await waitFor(`!!document.querySelector('[data-testid="approve-contact"]')`, "the flagged contact's Approve");
   await screenshot("email-flagged");
@@ -1389,7 +1397,7 @@ if (process.env.TOUR_EMAIL === "1") {
   await screenshot("email-shield");
 
   // A table of sign-ups in the next example's data folder (TOUR_DEPLOY deployed it), synced into the list.
-  box(`${node} runuser -u app-next -- $N -e 'const d = new (require("node:sqlite").DatabaseSync)("/srv/apps/next/data/leads.db"); d.exec("CREATE TABLE IF NOT EXISTS signups (id INTEGER PRIMARY KEY, email TEXT NOT NULL, full_name TEXT, plan TEXT)"); d.prepare("INSERT INTO signups (email, full_name, plan) VALUES (?, ?, ?), (?, ?, ?)").run("ada@tour.test", "Ada Lovelace", "pro", "z@spam4.me", "Bot", "free")'`);
+  box(`${node} runuser -u app-next -- $N -e 'const d = new (require("node:sqlite").DatabaseSync)("/srv/apps/next/data/leads.db"); d.exec("CREATE TABLE IF NOT EXISTS signups (id INTEGER PRIMARY KEY, email TEXT NOT NULL, full_name TEXT, plan TEXT)"); d.prepare("INSERT INTO signups (email, full_name, plan) VALUES (?, ?, ?), (?, ?, ?)").run("ada.tour@gmail.com", "Ada Lovelace", "pro", "z@spam4.me", "Bot", "free")'`);
   await go(`${brand}/sync?project=next&db=sqlite:leads.db&table=signups`);
   await waitFor(`!!document.querySelector('[data-testid="sync-mapping"] #s-email')`, "the column mapping", 60_000);
   await hydrated('[data-testid="sync-mapping"]', "the mapping form to come alive");
@@ -1403,8 +1411,9 @@ if (process.env.TOUR_EMAIL === "1") {
     await waitForPath(`${brand}/sync`);
     synced = String(await evaluate(`document.querySelector('[data-testid="sync-status"]')?.innerText ?? ""`));
   }
-  if (!synced.includes("2 rows read")) throw new Error(`the sync didn't read the table: ${synced}`);
-  const ada = JSON.parse(emailDb("SELECT source, fields, name FROM contacts WHERE email = 'ada@tour.test'"))[0];
+  if (!synced.includes("2 rows read") || !synced.includes("1 new") || !synced.includes("1 refused")) throw new Error(`the sync didn't read the table as expected: ${synced}`);
+  // A real mail domain: Shield refuses tour.test, which has no mail server.
+  const ada = JSON.parse(emailDb("SELECT source, fields, name FROM contacts WHERE email = 'ada.tour@gmail.com'"))[0];
   if (ada?.source !== "sync:next" || !ada.fields.includes('"plan":"pro"') || ada.name !== "Ada Lovelace") throw new Error(`the synced contact: ${JSON.stringify(ada)}`);
   await screenshot("email-sync");
   console.log(`  ✓ synced the next example's signups table into the list (${synced})`);

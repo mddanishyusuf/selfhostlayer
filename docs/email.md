@@ -8,7 +8,9 @@ Email sends your products' email from your own server: newsletters to your lists
 2. **Add a brand:** your product's name and the address it sends from. Each brand has its own provider, domains, contacts, campaigns, automations, templates and API keys.
 3. The brand's **Overview** lists what it still needs before it can send: a provider, a verified domain, a From address on it, and a list.
 
-Opening a brand shrinks the panel's sidebar to its icons and opens Email's own sidebar beside it: a brand picker at the top (with **Add a brand**), then the brand's pages. On phones, the picker and the pages are a row of tabs above the page.
+**Email** in the sidebar lists your brands: each one's logo, sending domain, contacts, emails sent in 30 days and provider, with **New brand** at the top. A brand's logo is its website's icon (or its sending domain's) from Google's favicon service, so your browser asks Google for it with the domain, and nothing else. A brand with neither shows its initial.
+
+Opening a brand shrinks the panel's sidebar to its icons and opens Email's own sidebar beside it: a brand picker at the top (with **All brands** and **Add a brand**), then the brand's pages. On phones, the picker and the pages are a row of tabs above the page.
 
 ## Sending: SMTP or Amazon SES
 
@@ -43,6 +45,13 @@ Each contact has an address, a name, custom fields, the lists it's in, and a sta
 
 **Add contact** adds one. **Import** takes a CSV with an email column, and name (or first and last name); every other column becomes a custom field. Imports never subscribe someone who unsubscribed, and never start an automation. **CSV** exports the contacts shown.
 
+Before an import, **Check** runs [Shield](#shield)'s address checks on the file (on by default) and shows the result first:
+
+- how many addresses are fine, flagged or refused;
+- what each check found, with examples.
+
+Refused addresses stay out, or you can import them as flagged. **Flagged** on Contacts shows Shield's flags.
+
 **Suppressed** (on Contacts) lists the addresses nothing is sent to, transactional email included: hard bounces, spam complaints, and addresses added by hand.
 
 **Lists** group contacts. Each list has a signup endpoint, `https://<email address>/subscribe/<key>`, which takes a plain HTML form, or JSON with `Accept: application/json`. The Lists page has a form to paste:
@@ -53,6 +62,74 @@ Each contact has an address, a name, custom fields, the lists it's in, and a sta
 - With **double opt-in**, new signups get an email with a link to confirm first. The link opens a page with a **Confirm** button: mail scanners open every link in an email, so only the button confirms.
 
 Anyone can send a signup form with any address, so it never changes someone who's already a contact: it only adds them to the list. Their name and fields stay, someone waiting to confirm still has to, and someone who unsubscribed stays unsubscribed. They're sent a link to come back instead (it works for a week), and only that link resubscribes them. A form sends at most one such email an address a day, and takes 10 signups a minute from one address.
+
+## Shield
+
+Shield keeps bad and spam addresses off a brand's lists. Its page has eight checks, each set to **Refuse**, **Flag** or **Off**:
+
+| Check | What it catches | Default |
+|---|---|---|
+| Invalid email | Malformed addresses, and domains with no mail server (an MX record, or an address to fall back to). A DNS lookup that times out refuses nobody. | Refuse |
+| Temporary email | Throwaway inbox domains, from the [disposable-email-domains](https://github.com/disposable-email-domains/disposable-email-domains) list. | Refuse |
+| Spam-listed domain | Email domains listed by StopForumSpam. | Refuse |
+| Free webmail | Gmail, Outlook and the like, for B2B sign-ups that should use a work address. | Off |
+| Bounced elsewhere | Addresses that hard-bounced or complained with another brand on this server. | Flag |
+| Scripted browsers | Headless browsers, curl and scripts, the hidden field filled in, and (with the form snippet) a browser driven by a script or a form sent under 2 seconds after it loaded. | Refuse |
+| Spam-listed IP | IPs StopForumSpam saw spamming in the last 30 days. | Refuse |
+| Abusive IPs | Tor exit nodes and data centers (allowed with **Allow sign-ups from data centers**), and AbuseIPDB's reports when you add its key. | Refuse |
+
+The first five need only the address, so they run on every way in: sign-up forms, the API, imports and syncs. The last three need a browser's request, so only sign-up forms get them.
+
+- **Refuse** keeps the address out. A sign-up form still says thanks, so a bot learns nothing, and the API answers 422 with the reason.
+- **Flag** keeps the contact, but campaigns, automations and confirmation emails skip it until you **Approve** it on its page.
+- **Clean the list** runs the address checks on every subscribed and unconfirmed contact you haven't approved. It shows what each check found, then flags or unsubscribes the ones you pick.
+- **The form snippet** is optional. On a sign-up form that posts to a list, it adds the hidden field, how long the page was open, whether a script drives the browser, and the visitor's time zone:
+  ```html
+  <script src="https://<email address>/subscribe.js" defer></script>
+  ```
+- **AbuseIPDB** is optional too: its free key (1,000 lookups a day) is kept encrypted, and only sign-up IPs are sent to it.
+
+**Privacy:** a sign-up's IP is used only while it's checked, and never stored. Shield's page counts refusals and flags by check and by where they came from, never with the address.
+
+**The lists** are downloaded by Email and kept in its data folder: temporary domains and data-center ranges weekly, StopForumSpam's lists and Tor's daily. A failed download keeps the last copy, and the page shows each list's age, with **Download them now**.
+
+## Sync from your apps
+
+On a brand's **Sync** page, **Add a source** takes sign-ups or leads from one of your projects' databases (SQLite, Postgres, MySQL or MongoDB) into a list:
+
+1. Pick the project, the database and the table. A few of its rows are shown.
+2. Pick the email column (it's guessed), optionally the name column, and up to 10 more columns as contact fields.
+3. Pick the list. **Add and sync now** runs the first sync.
+
+How it works:
+
+- **Read-only, as the app:** the panel reads the table through the database viewer, as the app's own user with its own logins, so no database password leaves the server.
+- **When:** every 15 minutes, and on **Sync now**.
+- **Only new rows:** a table with a single primary key is read after the last key it saw. One without is read whole each time, and contacts already in Email are only updated.
+- **New contacts** come in subscribed, through Shield's address checks.
+- **What it never does:** bring back someone who unsubscribed or bounced, or delete a contact whose row was deleted.
+
+Each source shows its last sync: rows read, contacts added, and what Shield refused or flagged.
+
+## Insights
+
+A brand's **Insights** page shows:
+
+- **Engagement:** subscribed contacts by their last open or click (active within 30 days, cooling within 90, inactive, or no opens yet).
+- **Countries**, **devices** and **email apps**.
+- **The best hour to send:** clicks over 90 days by the hour in each contact's own time zone.
+- **New contacts** by week and where they came from: forms, syncs, the API, imports.
+- **List health:** bounces and complaints against the thresholds mailbox providers filter at (2% and 0.1%), plus Shield's flags and refusals.
+
+A contact's page shows its profile (country, time zone, device and email app, opens and clicks) and a timeline of its opens, clicks and how it was added.
+
+**Where it comes from:**
+
+- **Country:** the IP of a sign-up or a click, looked up in DB-IP's free list on the server. The IP is never kept.
+- **Time zone:** the form snippet.
+- **Device and app:** the User-Agent.
+
+Gmail and Yahoo load images through their own servers, so their opens are counted but tell nothing about the reader. Apple Mail Privacy Protection loads them for everyone, often without anyone reading, so its opens are counted but don't make a contact active.
 
 ## Campaigns
 
@@ -114,7 +191,7 @@ Everything is under `/v1/` too. The From address must be on a verified domain of
 
 ## Tracking
 
-Opens are counted from a tiny image and clicks through this server, in campaigns and automations, when the brand counts them; links are signed, so the redirect can't be misused. Opens are a rough measure: Apple Mail loads images for everyone (more opens), and other apps block them (fewer). Transactional email from the API is never tracked, so its links go straight where they say.
+Opens are counted from a tiny image and clicks through this server, in campaigns and automations, when the brand counts them; links are signed, so the redirect can't be misused. Opens are a rough measure: Apple Mail loads images for everyone (more opens), and other apps block them (fewer). Each open and click also fills in its contact (see [Insights](#insights)). Transactional email from the API is never tracked, so its links go straight where they say.
 
 ## What's kept
 
