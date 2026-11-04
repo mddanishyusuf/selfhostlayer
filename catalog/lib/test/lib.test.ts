@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { CsvReader, parseCsv } from "../csv.ts";
 import { buildGeo, ipv6High } from "../geo-build.ts";
 import { clientIp, Geo, isCloudflare } from "../geo.ts";
 import { recentMonths } from "../geo-update.ts";
@@ -85,5 +86,19 @@ describe("countries", () => {
 
   it("asks DB-IP for this month's list, then last month's", () => {
     expect(recentMonths(Date.UTC(2026, 0, 2))).toEqual(["2026-01", "2025-12"]);
+  });
+});
+
+describe("CsvReader", () => {
+  it("reads like parseCsv, however the text is cut into pieces", () => {
+    const text = '﻿email,name,note\r\nada@x.test,"Lovelace, Ada","said ""hi""\r\nthen left"\r\n\r\nbob@x.test,Bob,\n"q""",,"x"\r\nlast@x.test,Last,end';
+    const want = parseCsv(text);
+    for (const size of [1, 2, 3, 5, 7, 11, text.length]) {
+      const r = new CsvReader();
+      const got: string[][] = [];
+      for (let i = 0; i < text.length; i += size) got.push(...r.push(text.slice(i, i + size)));
+      got.push(...r.end());
+      expect(got, `pieces of ${size}`).toEqual(want);
+    }
   });
 });

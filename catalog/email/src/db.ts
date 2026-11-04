@@ -227,6 +227,50 @@ export const MIGRATIONS = [
      country TEXT
    );
    CREATE INDEX shield_log_brand ON shield_log (brand_id, at);`,
+  // 3: imports as background jobs (a CSV on disk, read in batches, mapped
+  // column by column, progress saved per batch so they outlive a restart);
+  // Clean the list the same way, its findings in a table rather than memory;
+  // and Shield's log counting a batch's refusals in one row.
+  `CREATE TABLE imports (
+     id INTEGER PRIMARY KEY,
+     brand_id INTEGER NOT NULL,
+     status TEXT NOT NULL CHECK (status IN ('mapping', 'checking', 'review', 'importing', 'done', 'failed', 'cancelled')),
+     filename TEXT NOT NULL DEFAULT '',
+     bytes INTEGER NOT NULL DEFAULT 0,
+     headers TEXT NOT NULL DEFAULT '[]',
+     mapping TEXT,
+     options TEXT,
+     rows INTEGER,
+     checked INTEGER NOT NULL DEFAULT 0,
+     processed INTEGER NOT NULL DEFAULT 0,
+     counts TEXT NOT NULL DEFAULT '{}',
+     shield TEXT NOT NULL DEFAULT '{}',
+     skipped TEXT NOT NULL DEFAULT '[]',
+     error TEXT,
+     created_at INTEGER NOT NULL,
+     started_at INTEGER,
+     finished_at INTEGER
+   );
+   CREATE INDEX imports_brand ON imports (brand_id, created_at);
+   CREATE TABLE shield_scans (
+     brand_id INTEGER PRIMARY KEY,
+     status TEXT NOT NULL CHECK (status IN ('running', 'done', 'failed')),
+     cursor INTEGER NOT NULL DEFAULT 0,
+     checked INTEGER NOT NULL DEFAULT 0,
+     total INTEGER NOT NULL DEFAULT 0,
+     by_check TEXT NOT NULL DEFAULT '{}',
+     examples TEXT NOT NULL DEFAULT '{}',
+     error TEXT,
+     started_at INTEGER NOT NULL,
+     finished_at INTEGER
+   );
+   CREATE TABLE shield_hits (
+     brand_id INTEGER NOT NULL,
+     contact_id INTEGER NOT NULL,
+     checks TEXT NOT NULL,
+     PRIMARY KEY (brand_id, contact_id)
+   );
+   ALTER TABLE shield_log ADD COLUMN n INTEGER NOT NULL DEFAULT 1;`,
 ];
 
 /** email.db, migrated. */

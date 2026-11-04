@@ -14,6 +14,7 @@ import type { DatabaseSync } from "node:sqlite";
 import { gunzipSync } from "node:zlib";
 import { InputError } from "../../lib/http.ts";
 import type { Secrets } from "../../lib/secrets.ts";
+import type { Verdicts } from "./contacts.ts";
 import { getSetting, setSetting } from "./db.ts";
 
 export const CHECKS = ["invalid", "disposable", "spamDomain", "freeMail", "bounced", "scripted", "spamIp", "abusiveIp"] as const;
@@ -61,6 +62,16 @@ export function checkShieldSettings(input: Record<string, unknown>, was: ShieldS
   }
   if (input.allowDatacenter !== undefined) next.allowDatacenter = input.allowDatacenter === true;
   return next;
+}
+
+/** What a batch's verdicts come to: distinct addresses, how many fine, flagged or refused, by check with a few examples. */
+export interface VerdictSummary {
+  total: number;
+  ok: number;
+  flag: number;
+  refuse: number;
+  byCheck: Partial<Record<Check, { action: "refuse" | "flag"; count: number }>>;
+  examples: Partial<Record<Check, { email: string; detail: string }[]>>;
 }
 
 export interface Verdict {
@@ -497,21 +508,54 @@ export class Shield {
   }
 
   /** What was refused or flagged, by check, for the Shield page: never the address. */
-  log(brandId: number, outcome: Decision["outcome"], checks: string[], source: string, country: string | null = null): void {
-    if (outcome === "ok") return;
-    this.#db.prepare("INSERT INTO shield_log (brand_id, at, outcome, checks, source, country) VALUES (?, ?, ?, ?, ?, ?)").run(brandId, Date.now(), outcome === "refuse" ? "refused" : "flagged", checks.join(","), source, country);
+  log(brandId: number, outcome: Decision["outcome"], checks: string[], source: string, country: string | null = null, n = 1): void {
+    if (outcome === "ok" || n < 1) return;
+    this.#db.prepare("INSERT INTO shield_log (brand_id, at, outcome, checks, source, country, n) VALUES (?, ?, ?, ?, ?, ?, ?)").run(brandId, Date.now(), outcome === "refuse" ? "refused" : "flagged", checks.join(","), source, country, n);
+  }
+
+  /** A batch's verdicts in the log: one row per outcome and set of checks, with how many (an import of millions doesn't write millions of rows). */
+  logBatch(brandId: number, verdicts: Verdicts, source: string): void {
+    const groups = new Map<string, { outcome: Decision["outcome"]; checks: string[]; n: number }>();
+    for (const v of verdicts.values()) {
+      if (v.outcome === "ok") continue;
+      const key = `${v.outcome}|${v.checks.join(",")}`;
+      const g = groups.get(key) ?? { outcome: v.outcome, checks: v.checks, n: 0 };
+      g.n++;
+      groups.set(key, g);
+    }
+    for (const g of groups.values()) this.log(brandId, g.outcome, g.checks, source, null, g.n);
+  }
+
+  /** Verdicts for many addresses (an import, a sync), and what they come to: counts by check, with a few examples. */
+  async verdicts(brandId: number, emails: string[]): Promise<{ verdicts: Verdicts; summary: VerdictSummary }> {
+    const settings = this.settings(brandId);
+    const found = await this.checkMany(brandId, emails);
+    const verdicts: Verdicts = new Map();
+    const summary: VerdictSummary = { total: found.size, ok: 0, flag: 0, refuse: 0, byCheck: {}, examples: {} };
+    for (const [email, v] of found) {
+      const d = decide(v, settings);
+      verdicts.set(email, { outcome: d.outcome, checks: d.verdicts.map((x) => x.check), labels: d.verdicts.map((x) => CHECK_LABELS[x.check]) });
+      summary[d.outcome]++;
+      for (const x of d.verdicts) {
+        const b = (summary.byCheck[x.check] ??= { action: x.action, count: 0 });
+        b.count++;
+        const ex = (summary.examples[x.check] ??= []);
+        if (ex.length < 5) ex.push({ email, detail: x.detail });
+      }
+    }
+    return { verdicts, summary };
   }
 
   /** Refusals and flags in the last `days`, by check and by source. */
   stats(brandId: number, days = 30): { refused: number; flagged: number; byCheck: Record<string, { refused: number; flagged: number }>; bySource: Record<string, number> } {
-    const rows = this.#db.prepare("SELECT outcome, checks, source FROM shield_log WHERE brand_id = ? AND at >= ?").all(brandId, Date.now() - days * DAY) as { outcome: "refused" | "flagged"; checks: string; source: string }[];
+    const rows = this.#db.prepare("SELECT outcome, checks, source, sum(n) n FROM shield_log WHERE brand_id = ? AND at >= ? GROUP BY outcome, checks, source").all(brandId, Date.now() - days * DAY) as { outcome: "refused" | "flagged"; checks: string; source: string; n: number }[];
     const out = { refused: 0, flagged: 0, byCheck: {} as Record<string, { refused: number; flagged: number }>, bySource: {} as Record<string, number> };
     for (const r of rows) {
-      out[r.outcome]++;
-      out.bySource[r.source] = (out.bySource[r.source] ?? 0) + 1;
+      out[r.outcome] += r.n;
+      out.bySource[r.source] = (out.bySource[r.source] ?? 0) + r.n;
       for (const c of r.checks.split(",")) {
         const b = (out.byCheck[c] ??= { refused: 0, flagged: 0 });
-        b[r.outcome]++;
+        b[r.outcome] += r.n;
       }
     }
     return out;

@@ -1418,6 +1418,37 @@ if (process.env.TOUR_EMAIL === "1") {
   await screenshot("email-sync");
   console.log(`  ✓ synced the next example's signups table into the list (${synced})`);
 
+  // An import of 3,000 rows as a background job: the file chosen as a person would, its columns mapped,
+  // the dialog closed at once, the page reloaded mid-way, and the progress still there until it's done.
+  const csvDir = mkdtempSync(join(tmpdir(), "tour-import-"));
+  const csvPath = join(csvDir, "leads.csv");
+  writeFileSync(csvPath, `Work email,First,Last,Plan,Notes\n${Array.from({ length: 3000 }, (_, i) => (i === 5 ? "x@mailinator.com,Spam,Bot,free,_" : `lead${i}@gmail.com,Lead,${i},${i % 2 ? "pro" : "free"},_`)).join("\n")}\n`);
+  await go(`${brand}/contacts`);
+  await waitFor(`!!document.querySelector('[data-testid="import-contacts"]')`, "the Contacts page");
+  await hydrated('[data-testid="import-contacts"]', "the Import button to come alive");
+  await clickFor('[data-testid="import-contacts"]', "#i-file", "the import dialog");
+  const { root } = await send("DOM.getDocument", { depth: -1 });
+  const { nodeId } = await send("DOM.querySelector", { nodeId: root.nodeId, selector: "#i-file" });
+  await send("DOM.setFileInputFiles", { nodeId, files: [csvPath] });
+  await click('[data-testid="import-upload"]');
+  await waitFor(`!!document.querySelector('[data-testid="import-mapping"]')`, "the column mapping", 60_000);
+  const roles = String(await evaluate(`[...document.querySelectorAll('[data-testid="import-mapping"] select')].map((s) => s.value).join(",")`));
+  if (roles !== "email,first,last,field,field") throw new Error(`the import's guessed mapping: ${roles}`);
+  await setSelect('[data-testid="import-mapping"] > div:nth-child(5) select', "skip");
+  await screenshot("email-import-mapping");
+  await click('[data-testid="import-start"]');
+  await waitFor(`!document.querySelector('[data-testid="import-form"]') && !!document.querySelector('[data-testid="import-job"]')`, "the dialog closed and the import running");
+  await go(`${brand}/contacts`);
+  await waitFor(`!!document.querySelector('[data-testid="import-job"]')`, "the import's progress after a reload");
+  await waitFor(`(document.querySelector('[data-testid="import-status"]')?.innerText ?? "").startsWith("Imported 3,000 rows")`, "the import done", 120_000);
+  const imported = String(await evaluate(`document.querySelector('[data-testid="import-status"]').innerText`));
+  if (!imported.includes("2,999 added") || !imported.includes("1 refused by Shield")) throw new Error(`the import's result: ${imported}`);
+  const lead = JSON.parse(emailDb("SELECT name, fields FROM contacts WHERE email = 'lead7@gmail.com'"))[0];
+  if (lead?.name !== "Lead 7" || lead.fields !== '{"plan":"pro"}') throw new Error(`an imported contact: ${JSON.stringify(lead)}`);
+  rmSync(csvDir, { recursive: true, force: true });
+  await screenshot("email-import-done");
+  console.log(`  ✓ imported 3,000 rows in the background, mapped by hand, through a reload (${imported})`);
+
   // Grace opens the campaign in Outlook: her contact learns her device and app, and Insights counts her active.
   const grace = (JSON.parse(emailDb("SELECT m.id, c.id contact FROM messages m JOIN contacts c ON c.id = m.contact_id WHERE m.to_email = 'grace@tour.test' AND m.kind = 'campaign'")) as { id: string; contact: number }[])[0]!;
   await boxRequest(`https://${domain}/t/o/${grace.id}.gif`, { headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Microsoft Outlook 16.0.17928; ms-office; MSOffice 16" } });

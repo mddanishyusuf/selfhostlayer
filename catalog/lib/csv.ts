@@ -46,3 +46,69 @@ export function parseCsv(text: string): string[][] {
   }
   return rows.filter((r) => r.some((v) => v.trim()));
 }
+
+/**
+ * The same rules as parseCsv, fed a piece at a time: for files too big to hold
+ * whole (an import of millions of contacts). push() returns the rows each
+ * piece completed; end() the last one. A quote or a \r\n split across pieces
+ * is carried over.
+ */
+export class CsvReader {
+  #row: string[] = [];
+  #value = "";
+  #quoted = false;
+  #pendingQuote = false;
+  #pendingCr = false;
+  #started = false;
+
+  push(piece: string): string[][] {
+    const rows: string[][] = [];
+    let input = piece;
+    if (!this.#started) {
+      input = input.replace(/^﻿/, "");
+      this.#started = true;
+    }
+    for (let i = 0; i < input.length; i++) {
+      const c = input[i]!;
+      if (this.#pendingCr) {
+        this.#pendingCr = false;
+        if (c === "\n") continue;
+      }
+      if (this.#pendingQuote) {
+        this.#pendingQuote = false;
+        if (c === '"') {
+          this.#value += '"';
+          continue;
+        }
+        this.#quoted = false;
+      }
+      if (this.#quoted) {
+        if (c === '"') this.#pendingQuote = true;
+        else this.#value += c;
+      } else if (c === '"') this.#quoted = true;
+      else if (c === ",") {
+        this.#row.push(this.#value);
+        this.#value = "";
+      } else if (c === "\n" || c === "\r") {
+        if (c === "\r") this.#pendingCr = true;
+        this.#row.push(this.#value);
+        if (this.#row.some((v) => v.trim())) rows.push(this.#row);
+        this.#row = [];
+        this.#value = "";
+      } else this.#value += c;
+    }
+    return rows;
+  }
+
+  end(): string[][] {
+    if (this.#pendingQuote) this.#quoted = false;
+    if (this.#value || this.#row.length) {
+      this.#row.push(this.#value);
+      const last = this.#row;
+      this.#row = [];
+      this.#value = "";
+      if (last.some((v) => v.trim())) return [last];
+    }
+    return [];
+  }
+}

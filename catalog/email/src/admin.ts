@@ -11,13 +11,15 @@ import type { ApiKeys } from "./api.ts";
 import type { Automations } from "./automations.ts";
 import type { Brands } from "./brands.ts";
 import type { Campaigns } from "./campaigns.ts";
-import { checkEmail, checkFields, type Contacts, type Verdicts } from "./contacts.ts";
+import { checkEmail, checkFields, type Contacts } from "./contacts.ts";
 import { isEmail } from "./mime.ts";
 import { getSetting, setSetting } from "./db.ts";
 import type { Domains } from "./domains.ts";
 import type { Mailer } from "./mailer.ts";
 import { contactVars, renderMarketing } from "./render.ts";
-import { ADDRESS_CHECKS, CHECK_LABELS, decide, type Check, type Shield } from "./shield.ts";
+import type { Cleanup } from "./cleanup.ts";
+import type { Imports } from "./imports.ts";
+import type { Shield } from "./shield.ts";
 import { SmtpConnection } from "./smtp.ts";
 import type { Templates } from "./templates.ts";
 
@@ -46,6 +48,8 @@ export interface AdminContext {
   mailer: Mailer;
   keys: ApiKeys;
   shield: Shield;
+  imports: Imports;
+  cleanup: Cleanup;
   token: string;
   version: string;
   publicUrl: () => string;
@@ -104,89 +108,6 @@ function brandDomain(ctx: AdminContext, brandId: number, website: string): { dom
   const first = domains.find((d) => d.status === "verified") ?? domains[0];
   return { domain: host || first?.domain || null, verified };
 }
-
-/** Shield's verdicts for many addresses, for an import or a sync: what each would do, and the counts. */
-export async function shieldVerdicts(ctx: AdminContext, brandId: number, emails: string[]): Promise<{ verdicts: Verdicts; summary: ImportCheck }> {
-  const settings = ctx.shield.settings(brandId);
-  const found = await ctx.shield.checkMany(brandId, emails);
-  const verdicts: Verdicts = new Map();
-  const summary: ImportCheck = { total: found.size, ok: 0, flag: 0, refuse: 0, byCheck: {}, examples: {} };
-  for (const [email, v] of found) {
-    const d = decide(v, settings);
-    verdicts.set(email, { outcome: d.outcome, checks: d.verdicts.map((x) => x.check), labels: d.verdicts.map((x) => CHECK_LABELS[x.check]) });
-    summary[d.outcome]++;
-    for (const x of d.verdicts) {
-      const b = (summary.byCheck[x.check] ??= { action: x.action, count: 0 });
-      b.count++;
-      const ex = (summary.examples[x.check] ??= []);
-      if (ex.length < 5) ex.push({ email, detail: x.detail });
-    }
-  }
-  return { verdicts, summary };
-}
-
-export interface ImportCheck {
-  /** Distinct addresses checked, and how many would come in clean, flagged or not at all. */
-  total: number;
-  ok: number;
-  flag: number;
-  refuse: number;
-  byCheck: Partial<Record<Check, { action: "refuse" | "flag"; count: number }>>;
-  examples: Partial<Record<Check, { email: string; detail: string }[]>>;
-}
-
-/**
- * Clean the list: the address checks on every subscribed or unconfirmed contact
- * not yet approved, in the background (DNS takes a while on a big list). The
- * result stays until the next scan, for Apply.
- */
-interface Scan {
-  state: "running" | "done" | "failed";
-  checked: number;
-  total: number;
-  startedAt: number;
-  finishedAt: number | null;
-  error: string | null;
-  byCheck: Partial<Record<Check, number>>;
-  examples: Partial<Record<Check, { email: string; detail: string }[]>>;
-  /** Contact ids by check, for Apply. */
-  ids: Partial<Record<Check, number[]>>;
-}
-const scans = new Map<number, Scan>();
-
-function startScan(ctx: AdminContext, brandId: number): Scan {
-  const running = scans.get(brandId);
-  if (running?.state === "running") return running;
-  const contacts = ctx.db.prepare("SELECT id, email FROM contacts WHERE brand_id = ? AND status IN ('subscribed', 'unconfirmed') AND approved = 0").all(brandId) as { id: number; email: string }[];
-  const scan: Scan = { state: "running", checked: 0, total: contacts.length, startedAt: Date.now(), finishedAt: null, error: null, byCheck: {}, examples: {}, ids: {} };
-  scans.set(brandId, scan);
-  void (async () => {
-    const settings = ctx.shield.settings(brandId);
-    for (let i = 0; i < contacts.length; i += 500) {
-      const chunk = contacts.slice(i, i + 500);
-      const found = await ctx.shield.checkMany(brandId, chunk.map((c) => c.email));
-      for (const c of chunk) {
-        for (const v of found.get(c.email.toLowerCase()) ?? []) {
-          if (settings.checks[v.check] === "off") continue;
-          scan.byCheck[v.check] = (scan.byCheck[v.check] ?? 0) + 1;
-          (scan.ids[v.check] ??= []).push(c.id);
-          const ex = (scan.examples[v.check] ??= []);
-          if (ex.length < 5) ex.push({ email: c.email, detail: v.detail });
-        }
-      }
-      scan.checked += chunk.length;
-    }
-    scan.state = "done";
-    scan.finishedAt = Date.now();
-  })().catch((err: Error) => {
-    scan.state = "failed";
-    scan.error = err.message;
-    scan.finishedAt = Date.now();
-  });
-  return scan;
-}
-
-const scanView = (s: Scan | undefined) => (s ? { state: s.state, checked: s.checked, total: s.total, startedAt: s.startedAt, finishedAt: s.finishedAt, error: s.error, byCheck: s.byCheck, examples: s.examples } : null);
 
 /** The hour (0-23) a moment falls on in a time zone; the server's (UTC) when there's none. */
 function hourIn(at: number, tz: string | null): number {
@@ -404,7 +325,7 @@ const ROUTES: [string, string, Handler][] = [
       // Shield's address checks, unless asked not to; include: "flagged" lets refused ones in, flagged.
       if (input.shield === false) return ctx.contacts.importCsv(b, input.csv, { lists: input.lists, status: input.status });
       const parsed = ctx.contacts.parseCsv(input.csv);
-      const { verdicts } = await shieldVerdicts(ctx, b, parsed.rows.map((r) => r.email));
+      const { verdicts } = await ctx.shield.verdicts(b, parsed.rows.map((r) => r.email));
       if (input.include === "flagged") for (const v of verdicts.values()) if (v.outcome === "refuse") v.outcome = "flag";
       const r = ctx.contacts.importRows(b, parsed, { lists: input.lists, status: input.status, verdicts, source: "import" });
       for (const v of verdicts.values()) ctx.shield.log(b, v.outcome, v.checks, "import");
@@ -433,7 +354,7 @@ const ROUTES: [string, string, Handler][] = [
         }
         parsed.rows.push({ line: i + 1, email, name: typeof r.name === "string" ? r.name.trim().replace(/[\r\n]+/g, " ").slice(0, 200) : "", fields });
       });
-      const { verdicts } = await shieldVerdicts(ctx, b, parsed.rows.map((r) => r.email));
+      const { verdicts } = await ctx.shield.verdicts(b, parsed.rows.map((r) => r.email));
       for (const v of verdicts.values()) ctx.shield.log(b, v.outcome, v.checks, "sync");
       // Subscribed: they signed up on the brand's own site. Nobody who left comes back.
       return ctx.contacts.importRows(b, parsed, { lists: input.lists, verdicts, source });
@@ -448,7 +369,7 @@ const ROUTES: [string, string, Handler][] = [
       const input = await readJson(req, 60 * 1024 * 1024);
       if (typeof input.csv !== "string") throw new InputError("csv", "must be the file's text");
       const parsed = ctx.contacts.parseCsv(input.csv);
-      const { summary } = await shieldVerdicts(ctx, b, parsed.rows.map((r) => r.email));
+      const { summary } = await ctx.shield.verdicts(b, parsed.rows.map((r) => r.email));
       return { ...summary, rows: parsed.rows.length, skipped: parsed.skipped.slice(0, 50), unreadable: parsed.skipped.length };
     },
   ],
@@ -471,31 +392,31 @@ const ROUTES: [string, string, Handler][] = [
     "brands/:b/shield",
     ({ ctx, p, q }) => {
       const b = ctx.brands.must(num(p.b, "brand")).id;
-      return { settings: ctx.shield.settings(b), lists: ctx.shield.lists(), abuseipdb: ctx.shield.hasAbuseKey(), stats: ctx.shield.stats(b, Math.min(90, Math.max(1, Number(q.get("days")) || 30))), flagged: ctx.contacts.counts(b).flagged, scan: scanView(scans.get(b)) };
+      return { settings: ctx.shield.settings(b), lists: ctx.shield.lists(), abuseipdb: ctx.shield.hasAbuseKey(), stats: ctx.shield.stats(b, Math.min(90, Math.max(1, Number(q.get("days")) || 30))), flagged: ctx.contacts.counts(b).flagged, scan: ctx.cleanup.view(b) };
     },
   ],
   ["PUT", "brands/:b/shield", async ({ ctx, p, body }) => ctx.shield.setSettings(ctx.brands.must(num(p.b, "brand")).id, await body())],
   ["PUT", "shield/abuseipdb", async ({ ctx, body }) => (ctx.shield.setAbuseKey((await body()).key), { abuseipdb: ctx.shield.hasAbuseKey() })],
   ["POST", "shield/refresh", async ({ ctx }) => (await ctx.shield.refresh(true), { lists: ctx.shield.lists() })],
-  ["POST", "brands/:b/shield/scan", ({ ctx, p }) => scanView(startScan(ctx, ctx.brands.must(num(p.b, "brand")).id))],
+  ["POST", "brands/:b/shield/scan", ({ ctx, p }) => ctx.cleanup.start(ctx.brands.must(num(p.b, "brand")).id)],
   [
     "POST",
     "brands/:b/shield/scan/apply",
     async ({ ctx, p, body }) => {
       const b = ctx.brands.must(num(p.b, "brand")).id;
-      const scan = scans.get(b);
-      if (scan?.state !== "done") throw new InputError("scan", "run Clean the list first, and wait for it to finish", 409);
       const input = await body();
       const action = input.action === "unsubscribe" ? "unsubscribe" : "flag";
-      const checks = Array.isArray(input.checks) ? (input.checks.filter((c) => (ADDRESS_CHECKS as unknown[]).includes(c)) as Check[]) : [];
-      if (!checks.length) throw new InputError("checks", "pick at least one check");
-      const byContact = new Map<number, string[]>();
-      for (const c of checks) for (const id of scan.ids[c] ?? []) byContact.set(id, [...(byContact.get(id) ?? []), c]);
-      const changed = ctx.contacts.applyFlags(b, byContact, action);
-      scans.delete(b);
-      return { changed, action };
+      return { changed: ctx.cleanup.apply(b, input.checks, action), action };
     },
   ],
+
+  // Imports as background jobs: the file (its body as is, ?name= its name), then its mapping, then progress.
+  ["POST", "brands/:b/imports", ({ ctx, p, q, req }) => ctx.imports.create(ctx.brands.must(num(p.b, "brand")).id, req, q.get("name") ?? "contacts.csv")],
+  ["GET", "brands/:b/imports", ({ ctx, p }) => ({ imports: ctx.imports.list(ctx.brands.must(num(p.b, "brand")).id) })],
+  ["GET", "brands/:b/imports/:id", ({ ctx, p }) => ctx.imports.get(num(p.b, "brand"), num(p.id, "import"))],
+  ["POST", "brands/:b/imports/:id/start", async ({ ctx, p, body }) => ctx.imports.start(ctx.brands.must(num(p.b, "brand")).id, num(p.id, "import"), await body())],
+  ["POST", "brands/:b/imports/:id/continue", async ({ ctx, p, body }) => ctx.imports.continue(num(p.b, "brand"), num(p.id, "import"), await body())],
+  ["POST", "brands/:b/imports/:id/cancel", ({ ctx, p }) => ctx.imports.cancel(num(p.b, "brand"), num(p.id, "import"))],
 
   // Campaigns
   ["GET", "brands/:b/campaigns", ({ ctx, p }) => ({ campaigns: ctx.campaigns.list(ctx.brands.must(num(p.b, "brand")).id) })],

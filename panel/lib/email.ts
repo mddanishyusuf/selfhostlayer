@@ -98,17 +98,6 @@ export interface ShieldInfo {
   scan: { state: "running" | "done" | "failed"; checked: number; total: number; startedAt: number; finishedAt: number | null; error: string | null; byCheck: Partial<Record<ShieldCheck, number>>; examples: Partial<Record<ShieldCheck, { email: string; detail: string }[]>> } | null;
 }
 
-export interface ImportCheck {
-  rows: number;
-  unreadable: number;
-  total: number;
-  ok: number;
-  flag: number;
-  refuse: number;
-  byCheck: Partial<Record<ShieldCheck, { action: "refuse" | "flag"; count: number }>>;
-  examples: Partial<Record<ShieldCheck, { email: string; detail: string }[]>>;
-}
-
 export interface List {
   id: number;
   brandId: number;
@@ -276,15 +265,17 @@ async function endpoint(p: Project): Promise<{ base: string; token: string }> {
   return { base: `http://127.0.0.1:${port}`, token };
 }
 
-/** One admin API call; Email's own errors come back as EmailError. raw: the response's text (CSV). */
-export async function emailApi<T>(p: Project, path: string, init: { method?: string; body?: unknown; timeoutMs?: number; raw?: boolean } = {}): Promise<T> {
+/** One admin API call; Email's own errors come back as EmailError. raw: the response's text (CSV). stream: a body sent as is (an import's file). */
+export async function emailApi<T>(p: Project, path: string, init: { method?: string; body?: unknown; timeoutMs?: number; raw?: boolean; stream?: ReadableStream<Uint8Array> } = {}): Promise<T> {
   const { base, token } = await endpoint(p);
   let res: Response;
   try {
     res = await fetch(`${base}/_admin/${path}`, {
-      method: init.method ?? (init.body === undefined ? "GET" : "POST"),
-      headers: { Authorization: `Bearer ${token}`, "X-Public-Url": emailPublicUrl(p), ...(init.body === undefined ? {} : { "Content-Type": "application/json" }) },
-      body: init.body === undefined ? undefined : JSON.stringify(init.body),
+      method: init.method ?? (init.body === undefined && !init.stream ? "GET" : "POST"),
+      headers: { Authorization: `Bearer ${token}`, "X-Public-Url": emailPublicUrl(p), ...(init.stream ? { "Content-Type": "text/csv" } : init.body === undefined ? {} : { "Content-Type": "application/json" }) },
+      body: init.stream ?? (init.body === undefined ? undefined : JSON.stringify(init.body)),
+      // Node's fetch sends a stream only half-duplex.
+      ...(init.stream ? { duplex: "half" } : {}),
       signal: AbortSignal.timeout(init.timeoutMs ?? 20_000),
       cache: "no-store",
     });
@@ -365,6 +356,40 @@ export interface Insights {
 }
 
 export const insightsOf = (p: Project, brand: number) => emailApi<Insights>(p, `brands/${brand}/insights`);
+/** An import running in Email (catalog/email/src/imports.ts). */
+export interface ImportJob {
+  id: number;
+  brandId: number;
+  status: "mapping" | "checking" | "review" | "importing" | "done" | "failed" | "cancelled";
+  filename: string;
+  bytes: number;
+  headers: string[];
+  sample: string[][];
+  guess: ImportMapping;
+  mapping: ImportMapping | null;
+  options: { lists: number[]; shield: boolean; review: boolean; include: "clean" | "flagged" } | null;
+  rows: number | null;
+  checked: number;
+  processed: number;
+  counts: { created: number; updated: number; refused: number; flagged: number; skipped: number };
+  shield: { total: number; ok: number; flag: number; refuse: number; byCheck: Partial<Record<ShieldCheck, { action: "refuse" | "flag"; count: number }>>; examples: Partial<Record<ShieldCheck, { email: string; detail: string }[]>> };
+  skipped: { line: number; reason: string }[];
+  error: string | null;
+  createdAt: number;
+  startedAt: number | null;
+  finishedAt: number | null;
+}
+
+export interface ImportMapping {
+  email: number;
+  name: number | null;
+  first: number | null;
+  last: number | null;
+  fields: { column: number; key: string }[];
+}
+
+export const importsOf = async (p: Project, brand: number) => (await emailApi<{ imports: ImportJob[] }>(p, `brands/${brand}/imports`)).imports;
+
 export const shieldOf = (p: Project, brand: number) => emailApi<ShieldInfo>(p, `brands/${brand}/shield`);
 export const suppressionsOf = (p: Project, brand: number, page = 1) => emailApi<{ items: { email: string; reason: string; detail: string; createdAt: number }[]; total: number }>(p, `brands/${brand}/suppressions${qs({ page: page > 1 ? page : undefined })}`);
 export const campaignsOf = async (p: Project, brand: number) => (await emailApi<{ campaigns: Campaign[] }>(p, `brands/${brand}/campaigns`)).campaigns;

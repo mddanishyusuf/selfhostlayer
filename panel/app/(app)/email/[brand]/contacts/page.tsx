@@ -2,11 +2,12 @@ import { DownloadIcon } from "lucide-react";
 import Link from "next/link";
 import { ContactButtons, SuppressForm, UnsuppressButton } from "@/components/email-forms";
 import { ContactFilters } from "@/components/email-filters";
+import { ImportsPanel } from "@/components/email-import";
 import { StatusPill, when } from "@/components/email-ui";
 import { Icon } from "@/components/icon";
 import { CARD, Empty, Notice, PageHeader, Section, Segmented } from "@/components/page";
 import { buttonClass } from "@/components/ui";
-import { brandFor, checkLabel, contactsOf, listsOf, suppressionsOf, type List } from "@/lib/email";
+import { brandFor, checkLabel, contactsOf, importsOf, listsOf, suppressionsOf, type ImportJob, type List } from "@/lib/email";
 import { requireUser } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
@@ -28,11 +29,12 @@ export default async function ContactsPage({ params, searchParams }: { params: P
     return p.size ? `${path}?${p}` : path;
   };
   let lists: List[] = [];
+  let imports: ImportJob[] = [];
   let problem: string | null = null;
   let data: Awaited<ReturnType<typeof contactsOf>> | null = null;
   let suppressed: Awaited<ReturnType<typeof suppressionsOf>> | null = null;
   try {
-    lists = await listsOf(project, brand.id);
+    [lists, imports] = await Promise.all([listsOf(project, brand.id), importsOf(project, brand.id).catch(() => [])]);
     if (sp.view === "suppressed") suppressed = await suppressionsOf(project, brand.id, Number(sp.page) || 1);
     else data = await contactsOf(project, brand.id, { q: sp.q, list: sp.list, status: sp.status, page: Number(sp.page) || 1 });
   } catch (err) {
@@ -56,6 +58,7 @@ export default async function ContactsPage({ params, searchParams }: { params: P
           </a>
         )}
       </div>
+      {sp.view !== "suppressed" && <ImportsPanel brandId={brand.id} initial={imports} />}
       {sp.view !== "suppressed" && <ContactFilters path={path} q={sp.q} list={sp.list} status={sp.status} lists={lists.map((l) => ({ id: l.id, name: l.name, total: l.total }))} />}
       {problem && (
         <Notice lead="Not reachable" tone="err">

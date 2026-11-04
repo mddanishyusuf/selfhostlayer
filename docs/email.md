@@ -45,12 +45,13 @@ Each contact has an address, a name, custom fields, the lists it's in, and a sta
 
 **Add contact** adds one. **Import** takes a CSV with an email column, and name (or first and last name); every other column becomes a custom field. Imports never subscribe someone who unsubscribed, and never start an automation. **CSV** exports the contacts shown.
 
-Before an import, **Check** runs [Shield](#shield)'s address checks on the file (on by default) and shows the result first:
+**Import** takes a CSV file of any size up to 1 GB, and runs on the server:
 
-- how many addresses are fine, flagged or refused;
-- what each check found, with examples.
+1. **Upload:** the file goes to Email, with a progress bar.
+2. **Map the columns:** say what each one is: the email, the name (or first and last name), a contact field (name it), or skip it. It's guessed from the headers, and a few rows are shown under each.
+3. **Start:** with **Check the addresses with Shield** (on by default), invalid, temporary and spam-listed addresses stay out by the brand's [Shield](#shield) settings. **Check everything first** reads the whole file with Shield and waits, showing what each check found, with examples. Then you import leaving refused addresses out, or bring them in flagged.
 
-Refused addresses stay out, or you can import them as flagged. **Flagged** on Contacts shows Shield's flags.
+The import runs 1,000 rows at a time with a short pause between batches, so sending and the API stay quick during an import of millions. Its progress is saved after each batch. You can close the dialog or leave the page, and Contacts shows it running with **Cancel**; what's imported by then stays. If Email restarts, the import carries on from its last batch. When it's done, Contacts shows what was added, updated, flagged, refused and skipped, with the skipped rows' line numbers.
 
 **Suppressed** (on Contacts) lists the addresses nothing is sent to, transactional email included: hard bounces, spam complaints, and addresses added by hand.
 
@@ -82,7 +83,7 @@ The first five need only the address, so they run on every way in: sign-up forms
 
 - **Refuse** keeps the address out. A sign-up form still says thanks, so a bot learns nothing, and the API answers 422 with the reason.
 - **Flag** keeps the contact, but campaigns, automations and confirmation emails skip it until you **Approve** it on its page.
-- **Clean the list** runs the address checks on every subscribed and unconfirmed contact you haven't approved. It shows what each check found, then flags or unsubscribes the ones you pick.
+- **Clean the list** runs the address checks on every subscribed and unconfirmed contact you haven't approved, 1,000 at a time in the background (its progress survives a restart). It shows what each check found, then flags or unsubscribes the ones you pick.
 - **The form snippet** is optional. On a sign-up form that posts to a list, it adds the hidden field, how long the page was open, whether a script drives the browser, and the visitor's time zone:
   ```html
   <script src="https://<email address>/subscribe.js" defer></script>

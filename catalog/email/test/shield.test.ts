@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -263,18 +263,15 @@ describe("Shield in Email", () => {
     const approved = (await admin(`brands/${b}/contacts?q=w%40gone`)).body.contacts[0];
     await admin(`brands/${b}/contacts/${approved.id}/approve`, { method: "POST" });
     expect((await admin(`brands/${b}/shield/scan/apply`, { body: { checks: ["disposable"] } })).status).toBe(409);
-    await admin(`brands/${b}/shield/scan`, { method: "POST" });
-    let scan;
-    for (let i = 0; i < 50; i++) {
-      scan = (await admin(`brands/${b}/shield`)).body.scan;
-      if (scan.state !== "running") break;
-      await new Promise((r) => setTimeout(r, 20));
-    }
+    expect((await admin(`brands/${b}/shield/scan`, { method: "POST" })).body).toMatchObject({ state: "running", total: 4 });
+    // Background work is off in tests: the scan runs when told.
+    await app.cleanup.run(b);
+    const scan = (await admin(`brands/${b}/shield`)).body.scan;
     expect(scan).toMatchObject({ state: "done", checked: 4, total: 4, byCheck: { disposable: 2, spamDomain: 1 } });
     expect((await admin(`brands/${b}/shield/scan/apply`, { body: { checks: ["disposable"], action: "flag" } })).body).toEqual({ changed: 2, action: "flag" });
     expect((await admin(`brands/${b}/contacts?status=flagged`)).body.total).toBe(2);
     await admin(`brands/${b}/shield/scan`, { method: "POST" });
-    for (let i = 0; i < 50 && (await admin(`brands/${b}/shield`)).body.scan.state === "running"; i++) await new Promise((r) => setTimeout(r, 20));
+    await app.cleanup.run(b);
     expect((await admin(`brands/${b}/shield/scan/apply`, { body: { checks: ["spamDomain"], action: "unsubscribe" } })).body.changed).toBe(1);
     expect((await admin(`brands/${b}/contacts?q=spammy`)).body.contacts[0].status).toBe("unsubscribed");
   });
@@ -348,5 +345,60 @@ describe("Shield in Email", () => {
     expect(i.hours[berlinHour]).toBe(1);
     expect(i.clicks).toEqual({ total: 1, withZone: 1 });
     expect(i.health).toMatchObject({ flagged: 0, sent30d: 1, bounced30d: 0 });
+  });
+
+});
+
+describe("imports as background jobs", () => {
+  const upload = (b: number, csv: string, name = "people.csv") => fetch(`${base}/_admin/brands/${b}/imports?name=${encodeURIComponent(name)}`, { method: "POST", headers: { Authorization: `Bearer ${TOKEN}` }, body: csv }).then(async (r) => ({ status: r.status, body: await r.json() }));
+
+  it("uploads, guesses the mapping, imports by the owner's mapping in batches, and keeps its progress", async () => {
+    await start();
+    const b = await brand();
+    const list = (await admin(`brands/${b}/lists`, { body: { name: "Leads" } })).body;
+    // 2,500 rows: three batches, with a bad address and a temporary one among them.
+    const lines = ["Work Email,Given name,Surname,Company,Ignore me"];
+    for (let i = 0; i < 2500; i++) lines.push(i === 7 ? "not-an-address,X,Y,Z,_" : i === 9 ? "t@mailinator.com,T,M,Spam,_" : `p${i}@piqo.test,P${i},Last,Acme ${i % 3},_`);
+    const up = await upload(b, `${lines.join("\r\n")}\r\n`);
+    expect(up.status).toBe(200);
+    expect(up.body).toMatchObject({ status: "mapping", filename: "people.csv", headers: ["Work Email", "Given name", "Surname", "Company", "Ignore me"] });
+    expect(up.body.sample[0]).toEqual(["p0@piqo.test", "P0", "Last", "Acme 0", "_"]);
+    expect(up.body.guess).toMatchObject({ email: 0, first: 1, last: 2 });
+
+    const mapping = { email: 0, name: null, first: 1, last: 2, fields: [{ column: 3, key: "company" }] };
+    expect((await admin(`brands/${b}/imports/${up.body.id}/start`, { body: { mapping: { ...mapping, email: 9 } } })).status).toBe(400);
+    expect((await admin(`brands/${b}/imports/${up.body.id}/start`, { body: { mapping, lists: [list.id] } })).body.status).toBe("importing");
+    await app.imports.run(up.body.id);
+    const done = (await admin(`brands/${b}/imports/${up.body.id}`)).body;
+    expect(done).toMatchObject({ status: "done", rows: 2500, processed: 2500, counts: { created: 2498, refused: 1, skipped: 1, flagged: 0 } });
+    expect(done.skipped).toEqual(expect.arrayContaining([{ line: 9, reason: "not-an-address isn't an email address" }]));
+    expect(done.shield.byCheck.disposable).toEqual({ action: "refuse", count: 1 });
+    expect((await admin(`brands/${b}/contacts?q=p42%40`)).body.contacts[0]).toMatchObject({ name: "P42 Last", fields: { company: "Acme 0" }, lists: [list.id] });
+    expect((await admin(`brands/${b}/imports`)).body.imports.map((j: { id: number }) => j.id)).toEqual([up.body.id]);
+    // The file goes once it's done.
+    expect(existsSync(join(dir, "imports", `${up.body.id}.csv`))).toBe(false);
+    // One log row per kind of refusal, not one per address.
+    expect((app.db.prepare("SELECT count(*) n, sum(n) total FROM shield_log WHERE brand_id = ? AND source = 'import'").get(b) as { n: number; total: number })).toEqual({ n: 1, total: 1 });
+  });
+
+  it("with a review: checks everything first and waits, then imports refused ones flagged if asked; a cancel stops it", async () => {
+    await start();
+    const b = await brand();
+    const up = await upload(b, "email\nada@piqo.test\nx@mailinator.com\nz@spammy.test\n");
+    await admin(`brands/${b}/imports/${up.body.id}/start`, { body: { mapping: { email: 0, fields: [] }, review: true } });
+    await app.imports.run(up.body.id);
+    const review = (await admin(`brands/${b}/imports/${up.body.id}`)).body;
+    expect(review).toMatchObject({ status: "review", rows: 3, checked: 3, processed: 0, shield: { ok: 1, refuse: 2 } });
+    expect((await admin(`brands/${b}/contacts`)).body.total).toBe(0);
+    await admin(`brands/${b}/imports/${up.body.id}/continue`, { body: { include: "flagged" } });
+    await app.imports.run(up.body.id);
+    expect((await admin(`brands/${b}/imports/${up.body.id}`)).body).toMatchObject({ status: "done", counts: { created: 3, flagged: 2 } });
+
+    const again = await upload(b, "email\nnew@piqo.test\n");
+    await admin(`brands/${b}/imports/${again.body.id}/start`, { body: { mapping: { email: 0, fields: [] } } });
+    expect((await admin(`brands/${b}/imports/${again.body.id}/cancel`, { method: "POST" })).body.status).toBe("cancelled");
+    await app.imports.run(again.body.id);
+    expect((await admin(`brands/${b}/contacts?q=new%40`)).body.total).toBe(0);
+    expect((await upload(b, "")).status).toBe(400);
   });
 });

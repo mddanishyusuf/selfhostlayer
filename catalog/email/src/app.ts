@@ -19,6 +19,8 @@ import { Mailer } from "./mailer.ts";
 import { handlePublic, publicLimits, type PublicContext } from "./public.ts";
 import { loadGeo } from "../../lib/geo.ts";
 import { Secrets } from "../../lib/secrets.ts";
+import { Cleanup } from "./cleanup.ts";
+import { Imports } from "./imports.ts";
 import { Shield, type ShieldOptions } from "./shield.ts";
 import { Templates } from "./templates.ts";
 
@@ -54,6 +56,8 @@ export interface App {
   mailer: Mailer;
   keys: ApiKeys;
   shield: Shield;
+  imports: Imports;
+  cleanup: Cleanup;
   publicUrl: () => string;
   close: () => Promise<void>;
 }
@@ -82,14 +86,19 @@ export function createApp(o: AppOptions): App {
   let geo = loadGeo(geoPaths);
   const country = (ip: string | null) => (ip && geo ? geo.geo.country(ip) : null);
   const shield = new Shield({ db, secrets, dir: join(o.dataDir, "shield"), fetch: o.fetch, dns: o.shieldDns });
+  const imports = new Imports({ db, dir: join(o.dataDir, "imports"), contacts, shield, background: o.background });
+  const cleanup = new Cleanup({ db, shield, contacts, background: o.background });
 
-  const admin: AdminContext = { db, brands, domains, contacts, campaigns, templates, automations, mailer, keys, shield, token: o.token, version: o.version, publicUrl: () => publicUrl, setPublicUrl, smtpCa: o.smtpCa };
+  const admin: AdminContext = { db, brands, domains, contacts, campaigns, templates, automations, mailer, keys, shield, imports, cleanup, token: o.token, version: o.version, publicUrl: () => publicUrl, setPublicUrl, smtpCa: o.smtpCa };
   const api: ApiContext = { db, brands, domains, contacts, templates, automations, mailer, keys, shield };
   const pub: PublicContext = { db, brands, domains, contacts, mailer, secrets, shield, country, publicUrl: () => publicUrl, fetch: o.fetch, snsCertificate: o.snsCertificate, limits: publicLimits() };
 
   const timers: NodeJS.Timeout[] = [];
   if (o.background !== false) {
     mailer.start();
+    // Imports and Clean the list a restart cut short carry on.
+    imports.resume();
+    cleanup.resume();
     const every = (ms: number, run: () => void, what: string) => {
       const t = setInterval(() => {
         try {
@@ -139,6 +148,8 @@ export function createApp(o: AppOptions): App {
     mailer,
     keys,
     shield,
+    imports,
+    cleanup,
     publicUrl: () => publicUrl,
     close: async () => {
       for (const t of timers) clearInterval(t);

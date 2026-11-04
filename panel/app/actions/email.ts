@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { emailApi, EmailError, emailInstall, SHIELD_CHECKS, type Brand, type Campaign, type ImportCheck, type Step } from "@/lib/email";
+import { emailApi, EmailError, emailInstall, SHIELD_CHECKS, type Brand, type Campaign, type ImportJob, type ImportMapping, type Step } from "@/lib/email";
 import type { Engine } from "@/lib/browse";
 import { addSync, deleteSync, getSync, runSync } from "@/lib/email-sync";
 import { markdownEmail } from "@/lib/markdown";
@@ -208,44 +208,6 @@ export async function removeContact(_prev: FormState, form: FormData): Promise<F
   if ("error" in r) return r;
   refresh();
   redirect(`/email/${num(form, "brand")}/contacts`);
-}
-
-/** The CSV from a form, or an error to show. */
-async function csvOf(form: FormData): Promise<string | { error: string }> {
-  const file = form.get("file");
-  if (!(file instanceof File) || !file.size) return { error: "Choose a CSV file." };
-  if (file.size > 50 * 1024 * 1024) return { error: "The file is over 50 MB: split it." };
-  return file.text();
-}
-
-/** What Shield makes of an import's addresses, before anything is added. */
-export async function checkImport(form: FormData): Promise<{ ok: ImportCheck } | { error: string }> {
-  await requireUser();
-  const csv = await csvOf(form);
-  if (typeof csv !== "string") return csv;
-  const r = await attempt(() => api<ImportCheck>(`brands/${num(form, "brand")}/import/check`, { body: { csv }, timeoutMs: 300_000 }));
-  return "error" in r ? { error: r.error } : r;
-}
-
-/**
- * Imports a CSV. shield: "off" skips Shield; include: "flagged" lets refused
- * addresses in as flagged instead of leaving them out.
- */
-export async function importContacts(_prev: FormState, form: FormData): Promise<FormState> {
-  await requireUser();
-  const csv = await csvOf(form);
-  if (typeof csv !== "string") return csv;
-  const body = { csv, lists: ids(form, "lists"), shield: text(form, "shield") !== "off", include: text(form, "include") === "flagged" ? "flagged" : undefined };
-  const r = await attempt(() => api<{ created: number; updated: number; refused?: number; flagged?: number; skipped: { line: number; reason: string }[] }>(`brands/${num(form, "brand")}/import`, { body, timeoutMs: 300_000 }));
-  if ("error" in r) return r;
-  refresh();
-  const { created, updated, refused = 0, flagged = 0, skipped } = r.ok;
-  const other = skipped.filter((x) => !x.reason.startsWith("Shield refused"));
-  const parts = [`${created.toLocaleString("en")} added`, `${updated.toLocaleString("en")} updated`];
-  if (flagged) parts.push(`${flagged.toLocaleString("en")} of them flagged`);
-  if (refused) parts.push(`${refused.toLocaleString("en")} refused by Shield`);
-  if (other.length) parts.push(`${other.length} skipped (line ${other[0]!.line}: ${other[0]!.reason}${other.length > 1 ? ", …" : ""})`);
-  return { saved: `${parts.join(", ")}.` };
 }
 
 // Shield
@@ -520,4 +482,30 @@ export async function deleteEmailSync(form: FormData): Promise<void> {
   if (!s) return;
   deleteSync(s.id);
   revalidatePath(`/email/${s.brandId}/sync`);
+}
+
+// Imports as background jobs (catalog/email/src/imports.ts)
+
+export async function startImport(brand: number, id: number, input: { mapping: ImportMapping; lists: number[]; shield: boolean; review: boolean; include: "clean" | "flagged" }): Promise<{ ok: ImportJob } | { error: string }> {
+  await requireUser();
+  const r = await attempt(() => api<ImportJob>(`brands/${brand}/imports/${id}/start`, { body: input }));
+  return "error" in r ? { error: r.error } : r;
+}
+
+export async function continueImport(brand: number, id: number, include: "clean" | "flagged"): Promise<{ ok: ImportJob } | { error: string }> {
+  await requireUser();
+  const r = await attempt(() => api<ImportJob>(`brands/${brand}/imports/${id}/continue`, { body: { include } }));
+  return "error" in r ? { error: r.error } : r;
+}
+
+export async function cancelImport(brand: number, id: number): Promise<void> {
+  await requireUser();
+  await attempt(() => api(`brands/${brand}/imports/${id}/cancel`, { method: "POST" }));
+}
+
+/** The brand's imports, for the progress shown on Contacts (polled while one runs). */
+export async function importJobs(brand: number): Promise<ImportJob[]> {
+  await requireUser();
+  const r = await attempt(() => api<{ imports: ImportJob[] }>(`brands/${brand}/imports`));
+  return "error" in r ? [] : r.ok.imports;
 }
