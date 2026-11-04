@@ -59,6 +59,25 @@ export default async function ContactPage({ params }: { params: Promise<{ brand:
       <section className={`${CARD} p-3.5`}>
         <ContactForm brandId={brand.id} contact={c} lists={lists} />
       </section>
+      <Section title="Activity" description="Its opens, clicks and what it did, newest first">
+        <div className="border-t border-border" data-testid="contact-activity">
+          {[
+            ...data.activity.map((e) => ({
+              at: e.at,
+              text: { open: "Opened", click: "Clicked", unsubscribe: "Unsubscribed from", bounce: "Bounced on", complaint: "Marked as spam" }[e.kind] ?? e.kind,
+              what: e.kind === "click" && e.detail ? `${e.subject || "(no subject)"} → ${e.detail.replace(/^https?:\/\//, "").slice(0, 80)}` : e.subject || "(no subject)",
+            })),
+            { at: c.createdAt, text: "Added", what: c.source ? { form: "from a sign-up form", api: "through the API", import: "from an import", panel: "by hand", event: "by an API event" }[c.source] ?? (c.source.startsWith("sync:") ? `synced from ${c.source.slice(5)}` : `from ${c.source}`) : "" },
+          ].map((e, i) => (
+            <div key={i} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-b border-border-soft px-3.5 py-2 text-[13px] last:border-b-0">
+              <span className="truncate">
+                <b className="font-medium">{e.text}</b> <span className="text-muted">{e.what}</span>
+              </span>
+              <span className="text-[12px] text-muted">{when(e.at)}</span>
+            </div>
+          ))}
+        </div>
+      </Section>
       <Section title="Emails" description="What this address was sent, newest first">
         <div className="border-t border-border" data-testid="contact-history">
           {data.messages.length === 0 && <Empty>Nothing sent yet.</Empty>}

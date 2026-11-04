@@ -5,7 +5,9 @@ import { join } from "node:path";
 import { gzipSync } from "node:zlib";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createApp, type App } from "../src/app.ts";
+import { openSource, readerApp } from "../src/public.ts";
 import { decide, DEFAULT_SETTINGS, normalizeIpv6, readShieldSettings } from "../src/shield.ts";
+import { Secrets } from "../../lib/secrets.ts";
 
 const TOKEN = "t".repeat(64);
 const BROWSER = "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_5) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Safari/605.1.15";
@@ -275,5 +277,45 @@ describe("Shield in Email", () => {
     for (let i = 0; i < 50 && (await admin(`brands/${b}/shield`)).body.scan.state === "running"; i++) await new Promise((r) => setTimeout(r, 20));
     expect((await admin(`brands/${b}/shield/scan/apply`, { body: { checks: ["spamDomain"], action: "unsubscribe" } })).body.changed).toBe(1);
     expect((await admin(`brands/${b}/contacts?q=spammy`)).body.contacts[0].status).toBe("unsubscribed");
+  });
+
+  it("opens and clicks fill in the contact: proxies and Apple's automatic opens are counted but tell nothing, clicks tell device and app", async () => {
+    await start();
+    const b = await brand();
+    const { contact } = app.contacts.upsert(b, { email: "ada@piqo.test" });
+    const id = "a".repeat(24);
+    const t0 = Date.now() - 60_000;
+    app.db.prepare("INSERT INTO messages (id, brand_id, kind, contact_id, to_email, from_email, status, send_at, created_at, sent_at) VALUES (?, ?, 'campaign', ?, ?, ?, 'sent', ?, ?, ?)").run(id, b, contact.id, contact.email, "news@piqo.app", t0, t0, t0);
+    const open = (ua: string) => fetch(`${base}/t/o/${id}.gif`, { headers: { "User-Agent": ua } });
+    await open("Mozilla/5.0 (Windows NT 5.1; rv:11.0) Gecko Firefox/11.0 (via ggpht.com GoogleImageProxy)");
+    let c = app.contacts.get(b, contact.id);
+    expect(c).toMatchObject({ opens: 1, device: null, client: null });
+    expect(c.lastOpenAt).not.toBeNull();
+    const first = c.lastOpenAt;
+    await new Promise((r) => setTimeout(r, 5));
+    await open("Mozilla/5.0");
+    c = app.contacts.get(b, contact.id);
+    expect([c.opens, c.lastOpenAt]).toEqual([2, first]);
+    await open("Mozilla/5.0 (Windows NT 10.0; Win64; x64) Microsoft Outlook 16.0.17928; ms-office; MSOffice 16");
+    expect(app.contacts.get(b, contact.id)).toMatchObject({ opens: 3, device: "desktop", client: "Outlook on Windows" });
+
+    const target = "https://piqo.app/pricing";
+    const sig = new Secrets(TOKEN, "s".repeat(64), "email").sign("c", id, target);
+    const click = await fetch(`${base}/t/c/${id}?u=${encodeURIComponent(target)}&s=${sig}`, { redirect: "manual", headers: { "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1" } });
+    expect(click.status).toBe(302);
+    c = app.contacts.get(b, contact.id);
+    expect(c).toMatchObject({ clicks: 1, device: "mobile", client: "Safari on iOS" });
+    expect(c.lastClickAt).not.toBeNull();
+    const detail = (await admin(`brands/${b}/contacts/${contact.id}`)).body;
+    expect(detail.activity.map((e: { kind: string }) => e.kind)).toEqual(["click", "open", "open", "open"]);
+  });
+
+  it("tells proxies, Apple and readers apart", () => {
+    expect(openSource("Mozilla/5.0 (Windows NT 5.1) (via ggpht.com GoogleImageProxy)")).toBe("proxy");
+    expect(openSource("YahooMailProxy; https://help.yahoo.com/kb/yahoo-mail-proxy-SLN28749.html")).toBe("proxy");
+    expect(openSource("Mozilla/5.0")).toBe("apple");
+    expect(openSource("Mozilla/5.0 (Macintosh; Intel Mac OS X 14_5) AppleWebKit/605.1.15 (KHTML, like Gecko)")).toBe("direct");
+    expect(readerApp("Mozilla/5.0 (Macintosh; Intel Mac OS X 14_5) AppleWebKit/605.1.15 (KHTML, like Gecko)")).toEqual({ device: "desktop", client: "Apple Mail on macOS" });
+    expect(readerApp("curl/8.0")).toBeNull();
   });
 });

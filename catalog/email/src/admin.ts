@@ -311,7 +311,14 @@ const ROUTES: [string, string, Handler][] = [
            FROM messages m LEFT JOIN campaigns c ON c.id = m.campaign_id WHERE m.brand_id = ? AND (m.contact_id = ? OR m.to_email = ?) ORDER BY m.created_at DESC LIMIT 100`,
         )
         .all(b, c.id, c.email);
-      return { contact: c, messages, suppressed: ctx.contacts.isSuppressed(b, c.email) };
+      // Its opens and clicks, newest first, for the contact's timeline.
+      const activity = ctx.db
+        .prepare(
+          `SELECT e.at, e.kind, e.detail, m.subject, m.campaign_id campaignId FROM events e JOIN messages m ON m.id = e.message_id
+           WHERE m.brand_id = ? AND (m.contact_id = ? OR m.to_email = ?) AND e.kind IN ('open', 'click', 'unsubscribe', 'bounce', 'complaint') ORDER BY e.at DESC LIMIT 100`,
+        )
+        .all(b, c.id, c.email);
+      return { contact: c, messages, activity, suppressed: ctx.contacts.isSuppressed(b, c.email) };
     },
   ],
   ["PATCH", "brands/:b/contacts/:id", async ({ ctx, p, body }) => ctx.contacts.update(num(p.b, "brand"), num(p.id, "contact"), await body())],

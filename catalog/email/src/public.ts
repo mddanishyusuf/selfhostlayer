@@ -130,10 +130,51 @@ async function form(req: IncomingMessage): Promise<Record<string, unknown>> {
   return Object.fromEntries(new URLSearchParams(raw));
 }
 
-function recordOpen(ctx: PublicContext, id: string, now: number): boolean {
+function recordOpen(ctx: PublicContext, id: string, now: number, req?: IncomingMessage): boolean {
   const r = ctx.db.prepare("UPDATE messages SET opens = opens + 1, opened_at = coalesce(opened_at, ?) WHERE id = ? AND status IN ('sent', 'delivered') RETURNING opens").get(now, id) as { opens: number } | undefined;
   if (r && r.opens <= MAX_EVENTS) ctx.mailer.event(id, "open", undefined, now);
+  if (r && req) enrich(ctx, id, "open", req, now);
   return r !== undefined;
+}
+
+/**
+ * How an open reached us. Gmail and Yahoo fetch images through their own
+ * proxies, so the IP and User-Agent are theirs, not the reader's; Apple Mail
+ * Privacy Protection fetches them too, often without anyone reading. Those
+ * are counted but tell nothing about the reader.
+ */
+export function openSource(ua: string | undefined): "proxy" | "apple" | "direct" {
+  const s = ua ?? "";
+  if (/GoogleImageProxy|ggpht\.com|YahooMailProxy/i.test(s)) return "proxy";
+  if (s.trim() === "Mozilla/5.0") return "apple";
+  return "direct";
+}
+
+/** The reader's email app from an open's User-Agent, or their browser from a click's. */
+export function readerApp(ua: string | undefined): { device: string; client: string } | null {
+  const a = readAgent(ua);
+  if (a.bot) return null;
+  const s = ua ?? "";
+  const app = /Microsoft Outlook|ms-office|MSOffice/i.test(s) ? "Outlook" : /Thunderbird/i.test(s) ? "Thunderbird" : /AppleWebKit/.test(s) && !/Safari|Chrome|Firefox/.test(s) && /Mac OS X|iPhone|iPad/.test(s) ? "Apple Mail" : a.browser;
+  return { device: a.device, client: `${app} on ${a.os}` };
+}
+
+/** What an open or click tells about its contact: counts, when, and (from the reader's own device) where and on what. Never the IP. */
+function enrich(ctx: PublicContext, messageId: string, kind: "open" | "click", req: IncomingMessage, now: number): void {
+  const m = ctx.db.prepare("SELECT contact_id FROM messages WHERE id = ?").get(messageId) as { contact_id: number | null } | undefined;
+  if (!m?.contact_id) return;
+  const ua = req.headers["user-agent"];
+  const source = kind === "click" ? "direct" : openSource(ua);
+  const reader = source === "direct" ? readerApp(ua) : null;
+  const country = reader ? ctx.country(clientIp(req)) : null;
+  if (kind === "open") {
+    // Apple's automatic opens don't make anyone active.
+    ctx.db
+      .prepare("UPDATE contacts SET opens = opens + 1, last_open_at = CASE WHEN ? THEN last_open_at ELSE ? END, country = coalesce(?, country), device = coalesce(?, device), client = coalesce(?, client) WHERE id = ?")
+      .run(source === "apple" ? 1 : 0, now, country, reader?.device ?? null, reader?.client ?? null, m.contact_id);
+  } else {
+    ctx.db.prepare("UPDATE contacts SET clicks = clicks + 1, last_click_at = ?, country = coalesce(?, country), device = coalesce(?, device), client = coalesce(?, client) WHERE id = ?").run(now, country, reader?.device ?? null, reader?.client ?? null, m.contact_id);
+  }
 }
 
 /** Handles the public routes; false when the path isn't one of them. */
@@ -148,7 +189,7 @@ export async function handlePublic(req: IncomingMessage, res: ServerResponse, ct
 
   let m = /^\/t\/o\/([0-9a-f]{24})\.gif$/.exec(p);
   if (m) {
-    recordOpen(ctx, m[1]!, now);
+    recordOpen(ctx, m[1]!, now, req);
     send(res, 200, GIF, { "Content-Type": "image/gif", "Cache-Control": "no-store, max-age=0" });
     return true;
   }
@@ -163,6 +204,7 @@ export async function handlePublic(req: IncomingMessage, res: ServerResponse, ct
     }
     const r = ctx.db.prepare("UPDATE messages SET clicks = clicks + 1, clicked_at = coalesce(clicked_at, ?), opened_at = coalesce(opened_at, ?) WHERE id = ? RETURNING clicks").get(now, now, id) as { clicks: number } | undefined;
     if (r && r.clicks <= MAX_EVENTS) ctx.mailer.event(id, "click", target, now);
+    if (r) enrich(ctx, id, "click", req, now);
     send(res, 302, "", { Location: target, "Cache-Control": "no-store", "Referrer-Policy": "no-referrer" });
     return true;
   }

@@ -332,7 +332,7 @@ export const listsOf = async (p: Project, brand: number) => (await emailApi<{ li
 export const contactsOf = (p: Project, brand: number, o: { q?: string; list?: string; status?: string; page?: number }) =>
   emailApi<{ contacts: Contact[]; total: number; page: number; pageSize: number }>(p, `brands/${brand}/contacts${qs({ q: o.q, list: o.list, status: o.status, page: o.page && o.page > 1 ? o.page : undefined })}`);
 export const contactOf = (p: Project, brand: number, id: number) =>
-  emailApi<{ contact: Contact; suppressed: boolean; messages: { id: string; kind: string; subject: string; status: string; createdAt: number; sentAt: number | null; openedAt: number | null; clickedAt: number | null; campaignId: number | null; campaign: string | null }[] }>(p, `brands/${brand}/contacts/${id}`);
+  emailApi<{ contact: Contact; suppressed: boolean; activity: { at: number; kind: string; detail: string | null; subject: string; campaignId: number | null }[]; messages: { id: string; kind: string; subject: string; status: string; createdAt: number; sentAt: number | null; openedAt: number | null; clickedAt: number | null; campaignId: number | null; campaign: string | null }[] }>(p, `brands/${brand}/contacts/${id}`);
 /** How engaged a contact is: opened or clicked in 30 days, in 30 to 90, or not since (Apple's automatic opens don't count). */
 export function engagement(c: Pick<Contact, "lastOpenAt" | "lastClickAt">, now = Date.now()): "active" | "cooling" | "inactive" | "new" {
   const last = Math.max(c.lastOpenAt ?? 0, c.lastClickAt ?? 0);
