@@ -1349,6 +1349,77 @@ if (process.env.TOUR_EMAIL === "1") {
   await screenshot("email-logs");
   console.log("  ✓ an email through the API with a key made in the panel, in the logs and at the server");
 
+  // PLAN-EMAIL-2.md: the brands list, Shield, a sync from an app, enrichment and Insights.
+  await go("/email");
+  await waitFor(`(document.querySelector('[data-testid="brand-list"]')?.innerText ?? "").includes("Tour")`, "the brands list");
+  await click('[data-testid="brand-row"]');
+  await waitForPath(brand);
+  await screenshot("email-brands");
+  console.log("  ✓ /email lists the brands, and a row opens its brand");
+
+  const node = "N=$(ls -d /opt/layer/node/*/bin/node | sort -V | tail -1);";
+  const emailDb = (sql: string) => box(`${node} $N -e 'const { DatabaseSync } = require("node:sqlite"); console.log(JSON.stringify(new DatabaseSync("/srv/apps/email/data/email.db").prepare(process.argv[1]).all()))' ${JSON.stringify(sql)}`);
+  await go(`${brand}/shield`);
+  await waitFor(`!!document.querySelector('[data-testid="shield-form"]')`, "the Shield page");
+  await hydrated('[data-testid="shield-form"]', "the Shield form to come alive");
+  await evaluate(`[...document.querySelectorAll("button")].find((b) => b.textContent === "Download them now").click(), true`);
+  await waitFor(`document.body.innerText.includes("Every list is up to date") || document.body.innerText.includes("The last copies stay in use")`, "Shield's lists downloaded", 180_000);
+  const listKey = (JSON.parse(emailDb("SELECT public_key k FROM lists WHERE name = 'Newsletter'")) as { k: string }[])[0]!.k;
+  const BROWSER = "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_5) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Safari/605.1.15";
+  const signup = (email: string) => boxRequest(`https://${domain}/subscribe/${listKey}`, { method: "POST", headers: { "Content-Type": "application/json", "User-Agent": BROWSER }, body: JSON.stringify({ email }) });
+  const thanked = await signup("x@mailinator.com");
+  if (thanked.status !== 200 || !thanked.body.includes('"ok":true')) throw new Error(`the refused sign-up wasn't thanked: ${thanked.status} ${thanked.body}`);
+  if (JSON.parse(emailDb("SELECT count(*) n FROM contacts WHERE email = 'x@mailinator.com'"))[0].n !== 0) throw new Error("a temporary address got onto the list");
+  console.log("  ✓ Shield downloaded its lists; a temporary address was thanked and kept out");
+  // Temporary email to Flag: the next one comes in flagged, gets nothing, and Approve lets it in.
+  await evaluate(`document.querySelector('[data-testid="shield-disposable"] button[role=radio]:nth-child(2)').click(), true`);
+  await click('[data-testid="shield-form"] button[type=submit]');
+  await waitFor(`document.body.innerText.includes("New sign-ups, imports and syncs follow these")`, "Shield's settings saved");
+  await signup("y@mailinator.com");
+  await go(`${brand}/contacts?status=flagged`);
+  await waitFor(`(document.querySelector('[data-testid="contacts"]')?.innerText ?? "").includes("y@mailinator.com")`, "the flagged contact");
+  await click('[data-testid="contact-row"]');
+  await waitFor(`!!document.querySelector('[data-testid="approve-contact"]')`, "the flagged contact's Approve");
+  await screenshot("email-flagged");
+  await click('[data-testid="approve-contact"] button[type=submit]');
+  await waitFor(`!document.querySelector('[data-testid="approve-contact"]')`, "the contact approved", 20_000);
+  console.log("  ✓ set to Flag, a temporary address came in flagged; Approve let it in");
+  await go(`${brand}/shield`);
+  await waitFor(`/Refused\\s+1/.test(document.body.innerText)`, "Shield's count of refusals");
+  await screenshot("email-shield");
+
+  // A table of sign-ups in the next example's data folder (TOUR_DEPLOY deployed it), synced into the list.
+  box(`${node} runuser -u app-next -- $N -e 'const d = new (require("node:sqlite").DatabaseSync)("/srv/apps/next/data/leads.db"); d.exec("CREATE TABLE IF NOT EXISTS signups (id INTEGER PRIMARY KEY, email TEXT NOT NULL, full_name TEXT, plan TEXT)"); d.prepare("INSERT INTO signups (email, full_name, plan) VALUES (?, ?, ?), (?, ?, ?)").run("ada@tour.test", "Ada Lovelace", "pro", "z@spam4.me", "Bot", "free")'`);
+  await go(`${brand}/sync?project=next&db=sqlite:leads.db&table=signups`);
+  await waitFor(`!!document.querySelector('[data-testid="sync-mapping"] #s-email')`, "the column mapping", 60_000);
+  await hydrated('[data-testid="sync-mapping"]', "the mapping form to come alive");
+  if (String(await evaluate(`document.querySelector("#s-email").value`)) !== "email" || String(await evaluate(`document.querySelector("#s-name").value`)) !== "full_name") throw new Error("the sync didn't guess the email and name columns");
+  await click('[data-testid="sync-mapping"] input[value="plan"]');
+  await click('[data-testid="sync-mapping"] button[type=submit]');
+  let synced = "";
+  for (let i = 0; i < 30 && !synced.includes("rows read"); i++) {
+    await sleep(1500);
+    await go(`${brand}/sync`);
+    await waitForPath(`${brand}/sync`);
+    synced = String(await evaluate(`document.querySelector('[data-testid="sync-status"]')?.innerText ?? ""`));
+  }
+  if (!synced.includes("2 rows read")) throw new Error(`the sync didn't read the table: ${synced}`);
+  const ada = JSON.parse(emailDb("SELECT source, fields, name FROM contacts WHERE email = 'ada@tour.test'"))[0];
+  if (ada?.source !== "sync:next" || !ada.fields.includes('"plan":"pro"') || ada.name !== "Ada Lovelace") throw new Error(`the synced contact: ${JSON.stringify(ada)}`);
+  await screenshot("email-sync");
+  console.log(`  ✓ synced the next example's signups table into the list (${synced})`);
+
+  // Grace opens the campaign in Outlook: her contact learns her device and app, and Insights counts her active.
+  const grace = (JSON.parse(emailDb("SELECT m.id, c.id contact FROM messages m JOIN contacts c ON c.id = m.contact_id WHERE m.to_email = 'grace@tour.test' AND m.kind = 'campaign'")) as { id: string; contact: number }[])[0]!;
+  await boxRequest(`https://${domain}/t/o/${grace.id}.gif`, { headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Microsoft Outlook 16.0.17928; ms-office; MSOffice 16" } });
+  await go(`${brand}/contacts/${grace.contact}`);
+  await waitFor(`document.body.innerText.includes("Outlook on Windows") && document.body.innerText.includes("Active: opened or clicked")`, "Grace's profile from her open");
+  console.log("  ✓ an open in Outlook filled in the contact: active, desktop, Outlook on Windows");
+  await go(`${brand}/insights`);
+  await waitFor(`/Active, 30 days\\s+1/.test(document.querySelector('[data-testid="insights-engagement"]')?.innerText ?? "")`, "Insights' engagement");
+  await screenshot("email-insights");
+  console.log("  ✓ Insights counts her active");
+
   await go("/projects/email/settings");
   await waitForPath("/projects/email/settings");
   await click('[data-testid="uninstall"]');

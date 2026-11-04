@@ -319,13 +319,30 @@ export class Shield {
     } catch {
       return;
     }
-    const lines = text.split(/\r?\n/).map((l) => l.trim().toLowerCase()).filter((l) => l && !l.startsWith("#"));
-    if (spec.kind === "domains") this.#domains[name as "disposable"] = new Set(lines);
-    else if (spec.kind === "ips") {
+    // One pass over the text, no arrays of lines: a 1 MB list split, trimmed and
+    // lowercased in steps left tens of MB of garbage the process kept.
+    const each = (take: (line: string) => void) => {
+      for (let start = 0; start < text.length; ) {
+        let end = text.indexOf("\n", start);
+        if (end < 0) end = text.length;
+        const line = text.slice(start, end).trim();
+        start = end + 1;
+        if (line && line[0] !== "#") take(line.toLowerCase());
+      }
+    };
+    if (spec.kind === "domains") {
+      const set = new Set<string>();
+      each((l) => set.add(l));
+      this.#domains[name as "disposable"] = set;
+    } else if (spec.kind === "ips") {
       const set = new IpSet();
-      for (const l of lines) set.add(l.split(/\s/)[0]!);
+      each((l) => set.add(l.split(/\s/, 1)[0]!));
       this.#ips[name as "spamIps"] = set;
-    } else this.#datacenters = Ranges.parse(lines);
+    } else {
+      const lines: string[] = [];
+      each((l) => lines.push(l));
+      this.#datacenters = Ranges.parse(lines);
+    }
   }
 
   #age(name: string): number | null {

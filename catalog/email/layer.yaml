@@ -3,7 +3,7 @@
 # page (PLAN-EMAIL.md).
 id: email
 name: Email
-version: 0.1.2
+version: 0.2.0
 summary: Newsletters, transactional email and automations on your own SMTP or Amazon SES.
 runtime:
   kind: node
@@ -11,7 +11,8 @@ runtime:
   # node:sqlite warns that it's experimental on every start: not news worth a log line.
   start: [node, --disable-warning=ExperimentalWarning, server.js]
   health: /healthz
-memory: { default: 192, min: 96 }
+# Shield keeps its lists in memory (about 10 MB of heap, more while they load).
+memory: { default: 256, min: 128 }
 env:
   # The panel's key to Email's admin API (127.0.0.1 only); provider credentials are encrypted under a key made from it.
   EMAIL_ADMIN_TOKEN: { generate: secret }
