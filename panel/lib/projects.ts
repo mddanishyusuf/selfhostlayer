@@ -19,9 +19,9 @@ export interface Project {
   domains: string[];
   memoryMb: number;
   autoDeploy: boolean;
-  /** github: built from a repo; catalog: an integration, installed from the catalog (no repo, no build); site: a Sites WordPress or Ghost. */
-  source: "github" | "catalog" | "site";
-  /** The catalog app's id (links), for integrations; a site's engine (wordpress, ghost). */
+  /** github: built from a repo; site: a Sites WordPress or Ghost. */
+  source: "github" | "site";
+  /** A site's engine (wordpress, ghost); the column is named catalog_app. */
   catalogApp: string | null;
   /** The server it runs on (Settings → Servers); null: the panel's own. */
   serverId: number | null;
@@ -106,15 +106,9 @@ export function getProjectBySlug(slug: string): Project | null {
   return row ? fromRow(row) : null;
 }
 
-/** Every project, integrations included (the Projects page shows only source github). */
+/** Every project, sites included (the Projects page shows only source github). */
 export function listProjects(): Project[] {
   return (db().prepare("SELECT * FROM projects ORDER BY created_at DESC").all() as unknown as Row[]).map(fromRow);
-}
-
-/** The integration installed from this catalog app, if any (one per app for now). */
-export function integrationFor(app: string): Project | null {
-  const row = db().prepare("SELECT * FROM projects WHERE source = 'catalog' AND catalog_app = ? ORDER BY id LIMIT 1").get(app) as Row | undefined;
-  return row ? fromRow(row) : null;
 }
 
 /** Projects that deploy on pushes to this repo and branch. */
@@ -157,7 +151,6 @@ export function setProjectEnv(projectId: number, vars: Record<string, string>): 
   }
 }
 
-/** What an integration's manifest decides (lib/catalog.ts applies it before each deploy). */
 export interface PrivateFile {
   path: string;
   content: string;
@@ -178,10 +171,6 @@ export function setProjectFile(projectId: number, path: string, content: string)
 
 export function deleteProjectFile(projectId: number, path: string): void {
   db().prepare("DELETE FROM project_files WHERE project_id = ? AND path = ?").run(projectId, path);
-}
-
-export function updateIntegration(id: number, s: { runtime: Runtime; nodeVersion: string; memoryMb: number }): void {
-  db().prepare("UPDATE projects SET runtime = ?, node_version = ?, memory_mb = ? WHERE id = ?").run(JSON.stringify(s.runtime), s.nodeVersion, s.memoryMb, id);
 }
 
 export function setMemory(id: number, memoryMb: number): void {

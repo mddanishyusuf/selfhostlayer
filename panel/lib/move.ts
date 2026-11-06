@@ -3,7 +3,7 @@
 // free address moved to that server's, and its own domains wait for DNS to
 // point at the new IP. The old copy keeps running until the owner removes it,
 // so nothing is down while DNS changes. GitHub projects only for now: a site's
-// and an integration's state also lives in the agent's /etc/layer there.
+// state also lives in the agent's /etc/layer there.
 import { randomBytes } from "node:crypto";
 import { mkdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
@@ -39,7 +39,7 @@ async function waitForDeploy(id: number): Promise<Deployment> {
  * project's server is switched, nothing about it changes.
  */
 export async function moveProject(project: Project, target: number | null, log: (line: string) => void): Promise<void> {
-  if (project.source !== "github") throw new Error("Only projects from GitHub can move for now: a site or an integration keeps settings on its server.");
+  if (project.source !== "github") throw new Error("Only projects from GitHub can move for now: a site keeps settings on its server.");
   if (project.serverId === target) throw new Error("It's on that server already.");
   if (target !== null && !getServer(target)?.seenAt) throw new Error("Check the connection to that server first.");
   if (activeDeployment(project.id)) throw new Error("A deploy is running: wait for it first.");

@@ -53,7 +53,7 @@ A site has a project's pages: Overview, Deployments, Logs, Domains, Databases, B
 
 **To keep it out of spam folders,** give the site its own domain, and add the SPF record its WordPress page shows: a TXT record like `v=spf1 ip4:<server's IP> ~all`. Mail from a free address (`*.sslip.io`) often lands in spam. Some hosts block outgoing port 25 on new accounts. Hetzner does for some; ask them to unblock it.
 
-**For newsletters or high volume,** send through a real provider instead. On a WordPress site's page, **Email** can switch to the Email integration (one of its brands), an alert channel's SMTP server, or any SMTP server. A Ghost site takes Ghost's own settings as `GHOST_MAIL__…` env vars on its Environment page. Ghost's newsletters need Mailgun, set in Ghost's own settings.
+**For newsletters or high volume,** send through a real provider instead. On a WordPress site's page, **Email** can switch to an alert channel's SMTP server, or any SMTP server. A Ghost site takes Ghost's own settings as `GHOST_MAIL__…` env vars on its Environment page. Ghost's newsletters need Mailgun, set in Ghost's own settings.
 
 ## Bringing a site in
 

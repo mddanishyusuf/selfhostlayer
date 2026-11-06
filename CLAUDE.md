@@ -115,6 +115,9 @@ The panel uses the design of our AgentOS app (`~/projects/agent-os/web/src/theme
 
 **Marketing angle:** most people running apps by hand with pm2 run everything as root. Make "every app sandboxed, memory-limited and scored, with no Docker" a headline feature.
 
+## Integrations removed (decided 2026-11-06)
+Self Host Layer no longer ships integrations: the catalog, `catalog.fetch`, the Integrations page and the four first-party tools (Links, Analytics, Email, Forms) were deleted from the panel, the agent, `packages/protocol` and `catalog/`, and from the website (docs, the catalog routes, the homepage). They're in git history. **Sites (WordPress and Ghost) stay**, with their engine still in the `catalog_app` column. The live server's Analytics and Email installs were uninstalled the same day (their data saved in `/root/removed-integrations-2026-11-06/` on 201.79.113.152), so selfhostlayer.com no longer counts visits. The sections above that describe integrations are history.
+
 ## Business model
 - **License: deferred until the tool works (decided 2026-10-28).** The repo is private and has one author, so there's no LICENSE file (all rights reserved). Leading option: an **AGPL-3.0** core plus a **CLA** (CLA-assistant), so Pro can ship as a separate proprietary package, and an **MIT** manifest spec. **Decide before** making the repo public or accepting any outside contribution.
 - **Free (decided 2026-11-05):** Self Host Layer is free, with every integration and every update, and installs without a license key. This replaced, before any sale, the lifetime license sold on selfhostlayer.com through Stripe ($49 for the first 100 supporters, then $149; decided 2026-11-04): the website's checkout, license pages and the install script's key check were removed (in shl's git history if they're ever needed). Still to decide: whether any part stays open source (see License above).

@@ -18,8 +18,6 @@ One panel can deploy to several servers. Your projects, sites and their database
 - **Each server keeps its own** apps, databases (MariaDB, Postgres, MongoDB, Redis, MySQL 8 for Ghost), PHP, Caddy, certificates and firewall. Each one is installed on the server that needs it, the first time it's needed.
 - **What stays in one place:** env vars, private files, GitHub and the backup bucket all stay in the panel, and backups of any server go to the same bucket.
 
-**Integrations** (Links, Analytics, Email, Forms) run on the panel's own server.
-
 ## Move a project
 
 On a project's **Settings**, **Server → Move to** moves it to another server, and back:
@@ -33,7 +31,7 @@ The old copy keeps running, so nothing is down while DNS changes. Once the domai
 
 If the deploy on the new server fails, the project goes back to its old server as it was.
 
-Changes made on the old copy after the snapshot stay there. For a busy app, move it when it's quiet. Sites and integrations can't move yet.
+Changes made on the old copy after the snapshot stay there. For a busy app, move it when it's quiet. Sites can't move yet.
 
 ## Watching
 

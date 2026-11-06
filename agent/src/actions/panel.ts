@@ -25,8 +25,6 @@ export interface BoxFile {
   panelAllow?: string[];
   /** The release feed for update.*, set by the installer (the panel can't change it). */
   updatesUrl?: string;
-  /** The integrations catalog; when missing, catalog.json next to updatesUrl. */
-  catalogUrl?: string;
 }
 
 export function readBox(ctx: Context): BoxFile {

@@ -10,7 +10,7 @@ const walk = (d: string): string[] => readdirSync(d).flatMap((f) => (statSync(jo
 describe("the panel's pages", () => {
   it("each check the session before anything else", () => {
     const pages = walk(join(__dirname, "..", "app", "(app)"));
-    expect(pages.length).toBeGreaterThan(50);
+    expect(pages.length).toBeGreaterThan(25);
     const unchecked = pages.filter((f) => {
       const s = readFileSync(f, "utf8");
       const m = /export default async function \w*\s*\(/.exec(s);

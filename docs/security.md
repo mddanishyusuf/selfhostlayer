@@ -58,7 +58,7 @@ The panel is the most valuable target, so it holds no privileges of its own.
   - Five failed attempts lock out that address and that account for 15 minutes.
 - **Restricting who can reach it:** Settings → Access can limit the panel to some addresses or to Tailscale. Blocked requests stop at Caddy and never reach the panel. If you lock yourself out, `layer access reset` on the server undoes it.
 - **A record of every change:** the agent writes every change it makes to `/var/log/layer/audit.jsonl` (root-only). Server → Activity shows it.
-- **Updates and integrations are checked:** the agent downloads them only from the addresses in `/etc/layer/config.json` (the release feed, and the catalog beside it), never from an address the panel names. It checks each file against its sha256 before using it. An integration is unpacked by its own app user with no network access, then runs fenced in like your apps.
+- **Updates are checked:** the agent downloads them only from the address in `/etc/layer/config.json` (the release feed), never from an address the panel names. It checks each file against its sha256 before using it.
 
 ## The server
 

@@ -4,7 +4,6 @@ import { browseActions } from "./actions/browse.ts";
 import { editActions } from "./actions/edit.ts";
 import { appActions } from "./actions/app.ts";
 import { buildActions } from "./actions/build.ts";
-import { catalogActions } from "./actions/catalog.ts";
 import { backupActions } from "./actions/backup.ts";
 import { cronActions } from "./actions/cron.ts";
 import { workerActions } from "./actions/worker.ts";
@@ -46,7 +45,6 @@ export const ACTION_TABLE: ActionTable = {
   ...proxyActions,
   ...logsActions,
   ...buildActions,
-  ...catalogActions,
   ...toolActions,
   ...staticActions,
   ...cronActions,

@@ -5,7 +5,7 @@ import { UpdateModal } from "@/components/shell/update-modal";
 import { agent, type SystemInfo } from "@/lib/agent";
 import { listIncidents } from "@/lib/alerts/engine";
 import { boxConfig } from "@/lib/box";
-import { installedVersion, listDeployments, liveDeployment } from "@/lib/deploy";
+import { listDeployments, liveDeployment } from "@/lib/deploy";
 import { listAllDomains, servingConfig } from "@/lib/domains";
 import { listProjects } from "@/lib/projects";
 import { ENGINES, engineOf } from "@/lib/sites";
@@ -22,14 +22,11 @@ function sidebarProjects(): SidebarProject[] {
     const hosts = servingConfig(p.id).domains;
     // A custom domain (not the free URL) is the one to visit, once it's live.
     const host = hosts.find((h) => h !== p.domains[0]) ?? hosts[0] ?? p.domains[0];
-    const integration = p.source === "catalog";
     const site = engineOf(p);
     return {
       slug: p.slug,
-      repo: site ? (latest?.version ? `${ENGINES[site].name} ${latest.version}` : ENGINES[site].name) : integration ? (installedVersion(p.id)?.commitMessage ?? p.slug) : `${p.repoOwner}/${p.repoName}`,
-      branch: site ? "a site" : integration ? "from the catalog" : p.branch,
-      integration,
-      app: integration ? p.catalogApp : null,
+      repo: site ? (latest?.version ? `${ENGINES[site].name} ${latest.version}` : ENGINES[site].name) : `${p.repoOwner}/${p.repoName}`,
+      branch: site ? "a site" : p.branch,
       site,
       status: building ? "warn" : live ? "ok" : latest?.status === "failed" ? "err" : "idle",
       isStatic: p.runtime.kind === "static",
@@ -42,14 +39,10 @@ function sidebarProjects(): SidebarProject[] {
 const PAGES: PaletteItem[] = [
   { label: "Projects", href: "/", hint: "Page" },
   { label: "Deployments", href: "/deployments", hint: "Page" },
-  { label: "Analytics", href: "/analytics", hint: "Page" },
-  { label: "Email", href: "/email", hint: "Page" },
-  { label: "Forms", href: "/forms", hint: "Page" },
   { label: "Firewall", href: "/firewall", hint: "Page" },
   { label: "Domains", href: "/domains", hint: "Page" },
   { label: "Sites", href: "/sites", hint: "Page" },
   { label: "Servers", href: "/servers", hint: "Page" },
-  { label: "Integrations", href: "/integrations", hint: "Page" },
   { label: "Databases", href: "/databases", hint: "Page" },
   { label: "Health", href: "/health", hint: "Page" },
   { label: "Backups", href: "/settings/backups", hint: "Page" },

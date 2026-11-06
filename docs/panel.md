@@ -210,15 +210,6 @@ Opens the app's live address.
 ### Deployments
 Every project's deployments in one list. A gold dot on the sidebar item means something is building.
 
-### Analytics
-Cookie-free web analytics for your sites, once Analytics is installed (the page offers **Install** until then): add a site and paste one line into its pages. The page lists your sites, each with its last 24 hours. A site opens with the sidebar shrunk to its icons and Analytics' own sidebar beside it: a site picker, then Overview, Realtime, Pages, Users (each visit's journey), Goals, Revenue (from Stripe, Polar, Paddle, Dodo Payments, Creem or Lemon Squeezy, by source), Outbound and the site's Settings. See [Analytics](analytics.md).
-
-### Email
-Newsletters, transactional email and automations, once Email is installed (the page offers **Install** until then). The page lists your brands with their logos; add one, set its SMTP provider or Amazon SES, verify a sending domain. A brand opens with the sidebar shrunk to its icons and Email's own sidebar beside it: a brand picker, then Overview, Insights, Campaigns, Automations, Contacts, Sync, Shield, Lists, Templates, Logs, API, Domains and Settings. Shield keeps bad and spam addresses off its lists, and Sync brings in sign-ups from your projects' databases. See [Email](email.md).
-
-### Forms
-Forms and surveys, once Forms is installed (the page offers **Install** until then): every form with its responses and whether it's open, and **New form** from a template. A form opens with the sidebar shrunk to its icons and Forms' own sidebar beside it: a form picker, then Build (the questions, their logic and the design, with a preview), Share (the link, a QR code, embed codes), Responses, Insights and Settings (closing it, notifications, its address). See [Forms](forms.md).
-
 ### Firewall
 The firewall rules (`ufw status`) and fail2ban's SSH jail: who is banned now, and failures so far. Editing rules from the panel is coming.
 
@@ -229,20 +220,6 @@ fail2ban-client status sshd
 
 ### Domains
 Every project's domains, one row per project: its main domain, the project's name and how many more it has, or what needs attention. **Manage** opens that project's Domains page.
-
-### Integrations
-Tools every product needs, built for Self Host Layer and installed in one click. Every tool comes with Self Host Layer. Each one runs like your own apps: its own Linux user and sandbox, a free URL with HTTPS, and the same pages as a project (**Manage**): Domains, Logs, Backups, Cron jobs, Environment and Settings.
-
-- **Catalog:** the tools you can install, from `catalog.json` beside the update feed (`https://get.selfhostlayer.com/catalog.json`). **Install** opens the tool's first deployment. The server downloads it from the catalog's own address only and checks it against the catalog's sha256 before unpacking anything. Then the tool's own user unpacks it with no network access. Nothing is built on your server.
-- **Installed:** each tool with its version and whether it runs. **Open** goes to its address, and **Manage** to its pages.
-- **Settings:** the memory limit, down to the least the tool needs. How it starts and runs comes with each version.
-- **Uninstall** (on its Settings page): type its name to confirm. As when deleting a project, the tool stops, and its user, files, unit, cron jobs and Caddy site are removed. Its `data/` folder is kept in `/var/lib/layer-agent/archive/` unless you say otherwise.
-- **Updates:** when the catalog has a newer version, Installed and the tool's Settings page show **Update**. It backs the tool's data up first when backups are on, then starts the new version beside the old one. **Check again** reads the catalog at once (it's kept for 10 minutes).
-- **[Links](links.md)**, the first tool: short links on your own domain, with click stats and QR codes.
-- **[Analytics](analytics.md):** cookie-free web analytics for your sites, on the sidebar's Analytics page.
-- **[Email](email.md):** newsletters, transactional email and automations, on the sidebar's Email page.
-- **[Forms](forms.md):** forms and surveys, on the sidebar's Forms page.
-- **Coming soon:** a feedback board.
 
 ### Databases
 - **Engines:** SQLite, PostgreSQL, Redis, MongoDB and MySQL (MariaDB), each with its version, whether it runs (PostgreSQL, MySQL and MongoDB as systemd sees their server) and how much the apps use. MongoDB has its Install button here, and Start when it's stopped, which tells you why if it can't start.

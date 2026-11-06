@@ -1,6 +1,6 @@
-// Which of two versions is newer: Self Host Layer's own, and catalog apps'.
-// No imports, so the publish scripts can use it too (scripts/release-feed.ts
-// and scripts/catalog-feed.ts), as well as the agent and the panel.
+// Which of two versions is newer: Self Host Layer's own releases.
+// No imports, so the publish script can use it too (scripts/release-feed.ts),
+// as well as the agent and the panel.
 const SEMVER = /^(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?$/;
 
 /**

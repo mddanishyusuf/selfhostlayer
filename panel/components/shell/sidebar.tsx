@@ -1,6 +1,6 @@
 "use client";
 
-import { AppWindowIcon, ArrowUpRightIcon, BellIcon, BracesIcon, ChartColumnIcon, ChevronDownIcon, ChevronLeftIcon, CircleArrowUpIcon, ClipboardListIcon, ClockIcon, CpuIcon, DatabaseBackupIcon, DatabaseIcon, FolderIcon, GlobeIcon, HistoryIcon, KeyRoundIcon, LayoutDashboardIcon, LinkIcon, LogOutIcon, MailIcon, MenuIcon, MoonIcon, PanelLeftOpenIcon, PuzzleIcon, RocketIcon, SearchIcon, ServerCogIcon, ServerIcon, SettingsIcon, ShieldIcon, SquareTerminalIcon, SunIcon } from "lucide-react";
+import { AppWindowIcon, ArrowUpRightIcon, BellIcon, ChevronDownIcon, ChevronLeftIcon, CircleArrowUpIcon, ClockIcon, CpuIcon, DatabaseBackupIcon, DatabaseIcon, FolderIcon, GlobeIcon, HistoryIcon, KeyRoundIcon, LayoutDashboardIcon, LogOutIcon, MenuIcon, MoonIcon, PanelLeftOpenIcon, RocketIcon, SearchIcon, ServerCogIcon, ServerIcon, SettingsIcon, ShieldIcon, SquareTerminalIcon, SunIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Fragment, useEffect, useState } from "react";
@@ -13,13 +13,9 @@ import { openUpdateModal } from "./update-modal";
 
 export interface SidebarProject {
   slug: string;
-  /** owner/name and the branch; an integration's name and version, "from the catalog". */
+  /** owner/name and the branch; a site's engine and version, "a site". */
   repo: string;
   branch: string;
-  /** Installed from Integrations: its pages go back there, and Projects doesn't count it. */
-  integration: boolean;
-  /** The catalog app (links), whose own pages come first. */
-  app: string | null;
   /** A Sites WordPress or Ghost: its pages go back to Sites, and its engine's page comes first. */
   site: "wordpress" | "ghost" | null;
   status: "ok" | "warn" | "err" | "idle";
@@ -52,19 +48,14 @@ interface Item {
 }
 
 function globalNav(p: SidebarProps): Item[][] {
-  const integrations = p.projects.filter((x) => x.integration).length;
   const sites = p.projects.filter((x) => x.site).length;
   return [
     [
-      { href: "/", label: "Projects", icon: FolderIcon, exact: true, count: p.projects.length - integrations - sites },
+      { href: "/", label: "Projects", icon: FolderIcon, exact: true, count: p.projects.length - sites },
       { href: "/sites", label: "Sites", icon: AppWindowIcon, ...(sites ? { count: sites } : {}) },
       { href: "/deployments", label: "Deployments", icon: RocketIcon, dot: p.deploying },
-      { href: "/analytics", label: "Analytics", icon: ChartColumnIcon },
-      { href: "/email", label: "Email", icon: MailIcon },
-      { href: "/forms", label: "Forms", icon: ClipboardListIcon },
       { href: "/firewall", label: "Firewall", icon: ShieldIcon },
       { href: "/domains", label: "Domains", icon: GlobeIcon, count: p.domainCount },
-      { href: "/integrations", label: "Integrations", icon: PuzzleIcon, ...(integrations ? { count: integrations } : {}) },
       { href: "/databases", label: "Databases", icon: DatabaseIcon },
     ],
     [
@@ -78,29 +69,11 @@ function globalNav(p: SidebarProps): Item[][] {
   ];
 }
 
-/** An integration's own pages, above the ones every project has. */
-function appNav(p: SidebarProject, base: string): Item[][] {
-  if (p.app === "analytics") return [[{ href: "/analytics", label: "Dashboard", icon: ChartColumnIcon }]];
-  if (p.app === "email") return [[{ href: "/email", label: "Brands", icon: MailIcon }]];
-  if (p.app === "forms") return [[{ href: "/forms", label: "Forms", icon: ClipboardListIcon }]];
-  if (p.app === "links") {
-    return [
-      [
-        { href: `${base}/links`, label: "Links", icon: LinkIcon },
-        { href: `${base}/stats`, label: "Stats", icon: ChartColumnIcon },
-        { href: `${base}/api`, label: "API", icon: BracesIcon },
-      ],
-    ];
-  }
-  return [];
-}
-
 function projectNav(p: SidebarProject): Item[][] {
   const base = `/projects/${p.slug}`;
   // WordPress: wp-config.php is generated and WP-Cron has its own timer.
   const wordpress = p.site === "wordpress";
   return [
-    ...appNav(p, base),
     ...(p.site ? [[{ href: `${base}/site`, label: p.site === "wordpress" ? "WordPress" : "Ghost", icon: AppWindowIcon }]] : []),
     [
       { href: base, label: "Overview", icon: LayoutDashboardIcon, exact: true },
@@ -218,11 +191,11 @@ function Nav(props: SidebarProps & { onNavigate?: () => void }) {
 
       {project && (
         <>
-          <Link href={project.site ? "/sites" : project.integration ? "/integrations" : "/"} onClick={props.onNavigate} className={cx(ITEM, "text-muted")}>
+          <Link href={project.site ? "/sites" : "/"} onClick={props.onNavigate} className={cx(ITEM, "text-muted")}>
             <span className={ICON}>
               <Icon icon={ChevronLeftIcon} />
             </span>
-            {project.site ? "Sites" : project.integration ? "Integrations" : "All projects"}
+            {project.site ? "Sites" : "All projects"}
           </Link>
           <div className="my-1.5 flex items-center gap-2 px-[9px] py-1.5" title={`${project.repo} · ${project.branch}`}>
             <StatusDot status={project.status} pulse={project.status === "warn"} />
@@ -276,8 +249,8 @@ function Nav(props: SidebarProps & { onNavigate?: () => void }) {
   );
 }
 
-/** Pages that need the width, or have a sidebar of their own (a site's Analytics, a brand's Email, a form): the sidebar shrinks to its icons there. */
-const COMPACT = /^\/(projects\/[^/]+\/databases\/view|analytics\/[^/]+|email\/[^/]+|forms\/[^/]+)/;
+/** Pages that need the width (the database viewer): the sidebar shrinks to its icons there. */
+const COMPACT = /^\/projects\/[^/]+\/databases\/view/;
 
 /**
  * The sidebar as a column of icons, each named on hover. The last button

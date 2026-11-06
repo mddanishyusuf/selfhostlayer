@@ -7,8 +7,7 @@ import { agent } from "@/lib/agent";
 import { listChannels } from "@/lib/alerts/engine";
 import { activeDeployment, createDeployment, deploymentPath, deployProject } from "@/lib/deploy";
 import { applyDomains, servingConfig } from "@/lib/domains";
-import { emailApi, emailInstall, emailPublicUrl, type Brand } from "@/lib/email";
-import { getProjectBySlug } from "@/lib/projects";
+import { getProjectBySlug, setMemory } from "@/lib/projects";
 import { requireUser } from "@/lib/session";
 import { createSite, ENGINES, engineOf, forgetPassword, getSite, setXmlrpc, type SiteEngine } from "@/lib/sites";
 
@@ -74,7 +73,7 @@ export async function siteAction(_prev: SiteActionState, form: FormData): Promis
     if (op === "update" && engine === "ghost") {
       const version = field(form, "version");
       if (!/^\d+\.\d+\.\d+$/.test(version)) return { error: "No version to update to." };
-      const d = createDeployment(project, "update", { sha: randomBytes(20).toString("hex"), message: `Update Ghost to ${version}`, author: "" }, undefined, version);
+      const d = createDeployment(project, "update", { sha: randomBytes(20).toString("hex"), message: `Update Ghost to ${version}`, author: "" }, version);
       redirect(deploymentPath(project.slug, d.id));
     }
     if (engine === "wordpress" && ["update-core", "update-plugins", "update-themes"].includes(op)) {
@@ -115,6 +114,33 @@ export async function siteAction(_prev: SiteActionState, form: FormData): Promis
   return { error: "Unknown action." };
 }
 
+export interface SiteSettingsState {
+  error?: string;
+  saved?: string;
+}
+
+/** A site's memory limit, from its engine's floor up; "deploy" in the submit button's value redeploys right after. */
+export async function saveSiteSettings(_prev: SiteSettingsState, form: FormData): Promise<SiteSettingsState> {
+  await requireUser();
+  const project = getProjectBySlug(field(form, "slug"));
+  const engine = project && engineOf(project);
+  if (!project || !engine) redirect("/sites");
+  // WordPress's PHP, or Ghost (which needs a few hundred MB).
+  const min = engine === "ghost" ? 384 : 128;
+  const memoryMb = Number(form.get("memoryMb"));
+  if (!Number.isInteger(memoryMb) || memoryMb < min || memoryMb > 16384) return { error: `Use ${min} to 16384 MB.` };
+  setMemory(project.id, memoryMb);
+  if (form.get("intent") !== "deploy") return { saved: "Saved. The next deploy uses it." };
+  if (activeDeployment(project.id)) return { saved: "Saved. A deploy is running: redeploy after it to use the new limit." };
+  let path: string;
+  try {
+    path = deploymentPath(project.slug, (await deployProject(project, "manual")).id);
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "Couldn't start the deployment." };
+  }
+  redirect(path);
+}
+
 export interface SiteMailState {
   error?: string;
   saved?: string;
@@ -124,9 +150,9 @@ export interface SiteMailState {
 const addressOf = (from: string) => /<([^<>\s]+@[^<>\s]+)>/.exec(from)?.[1] ?? from.trim();
 
 /**
- * How a WordPress site sends its email: through the Email integration (a key
- * of one of its brands), the SMTP server of an alert channel, an SMTP server
- * typed here, or not at all. wp-config.php is written again; nothing restarts.
+ * How a WordPress site sends its email: through the SMTP server of an alert
+ * channel, an SMTP server typed here, or this server's own mail.
+ * wp-config.php is written again; nothing restarts.
  */
 export async function siteMailAction(_prev: SiteMailState, form: FormData): Promise<SiteMailState> {
   await requireUser();
@@ -136,16 +162,7 @@ export async function siteMailAction(_prev: SiteMailState, form: FormData): Prom
   let mail: Record<string, unknown> | null;
   let saved: string;
   try {
-    if (via === "email") {
-      const email = emailInstall();
-      if (!email) return { error: "Install the Email integration first, or use SMTP." };
-      const brandId = Number(field(form, "brand"));
-      const { brand } = await emailApi<{ brand: Brand }>(email, `brands/${brandId}?days=1`);
-      if (!brand.fromEmail) return { error: `${brand.name} has no From address: set it in Email first.` };
-      const { key } = await emailApi<{ key: string }>(email, `brands/${brandId}/keys`, { body: { name: `WordPress (${project.slug})` } });
-      mail = { kind: "api", url: emailPublicUrl(email), key, from: brand.fromName ? `${brand.fromName} <${brand.fromEmail}>` : brand.fromEmail };
-      saved = `Email goes out through Email's ${brand.name} brand, from ${brand.fromEmail}.`;
-    } else if (via === "alerts") {
+    if (via === "alerts") {
       const channel = listChannels().find((c) => c.id === Number(field(form, "channel")) && c.config.kind === "email");
       if (!channel || channel.config.kind !== "email") return { error: "Pick one of the alert channels that send email." };
       const c = channel.config;

@@ -1,16 +1,8 @@
 import { notFound } from "next/navigation";
-import { AnalyticsSettingsForm } from "@/components/analytics-forms";
-import { EmailSettingsForm } from "@/components/email-forms";
-import { UpdateButton } from "@/components/integrations";
-import { LinksSettingsForm } from "@/components/links";
-import { DeleteProject, IntegrationSettingsForm, SettingsForm } from "@/components/settings";
+import { DeleteProject, SiteSettingsForm, SettingsForm } from "@/components/settings";
 import { Notice, PageHeader, SettingsRow } from "@/components/page";
-import { analyticsApi, type AnalyticsSettings } from "@/lib/analytics";
-import { catalogApps, updateFor } from "@/lib/catalog";
 import { frameworkLabel } from "@/lib/detect";
-import { installedVersion, listDeployments } from "@/lib/deploy";
-import { emailApi } from "@/lib/email";
-import { isLinks, linksApi, shortDomain, type LinksSettings } from "@/lib/links";
+import { listDeployments } from "@/lib/deploy";
 import { getProjectBySlug, projectEnv } from "@/lib/projects";
 import { movedFrom } from "@/lib/move";
 import { listServers } from "@/lib/servers";
@@ -33,43 +25,8 @@ export default async function SettingsPage({ params, searchParams }: { params: P
     return (
       <>
         <PageHeader title={project.slug} crumb="Settings" meta={`A ${name} site`} />
-        <IntegrationSettingsForm slug={project.slug} name={project.slug} memoryMb={project.memoryMb} min={project.catalogApp === "ghost" ? 384 : 128} />
+        <SiteSettingsForm slug={project.slug} name={project.slug} memoryMb={project.memoryMb} min={project.catalogApp === "ghost" ? 384 : 128} />
         <DeleteProject slug={project.slug} />
-      </>
-    );
-  }
-  if (project.source === "catalog") {
-    // An integration's manifest decides how it builds and runs; its memory limit is the owner's.
-    const version = installedVersion(project.id);
-    const name = version?.manifest?.name ?? project.slug;
-    // Links keeps its own settings; they show when it's running.
-    const links = isLinks(project) ? await linksApi<LinksSettings>(project, "settings").catch(() => null) : null;
-    const analytics = project.catalogApp === "analytics" ? await analyticsApi<AnalyticsSettings>(project, "settings").catch(() => null) : null;
-    const email = project.catalogApp === "email" ? await emailApi<{ keepBodiesDays: number; keepDays: number }>(project, "settings").catch(() => null) : null;
-    const app = (await catalogApps().catch(() => [])).find((a) => a.id === project.catalogApp);
-    const update = updateFor(version?.version, app);
-    return (
-      <>
-        <PageHeader title={project.slug} crumb="Settings" meta={`${version?.commitMessage ?? name}, from the catalog`} />
-        <SettingsRow title="Version" description="Updates come from the Self Host Layer catalog. An update backs the data up first when backups are on, and starts beside the old version, so nothing goes down.">
-          <div className="flex flex-wrap items-center justify-between gap-3" data-testid="integration-version">
-            <span>
-              {version?.commitMessage ?? name}
-              {!update && <span className="text-muted"> · the newest</span>}
-            </span>
-            {update && <UpdateButton slug={project.slug} version={update.version} size="md" />}
-          </div>
-          {update?.notes && <p className="text-[12px] text-muted">New in {update.version}: {update.notes}</p>}
-        </SettingsRow>
-        {links && <LinksSettingsForm slug={project.slug} domain={shortDomain(project)} settings={links} />}
-        {analytics && <AnalyticsSettingsForm keepDays={analytics.keepDays} />}
-        {email && (
-          <SettingsRow title="Email" description="How long the logs keep what was sent, for every brand. The daily clean-up uses it.">
-            <EmailSettingsForm keepBodiesDays={email.keepBodiesDays} keepDays={email.keepDays} />
-          </SettingsRow>
-        )}
-        <IntegrationSettingsForm slug={project.slug} name={name} memoryMb={project.memoryMb} min={version?.manifest?.memory.min ?? 64} />
-        <DeleteProject slug={project.slug} integration={name} />
       </>
     );
   }

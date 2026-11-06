@@ -177,11 +177,10 @@ export function WordpressImport({ slug }: { slug: string }) {
   );
 }
 
-/** How a WordPress site sends email: Email's API, an alert channel's SMTP, SMTP typed here, or not at all. */
+/** How a WordPress site sends email: this server's own mail, an alert channel's SMTP, or SMTP typed here. */
 export function SiteMailForm({
   slug,
   current,
-  brands,
   channels,
   host,
   ip,
@@ -191,16 +190,14 @@ export function SiteMailForm({
   /** The site's address, for the From and the SPF record. */
   host: string;
   ip: string | null;
-  brands: { id: number; name: string; fromEmail: string | null }[] | null;
   channels: { id: number; name: string; host: string }[];
 }) {
   const [state, action] = useActionState(siteMailAction, {} as SiteMailState);
-  const [via, setVia] = useState<"server" | "email" | "alerts" | "smtp">(current ? (current.kind === "api" ? "email" : "smtp") : "server");
+  const [via, setVia] = useState<"server" | "alerts" | "smtp">(current ? "smtp" : "server");
   const domain = host.replace(/^www\./, "");
-  type Via = "server" | "email" | "alerts" | "smtp";
+  type Via = "server" | "alerts" | "smtp";
   const options: { id: Via; label: string }[] = [
     { id: "server", label: "This server (built in)" },
-    ...(brands ? [{ id: "email" as const, label: "The Email integration" }] : []),
     ...(channels.length ? [{ id: "alerts" as const, label: "An alert channel's SMTP" }] : []),
     { id: "smtp", label: "An SMTP server" },
   ];
@@ -211,7 +208,7 @@ export function SiteMailForm({
       <p className="text-[13px]">
         {current ? (
           <>
-            Sending from <b className="font-medium">{current.from}</b> ({current.kind === "api" ? "through Email" : "by SMTP"}).
+            Sending from <b className="font-medium">{current.from}</b> ({current.kind === "api" ? "through an email API" : "by SMTP"}).
           </>
         ) : (
           <>
@@ -232,20 +229,6 @@ export function SiteMailForm({
           {/\.(sslip\.io|nip\.io|internal)$/.test(domain) ? " A free address can't have one: mail from it often lands in spam, so give the site its own domain." : ""}
         </p>
       )}
-      {via === "email" &&
-        (brands?.length ? (
-          <Field label="Brand" htmlFor="mail-brand" hint="The site sends as this brand, with a key of its own.">
-            <select id="mail-brand" name="brand" className="h-[39px] w-full max-w-[340px] border border-border bg-field px-2.5">
-              {brands.map((b) => (
-                <option key={b.id} value={b.id} disabled={!b.fromEmail}>
-                  {b.name} {b.fromEmail ? `(${b.fromEmail})` : "(no From address yet)"}
-                </option>
-              ))}
-            </select>
-          </Field>
-        ) : (
-          <p className="text-[12px] text-muted">Email has no brands yet: add one in Email first.</p>
-        ))}
       {via === "alerts" && (
         <Field label="Alert channel" htmlFor="mail-channel" hint="Its SMTP server and From address; the alerts keep using it too.">
           <select id="mail-channel" name="channel" className="h-[39px] w-full max-w-[340px] border border-border bg-field px-2.5">

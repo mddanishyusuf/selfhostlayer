@@ -140,7 +140,7 @@ export async function deleteFileAction(_prev: FileState, form: FormData): Promis
   return { saved: `Removed ${path}. The next deploy leaves it out; the live release keeps its copy until then.`, done: Date.now() };
 }
 
-/** Deletes the project (or uninstalls an integration) and its app on the server (data/ is archived unless asked otherwise). */
+/** Deletes the project (or a site) and its app on the server (data/ is archived unless asked otherwise). */
 export async function removeProject(_prev: SettingsState, form: FormData): Promise<SettingsState> {
   await requireUser();
   const project = getProjectBySlug(field(form, "slug"));
@@ -156,7 +156,7 @@ export async function removeProject(_prev: SettingsState, form: FormData): Promi
   }
   deleteProject(project.id);
   removePreview(project.slug);
-  redirect(project.source === "catalog" ? "/integrations" : project.source === "site" ? "/sites" : "/");
+  redirect(project.source === "site" ? "/sites" : "/");
 }
 
 export async function redeploy(form: FormData): Promise<void> {

@@ -223,8 +223,8 @@ const MIGRATIONS = [
   // Domains behind Cloudflare's proxy (orange cloud), and what the last DNS check found.
   `ALTER TABLE project_domains ADD COLUMN proxied INTEGER NOT NULL DEFAULT 0;
    ALTER TABLE project_domains ADD COLUMN dns_status TEXT;`,
-  // Integrations: projects whose code comes from the catalog instead of GitHub (lib/catalog.ts).
-  // Their deployments name the app's version and keep its manifest; the sha is the release (the tarball's checksum).
+  // Projects not built from GitHub: once integrations from a catalog (removed), now sites, whose engine is in catalog_app.
+  // Deployments name the version they install; manifest was the catalog's and is no longer written.
   `ALTER TABLE projects ADD COLUMN source TEXT NOT NULL DEFAULT 'github';
    ALTER TABLE projects ADD COLUMN catalog_app TEXT;
    ALTER TABLE deployments ADD COLUMN version TEXT;
@@ -297,7 +297,7 @@ const MIGRATIONS = [
      created_at INTEGER NOT NULL,
      UNIQUE (project_id, name)
    );`,
-  // Email's Sync from an app (lib/email-sync.ts, PLAN-EMAIL-2.md): a project's table, read page by page, into a brand's list.
+  // The Email integration's Sync from an app (removed; the table stays, unused, so old databases keep their history of migrations).
   `CREATE TABLE email_syncs (
      id INTEGER PRIMARY KEY,
      brand_id INTEGER NOT NULL,

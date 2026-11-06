@@ -84,7 +84,7 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
   const onServer = server === "here" ? null : servers.find((x) => String(x.id) === server)?.id;
   // Warm the New project list in the background, so it opens without waiting on GitHub.
   if (getApp()) void allRepos().catch(() => {});
-  // Integrations have their own page.
+  // Sites have their own page.
   const all = listProjects().filter((p) => p.source === "github");
   // Each project's own mark, oldest first so a new project never changes an older one's.
   const marks = projectMarks(all.toSorted((a, b) => a.id - b.id).map((p) => p.slug));

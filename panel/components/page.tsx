@@ -266,7 +266,7 @@ export function RowIcon({ children, tone = "dim" }: { children: ReactNode; tone?
   return <span className={cx("grid size-8 shrink-0 place-items-center bg-well", cls)}>{children}</span>;
 }
 
-/** The color of a square icon for engines and integrations. */
+/** The color of a square icon for engines and sites. */
 export type TileTone = "dim" | "lav" | "blue" | "coral" | "teal" | "gold" | "rose";
 
 /** A square with its icon in a color of its own (the text color for "dim"): 36px, or 32px in rows (size "sm"). */

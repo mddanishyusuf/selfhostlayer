@@ -1,5 +1,4 @@
 export * from "./validate.ts";
-export * from "./manifest.ts";
 export * from "./client.ts";
 
 /**
@@ -86,8 +85,6 @@ export const ACTIONS = [
   "update.check",
   "update.start",
   "update.status",
-  "catalog.list",
-  "catalog.fetch",
 ] as const;
 
 export type ActionName = (typeof ACTIONS)[number];

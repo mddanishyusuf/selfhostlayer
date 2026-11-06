@@ -88,14 +88,14 @@ function mailLines(mail: WordpressMail | null): string[] {
 }
 
 /**
- * A must-use plugin: wp_mail through the Email integration's API (Resend's
- * shape) or SMTP, from the constants in wp-config.php; by default, the
- * server's own send-only Postfix on 127.0.0.1.
+ * A must-use plugin: wp_mail through an email API (Resend's shape, as set by
+ * earlier panels) or SMTP, from the constants in wp-config.php; by default,
+ * the server's own send-only Postfix on 127.0.0.1.
  */
 export const MAIL_PLUGIN = `<?php
 /*
  * Plugin Name: Self Host Layer mail
- * Description: Sends WordPress's email through this server's own mail, or the Email integration or SMTP set in the panel (Sites).
+ * Description: Sends WordPress's email through this server's own mail, or the email API or SMTP set in the panel (Sites).
  */
 if (defined('LAYER_MAIL_API') && defined('LAYER_MAIL_KEY')) {
 	add_filter('pre_wp_mail', function ($result, $atts) {

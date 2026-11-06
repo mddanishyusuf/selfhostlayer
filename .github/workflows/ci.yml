@@ -97,14 +97,6 @@ jobs:
         run: sudo bash installer/test/browse-e2e.sh
       - name: importing a data folder from another server
         run: sudo bash installer/test/import-e2e.sh
-      - name: the integrations catalog (checked downloads, unpacked as the app's user)
-        run: |
-          node scripts/build-catalog.ts hello
-          node scripts/build-catalog.ts links
-          node scripts/build-catalog.ts analytics
-          node scripts/build-catalog.ts email
-          node scripts/build-catalog.ts forms
-          sudo bash installer/test/catalog-e2e.sh dist/catalog/hello-0.1.0.tar.gz
       - name: moving the panel to another address and back
         run: |
           echo "127.0.0.1 panel2.internal" | sudo tee -a /etc/hosts
@@ -117,27 +109,12 @@ jobs:
         run: |
           cp panel/scripts/fake-s3.ts panel/lib/backup/s3.ts installer/test/
           sudo bash installer/test/fake-s3.sh
-      - name: an SMTP sink for Email's tour
-        run: (setsid nohup node catalog/email/test/smtp-sink.ts 2525 /tmp/smtp-sink.log > /tmp/smtp-sink.out 2>&1 < /dev/null &) && sleep 2 && cat /tmp/smtp-sink.out
-      - name: a webhook sink for Forms' tour
-        run: (setsid nohup node catalog/forms/test/hook-sink.ts 2626 /tmp/hook-sink.log > /tmp/hook-sink.out 2>&1 < /dev/null &) && sleep 2 && cat /tmp/hook-sink.out
-      - name: panel UI tour in Chrome (setup, 2FA, deploy, rollback, crons, backups, databases, import, delete, integrations, links, analytics, email, forms)
+      - name: panel UI tour in Chrome (setup, 2FA, deploy, rollback, crons, backups, databases, import, delete)
         run: |
-          echo "127.0.0.1 layer.internal next.internal vite.internal hello.internal links.internal analytics.internal email.internal forms.internal panel2.internal next.apps2.internal" | sudo tee -a /etc/hosts
+          echo "127.0.0.1 layer.internal next.internal vite.internal panel2.internal next.apps2.internal" | sudo tee -a /etc/hosts
           sudo bash installer/test/release-feed.sh start dist/layer-ci.tar.gz dist/install.sh ci-tour
-          apps="dist/catalog/hello-0.1.0.tar.gz dist/catalog/links-0.1.0.tar.gz $(ls dist/catalog/analytics-*.tar.gz) $(ls dist/catalog/email-*.tar.gz) $(ls dist/catalog/forms-*.tar.gz)"
-          sudo bash installer/test/release-feed.sh catalog $apps
-          TOUR_CATALOG_CMD="sudo bash installer/test/release-feed.sh catalog $apps dist/catalog/links-0.1.0.tar.gz=0.1.1" \
-          TOUR_UPDATE=1 TOUR_DEPLOY=1 TOUR_BACKUPS=1 TOUR_REDIS=1 TOUR_POSTGRES=1 TOUR_INTEGRATIONS=1 TOUR_LINKS=1 TOUR_ANALYTICS=1 TOUR_EMAIL=1 TOUR_FORMS=1 TOUR_BOX_CMD="sudo bash -c" TOUR_SMTP_LOG=/tmp/smtp-sink.log TOUR_HOOK_LOG=/tmp/hook-sink.log TOUR_APPS_DOMAIN=internal TOUR_PANEL_ADDRESS=panel2.internal TOUR_ACCESS=1 CHROME="$(command -v google-chrome)" \
+          TOUR_UPDATE=1 TOUR_DEPLOY=1 TOUR_BACKUPS=1 TOUR_REDIS=1 TOUR_POSTGRES=1 TOUR_BOX_CMD="sudo bash -c" TOUR_APPS_DOMAIN=internal TOUR_PANEL_ADDRESS=panel2.internal TOUR_ACCESS=1 CHROME="$(command -v google-chrome)" \
             node panel/scripts/ui-tour.ts https://layer.internal "$(cat setup-token)" screenshots
-      - name: uninstalling integrations left nothing behind
-        run: |
-          for app in hello links analytics email forms; do
-            ! id "app-$app" 2>/dev/null
-            test ! -e "/etc/systemd/system/app-$app@.service"
-            test ! -e "/etc/caddy/sites/$app.caddy"
-            test ! -e "/srv/apps/$app"
-          done
       - name: a one-click update from a release feed
         run: sudo bash installer/test/update-e2e.sh dist/layer-ci.tar.gz dist/install.sh
       - name: after setup, a re-run prints no setup token

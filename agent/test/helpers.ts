@@ -104,7 +104,6 @@ export function testEnv(): TestEnv {
     wpCli: { version: "2.12.0", url: "https://example.invalid/wp-cli.phar", sha512: "0".repeat(128) },
     managedDir: join(root, "var", "lib", "layer-agent", "managed"),
     updatesDir: join(root, "var", "lib", "layer-agent", "updates"),
-    catalogDir: join(root, "var", "lib", "layer-agent", "catalog"),
     stagingDir: join(root, "var", "lib", "layer-staging"),
     restoreDir: join(root, "var", "lib", "layer", "restore"),
     panelUser: null,

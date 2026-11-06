@@ -37,8 +37,6 @@ export interface Paths {
   managedDir: string;
   /** Releases downloaded for panel.update. */
   updatesDir: string;
-  /** Catalog app tarballs while they're checked and unpacked (root 700; emptied after each fetch). */
-  catalogDir: string;
   /** Backup snapshots waiting for the panel to upload them (root:<socketGroup> 750). */
   stagingDir: string;
   /** Where the panel puts downloaded backups for backup.restore. */
@@ -87,7 +85,6 @@ export const DEFAULT_PATHS: Paths = {
   },
   managedDir: "/var/lib/layer-agent/managed",
   updatesDir: "/var/lib/layer-agent/updates",
-  catalogDir: "/var/lib/layer-agent/catalog",
   stagingDir: "/var/lib/layer-staging",
   restoreDir: "/var/lib/layer/restore",
   panelUser: "layer",
