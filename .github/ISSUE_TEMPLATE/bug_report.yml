@@ -1,0 +1,41 @@
+name: Bug report
+description: Something doesn't work as the docs say it should.
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Install on a fresh Ubuntu 24.04 server
+        2. Import a Next.js app from GitHub
+        3. …
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Self Host Layer version
+      description: Shown at the bottom of Settings, or run `layer info`.
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: Server OS and architecture
+      placeholder: Ubuntu 26.04, arm64
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: The deploy log, or `journalctl -u layer-panel -u layer-agent -n 100`. Remove any secrets first.
+      render: shell

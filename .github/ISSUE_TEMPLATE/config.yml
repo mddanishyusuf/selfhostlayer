@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Docs
+    url: https://selfhostlayer.com/docs
+    about: Install steps, every panel page, the CLI and the security model.
+  - name: Report a security problem privately
+    url: https://github.com/mddanishyusuf/selfhostlayer/security/policy
+    about: Please don't open a public issue for security problems.

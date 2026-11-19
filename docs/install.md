@@ -14,8 +14,6 @@ One command turns a fresh server into a place to deploy your apps, with the pane
 curl -fsSL https://get.selfhostlayer.com | bash
 ```
 
-While the project is private there's no public download yet. Build the release on your machine and copy it over instead, as the [README](../README.md#install-on-a-server) shows.
-
 The installer ends with a box showing two things: the panel's address, `https://<your-ip-with-dashes>.sslip.io`, and a one-time setup token. Then:
 
 1. Open the address and paste the token.
