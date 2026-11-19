@@ -1,6 +1,6 @@
 // PHP for Sites (WordPress): PHP from the distro, installed once, and one
 // sandboxed PHP-FPM master per site, as the site's own user, on a socket only
-// Caddy can reach. See PLAN-SITES.md.
+// Caddy can reach. See docs/sites.md.
 import { chownSync, existsSync, readdirSync, readFileSync } from "node:fs";
 import { promises as dns } from "node:dns";
 import { hostname } from "node:os";

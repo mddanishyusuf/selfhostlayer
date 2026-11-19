@@ -1,4 +1,4 @@
-// A project's workers (PLAN-PROCESSES.md): long-running processes beside its
+// A project's workers: long-running processes beside its
 // web server, like pm2's extra apps. Stored as typed (name + command), and
 // written to the server as systemd services through the agent. Every deploy
 // rewrites and restarts them, so they run the live code on the project's Node.

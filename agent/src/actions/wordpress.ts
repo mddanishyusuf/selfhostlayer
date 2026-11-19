@@ -1,6 +1,6 @@
 // WordPress for Sites: core from wordpress.org (checked against its sha1),
 // wp-cli as a pinned phar (sha512), the install and everything after it run
-// as the site's own user in a sandbox. See PLAN-SITES.md.
+// as the site's own user in a sandbox. See docs/sites.md.
 import { createHash, randomBytes } from "node:crypto";
 import { chmodSync, closeSync, createReadStream, existsSync, readdirSync, readFileSync, readSync, renameSync, rmSync } from "node:fs";
 import { join } from "node:path";

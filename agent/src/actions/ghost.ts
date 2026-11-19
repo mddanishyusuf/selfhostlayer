@@ -2,7 +2,7 @@
 // sha512 integrity), unpacked as the site's user into a release, then built
 // and run like any Node app (build.run with pnpm, unit.write, blue/green).
 // Its database is MySQL 8 (mysql8.add); its content lives in data/content.
-// ghost.setup makes the owner before the site is public. See PLAN-SITES.md.
+// ghost.setup makes the owner before the site is public. See docs/sites.md.
 import { createHash, randomBytes } from "node:crypto";
 import { createReadStream, existsSync, readFileSync, renameSync, rmSync } from "node:fs";
 import { join } from "node:path";

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Servers, Day 1: this server's panel reaching another server's agent over the
-# link (PLAN-SERVERS.md). Run as root on the panel's server, after the other
+# link. Run as root on the panel's server, after the other
 # one ran install.sh --agent-only --panel-key <this panel's key>:
 #   sudo bash installer/test/servers-e2e.sh <other server's IP>
 # SC2015: `[[ check ]] && pass || fail` is intended (pass never fails).

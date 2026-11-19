@@ -1,4 +1,4 @@
-// Servers: other servers this panel deploys to (PLAN-SERVERS.md). Each runs
+// Servers: other servers this panel deploys to. Each runs
 // an agent-only install; the panel reaches its agent over SSH as layer-link,
 // whose key is locked to one command, a pipe to the agent's socket. So a call
 // to another server is the same JSON line protocol, through ssh's stdin and

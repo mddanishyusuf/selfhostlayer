@@ -1,4 +1,4 @@
-// Processes (PLAN-PROCESSES.md): workers, a systemd service per long-running
+// Processes: workers, a systemd service per long-running
 // process of an app beside its web server, from the live release, as the app's
 // user in its sandbox; and app.run, one command run once, its output streamed.
 import { existsSync, readdirSync, realpathSync } from "node:fs";

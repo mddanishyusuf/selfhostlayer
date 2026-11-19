@@ -1,5 +1,5 @@
 // MySQL 8 for Ghost (Sites): Oracle's own build, from a signed tarball, run
-// beside MariaDB on its own port. See PLAN-SITES.md.
+// beside MariaDB on its own port. See docs/sites.md.
 
 export const MYSQL8 = {
   version: "8.4.13",

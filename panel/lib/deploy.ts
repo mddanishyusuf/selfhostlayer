@@ -481,7 +481,7 @@ async function runHere(id: number): Promise<void> {
     await waitForCertificates(id, serving(p).domains);
     // Cron jobs follow the project's Node version and folder, and run from this release now.
     for (const problem of await syncCrons(p)) log(id, `Cron ${problem}\n`);
-    // Workers too, restarted on this release (PLAN-PROCESSES.md).
+    // Workers too, restarted on this release.
     if (hasProcesses(p)) {
       const workers = listWorkers(p.id);
       if (workers.length) log(id, `Restarting ${workers.length === 1 ? "worker" : "workers"} ${workers.map((w) => w.name).join(", ")}…\n`);

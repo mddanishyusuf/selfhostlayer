@@ -268,7 +268,7 @@ const MIGRATIONS = [
      password_enc TEXT,
      installed INTEGER NOT NULL DEFAULT 0
    );`,
-  // Servers this panel deploys to (PLAN-SERVERS.md); a project's server_id is NULL on the panel's own.
+  // Servers this panel deploys to; a project's server_id is NULL on the panel's own.
   `CREATE TABLE servers (
      id INTEGER PRIMARY KEY,
      name TEXT NOT NULL,
@@ -287,7 +287,7 @@ const MIGRATIONS = [
      moved_from INTEGER,
      at INTEGER NOT NULL
    );`,
-  // Workers: long-running processes beside a project's web server (lib/workers.ts, PLAN-PROCESSES.md).
+  // Workers: long-running processes beside a project's web server (lib/workers.ts).
   `CREATE TABLE project_workers (
      id INTEGER PRIMARY KEY,
      project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,

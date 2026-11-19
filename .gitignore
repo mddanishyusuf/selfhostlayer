@@ -10,3 +10,4 @@ spike/out/
 .dev/
 next-env.d.ts
 *.tsbuildinfo
+notes/

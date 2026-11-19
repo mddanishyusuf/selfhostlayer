@@ -1,6 +1,6 @@
 # shellcheck shell=bash
 # Step 5: the panel user, the app group, and the base directory layout.
-# Modes follow the server layout table in PLAN-WEEK1.md.
+# Modes follow the table in "What's on the box" in docs/install.md.
 
 LAYER_USER=layer
 LAYER_APPS_GROUP=layer-apps

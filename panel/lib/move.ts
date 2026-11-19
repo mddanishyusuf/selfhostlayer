@@ -1,4 +1,4 @@
-// Moving a project to another server (PLAN-SERVERS.md, Day 5): it's made and
+// Moving a project to another server (docs/servers.md): it's made and
 // deployed there, its data (files and databases) copied from a snapshot, its
 // free address moved to that server's, and its own domains wait for DNS to
 // point at the new IP. The old copy keeps running until the owner removes it,

@@ -1,6 +1,6 @@
 # shellcheck shell=bash
 # An agent-only server: the managing panel reaches the agent over SSH as
-# layer-link, whose key is locked to one command (PLAN-SERVERS.md): a pipe to
+# layer-link, whose key is locked to one command: a pipe to
 # the agent's socket. No shell, no forwarding, no other command, so a panel
 # can do here exactly what it can do on its own server: the agent's
 # allowlisted actions. No root key is ever handed to a panel.

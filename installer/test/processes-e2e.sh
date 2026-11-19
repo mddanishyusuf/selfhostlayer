@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Processes (PLAN-PROCESSES.md): workers as systemd services beside the app,
+# Processes: workers as systemd services beside the app,
 # and app.run, end to end through the agent. Run as root after install.sh
 # (creates and deletes an app named proctest).
 #   sudo bash installer/test/processes-e2e.sh

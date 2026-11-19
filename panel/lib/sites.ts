@@ -1,4 +1,4 @@
-// Sites: one-click WordPress and Ghost (PLAN-SITES.md). A site is a project
+// Sites: one-click WordPress and Ghost. A site is a project
 // with source "site" and its engine in catalog_app; its deploys run the
 // engine's own steps (deploySite), through the same queue, log and pages as
 // any project. The owner's first password is kept encrypted until it's been

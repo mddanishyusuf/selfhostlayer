@@ -1,7 +1,7 @@
 // MySQL 8 for Ghost sites: Oracle's build from its signed tarball (checked
 // with gpgv against the key pinned in the agent), unpacked read-only into
 // /opt/layer/mysql/<version>, run as its own user on 127.0.0.1:3307 beside
-// MariaDB. One server; a user and database per site. See PLAN-SITES.md.
+// MariaDB. One server; a user and database per site. See docs/sites.md.
 import { randomBytes } from "node:crypto";
 import { createWriteStream, existsSync, mkdtempSync, readFileSync, renameSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { totalmem } from "node:os";
